@@ -27,7 +27,12 @@ npm install
 npm run dev      # start the dev server
 npm run build    # production build in dist/
 npm test         # game logic and AI tests
+npm run build:html  # rebuild tic-tac-toe.html
 ```
+
+### Standalone HTML
+
+`tic-tac-toe.html` is the whole game in one self-contained file: all JavaScript and CSS are inlined and nothing is loaded from the network. Open it straight from disk or upload it to any static host (GitHub Pages, Netlify, S3…). After changing the source, run `npm run build:html` to regenerate it.
 
 ### Layout
 
