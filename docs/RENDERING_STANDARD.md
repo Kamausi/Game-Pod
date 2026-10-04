@@ -7,6 +7,23 @@ This applies to every Game Pod asset: baked tiles, icons and banners (`src/art/`
 (`src/components/Scene.jsx` and future games). Values are defaults; a scene may deviate when matching a
 reference, but must say why in a comment.
 
+## 0. Two render modes
+
+| | Showcase mode | Gameplay mode |
+| --- | --- | --- |
+| Where | Game tiles, featured banners, menus, win screens, title/idle scenes (baked by `src/art/studio.js`) | Live play (`src/components/Scene.jsx` and future game scenes) |
+| Camera | Composed key-art shot; cropping allowed and encouraged | Functional, stable, whole play area readable |
+| Depth of field | Pronounced (aperture 0.006–0.012), focused on the hero pieces | Off, or barely perceptible |
+| Lighting | Strong key/fill ratio, dark cavities, environment bokeh, enhanced reflections | Same rig, softer ratio; nothing may hide game state |
+| Exposure | Per-shot grading | Stable across the session |
+
+## Benchmark
+
+**Tic Tac Toe is the canonical Game Pod visual benchmark** (`src/assets/art/tic-tac-toe.webp`, model in
+`src/art/models.js`). A new game is not visually complete until its showcase render sits next to the benchmark
+without looking like a different product: same bevel language, material response, lighting contrast,
+grounding and backdrop depth.
+
 ## 1. Geometry
 
 | Rule | Value |
@@ -31,8 +48,11 @@ reference, but must say why in a comment.
 | Metal | 0.15–0.2, metalness 1 | – | Darts, bands. |
 
 - Avoid `transmission` on small saturated pieces: it picks up the background and shifts hue.
-- **Variation:** every repeated piece goes through `vary(object, seed)`:
-  rotation ±1.5°, scale ±1%, height ±0.8%, colour value ±2.5%, roughness ±0.03.
+- **Variation:** every repeated piece goes through `vary(object, seed, ranges)`.
+  Defaults: rotation ±1.5°, scale ±1%, height ±0.8%, colour value ±2.5%, roughness ±0.03.
+  Glossy pieces (checkers): rotation ±2°, scale ±0.75%, value ±1.5%, roughness ±0.025.
+- **Tactile surfaces:** large flat faces (board squares, trays) get `noiseTexture()` as a faint roughness + bump map.
+  It must not read as distressed; it only varies the reflections.
 - Canvas textures: 512–1024 px, sRGB, anisotropy 8.
 
 ## 3. Lighting rig
@@ -50,7 +70,8 @@ Mood: warm scenes (tavern, sunset) set `envIntensity` ≤ 0.15 plus `ambient`, s
 
 ## 4. Grounding
 
-- Scene tiles render through **GTAO**: radius 3–5% of scene radius, `distanceExponent` 2, intensity 0.8–1.2. Small radius only: large radii darken flat tops next to tall neighbours.
+- Scene tiles render through **GTAO**: radius 2.5–6% of scene radius, `distanceExponent` 2, intensity 1.0–1.7. Cavities that hold pieces should go near-black so pieces pop. Small radius only: large radii darken flat tops next to tall neighbours.
+- Two shadow scales together: a tight, dark contact shadow right under each piece (GTAO) and a broad soft directional shadow (key light).
 - Key-light shadow maps on every object (`castShadow`/`receiveShadow`).
 - Objects without a scene get a shadow catcher plus a soft AO blob.
 
@@ -67,7 +88,7 @@ Key art is not the gameplay camera: tiles and banners are composed shots; in-gam
 
 ## 6. Environment and depth
 
-- Never a bare gradient: every tile has a painted out-of-focus backdrop (`backdrop`: colour masses + bokeh) matching its reference's setting.
+- Never a bare gradient: every tile has a painted out-of-focus backdrop (`backdrop`: colour masses, bokeh, and low-detail `shapes` such as cabinets, shelves, lamps and windows, all blurred) matching its reference's setting. More blurred structure gives richer bokeh than blobs alone.
 - Physical context where it helps (a table under a board, grass around holes), allowed to fall out of focus.
 - **Depth of field** (`look.dof`, BokehPass): aperture 0.003–0.008, maxblur ≤ 0.016, focused on the framed subject. The subject must stay sharp; check at 100%.
 

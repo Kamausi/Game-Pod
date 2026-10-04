@@ -265,6 +265,17 @@ export function paintBackdrop(width, height, spec) {
   ctx.fillStyle = g
   ctx.fillRect(0, 0, width, height)
 
+  // Low-detail room forms (cabinets, shelves, lamps, windows) painted then blurred: richer
+  // background structure than colour blobs alone. shapes: [[x, y, w, h, color, radius?]] in fractions.
+  if (spec.shapes) {
+    ctx.filter = `blur(${Math.round(width * (spec.shapeBlur ?? 0.025))}px)`
+    for (const [x, y, w, h, color, rad = 0.01] of spec.shapes) {
+      ctx.fillStyle = color
+      ctx.beginPath()
+      ctx.roundRect(x * width, y * height, w * width, h * height, rad * width)
+      ctx.fill()
+    }
+  }
   ctx.filter = `blur(${Math.round(width * 0.06)}px)`
   for (const [x, y, r, color] of spec.masses ?? []) {
     ctx.fillStyle = color

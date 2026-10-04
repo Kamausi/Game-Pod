@@ -2,7 +2,7 @@
 // Each returns { object, view } where view = { pitch, yaw, fill } positions the camera.
 import {
   THREE, mat, wood, metal, matte, mesh, group, rbox, cyl, sphere, torus, cone, capsule,
-  canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture, toyXGeometry, toyOGeometry, toyPuckGeometry, vary,
+  canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture, toyXGeometry, toyOGeometry, toyPuckGeometry, vary, noiseTexture,
 } from './kit.js'
 
 const C = {
@@ -286,10 +286,11 @@ const GAMES = {
     // Reference: a thick light-wood box, raised divider walls, dark pockets holding chunky pieces,
     // seen almost from above and turned slightly, over a warm out-of-focus glow.
     const wood = mat('#ffffff', {
-      map: woodTexture({ base: '#c06a26', dark: '#b46424', light: '#d47e34', seed: 7 }),
-      roughness: 0.55, clearcoat: 0.2, clearcoatRoughness: 0.5,
+      // Honey maple, not saturated orange.
+      map: woodTexture({ base: '#c97e36', dark: '#b8702e', light: '#dc9650', seed: 7 }),
+      roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.45,
     })
-    const pocket = mat('#3a1c0c', { roughness: 0.9, clearcoat: 0 })
+    const pocket = mat('#1a0c05', { roughness: 0.95, clearcoat: 0, envMapIntensity: 0.1 })
     // Toy proportions: chunky frame, thick rounded dividers, deep cells, oversized pieces.
     const S = 1.0 // cell pitch
     const WALL = 0.42 // outer frame width
@@ -297,11 +298,11 @@ const GAMES = {
     const floorTop = 0.12 // ~20% deeper cells than before
     const wallH = 0.6
     const parts = [
-      mesh(rbox(W, 0.32, W, 0.16, 6), wood, [0, -0.04, 0]), // base (slightly shallower frame depth)
+      mesh(rbox(W, 0.32, W, 0.135, 6), wood, [0, -0.04, 0]), // base (slightly shallower frame depth)
       mesh(new THREE.PlaneGeometry(3 * S, 3 * S), pocket, [0, floorTop + 0.001, 0], [-Math.PI / 2, 0, 0]),
     ]
     for (const [x, z, w, d] of [[0, W / 2 - WALL / 2, W, WALL], [0, -(W / 2 - WALL / 2), W, WALL], [W / 2 - WALL / 2, 0, WALL, W], [-(W / 2 - WALL / 2), 0, WALL, W]])
-      parts.push(mesh(rbox(w, wallH, d, 0.2, 6), wood, [x, floorTop + wallH / 2 - 0.12, z]))
+      parts.push(mesh(rbox(w, wallH, d, 0.17, 6), wood, [x, floorTop + wallH / 2 - 0.12, z]))
     for (const o of [-S / 2, S / 2]) {
       // Flat-topped slabs with soft shoulders, not tubes.
       parts.push(mesh(rbox(3 * S + 0.1, 0.44, 0.17, 0.05, 6), wood, [0, floorTop + 0.2, o]))
@@ -310,7 +311,7 @@ const GAMES = {
     // Painted toy plastic: broad soft highlights, not candy gloss.
     const blue = mat('#1650ff', { roughness: 0.48, clearcoat: 0.15, clearcoatRoughness: 0.5 })
     const red = mat('#e80c26', { roughness: 0.48, clearcoat: 0.15, clearcoatRoughness: 0.5 })
-    const xGeo = toyXGeometry({ size: 1.04, arm: 0.32, tip: 0.22, depth: 0.08, bevel: 0.07 })
+    const xGeo = toyXGeometry({ size: 1.04, arm: 0.3, tip: 0.23, depth: 0.12, bevel: 0.05 })
     const oGeo = toyOGeometry({ radius: 0.29, width: 0.27, height: 0.25, round: 0.1 })
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
@@ -322,7 +323,8 @@ const GAMES = {
       // Tip the right edge up toward the camera so that side reads nearer, like the reference.
       object: group(parts, [0, 0, 0], [0.12, 0, 0.16]),
       view: { pitch: 0.98, yaw: 0, fill: 0.86, shift: [-0.04, 0.04], roll: -0.12, fov: 26 },
-      look: { envIntensity: 0.7 },
+      // Contrast: bright warm key, dark cavities, cool environment, controlled rim.
+      look: { envIntensity: 0.45, keyIntensity: 2.4, keyColor: '#fff0d8', rim: { intensity: 0.22, color: '#9fc4ff' }, aoIntensity: 1.6, aoRadius: 0.06 },
       backdrop: {
         gradient: [180, '#1a2a78', '#4a3a88', '#9a5a50'],
         masses: [[0.1, 0.12, 0.28, '#4a7aff'], [0.9, 0.2, 0.25, '#8a6ad8'], [0.1, 0.75, 0.3, '#ff9a4a'], [0.85, 0.9, 0.3, '#2a3a9a'], [0.5, 0.05, 0.2, '#6aa0ff']],
@@ -347,21 +349,24 @@ const GAMES = {
       parts.push(mesh(rbox(w, 0.2, d, 0.08, 5), casing, [x, 0.12, z]))
     // Individual inset tiles with soft bevels and a little tonal variation.
     const tileGeo = rbox(SQ - 0.025, 0.1, SQ - 0.025, 0.025, 3)
+    // Tactile, not literally rough: faint roughness and bump noise varies the reflections.
+    const grain = noiseTexture({ contrast: 0.18, seed: 41 })
     const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0, (r - (N - 1) / 2) * SQ]
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
       const dark = (r + c) % 2 === 1
       const [x, , z] = at(c, r)
-      const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.35 : 0.5, clearcoat: dark ? 0.5 : 0.2, clearcoatRoughness: 0.3 }), [x, 0.03, z])
+      const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.35 : 0.5, roughnessMap: grain, bumpMap: grain, bumpScale: 0.6, clearcoat: dark ? 0.5 : 0.2, clearcoatRoughness: 0.3 }), [x, 0.03, z])
       parts.push(vary(tile, 100 + r * N + c))
       tile.rotation.set(0, 0, 0) // tiles stay square; only tone/roughness vary
     }
-    const geo = toyPuckGeometry({ radius: 0.245, height: 0.24 })
+    // Lower, heavier pucks: radius +5%, height -10%.
+    const geo = toyPuckGeometry({ radius: 0.258, height: 0.215 })
     const red = mat('#d80010', { roughness: 0.24, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 0.35, sheen: 0.3, sheenColor: '#ff4040' })
     const black = mat('#1c1917', { roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.4 })
     const pieces = []
     const put = (c, r, m) => {
       const [x, , z] = at(c, r)
-      const p = vary(mesh(geo, m, [x, 0.08, z]), pieces.length + 1)
+      const p = vary(mesh(geo, m, [x, 0.08, z]), pieces.length + 1, { rot: 2, rough: 0.025, value: 0.015, scale: 0.0075 })
       pieces.push(p)
       parts.push(p)
     }
@@ -378,17 +383,26 @@ const GAMES = {
     return {
       object: group([board, table]),
       // Key art, not the player camera: higher, farther, longer lens, the whole board as an object.
-      frame: [board],
-      view: { pitch: 0.72, yaw: 0.0, fill: 1.08, shift: [0.02, -0.04], roll: -0.05, fov: 24 },
+      // Sitting over an active game: close, higher, cropped asymmetrically on the middle pieces.
+      frame: pieces.slice(3, 15),
+      view: { pitch: 0.7, yaw: 0.0, fill: 1.0, shift: [0.04, -0.1], roll: -0.08, fov: 24 },
       look: {
         envIntensity: 0.12, ambient: ['#ffb070', '#3a1a08', 0.9], keyIntensity: 3.2, keyColor: '#ffd8a0',
-        rim: { intensity: 0.08, color: '#ffc080' }, aoIntensity: 1.0, aoRadius: 0.04,
-        dof: { aperture: 0.004, maxblur: 0.016 },
+        rim: { intensity: 0.08, color: '#ffc080' }, aoIntensity: 1.7, aoRadius: 0.025,
+        // Showcase DOF: nearest and rear pieces soften, centre stays sharpest.
+        dof: { aperture: 0.008, maxblur: 0.02 },
       },
       backdrop: {
         gradient: [180, '#3a2010', '#8a4a1a', '#2a1408'],
         masses: [[0.85, 0.1, 0.3, '#ffb050'], [0.1, 0.15, 0.25, '#d07a30'], [0.9, 0.7, 0.3, '#c86a20'], [0.1, 0.9, 0.3, '#3a1a0a']],
         bokeh: { n: 14, colors: ['#ffd090', '#ffb060', '#fff0c0'], min: 0.02, max: 0.07, seed: 9 },
+        // A room beyond the focal plane: cabinet, shelves, lamp glow, window.
+        shapes: [
+          [0.02, 0.05, 0.22, 0.45, '#2a140a'], [0.05, 0.12, 0.16, 0.02, '#6a3a1a'], [0.05, 0.25, 0.16, 0.02, '#6a3a1a'],
+          [0.62, 0.02, 0.2, 0.26, '#f0b870', 0.02], [0.63, 0.04, 0.08, 0.22, '#ffd8a0', 0.01],
+          [0.86, 0.06, 0.06, 0.08, '#ffe0a0', 0.03], [0.88, 0.14, 0.02, 0.3, '#3a1a0a'],
+          [0.3, 0.1, 0.12, 0.3, '#3a1c0c'],
+        ],
       },
     }
   },

@@ -231,21 +231,39 @@ export function toyPuckGeometry({ radius = 0.22, height = 0.2 } = {}) {
  * Spec ranges (Game Pod rendering standard): rotation ±1.5°, scale ±1%, height ±0.8%,
  * colour value ±2.5%, roughness ±0.03.
  */
-export function vary(object, seed) {
+export function vary(object, seed, { rot = 1.5, scale = 0.01, height = 0.008, value = 0.025, rough = 0.03 } = {}) {
   let r = (seed * 9301 + 49297) % 233280 || 1
   const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647) * 2 - 1
   const deg = Math.PI / 180
-  object.rotation.x += rand() * 1.5 * deg
-  object.rotation.y += rand() * 1.5 * deg
-  object.rotation.z += rand() * 1.5 * deg
-  const sc = 1 + rand() * 0.01
+  object.rotation.x += rand() * rot * deg
+  object.rotation.y += rand() * rot * deg
+  object.rotation.z += rand() * rot * deg
+  const sc = 1 + rand() * scale
   object.scale.multiplyScalar(sc)
-  object.scale.y *= 1 + rand() * 0.008
+  object.scale.y *= 1 + rand() * height
   object.traverse((o) => {
     if (!o.isMesh || !o.material?.isMeshStandardMaterial) return
     o.material = o.material.clone()
-    o.material.color.offsetHSL(0, 0, rand() * 0.025)
-    o.material.roughness = Math.min(1, Math.max(0, o.material.roughness + rand() * 0.03))
+    o.material.color.offsetHSL(0, 0, rand() * value)
+    o.material.roughness = Math.min(1, Math.max(0, o.material.roughness + rand() * rough))
   })
   return object
+}
+
+/** Faint tileable noise for roughness/bump maps: surfaces stop reading as flat shader colour. */
+export function noiseTexture({ size = 256, contrast = 0.12, seed = 1 } = {}) {
+  let r = seed
+  const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  const tex = canvasTexture(size, size, (ctx, W) => {
+    const img = ctx.createImageData(W, W)
+    for (let i = 0; i < W * W; i++) {
+      const v = Math.round(255 * (0.5 + (rand() - 0.5) * contrast))
+      img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v
+      img.data[i * 4 + 3] = 255
+    }
+    ctx.putImageData(img, 0, 0)
+  })
+  tex.colorSpace = THREE.NoColorSpace
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  return tex
 }
