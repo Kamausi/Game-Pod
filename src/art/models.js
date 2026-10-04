@@ -305,7 +305,7 @@ const GAMES = {
     const PIECE_HEIGHT = H - floorTop - PIECE_DROP
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
-    const WALL_EXTRA = 0.25 // outer walls run this much further down below the board, for a taller left side
+    const WALL_EXTRA = 0.15 // outer walls run this much further down below the board, for a taller left side
     const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H + WALL_EXTRA, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
     frameGeo.translate(0, -WALL_EXTRA, 0)
     const uv = frameGeo.attributes.uv
