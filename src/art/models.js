@@ -327,12 +327,12 @@ const GAMES = {
     const PIECE_BAND = 0.16
     const PIECE_SPAN = 0.64 // ~74% of the 0.86 cell, leaving a dark gap around each piece
     const X_ARM = 0.9 // X arms a little shorter than the full span
-    const PIECE_ROUND = 0.03 // slight edge rounding on X and O
+    const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
     const blue = mat('#0a66f5', { roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.4 })
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
-    const xGeo = mouldedXGeometry({ size: (PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND) * X_ARM, arm: PIECE_BAND, endRadius: 0.012, innerRadius: 0.008, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
+    const xGeo = mouldedXGeometry({ size: (PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND) * X_ARM, arm: PIECE_BAND, endRadius: 0.006, innerRadius: 0.004, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#e8101c', { roughness: 0.45, clearcoat: 0.25, clearcoatRoughness: 0.4 })
