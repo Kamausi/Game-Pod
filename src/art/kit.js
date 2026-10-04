@@ -299,3 +299,45 @@ export function trayFrameGeometry({ outer = 4, inner = 3.1, height = 0.6, outerR
   g.computeVertexNormals()
   return g
 }
+
+/** Closed polygon with each corner rounded by its own radius (quadratic fillets). */
+export function roundedPolygonShape(points, radii) {
+  const s = new THREE.Shape()
+  const n = points.length
+  const V = (p) => new THREE.Vector2(p[0], p[1])
+  const toward = (a, b, d) => a.clone().add(b.clone().sub(a).setLength(d))
+  for (let i = 0; i <= n; i++) {
+    const P = V(points[i % n])
+    const prev = V(points[(i - 1 + n) % n])
+    const next = V(points[(i + 1) % n])
+    const r = radii[i % n]
+    const pin = toward(P, prev, r)
+    const pout = toward(P, next, r)
+    if (i === 0) s.moveTo(pout.x, pout.y)
+    else {
+      s.lineTo(pin.x, pin.y)
+      if (i < n) s.quadraticCurveTo(P.x, P.y, pout.x, pout.y)
+      else s.quadraticCurveTo(P.x, P.y, pout.x, pout.y)
+    }
+  }
+  return s
+}
+
+/**
+ * Moulded-toy X: a plus outline with softly rounded square-ish arm ends and small inner fillets,
+ * extruded with a bevel taller than it is wide so the top crowns. Turned 45° and laid flat.
+ */
+export function mouldedXGeometry({ size = 0.9, arm = 0.26, endRadius = 0.05, innerRadius = 0.025, depth = 0.08, bevelHeight = 0.05, bevelWidth = 0.035 } = {}) {
+  const L = size / 2 - bevelWidth
+  const w = arm / 2 - bevelWidth
+  const pts = [[L, w], [L, -w], [w, -w], [w, -L], [-w, -L], [-w, -w], [-L, -w], [-L, w], [-w, w], [-w, L], [w, L], [w, w]]
+  const radii = pts.map(([x, y]) => (Math.abs(x) === L || Math.abs(y) === L ? endRadius : innerRadius))
+  const g = new THREE.ExtrudeGeometry(roundedPolygonShape(pts, radii), {
+    depth, bevelEnabled: true, bevelThickness: bevelHeight, bevelSize: bevelWidth, bevelSegments: 6, curveSegments: 12,
+  })
+  g.center()
+  g.rotateZ(Math.PI / 4)
+  g.rotateX(-Math.PI / 2)
+  g.computeVertexNormals()
+  return g
+}

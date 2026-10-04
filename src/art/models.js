@@ -2,7 +2,7 @@
 // Each returns { object, view } where view = { pitch, yaw, fill } positions the camera.
 import {
   THREE, mat, wood, metal, matte, mesh, group, rbox, cyl, sphere, torus, cone, capsule,
-  canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture, toyXGeometry, toyOGeometry, toyPuckGeometry, vary, noiseTexture, trayFrameGeometry,
+  canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture, toyXGeometry, toyOGeometry, toyPuckGeometry, vary, noiseTexture, trayFrameGeometry, mouldedXGeometry,
 } from './kit.js'
 
 const C = {
@@ -309,13 +309,16 @@ const GAMES = {
     ]
     // Thin flat-topped dividers, a little below the frame top.
     for (const o of [-S / 2, S / 2]) {
-      parts.push(mesh(rbox(INNER, 0.3, 0.12, 0.012, 2), wood, [0, floorTop + 0.15, o]))
-      parts.push(mesh(rbox(0.12, 0.3, INNER, 0.012, 2), wood, [o, floorTop + 0.15, 0]))
+      // Thicker dividers with rounded top edges.
+      parts.push(mesh(rbox(INNER, 0.3, 0.14, 0.035, 4), wood, [0, floorTop + 0.15, o]))
+      parts.push(mesh(rbox(0.14, 0.3, INNER, 0.035, 4), wood, [o, floorTop + 0.15, 0]))
     }
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
-    const blue = mat('#0a4fe8', { roughness: 0.35, clearcoat: 0.5, clearcoatRoughness: 0.2 })
-    const bar = rbox(0.92, 0.16, 0.22, 0.03, 3) // bars with squared ends and only slightly softened edges
-    const X = () => group([mesh(bar, blue, [0, 0, 0], [0, Math.PI / 4, 0]), mesh(bar, blue, [0, 0, 0], [0, -Math.PI / 4, 0])])
+    // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
+    const blue = mat('#0a66f5', { roughness: 0.38, clearcoat: 0.45, clearcoatRoughness: 0.25 })
+    // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
+    const xGeo = mouldedXGeometry({ size: 0.92, arm: 0.25, endRadius: 0.06, innerRadius: 0.02, depth: 0.14, bevelHeight: 0.05, bevelWidth: 0.035 })
+    const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#e8101c', { roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.08 })
     const ringGeo = toyOGeometry({ radius: 0.255, width: 0.24, height: 0.17, round: 0.035 }) // flat top, slightly softened edges
@@ -333,7 +336,7 @@ const GAMES = {
       look: {
         keyFrom: [2.4, 3.0, 0.6], // upper right: bright right/top rim, shaded front face
         keyIntensity: 2.2, keyColor: '#ffe0b0', envIntensity: 0.45,
-        rim: { intensity: 0.25, color: '#ffd8a0' }, aoIntensity: 1.8, aoRadius: 0.04,
+        rim: { intensity: 0.25, color: '#ffd8a0' }, aoIntensity: 2.4, aoRadius: 0.04,
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
       },
       backdrop: {

@@ -42,3 +42,8 @@ test('toy O ring faces outward on its outer wall', () => {
   }
   assert.ok(ok / n > 0.9)
 })
+
+test('moulded X faces outward', async () => {
+  const { mouldedXGeometry } = await import('./art/kit.js')
+  assert.ok(outwardFraction(mouldedXGeometry()) > 0.85)
+})
