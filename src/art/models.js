@@ -295,7 +295,9 @@ const GAMES = {
     const INNER = 3 * S + 0.08
     const OUTER = INNER + 2 * 0.4
     const H = 0.78 // whole tray height: thick side faces show
-    const floorTop = 0.3
+    const PIECE_HEIGHT = 0.18
+    // Cells are exactly one piece deep: pieces rest on the floor and their tops are flush with the board face.
+    const floorTop = H - PIECE_HEIGHT
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
     const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
@@ -307,9 +309,9 @@ const GAMES = {
       mesh(rbox(INNER + 0.1, floorTop, INNER + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
       mesh(new THREE.PlaneGeometry(INNER, INNER), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
-    // Dividers come up nearly level with the frame top, so the cross bars meet the walls flush instead of
-    // dropping away below the rim at the far ends; their ends run into the walls so no rounded stub shows.
-    const DIV_H = H - floorTop - 0.04
+    // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
+    // their ends run into the walls so no rounded stub shows.
+    const DIV_H = H - floorTop - 0.003
     for (const o of [-S / 2, S / 2]) {
       parts.push(mesh(rbox(INNER + 0.1, DIV_H, 0.14, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o]))
       parts.push(mesh(rbox(0.14, DIV_H, INNER + 0.1, 0.035, 4), wood, [o, floorTop + DIV_H / 2, 0]))
@@ -318,7 +320,6 @@ const GAMES = {
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
     // (the X's on-board width matches the O's outer diameter).
     const PIECE_BAND = 0.16
-    const PIECE_HEIGHT = 0.18
     const PIECE_SPAN = 0.72
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
     const blue = mat('#0a66f5', { roughness: 0.38, clearcoat: 0.45, clearcoatRoughness: 0.25 })
@@ -331,8 +332,9 @@ const GAMES = {
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - PIECE_BAND / 2, width: PIECE_BAND, height: PIECE_HEIGHT, round: 0.004 }) // flat top, sharp edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
+      // Both pieces are centred on their origin and PIECE_HEIGHT tall: rest on the floor, tops flush with the board face.
       const piece = p === 'X' ? X() : mesh(ringGeo, red)
-      piece.position.set(((i % 3) - 1) * S, floorTop + 0.2, (Math.floor(i / 3) - 1) * S)
+      piece.position.set(((i % 3) - 1) * S, floorTop + PIECE_HEIGHT / 2, (Math.floor(i / 3) - 1) * S)
       parts.push(vary(piece, i + 1, { rot: 1.5, scale: 0.005, value: 0.01, rough: 0.02 }))
     })
     return {
