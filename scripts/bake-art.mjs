@@ -58,7 +58,8 @@ for (const name of names) {
     const png = await bake(name)
     const out = join(outDir, `${name}.webp`)
     // Downsample the 2x render with Lanczos for clean edges; keep alpha.
-    execFileSync('convert', [png, '-filter', 'Lanczos', '-resize', '50%', '-quality', '90', '-define', 'webp:alpha-quality=95', out])
+    const encode = ASSETS[name]?.lossless ? ['-define', 'webp:lossless=true'] : ['-quality', '90', '-define', 'webp:alpha-quality=95']
+    execFileSync('convert', [png, '-filter', 'Lanczos', '-resize', '50%', ...encode, out])
     execFileSync('convert', [png, '-filter', 'Lanczos', '-resize', '50%', join(reviewDir, `${name}.png`)])
     rmSync(png)
     console.log(`baked ${out}`)

@@ -7,7 +7,8 @@ const prop = { width: 256, height: 256 }
 
 export const ASSETS = {
   // Games (tiles)
-  'tic-tac-toe': tile,
+  // Lossless: its colours are tuned to exact reference pixel values, which lossy compression would shift.
+  'tic-tac-toe': { ...tile, lossless: true },
   checkers: tile,
   'ring-toss': tile,
   darts: tile,

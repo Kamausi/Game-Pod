@@ -9,6 +9,11 @@ import { MODELS } from './models.js'
 
 const SUPERSAMPLE = 2
 
+// Bakes must be repeatable: seed Math.random (ambient-occlusion noise, painted textures) so the same
+// model always renders to the same pixels.
+let seed = 1234567
+Math.random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
+
 async function main() {
   const params = new URLSearchParams(location.search)
   const name = params.get('asset')
