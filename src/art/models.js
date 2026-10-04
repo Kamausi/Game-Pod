@@ -287,34 +287,25 @@ const GAMES = {
     // the upper right, thin flat dividers over black cells, crisp royal-blue X bars and thick glossy
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     const wood = mat('#ffffff', {
-      map: woodTexture({ base: '#d07638', dark: '#c46d35', light: '#db8140', seed: 7 }), // honey caramel, sampled against the reference
+      map: woodTexture({ base: '#bf6a28', dark: '#b46226', light: '#c8742e', seed: 7 }), // smooth warm caramel
       roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
     })
-    // Divider tops read much lighter than the frame in the reference.
-    const railWood = mat('#ffffff', {
-      map: woodTexture({ base: '#e6a052', dark: '#dc964b', light: '#eeab5e', seed: 11 }),
-      roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
-    })
-    const black = mat('#1e0d1c', { roughness: 1, clearcoat: 0, envMapIntensity: 0 }) // purple-navy cell floor
+    const black = mat('#050403', { roughness: 1, clearcoat: 0, envMapIntensity: 0 })
     const S = 1.0 // cell pitch
-    const DIV_W = 0.11 // divider width (measured from the reference)
+    const DIV_W = 0.14 // divider width
     // Inner well sized so all nine cells are equal (S - DIV_W) and each cell's centre is on the S pitch,
     // so pieces placed at -S / 0 / +S sit centred in their squares.
     const INNER = 3 * S - DIV_W
-    // Outer size measured from the reference art through the solved camera: 3.50 wide, 3.22 deep, and
-    // off-centre on the grid (walls: left 0.36, right 0.20, back 0.23, front 0.17).
-    const OUTER = 3.5 // width (x)
-    const OUTER_DEPTH = 3.22 // depth (z)
-    const OUTER_CENTER = [-0.107, 0.014] // [x, z] of the outside relative to the grid
-    const H = 0.6 // whole tray height
-    const BASE_Y = 0.28 // tray sits this high so its face stays where the solved camera expects it
-    const floorTop = H - 0.28 // black cell floor, 0.28 below the board face; pieces rest on it
+    const RIM = 0.3 // frame wall thickness
+    const OUTER = INNER + 2 * RIM
+    const floorTop = 0.6 // black cell floor; pieces rest on it
+    const H = 0.88 // whole tray height: tall side walls show
     // Pieces rest on the floor; their tops sit PIECE_DROP just below the board face.
     const PIECE_DROP = 0.07
     const PIECE_HEIGHT = H - floorTop - PIECE_DROP
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
-    const frameGeo = trayFrameGeometry({ outer: OUTER, outerDepth: OUTER_DEPTH, outerCenter: OUTER_CENTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
+    const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
     const uv = frameGeo.attributes.uv
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
     const parts = [
@@ -327,8 +318,8 @@ const GAMES = {
     // their ends run into the walls so no rounded stub shows.
     const DIV_H = H - floorTop - 0.003
     for (const o of [-S / 2, S / 2]) {
-      parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), railWood, [0, floorTop + DIV_H / 2, o]))
-      parts.push(mesh(rbox(DIV_W, DIV_H, INNER + 0.1, 0.035, 4), railWood, [o, floorTop + DIV_H / 2, 0]))
+      parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o]))
+      parts.push(mesh(rbox(DIV_W, DIV_H, INNER + 0.1, 0.035, 4), wood, [o, floorTop + DIV_H / 2, 0]))
     }
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
@@ -337,16 +328,16 @@ const GAMES = {
     const PIECE_SPAN = 0.64 // ~74% of the 0.86 cell, leaving a dark gap around each piece
     const X_BAND = 0.145 // X arm width, a touch thinner than PIECE_BAND (arm length unchanged)
     const O_BAND = X_BAND // O ring the same width as the X arms (same outer size)
-    const X_SIZE = 0.73 // X tip-to-tip length (measured from the reference)
+    const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const blue = mat('#0074ff', { roughness: 0.5, clearcoat: 0, specularIntensity: 0.2, envMapIntensity: 0.2 }) // saturated azure: little white specular to wash it out
+    const blue = mat('#0a66f5', { roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.4 })
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
-    const xGeo = mouldedXGeometry({ size: X_SIZE, arm: X_BAND, endRadius: 0.006, innerRadius: 0.004, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
+    const xGeo = mouldedXGeometry({ size: (PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND) * X_ARM, arm: X_BAND, endRadius: 0.006, innerRadius: 0.004, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
-    const red = mat('#ef2427', { roughness: 0.45, clearcoat: 0.25, clearcoatRoughness: 0.4 })
+    const red = mat('#e8101c', { roughness: 0.45, clearcoat: 0.25, clearcoatRoughness: 0.4 })
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - O_BAND / 2, width: O_BAND, height: PIECE_HEIGHT, round: PIECE_ROUND }) // flat top, slightly rounded edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
@@ -358,9 +349,8 @@ const GAMES = {
     return {
       // Board rotated in the world and tilted toward the camera, as in the reference.
       // Camera front-left so the left and front side faces show, as in the reference.
-      object: group([group(parts, [0, BASE_Y, 0])], [0, 0, 0], [0.15, 0, -0.15]),
-      // Exact camera solved so the nine piece centres land on the reference's piece centres (~3.5 px rms at 600 px).
-      view: { camera: { position: [-2.0903, 13.1018, 9.3071], target: [0.0254, -0.2664, -0.0332], roll: -0.0406, fov: 16.44 } },
+      object: group(parts, [0, 0, 0], [0.15, 0, -0.15]),
+      view: { pitch: 0.95, yaw: -0.3, fill: 0.92, shift: [-0.02, 0.03], roll: -0.02, fov: 26 },
       look: {
         keyFrom: [2.4, 3.0, 0.6], // upper right: bright right/top rim, shaded front face
         keyIntensity: 2.2, keyColor: '#ffe0b0', envIntensity: 0.45,
@@ -368,14 +358,11 @@ const GAMES = {
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
       },
       backdrop: {
-        // Blurred carnival at night, colours sampled from the reference: cyan lights and a pink-white glow
-        // along the top, purple upper left, deep blue then warm amber down the right, orange lower left,
-        // near-black navy across the bottom.
-        gradient: [180, '#6058a8', '#5a5098', '#9a6060', '#2a2638', '#1e2238'],
-        masses: [[0.55, 0.0, 0.2, '#38bcff'], [0.88, 0.02, 0.13, '#ead4f0'], [0.2, 0.05, 0.16, '#6a64b0'], [0.04, 0.33, 0.2, '#6a5498'],
-          [0.98, 0.25, 0.14, '#2a4a98'], [0.99, 0.5, 0.12, '#ffc070'], [0.02, 0.6, 0.15, '#f08858'], [0.98, 0.76, 0.13, '#c87060'],
-          [0.05, 0.8, 0.16, '#a87458'], [0.75, 0.02, 0.14, '#30a8ff'], [0.5, 1.0, 0.42, '#1c2034']],
-        bokeh: { n: 10, colors: ['#ffd9a0', '#ffffff', '#ffb060', '#a8d8ff'], min: 0.012, max: 0.035, seed: 5 },
+        // Blurred carnival / street at dusk.
+        gradient: [180, '#5a8af0', '#8a8ad0', '#e0a070', '#5a3a40'],
+        masses: [[0.5, 0.0, 0.14, '#ffffff'], [0.06, 0.55, 0.22, '#ffb050'], [0.12, 0.85, 0.25, '#f0a050'], [0.15, 0.25, 0.12, '#ffd090'], [0.88, 0.3, 0.2, '#5a7ae0'], [0.6, 1.0, 0.3, '#4a2a30']],
+        bokeh: { n: 16, colors: ['#ffd9a0', '#ffffff', '#ffb060', '#a8c8ff'], min: 0.015, max: 0.05, seed: 5 },
+        shapes: [[0.78, 0.08, 0.12, 0.5, '#3a5ab8'], [0.9, 0.15, 0.08, 0.4, '#5a7ad8'], [0.02, 0.35, 0.05, 0.3, '#e08a40']],
       },
     }
   },
