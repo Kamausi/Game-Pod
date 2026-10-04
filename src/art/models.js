@@ -319,12 +319,13 @@ const GAMES = {
     const PIECE_BAND = 0.16
     const PIECE_HEIGHT = 0.18
     const PIECE_SPAN = 0.72
+    const X_TURN = -0.3 // turn the X so its bars read level in the shot, not dipping to the right
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
     const blue = mat('#0a66f5', { roughness: 0.38, clearcoat: 0.45, clearcoatRoughness: 0.25 })
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
     const xGeo = mouldedXGeometry({ size: PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND, arm: PIECE_BAND, endRadius: 0.001, innerRadius: 0.001, depth: PIECE_HEIGHT - 0.012, bevelHeight: 0.006, bevelWidth: 0.006 })
-    const X = () => mesh(xGeo, blue)
+    const X = () => group([mesh(xGeo, blue)], [0, 0, 0], [0, X_TURN, 0])
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#e8101c', { roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.08 })
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - PIECE_BAND / 2, width: PIECE_BAND, height: PIECE_HEIGHT, round: 0.004 }) // flat top, sharp edges
