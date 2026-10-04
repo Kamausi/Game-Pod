@@ -21,22 +21,19 @@ After the title screen, Game Pod has five tabs (Home, All Games, Achievements, L
 
 ### Art
 
-All in-app art is generated in code; the only bitmap is the title-screen poster (`src/assets/title.webp`).
+All in-app art is generated in code; the only bitmap made outside the project is the title-screen poster (`src/assets/title.webp`).
 
-- **3D models** (`src/art/models.js`): every game, category icon and header decoration is a small Three.js model in the same glossy toy style as the Tic Tac Toe board. `src/art/sprites.js` renders each one once to a transparent image with a shared offscreen renderer (studio lights, reflections, soft contact shadow), queued one per frame and cached.
-- **Vector art**: the Game Pod logo (`Logo.jsx`), cartoon avatars (`Avatar.jsx`, built from face/hair/accessory parts plus frog and shark characters) and winged achievement medals (`Badge.jsx`) are SVG.
-- **Header** (`HeaderArt.jsx`): a live scene with a nebula sky, twinkling stars and floating 3D toys around the logo.
+**3D assets** go through a studio bake pipeline, one asset at a time:
 
-To add a game's art, add a builder to `models.js` under the game's id and give the game `colors` for its backdrop in `src/games.js`.
+1. **Model** (`src/art/models.js`): each game, icon and decoration is a Three.js model built from bevelled primitives, lathe-turned profiles and canvas textures (wood grain, board faces), with glossy plastic, satin wood and metal materials.
+2. **Studio** (`src/art/studio.js`): renders the model with an HDR environment (`npm run make-hdr` generates `src/art/env/studio.hdr`: warm key softbox, overhead strip, cool fill, hot-pink and cyan rim lights), a shadow-casting key light onto an invisible floor, a fresnel rim glow layered onto the model's own materials, ACES tone mapping, a camera fitted to the model's outline, and an alpha-preserving bloom pass.
+3. **Bake** (`npm run bake -- <asset>`): renders at 2x in headless Chromium, downsamples with Lanczos and saves a transparent WebP to `src/assets/art/`. Add `--compare` to get ACES / AgX / Neutral variants for review. Sizes are listed in `src/art/manifest.js`. (Needs Playwright's Chromium: `npx playwright install chromium`.)
 
-- **Home**: search, featured carousel, Popular / Categories / New & Trending rows.
-- **All Games**: 20 games, search, sort (popular, A–Z, newest, favorites first), category filters, and a working favorite heart on each tile.
-- **Achievements**: level and XP card, category filters, featured badges, and the full list with progress and details.
-- **Leaderboards**: Global / This Week / All Time standings and a podium. **The other players are sample data** (labeled in the app) because there is no online service yet; your own row and points are real. Friends is a placeholder.
-- **Profile**: avatar, editable name / username / bio, level, stats (achievements, games played, win rate), recent achievements, favorite games and play history.
-- **Settings**: edit profile, change avatar, sound effects, background music with volume, vibration, reduce motion, move hints, tutorials, replay intro, reset progress, privacy and help info. Light/System theme, languages, linked accounts, cloud sync, feedback and sign-out say "coming soon".
+The app shows baked images; an asset that hasn't been baked yet falls back to a live render of the same model, so assets can be upgraded individually. Baked so far: Tic Tac Toe, Checkers, Ring Toss, Darts.
 
-Only **Tic Tac Toe** is playable so far; other games carry a "Soon" badge.
+The live game scene uses the same HDR (`studio-small.hdr`) for reflections.
+
+**Vector art**: the Game Pod logo (`Logo.jsx`), cartoon avatars (`Avatar.jsx`) and winged achievement medals (`Badge.jsx`) are SVG. **Header** (`HeaderArt.jsx`): a live scene with a nebula sky, twinkling stars and floating 3D props around the logo.
 
 ### Progress
 

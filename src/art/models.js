@@ -341,17 +341,27 @@ const GAMES = {
   },
 
   'ring-toss': () => {
-    const w = wood('#b8743a')
+    const pine = mat('#ffffff', { map: woodTexture({ base: '#c8813f', dark: '#8a4e1e', light: '#dc9a58', seed: 21 }), roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.4 })
+    // Turned wooden base: wide foot, bevelled top edge, a collar where the peg sits.
+    const base = new THREE.LatheGeometry(
+      [[0, 0], [1.15, 0], [1.22, 0.05], [1.24, 0.16], [1.18, 0.26], [1.0, 0.3], [0.32, 0.32], [0.26, 0.4], [0, 0.4]].map(([x, y]) => new THREE.Vector2(x, y)),
+      64,
+    )
+    const peg = new THREE.LatheGeometry(
+      [[0, 0], [0.17, 0], [0.15, 0.3], [0.14, 2.0], [0.17, 2.1], [0.19, 2.22], [0.15, 2.34], [0, 2.38]].map(([x, y]) => new THREE.Vector2(x, y)),
+      48,
+    )
+    const ring = (color) => mat(color, { roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.06 })
+    const tube = (r, t) => new THREE.TorusGeometry(r, t, 32, 96)
     return {
       object: group([
-        mesh(cyl(1.15, 1.25, 0.28), wood('#8a5228'), [0, 0.14, 0]),
-        mesh(cyl(0.16, 0.18, 2.3), w, [0, 1.4, 0]),
-        mesh(sphere(0.16), w, [0, 2.55, 0]),
-        mesh(torus(0.62, 0.17), mat(C.blue), [0, 0.46, 0], [Math.PI / 2, 0, 0]),
-        mesh(torus(0.62, 0.17), mat(C.red), [0.05, 0.85, 0], [Math.PI / 2 - 0.25, 0, 0.1]),
-        mesh(torus(0.58, 0.17), mat(C.yellow), [0.55, 1.45, 0.2], [Math.PI / 2 - 0.9, 0.3, 0.4]),
+        mesh(base, pine),
+        mesh(peg, pine, [0, 0.38, 0]),
+        mesh(tube(0.6, 0.17), ring('#1546ff'), [0, 0.57, 0], [Math.PI / 2, 0, 0]),
+        mesh(tube(0.6, 0.17), ring('#e8001f'), [0.04, 0.93, 0], [Math.PI / 2 - 0.16, 0, 0.12]),
+        mesh(tube(0.56, 0.16), mat('#ffaa00', { roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.06, emissive: '#ff7a00', emissiveIntensity: 0.15 }), [0.5, 1.62, 0.12], [Math.PI / 2 - 0.95, 0.35, 0.45]),
       ]),
-      view: { pitch: 0.35, yaw: -0.4, fill: 1.05 },
+      view: { pitch: 0.32, yaw: -0.45, fill: 0.95 },
     }
   },
 
@@ -380,52 +390,96 @@ const GAMES = {
   },
 
   darts: () => {
-    const tex = canvasTexture(1024, 1024, (ctx, W) => {
+    const NUMS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5]
+    const face = canvasTexture(1024, 1024, (ctx, W) => {
       const c = W / 2
-      const ring = (r, colors, inner) => {
+      const seg = (r0, r1, colors) => {
         for (let i = 0; i < 20; i++) {
-          const a0 = ((i - 0.5) / 20) * Math.PI * 2
-          const a1 = ((i + 0.5) / 20) * Math.PI * 2
+          const a0 = ((i - 0.5) / 20) * Math.PI * 2 - Math.PI / 2
+          const a1 = ((i + 0.5) / 20) * Math.PI * 2 - Math.PI / 2
           ctx.beginPath()
-          ctx.arc(c, c, r, a0, a1)
-          ctx.arc(c, c, inner, a1, a0, true)
+          ctx.arc(c, c, r1, a0, a1)
+          ctx.arc(c, c, r0, a1, a0, true)
           ctx.closePath()
           ctx.fillStyle = colors[i % 2]
           ctx.fill()
         }
       }
-      ctx.fillStyle = '#151515'
-      ctx.fillRect(0, 0, W, W)
-      ring(c * 0.86, ['#d9262e', '#1f9b4a'], c * 0.8)
-      ring(c * 0.8, ['#141414', '#f2e6c8'], c * 0.52)
-      ring(c * 0.52, ['#d9262e', '#1f9b4a'], c * 0.46)
-      ring(c * 0.46, ['#141414', '#f2e6c8'], c * 0.1)
+      // Black number band with white numbers.
+      ctx.fillStyle = '#121216'
       ctx.beginPath()
-      ctx.arc(c, c, c * 0.1, 0, Math.PI * 2)
-      ctx.fillStyle = '#1f9b4a'
+      ctx.arc(c, c, c, 0, Math.PI * 2)
       ctx.fill()
-      ctx.beginPath()
-      ctx.arc(c, c, c * 0.045, 0, Math.PI * 2)
-      ctx.fillStyle = '#d9262e'
-      ctx.fill()
-      ctx.strokeStyle = '#c9ccd6'
-      ctx.lineWidth = 3
-      ;[0.86, 0.8, 0.52, 0.46].forEach((f) => {
-        ctx.beginPath()
-        ctx.arc(c, c, c * f, 0, Math.PI * 2)
-        ctx.stroke()
+      NUMS.forEach((n, i) => {
+        const a = (i / 20) * Math.PI * 2 - Math.PI / 2
+        text(ctx, String(n), c + Math.cos(a) * c * 0.89, c + Math.sin(a) * c * 0.89, { size: 46, color: '#f4f4f8' })
       })
+      const rr = c * 0.78
+      seg(rr * 0.94, rr, ['#e3122b', '#14a34a']) // double
+      seg(rr * 0.6, rr * 0.94, ['#16161a', '#f3e2bd'])
+      seg(rr * 0.54, rr * 0.6, ['#e3122b', '#14a34a']) // treble
+      seg(rr * 0.1, rr * 0.54, ['#16161a', '#f3e2bd'])
+      ctx.beginPath()
+      ctx.arc(c, c, rr * 0.1, 0, Math.PI * 2)
+      ctx.fillStyle = '#14a34a'
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(c, c, rr * 0.045, 0, Math.PI * 2)
+      ctx.fillStyle = '#e3122b'
+      ctx.fill()
+      // Silver spider wires.
+      ctx.strokeStyle = '#cfd4de'
+      ctx.lineWidth = 2.5
+      for (const f of [1, 0.94, 0.6, 0.54, 0.1, 0.045]) {
+        ctx.beginPath()
+        ctx.arc(c, c, rr * f, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+      for (let i = 0; i < 20; i++) {
+        const a = ((i - 0.5) / 20) * Math.PI * 2 - Math.PI / 2
+        ctx.beginPath()
+        ctx.moveTo(c + Math.cos(a) * rr * 0.1, c + Math.sin(a) * rr * 0.1)
+        ctx.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr)
+        ctx.stroke()
+      }
     })
-    const board = mesh(cyl(1.5, 1.5, 0.32, 96), [matte('#111'), mat('#fff', { map: tex, roughness: 0.6, clearcoat: 0 }), matte('#111')], [0, 0, 0], [Math.PI / 2, 0, 0])
-    const rim = mesh(torus(1.52, 0.08, 96), mat('#2b2b33'), [0, 0, 0.1])
-    const dart = group([
-      mesh(cone(0.04, 0.3), metal(), [0, -0.15, 0], [Math.PI, 0, 0]),
-      mesh(cyl(0.08, 0.06, 0.55), metal('#8e97ad'), [0, 0.25, 0]),
-      mesh(cyl(0.035, 0.035, 0.7), mat('#1d1d26'), [0, 0.85, 0]),
-      mesh(new THREE.PlaneGeometry(0.42, 0.5), mat(C.red, { side: THREE.DoubleSide }), [0, 1.2, 0]),
-      mesh(new THREE.PlaneGeometry(0.42, 0.5), mat(C.red, { side: THREE.DoubleSide }), [0, 1.2, 0], [0, Math.PI / 2, 0]),
-    ], [0.08, 0.06, 0.18], [1.05, 0, -0.55], 1.5)
-    return { object: group([board, rim, dart]), view: { pitch: 0.12, yaw: -0.45, fill: 1.1 }, shadow: false }
+    // The cylinder cap maps the canvas rotated a quarter turn; turn it back so 20 sits on top.
+    face.center.set(0.5, 0.5)
+    face.rotation = Math.PI / 2
+    const sisal = mat('#ffffff', { map: face, roughness: 0.85, clearcoat: 0 })
+    const board = mesh(cyl(1.5, 1.5, 0.3, 128), [matte('#151519'), sisal, matte('#151519')], [0, 0, 0], [Math.PI / 2, 0, 0])
+    const surround = mesh(torus(1.53, 0.1, 128), mat('#1e1e26', { roughness: 0.35 }), [0, 0, 0.06])
+
+    const flight = (color) => {
+      const s = new THREE.Shape()
+      s.moveTo(0, 0)
+      s.lineTo(0.24, 0.12)
+      s.lineTo(0.26, 0.42)
+      s.lineTo(0, 0.5)
+      s.closePath()
+      return new THREE.ExtrudeGeometry(s, { depth: 0.012, bevelEnabled: false })
+    }
+    const dart = (color, pos, rot) => {
+      const fm = mat(color, { roughness: 0.3, side: THREE.DoubleSide })
+      const fg = flight()
+      return group([
+        mesh(cone(0.035, 0.32, 16), metal('#e6e9f0'), [0, -0.16, 0], [Math.PI, 0, 0]),
+        mesh(cyl(0.075, 0.06, 0.5, 32), metal('#b9a06a'), [0, 0.25, 0]),
+        mesh(cyl(0.05, 0.075, 0.08, 32), metal('#c9ced8'), [0, 0.54, 0]),
+        mesh(cyl(0.032, 0.032, 0.6, 16), mat('#24242c', { roughness: 0.3 }), [0, 0.88, 0]),
+        ...[0, 1, 2, 3].map((k) => mesh(fg, fm, [0, 1.0, 0], [0, (k * Math.PI) / 2, 0])),
+      ], pos, rot)
+    }
+    return {
+      object: group([
+        board,
+        surround,
+        dart(C.red, [0.06, 0.05, 0.2], [1.2, 0.0, -0.5]),
+        dart('#1f6bff', [-0.42, 0.55, 0.2], [1.1, 0.0, 0.45]),
+      ]),
+      view: { pitch: 0.12, yaw: -0.5, fill: 0.95 },
+      shadow: false,
+    }
   },
 
   'mini-golf': () => {
