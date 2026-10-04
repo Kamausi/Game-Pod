@@ -59,7 +59,9 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
 function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift = null, roll = 0, fov = FOV, camera: exact = null }) {
   // An exact camera (position, look-at target, roll, fov), e.g. solved to line a model up with its reference art.
   if (exact) {
-    const camera = new THREE.PerspectiveCamera(exact.fov, aspect, 0.01, 1000)
+    // Near/far hug the subject: a far camera with a huge depth range makes close surfaces z-fight.
+    const dist = new THREE.Vector3(...exact.position).distanceTo(new THREE.Vector3(...exact.target))
+    const camera = new THREE.PerspectiveCamera(exact.fov, aspect, dist * 0.3, dist * 4)
     camera.position.set(...exact.position)
     camera.lookAt(...exact.target)
     if (exact.roll) camera.rotateZ(exact.roll)
