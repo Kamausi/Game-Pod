@@ -321,7 +321,8 @@ const GAMES = {
     ]
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
-    const DIV_H = H - floorTop - 0.003
+    const DIV_DROP = 0.04 // dividers sit slightly below the frame's top edge
+    const DIV_H = H - floorTop - DIV_DROP
     for (const o of [-0.5, 0.5]) {
       parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o * SZ]))
       parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH + 0.1, 0.035, 4), wood, [o * S, floorTop + DIV_H / 2, 0]))
