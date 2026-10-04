@@ -296,7 +296,7 @@ const GAMES = {
     // Inner well sized so all nine cells are equal (S - DIV_W) and each cell's centre is on the S pitch,
     // so pieces placed at -S / 0 / +S sit centred in their squares.
     const INNER = 3 * S - DIV_W
-    const RIM = 0.3 // frame wall thickness
+    const RIM = 0.25 // frame wall thickness
     const OUTER = INNER + 2 * RIM
     const floorTop = 0.6 // black cell floor; pieces rest on it
     const H = 0.88 // whole tray height: tall side walls show
