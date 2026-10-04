@@ -307,11 +307,12 @@ const GAMES = {
       mesh(rbox(INNER + 0.1, floorTop, INNER + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
       mesh(new THREE.PlaneGeometry(INNER, INNER), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
-    // Thin flat-topped dividers, a little below the frame top.
+    // Dividers come up nearly level with the frame top, so the cross bars meet the walls flush instead of
+    // dropping away below the rim at the far ends; their ends run into the walls so no rounded stub shows.
+    const DIV_H = H - floorTop - 0.04
     for (const o of [-S / 2, S / 2]) {
-      // Thicker dividers with rounded top edges.
-      parts.push(mesh(rbox(INNER, 0.3, 0.14, 0.035, 4), wood, [0, floorTop + 0.15, o]))
-      parts.push(mesh(rbox(0.14, 0.3, INNER, 0.035, 4), wood, [o, floorTop + 0.15, 0]))
+      parts.push(mesh(rbox(INNER + 0.1, DIV_H, 0.14, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o]))
+      parts.push(mesh(rbox(0.14, DIV_H, INNER + 0.1, 0.035, 4), wood, [o, floorTop + DIV_H / 2, 0]))
     }
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
@@ -319,13 +320,12 @@ const GAMES = {
     const PIECE_BAND = 0.16
     const PIECE_HEIGHT = 0.18
     const PIECE_SPAN = 0.72
-    const X_TURN = -0.3 // turn the X so its bars read level in the shot, not dipping to the right
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
     const blue = mat('#0a66f5', { roughness: 0.38, clearcoat: 0.45, clearcoatRoughness: 0.25 })
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
     const xGeo = mouldedXGeometry({ size: PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND, arm: PIECE_BAND, endRadius: 0.001, innerRadius: 0.001, depth: PIECE_HEIGHT - 0.012, bevelHeight: 0.006, bevelWidth: 0.006 })
-    const X = () => group([mesh(xGeo, blue)], [0, 0, 0], [0, X_TURN, 0])
+    const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#e8101c', { roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.08 })
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - PIECE_BAND / 2, width: PIECE_BAND, height: PIECE_HEIGHT, round: 0.004 }) // flat top, sharp edges
