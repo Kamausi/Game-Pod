@@ -287,17 +287,18 @@ const GAMES = {
     // the upper right, thin flat dividers over black cells, crisp royal-blue X bars and thick glossy
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     const wood = mat('#ffffff', {
-      map: woodTexture({ base: '#b8662a', dark: '#9a5220', light: '#cc7c3a', seed: 7 }), // caramel, real but soft grain
+      map: woodTexture({ base: '#bf6a28', dark: '#b46226', light: '#c8742e', seed: 7 }), // smooth warm caramel
       roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
     })
-    const black = mat('#0c0806', { roughness: 0.95, clearcoat: 0, envMapIntensity: 0.05 })
+    const black = mat('#050403', { roughness: 1, clearcoat: 0, envMapIntensity: 0 })
     const S = 1.0 // cell pitch
     const INNER = 3 * S + 0.08
     const OUTER = INNER + 2 * 0.4
     const H = 0.78 // whole tray height: thick side faces show
     const floorTop = 0.3
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
-    const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.08, bevel: 0.08 })
+    // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
+    const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
     const uv = frameGeo.attributes.uv
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
     const parts = [
@@ -308,16 +309,16 @@ const GAMES = {
     ]
     // Thin flat-topped dividers, a little below the frame top.
     for (const o of [-S / 2, S / 2]) {
-      parts.push(mesh(rbox(INNER, 0.3, 0.1, 0.03, 4), wood, [0, floorTop + 0.15, o]))
-      parts.push(mesh(rbox(0.1, 0.3, INNER, 0.03, 4), wood, [o, floorTop + 0.15, 0]))
+      parts.push(mesh(rbox(INNER, 0.3, 0.12, 0.012, 2), wood, [0, floorTop + 0.15, o]))
+      parts.push(mesh(rbox(0.12, 0.3, INNER, 0.012, 2), wood, [o, floorTop + 0.15, 0]))
     }
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
-    const blue = mat('#0a50ff', { roughness: 0.28, clearcoat: 0.7, clearcoatRoughness: 0.15 })
-    const bar = rbox(0.98, 0.17, 0.23, 0.045, 4)
+    const blue = mat('#0a4fe8', { roughness: 0.35, clearcoat: 0.5, clearcoatRoughness: 0.2 })
+    const bar = rbox(0.92, 0.16, 0.22, 0.03, 3) // bars with squared ends and only slightly softened edges
     const X = () => group([mesh(bar, blue, [0, 0, 0], [0, Math.PI / 4, 0]), mesh(bar, blue, [0, 0, 0], [0, -Math.PI / 4, 0])])
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#e8101c', { roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.08 })
-    const ringGeo = toyOGeometry({ radius: 0.265, width: 0.28, height: 0.22, round: 0.08 })
+    const ringGeo = toyOGeometry({ radius: 0.255, width: 0.24, height: 0.17, round: 0.035 }) // flat top, slightly softened edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
       const piece = p === 'X' ? X() : mesh(ringGeo, red)
@@ -331,7 +332,7 @@ const GAMES = {
       view: { pitch: 0.95, yaw: -0.3, fill: 0.92, shift: [-0.02, 0.03], roll: -0.01, fov: 26 },
       look: {
         keyFrom: [2.4, 3.0, 0.6], // upper right: bright right/top rim, shaded front face
-        keyIntensity: 2.8, keyColor: '#ffe6c0', envIntensity: 0.5,
+        keyIntensity: 2.2, keyColor: '#ffe0b0', envIntensity: 0.45,
         rim: { intensity: 0.25, color: '#ffd8a0' }, aoIntensity: 1.8, aoRadius: 0.04,
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
       },
