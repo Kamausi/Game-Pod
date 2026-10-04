@@ -326,6 +326,7 @@ const GAMES = {
     // (the X's on-board width matches the O's outer diameter).
     const PIECE_BAND = 0.16
     const PIECE_SPAN = 0.64 // ~74% of the 0.86 cell, leaving a dark gap around each piece
+    const O_BAND = 0.13 // O ring a bit narrower than the X arm, for a wider centre hole (same outer size)
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
@@ -336,7 +337,7 @@ const GAMES = {
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#e8101c', { roughness: 0.45, clearcoat: 0.25, clearcoatRoughness: 0.4 })
-    const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - PIECE_BAND / 2, width: PIECE_BAND, height: PIECE_HEIGHT, round: PIECE_ROUND }) // flat top, slightly rounded edges
+    const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - O_BAND / 2, width: O_BAND, height: PIECE_HEIGHT, round: PIECE_ROUND }) // flat top, slightly rounded edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
       // Both pieces are centred on their origin and PIECE_HEIGHT tall: rest on the floor, tops flush with the board face.
