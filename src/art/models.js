@@ -296,16 +296,19 @@ const GAMES = {
     // Inner well sized so all nine cells are equal (S - DIV_W) and each cell's centre is on the S pitch,
     // so pieces placed at -S / 0 / +S sit centred in their squares.
     const INNER = 3 * S - DIV_W
-    const RIM = 0.3 // frame wall thickness
-    const OUTER = INNER + 2 * RIM
-    const floorTop = 0.6 // black cell floor; pieces rest on it
-    const H = 0.88 // whole tray height: tall side walls show
+    // Outer size and height solved against the reference art with the camera below held fixed: the tray
+    // is a little wider than it is deep, so the side walls are thicker than the front and back walls.
+    const OUTER = 3.513 // width (x)
+    const OUTER_DEPTH = 3.229 // depth (z)
+    const H = 0.6 // whole tray height
+    const BASE_Y = 0.28 // tray sits this high so its face stays where the solved camera expects it
+    const floorTop = H - 0.28 // black cell floor, 0.28 below the board face; pieces rest on it
     // Pieces rest on the floor; their tops sit PIECE_DROP just below the board face.
     const PIECE_DROP = 0.07
     const PIECE_HEIGHT = H - floorTop - PIECE_DROP
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
-    const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
+    const frameGeo = trayFrameGeometry({ outer: OUTER, outerDepth: OUTER_DEPTH, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
     const uv = frameGeo.attributes.uv
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
     const parts = [
@@ -349,7 +352,7 @@ const GAMES = {
     return {
       // Board rotated in the world and tilted toward the camera, as in the reference.
       // Camera front-left so the left and front side faces show, as in the reference.
-      object: group(parts, [0, 0, 0], [0.15, 0, -0.15]),
+      object: group([group(parts, [0, BASE_Y, 0])], [0, 0, 0], [0.15, 0, -0.15]),
       // Exact camera solved so the nine piece centres land on the reference's piece centres (~3.5 px rms at 600 px).
       view: { camera: { position: [-2.0903, 13.1018, 9.3071], target: [0.0254, -0.2664, -0.0332], roll: -0.0406, fov: 16.44 } },
       look: {

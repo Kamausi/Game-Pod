@@ -288,8 +288,9 @@ export function roundedRectPath(path, w, h, r) {
  * One-piece tray frame: a rounded-rectangle block with a rounded-rectangle opening, bevelled all
  * round. Rounded outer corners and inner corners, no seams between walls.
  */
-export function trayFrameGeometry({ outer = 4, inner = 3.1, height = 0.6, outerRadius = 0.4, innerRadius = 0.1, bevel = 0.07 } = {}) {
-  const shape = roundedRectPath(new THREE.Shape(), outer - bevel * 2, outer - bevel * 2, outerRadius)
+export function trayFrameGeometry({ outer = 4, outerDepth = outer, inner = 3.1, height = 0.6, outerRadius = 0.4, innerRadius = 0.1, bevel = 0.07 } = {}) {
+  // outer is the width (x); outerDepth (z) defaults to it for a square tray.
+  const shape = roundedRectPath(new THREE.Shape(), outer - bevel * 2, outerDepth - bevel * 2, outerRadius)
   shape.holes.push(roundedRectPath(new THREE.Path(), inner + bevel * 2, inner + bevel * 2, innerRadius))
   const g = new THREE.ExtrudeGeometry(shape, {
     depth: height - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 6, curveSegments: 24,
