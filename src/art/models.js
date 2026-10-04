@@ -234,6 +234,46 @@ function mole(s = 1) {
   ], [0, 0, 0], [0, 0, 0], s)
 }
 
+// Expressive mole for the Whack a Mole tile: big head, cream muzzle, open grin with buck teeth,
+// huge eyes, raised brows and hair tufts, front paws resting on the hole's rim.
+function heroMole() {
+  const fur = mat('#a8561e', { roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.35, sheen: 0.4, sheenColor: '#ffcc99' })
+  const cream = mat('#e7b07a', { roughness: 0.55, clearcoat: 0.2 })
+  const white = mat('#ffffff', { roughness: 0.15, clearcoat: 0.8 })
+  const ink = mat('#140a05', { roughness: 0.2, clearcoat: 1 })
+  const iris = mat('#5a3214', { roughness: 0.2, clearcoat: 1 })
+  const mouth = mat('#3a0e0a', { roughness: 0.6 })
+  const tongue = mat('#ff6a7a', { roughness: 0.35 })
+  const eye = (x) => group([
+    mesh(sphere(0.26), white, [0, 0, 0], [0, 0, 0], [1, 1.15, 0.7]),
+    mesh(sphere(0.15), iris, [0.02 * Math.sign(x), -0.02, 0.13], [0, 0, 0], [1, 1.1, 0.6]),
+    mesh(sphere(0.09), ink, [0.02 * Math.sign(x), -0.02, 0.19], [0, 0, 0], [1, 1.1, 0.5]),
+    mesh(sphere(0.045), white, [0.07, 0.07, 0.23]),
+  ], [x, 1.6, 0.6], [0, 0, 0], 1.25)
+  const brow = (x) => mesh(capsule(0.045, 0.2), mat('#4a220c'), [x, 1.95, 0.72], [0, 0, x > 0 ? 1.2 : -1.2])
+  return group([
+    mesh(sphere(0.86), fur, [0, 1.05, 0], [0, 0, 0], [1, 1.12, 0.92]), // head + body
+    mesh(sphere(0.25), fur, [-0.72, 1.62, -0.05], [0, 0, 0], [1, 1, 0.6]), // ears
+    mesh(sphere(0.25), fur, [0.72, 1.62, -0.05], [0, 0, 0], [1, 1, 0.6]),
+    mesh(sphere(0.13), cream, [-0.74, 1.62, 0.06], [0, 0, 0], [1, 1, 0.4]),
+    mesh(sphere(0.13), cream, [0.74, 1.62, 0.06], [0, 0, 0], [1, 1, 0.4]),
+    mesh(sphere(0.42), cream, [0.05, 1.12, 0.62], [0, 0, 0], [1.25, 0.8, 0.7]), // muzzle
+    // Wide open grin: a dark half-ellipse with a pink tongue, buck teeth hanging from the top lip.
+    mesh(new THREE.SphereGeometry(0.34, 40, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), mouth, [0.05, 1.02, 0.86], [-0.25, 0, 0], [1.25, 1.0, 0.45]),
+    mesh(sphere(0.17), tongue, [0.05, 0.8, 0.95], [0, 0, 0], [1.4, 0.5, 0.5]),
+    mesh(rbox(0.11, 0.13, 0.05, 0.03), white, [-0.01, 0.96, 1.0]), // buck teeth
+    mesh(rbox(0.11, 0.13, 0.05, 0.03), white, [0.11, 0.96, 1.0]),
+    mesh(sphere(0.12), ink, [0.08, 1.28, 1.02], [0, 0, 0], [1.35, 0.9, 0.8]), // nose
+    mesh(sphere(0.035), white, [0.03, 1.32, 1.1]),
+    eye(-0.26), eye(0.34), brow(-0.28), brow(0.38),
+    mesh(sphere(0.14), mat('#ff8a8a', { roughness: 0.6 }), [-0.55, 1.05, 0.62], [0, 0, 0], [1, 0.6, 0.3]), // cheeks
+    mesh(sphere(0.14), mat('#ff8a8a', { roughness: 0.6 }), [0.55, 1.05, 0.62], [0, 0, 0], [1, 0.6, 0.3]),
+    ...[[-0.12, 0.25], [0.05, -0.1], [0.2, -0.4]].map(([x, r]) => mesh(cone(0.07, 0.3, 12), fur, [x, 2.05, 0.1], [0, 0, r])), // hair tufts
+    mesh(sphere(0.24), fur, [-0.75, 0.25, 0.55], [0, 0, 0], [1.2, 0.6, 1]), // paws on the rim
+    mesh(sphere(0.24), fur, [0.75, 0.25, 0.55], [0, 0, 0], [1.2, 0.6, 1]),
+  ])
+}
+
 function grassTuft(pos, s = 1) {
   const m = mat('#4fd65a', { roughness: 0.5 })
   return group([-0.1, 0, 0.1].map((x, i) => mesh(cone(0.07, 0.4 - i * 0.05, 8), m, [x, 0.18, 0], [0, 0, x * 2.5])), pos, [0, 0, 0], s)
@@ -366,26 +406,72 @@ const GAMES = {
   },
 
   'whack-a-mole': () => {
-    const grass = mat('#3fc048', { roughness: 0.55, clearcoat: 0.2 })
-    const dirt = mat('#6b3f1f', { roughness: 0.8, clearcoat: 0 })
-    const hole = matte('#160b05')
-    const holes = [[0, 0.2], [-1.15, -0.55], [1.15, -0.5], [-0.9, 0.95], [1.0, 0.95]]
+    // Reference: mole bursting from a hole lower-left, giant red mallet swinging in top-right,
+    // lush grass with more holes, sunny blurred sky behind.
+    // Lush lawn: saturated green with darker blade streaks so it doesn't read as flat plastic.
+    const lawn = canvasTexture(512, 512, (ctx, W) => {
+      ctx.fillStyle = '#2bb51a'
+      ctx.fillRect(0, 0, W, W)
+      let r = 5
+      const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+      for (let i = 0; i < 2600; i++) {
+        ctx.strokeStyle = rand() < 0.5 ? 'rgba(10,90,5,.35)' : 'rgba(150,240,80,.35)'
+        ctx.lineWidth = 1 + rand() * 1.5
+        const x = rand() * W
+        const y = rand() * W
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+        ctx.lineTo(x + (rand() - 0.5) * 4, y - 6 - rand() * 8)
+        ctx.stroke()
+      }
+    })
+    lawn.wrapS = lawn.wrapT = THREE.RepeatWrapping
+    lawn.repeat.set(6, 6)
+    const grass = mat('#ffffff', { map: lawn, roughness: 0.85, clearcoat: 0, envMapIntensity: 0.3, emissive: '#0f5a06', emissiveIntensity: 0.25 })
+    const hole = matte('#1a0d06')
+    const rim = mat('#6a3c1a', { roughness: 0.95, clearcoat: 0 })
+    // Dug-out holes: a dark pit with a soft lip of soil, not a hard ring.
+    const holeAt = (x, z, r) => group([
+      mesh(cyl(r * 1.12, r * 1.18, 0.05, 48), rim, [0, 0.01, 0]),
+      mesh(cyl(r, r * 0.85, 0.06, 48), hole, [0, 0.025, 0]),
+    ], [x, 0, z])
+    const red = mat('#e8192a', { roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.08 })
+    const gold = metal('#f2b33a')
     const hammer = group([
-      mesh(cyl(0.42, 0.42, 1.05), mat('#e3262e', { roughness: 0.25 }), [0, 0, 0], [0, 0, Math.PI / 2]),
-      mesh(cyl(0.44, 0.44, 0.12), mat('#f0b23a'), [-0.55, 0, 0], [0, 0, Math.PI / 2]),
-      mesh(cyl(0.44, 0.44, 0.12), mat('#f0b23a'), [0.55, 0, 0], [0, 0, Math.PI / 2]),
-      mesh(cyl(0.09, 0.11, 1.9), wood('#c98a4b'), [0.2, -0.95, 0], [0, 0, -0.2]),
-    ], [1.05, 2.05, -0.2], [0.2, 0.3, 0.8], 0.85)
+      mesh(cyl(0.62, 0.62, 1.5, 64), red, [0, 0, 0], [0, 0, Math.PI / 2]),
+      mesh(torus(0.62, 0.07, 64), gold, [-0.55, 0, 0], [0, Math.PI / 2, 0]),
+      mesh(torus(0.62, 0.07, 64), gold, [0.55, 0, 0], [0, Math.PI / 2, 0]),
+      mesh(cyl(0.6, 0.6, 0.06, 64), mat('#c8141f', { roughness: 0.3 }), [-0.76, 0, 0], [0, 0, Math.PI / 2]),
+      mesh(cyl(0.14, 0.16, 2.6, 24), wood('#d08a4a'), [0, -1.35, 0]),
+    ], [1.85, 2.85, 0.6], [0, 0, 0], 1.4)
+    // Striking face points down-left toward the camera; handle runs off to the lower right.
+    {
+      const face = new THREE.Vector3(-0.55, -0.35, 0.75).normalize()
+      const handle = new THREE.Vector3(0.85, -0.45, 0.2)
+      handle.addScaledVector(face, -handle.dot(face)).normalize()
+      const up = handle.clone().negate()
+      hammer.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(face, up, new THREE.Vector3().crossVectors(face, up)))
+    }
+    const moleGroup = group([heroMole()], [-0.45, -0.25, 0.3], [0, 0.18, 0], 1.3)
     return {
+      // Frame the mole and mallet; the grass runs off the tile edges.
+      frame: [moleGroup],
       object: group([
-        mesh(cyl(2.0, 2.1, 0.5), dirt, [0, -0.1, 0]),
-        mesh(cyl(2.0, 2.0, 0.16), grass, [0, 0.2, 0]),
-        ...holes.map(([x, z]) => mesh(cyl(0.48, 0.48, 0.02), hole, [x, 0.29, z], [0, 0, 0], [1, 1, 0.7])),
-        group([mole()], [0, 0.05, 0.25], [0, 0, 0], 1.25),
-        grassTuft([-1.6, 0.25, 0.3]), grassTuft([1.6, 0.25, 0.4], 1.2), grassTuft([0.5, 0.25, 1.5]), grassTuft([-0.4, 0.25, -1.2], 0.9),
+        mesh(cyl(9, 9, 0.3, 64), grass, [0, -0.15, 0]),
+        holeAt(-0.45, 0.3, 1.2),
+        holeAt(1.9, 0.6, 0.6),
+        holeAt(1.4, 2.0, 0.55),
+        moleGroup,
+        grassTuft([-1.6, 0, 1.2], 1.6), grassTuft([0.8, 0, 1.4], 1.3), grassTuft([2.6, 0, -0.4], 1.5), grassTuft([-2.2, 0, -0.6], 1.4),
         hammer,
       ]),
-      view: { pitch: 0.4, yaw: -0.2, fill: 1.15 },
+      view: { pitch: 0.24, yaw: 0, fill: 0.6, shift: [-0.13, -0.11] },
+      look: { envIntensity: 0.7, keyColor: '#fff0d8', rim: { intensity: 0.04 } },
+      backdrop: {
+        gradient: [180, '#4a8ae8', '#9ac0f0', '#f0c070'],
+        masses: [[0.15, 0.35, 0.25, '#e0a050'], [0.85, 0.3, 0.25, '#ffd080'], [0.5, 0.05, 0.25, '#6aa8ff'], [0.1, 0.1, 0.15, '#c08050']],
+        bokeh: { n: 10, colors: ['#ffffff', '#ffe0a0'], min: 0.02, max: 0.05, seed: 23, yMax: 0.5 },
+      },
     }
   },
 

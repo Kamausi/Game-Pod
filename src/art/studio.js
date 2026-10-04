@@ -46,18 +46,19 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
 }
 
 /**
- * Points the camera from the requested angle and frames the model's actual projected outline
+ * Points the camera from the requested angle and frames the projected outline of `targets`
+ * (the whole model, or the parts a model lists in `frame`)
  * (not its bounding sphere), so every asset fills the frame by `fill` without clipping.
  */
-function fitCamera(object, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift = null, roll = 0 }) {
+function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift = null, roll = 0 }) {
   const points = []
-  object.updateMatrixWorld(true)
-  object.traverse((o) => {
+  ;[].concat(targets).forEach((t) => t.updateMatrixWorld(true))
+  ;[].concat(targets).forEach((t) => t.traverse((o) => {
     if (!o.isMesh) return
     const pos = o.geometry.attributes.position
     const step = Math.max(1, Math.floor(pos.count / 400))
     for (let i = 0; i < pos.count; i += step) points.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld))
-  })
+  }))
   const sphere = new THREE.Box3().setFromPoints(points).getBoundingSphere(new THREE.Sphere())
   const dirV = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch))
   const camera = new THREE.PerspectiveCamera(FOV, aspect, 0.01, sphere.radius * 100)
@@ -125,7 +126,7 @@ function aoBlob(radius) {
 export function renderModel(name, { width, height, tone = 'aces', exposure = 1, rim = {} }) {
   const build = MODELS[name]
   if (!build) throw new Error(`No model named ${name}`)
-  const { object, view = {}, shadow = true, look = {}, backdrop = null } = build()
+  const { object, view = {}, shadow = true, look = {}, backdrop = null, frame = null } = build()
 
   renderer.toneMapping = TONE[look.tone ?? tone]
   renderer.toneMappingExposure = look.exposure ?? exposure
@@ -171,7 +172,7 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
     scene.add(catcher, ao)
   }
 
-  const camera = fitCamera(object, width / height, view)
+  const camera = fitCamera(frame ?? object, width / height, view)
   renderer.setPixelRatio(1)
   renderer.setSize(width, height, false)
   renderer.render(scene, camera)
