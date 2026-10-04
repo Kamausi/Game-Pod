@@ -296,8 +296,13 @@ const GAMES = {
     // Inner well sized so all nine cells are equal (S - DIV_W) and each cell's centre is on the S pitch,
     // so pieces placed at -S / 0 / +S sit centred in their squares.
     const INNER = 3 * S - DIV_W
+    // Front-to-back pitch: the reference's opening is shallower than it is wide (2.406 x 2.81), solved so
+    // the four inner corners land exactly on the reference's.
+    const SZ = 0.8653
+    const INNER_DEPTH = 3 * SZ - DIV_W
     const RIM = 0.25 // frame wall thickness
     const OUTER = INNER + 2 * RIM
+    const OUTER_DEPTH = INNER_DEPTH + 2 * RIM
     const floorTop = 0.6 // black cell floor; pieces rest on it
     const H = 0.88 // whole tray height: tall side walls show
     // Pieces rest on the floor; their tops sit PIECE_DROP just below the board face.
@@ -306,22 +311,22 @@ const GAMES = {
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
     const WALL_EXTRA = 0.15 // outer walls run this much further down below the board, for a taller left side
-    const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H + WALL_EXTRA, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
+    const frameGeo = trayFrameGeometry({ outer: OUTER, outerDepth: OUTER_DEPTH, inner: INNER, innerDepth: INNER_DEPTH, height: H + WALL_EXTRA, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
     frameGeo.translate(0, -WALL_EXTRA, 0)
     const uv = frameGeo.attributes.uv
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
     const parts = [
       // One-piece frame: rounded outer corners (radius 0.45), rounded inner corners, no seams.
       mesh(frameGeo, wood),
-      mesh(rbox(INNER + 0.1, floorTop, INNER + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
-      mesh(new THREE.PlaneGeometry(INNER, INNER), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
+      mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
+      mesh(new THREE.PlaneGeometry(INNER, INNER_DEPTH), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
     const DIV_H = H - floorTop - 0.003
-    for (const o of [-S / 2, S / 2]) {
-      parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o]))
-      parts.push(mesh(rbox(DIV_W, DIV_H, INNER + 0.1, 0.035, 4), wood, [o, floorTop + DIV_H / 2, 0]))
+    for (const o of [-0.5, 0.5]) {
+      parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o * SZ]))
+      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH + 0.1, 0.035, 4), wood, [o * S, floorTop + DIV_H / 2, 0]))
     }
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
@@ -345,14 +350,16 @@ const GAMES = {
     layout.forEach((p, i) => {
       // Both pieces are centred on their origin and PIECE_HEIGHT tall: rest on the floor, tops flush with the board face.
       const piece = p === 'X' ? X() : mesh(ringGeo, red)
-      piece.position.set(((i % 3) - 1) * S, floorTop + PIECE_HEIGHT / 2, (Math.floor(i / 3) - 1) * S)
+      piece.position.set(((i % 3) - 1) * S, floorTop + PIECE_HEIGHT / 2, (Math.floor(i / 3) - 1) * SZ)
       parts.push(vary(piece, i + 1, { rot: 1.5, scale: 0.005, value: 0.01, rough: 0.02 }))
     })
     return {
       // Board rotated in the world and tilted toward the camera, as in the reference.
       // Camera front-left so the left and front side faces show, as in the reference.
       object: group(parts, [0, 0, 0], [0.15, 0, -0.15]),
-      view: { pitch: 0.95, yaw: -0.3, fill: 0.92, shift: [0.03, 0.03], roll: -0.02, fov: 14 },
+      // Exact camera solved so the four inner corners of the frame land exactly on the reference's
+      // (82,100) (448,60) (158,432) (543,358) at 600 px.
+      view: { camera: { position: [-1.72327, 8.96642, 4.44024], target: [0.20528, -0.75146, -0.12564], roll: 0.15066, fov: 25.30057 } },
       look: {
         keyFrom: [2.4, 3.0, 0.6], // upper right: bright right/top rim, shaded front face
         keyIntensity: 2.2, keyColor: '#ffe0b0', envIntensity: 0.45,
