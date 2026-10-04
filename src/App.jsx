@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useState } from 'react'
 import Scene from './components/Scene.jsx'
+import TitleScreen from './components/TitleScreen.jsx'
 import { getAIMove, getWinner } from './game.js'
 
 const emptyBoard = () => Array(9).fill(null)
@@ -47,9 +48,28 @@ function reducer(state, action) {
 }
 
 export default function App() {
+  const [screen, setScreen] = useState('title')
+  // Game state lives here so scores survive a trip back to the title screen.
   const [state, dispatch] = useReducer(reducer, initialState)
   const [mode, setMode] = useState('ai')
   const [difficulty, setDifficulty] = useState('hard')
+
+  if (screen === 'title') return <TitleScreen onStart={() => setScreen('game')} />
+
+  return (
+    <Game
+      state={state}
+      dispatch={dispatch}
+      mode={mode}
+      setMode={setMode}
+      difficulty={difficulty}
+      setDifficulty={setDifficulty}
+      onHome={() => setScreen('title')}
+    />
+  )
+}
+
+function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, onHome }) {
   const { board, starter, gameId, scores } = state
 
   const winner = getWinner(board)
@@ -59,7 +79,7 @@ export default function App() {
   const aiTurn = mode === 'ai' && turn === 'O' && !over
   const canPlay = !over && !aiTurn
 
-  const play = useCallback((index) => dispatch({ type: 'play', index }), [])
+  const play = useCallback((index) => dispatch({ type: 'play', index }), [dispatch])
 
   useEffect(() => {
     if (!aiTurn) return
@@ -74,11 +94,13 @@ export default function App() {
         if (canPlay && !board[index]) play(index)
       } else if (e.key === 'r' || e.key === 'R') {
         dispatch({ type: 'newGame' })
+      } else if (e.key === 'Escape') {
+        onHome()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [canPlay, board, play])
+  }, [canPlay, board, play, dispatch, onHome])
 
   const changeMode = (m) => {
     setMode(m)
@@ -101,6 +123,10 @@ export default function App() {
   return (
     <div className="app">
       <Scene board={board} gameId={gameId} winner={winner} canPlay={canPlay} turn={turn} onPlay={play} />
+
+      <button className="home" onClick={onHome} aria-label="Back to title screen">
+        ← Home
+      </button>
 
       <header className="hud top">
         <h1>
@@ -143,7 +169,7 @@ export default function App() {
           </button>
           <button onClick={() => dispatch({ type: 'reset' })}>Reset scores</button>
         </div>
-        <p className="hint">Click a square or press 1–9 · drag to orbit · scroll to zoom · R for new game</p>
+        <p className="hint">Click a square or press 1–9 · drag to orbit · scroll to zoom · R for new game · Esc for home</p>
       </footer>
     </div>
   )
