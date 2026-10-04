@@ -19,10 +19,14 @@ reference, but must say why in a comment.
 
 ## Benchmark
 
-**Tic Tac Toe is the canonical Game Pod visual benchmark** (`src/assets/art/tic-tac-toe.webp`, model in
-`src/art/models.js`). A new game is not visually complete until its showcase render sits next to the benchmark
-without looking like a different product: same bevel language, material response, lighting contrast,
-grounding and backdrop depth.
+**Tic Tac Toe and Checkers are the locked Game Pod visual benchmarks** (`src/assets/art/tic-tac-toe.webp`,
+`src/assets/art/checkers.webp`; models in `src/art/models.js`). Every new game starts from their kit pieces,
+materials, lighting and camera settings, not from primitives, and is not visually complete until its showcase render
+sits next to them without looking like a different product: same bevel language, material response, lighting
+contrast, grounding and backdrop depth.
+
+The benchmark models are **locked**: don't change them while working on other assets. Shared studio changes that
+alter how they render must be re-checked against both before committing.
 
 ## 1. Geometry
 
@@ -51,8 +55,10 @@ grounding and backdrop depth.
 - **Variation:** every repeated piece goes through `vary(object, seed, ranges)`.
   Defaults: rotation ±1.5°, scale ±1%, height ±0.8%, colour value ±2.5%, roughness ±0.03.
   Glossy pieces (checkers): rotation ±2°, scale ±0.75%, value ±1.5%, roughness ±0.025.
-- **Tactile surfaces:** large flat faces (board squares, trays) get `noiseTexture()` as a faint roughness + bump map.
-  It must not read as distressed; it only varies the reflections.
+- **Tactile surfaces:** large flat faces (board squares, trays, casings) get `noiseTexture()` as a faint roughness + bump map
+  (bump 0.4–0.8, roughness variation ±0.025, luminance ±1–2%). It must not read as distressed; it only varies the reflections.
+- **Inset parts:** board squares are individual bevelled tiles with dark micro-gaps (≈7% of the square), never colours painted on one plane.
+- **Wood:** muted honey/maple tones; grain dark/light within ~5% of the base colour.
 - Canvas textures: 512–1024 px, sRGB, anisotropy 8.
 
 ## 3. Lighting rig
@@ -65,6 +71,7 @@ Defaults in `src/art/studio.js`; per-scene overrides in a model's `look`.
 | Key | Directional, warm white `#fff3e6`, 1.4–3.2, from front-left above, soft PCF shadows (2048 map, radius 6) | Shape and shadow. |
 | Fill | From the HDR's cool fill; warm scenes replace it with `look.ambient` hemisphere bounce | Keeps shadows from going black. |
 | Rim | Fresnel rim layered on materials (`addRim`), intensity 0.04–0.35 | Silhouette separation. Lower it on large flat ground (it washes grass out at grazing angles). |
+| Softbox | `look.softbox`: rectangular area light above and to one side, ~1.8 × 0.8 of scene radius, intensity 5–8 | Broad gradient highlights on glossy pieces (dark → saturated → broad highlight → thin rim) instead of a single specular dot. |
 
 Mood: warm scenes (tavern, sunset) set `envIntensity` ≤ 0.15 plus `ambient`, so cool studio colours don't tint reds pink or blacks blue.
 

@@ -8,6 +8,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { MODELS } from './models.js'
 
 const FOV = 30
@@ -174,6 +175,17 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   key.shadow.normalBias = 0.02
   Object.assign(key.shadow.camera, { left: -r * 1.6, right: r * 1.6, top: r * 1.6, bottom: -r * 1.6, near: 0.1, far: r * 10 })
   scene.add(key, key.target)
+
+  // Softbox: a large rectangular area light above and to one side, so glossy pieces get a broad
+  // gradient highlight that describes their curvature instead of a single specular dot.
+  if (look.softbox) {
+    RectAreaLightUniformsLib.init()
+    const { color = '#fff1dc', intensity = 6, width: sw = 1.6, height: sh = 0.9, from = [-1.2, 2.2, 0.8] } = look.softbox
+    const box = new THREE.RectAreaLight(color, intensity, r * sw, r * sh)
+    box.position.set(sphere.center.x + r * from[0], sphere.center.y + r * from[1], sphere.center.z + r * from[2])
+    box.lookAt(sphere.center)
+    scene.add(box)
+  }
 
   // Scene tiles (with a painted backdrop) float in front of it, so no floor shadow there.
   if (shadow && !backdrop) {

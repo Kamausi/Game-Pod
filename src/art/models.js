@@ -283,11 +283,12 @@ function grassTuft(pos, s = 1) {
 
 const GAMES = {
   'tic-tac-toe': () => {
+    // LOCKED benchmark (docs/RENDERING_STANDARD.md): don't modify while working on other assets.
     // Reference: a thick light-wood box, raised divider walls, dark pockets holding chunky pieces,
     // seen almost from above and turned slightly, over a warm out-of-focus glow.
     const wood = mat('#ffffff', {
       // Honey maple, not saturated orange.
-      map: woodTexture({ base: '#c97e36', dark: '#b8702e', light: '#dc9650', seed: 7 }),
+      map: woodTexture({ base: '#c08844', dark: '#b6803e', light: '#cc9654', seed: 7 }),
       roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.45,
     })
     const pocket = mat('#1a0c05', { roughness: 0.95, clearcoat: 0, envMapIntensity: 0.1 })
@@ -298,11 +299,11 @@ const GAMES = {
     const floorTop = 0.12 // ~20% deeper cells than before
     const wallH = 0.6
     const parts = [
-      mesh(rbox(W, 0.32, W, 0.135, 6), wood, [0, -0.04, 0]), // base (slightly shallower frame depth)
+      mesh(rbox(W, 0.32, W, 0.1, 6), wood, [0, -0.04, 0]), // base (slightly shallower frame depth)
       mesh(new THREE.PlaneGeometry(3 * S, 3 * S), pocket, [0, floorTop + 0.001, 0], [-Math.PI / 2, 0, 0]),
     ]
     for (const [x, z, w, d] of [[0, W / 2 - WALL / 2, W, WALL], [0, -(W / 2 - WALL / 2), W, WALL], [W / 2 - WALL / 2, 0, WALL, W], [-(W / 2 - WALL / 2), 0, WALL, W]])
-      parts.push(mesh(rbox(w, wallH, d, 0.17, 6), wood, [x, floorTop + wallH / 2 - 0.12, z]))
+      parts.push(mesh(rbox(w, wallH, d, 0.12, 6), wood, [x, floorTop + wallH / 2 - 0.12, z]))
     for (const o of [-S / 2, S / 2]) {
       // Flat-topped slabs with soft shoulders, not tubes.
       parts.push(mesh(rbox(3 * S + 0.1, 0.44, 0.17, 0.05, 6), wood, [0, floorTop + 0.2, o]))
@@ -311,7 +312,7 @@ const GAMES = {
     // Painted toy plastic: broad soft highlights, not candy gloss.
     const blue = mat('#1650ff', { roughness: 0.48, clearcoat: 0.15, clearcoatRoughness: 0.5 })
     const red = mat('#e80c26', { roughness: 0.48, clearcoat: 0.15, clearcoatRoughness: 0.5 })
-    const xGeo = toyXGeometry({ size: 1.04, arm: 0.3, tip: 0.23, depth: 0.12, bevel: 0.05 })
+    const xGeo = toyXGeometry({ size: 1.04, arm: 0.3, tip: 0.23, depth: 0.15, bevel: 0.04 })
     const oGeo = toyOGeometry({ radius: 0.29, width: 0.27, height: 0.25, round: 0.1 })
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
@@ -324,7 +325,7 @@ const GAMES = {
       object: group(parts, [0, 0, 0], [0.12, 0, 0.16]),
       view: { pitch: 0.98, yaw: 0, fill: 0.86, shift: [-0.04, 0.04], roll: -0.12, fov: 26 },
       // Contrast: bright warm key, dark cavities, cool environment, controlled rim.
-      look: { envIntensity: 0.45, keyIntensity: 2.4, keyColor: '#fff0d8', rim: { intensity: 0.22, color: '#9fc4ff' }, aoIntensity: 1.6, aoRadius: 0.06 },
+      look: { envIntensity: 0.45, keyIntensity: 2.6, keyColor: '#ffe2b8', ambient: ['#7a9cff', '#1a1430', 0.35], rim: { intensity: 0.22, color: '#9fc4ff' }, aoIntensity: 2.0, aoRadius: 0.045 },
       backdrop: {
         gradient: [180, '#1a2a78', '#4a3a88', '#9a5a50'],
         masses: [[0.1, 0.12, 0.28, '#4a7aff'], [0.9, 0.2, 0.25, '#8a6ad8'], [0.1, 0.75, 0.3, '#ff9a4a'], [0.85, 0.9, 0.3, '#2a3a9a'], [0.5, 0.05, 0.2, '#6aa0ff']],
@@ -334,12 +335,14 @@ const GAMES = {
   },
 
   checkers: () => {
+    // LOCKED benchmark (docs/RENDERING_STANDARD.md): don't modify while working on other assets.
     // Reference: a chunky physical toy board photographed on a table: thick casing, individually
     // bevelled inset squares, sculpted pucks with slight variation, warm raking light, shallow focus.
     const N = 6
     const SQ = 0.55
     const size = N * SQ
-    const casing = mat('#171310', { roughness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.12, envMapIntensity: 0.6 })
+    const surface = noiseTexture({ contrast: 0.1, seed: 43 })
+    const casing = mat('#171310', { roughness: 0.2, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.12, envMapIntensity: 0.6 })
     const parts = [
       mesh(rbox(size + 0.6, 0.55, size + 0.6, 0.22, 6), casing, [0, -0.2, 0]), // thick casing
     ]
@@ -348,19 +351,19 @@ const GAMES = {
     for (const [x, z, w, d] of [[0, (size + lipW) / 2, size + lipW * 2, lipW], [0, -(size + lipW) / 2, size + lipW * 2, lipW], [(size + lipW) / 2, 0, lipW, size], [-(size + lipW) / 2, 0, lipW, size]])
       parts.push(mesh(rbox(w, 0.2, d, 0.08, 5), casing, [x, 0.12, z]))
     // Individual inset tiles with soft bevels and a little tonal variation.
-    const tileGeo = rbox(SQ - 0.025, 0.1, SQ - 0.025, 0.025, 3)
+    const tileGeo = rbox(SQ - 0.04, 0.1, SQ - 0.04, 0.035, 4) // dark micro-gaps + bevel catch light
     // Tactile, not literally rough: faint roughness and bump noise varies the reflections.
     const grain = noiseTexture({ contrast: 0.18, seed: 41 })
     const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0, (r - (N - 1) / 2) * SQ]
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
       const dark = (r + c) % 2 === 1
       const [x, , z] = at(c, r)
-      const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.35 : 0.5, roughnessMap: grain, bumpMap: grain, bumpScale: 0.6, clearcoat: dark ? 0.5 : 0.2, clearcoatRoughness: 0.3 }), [x, 0.03, z])
-      parts.push(vary(tile, 100 + r * N + c))
-      tile.rotation.set(0, 0, 0) // tiles stay square; only tone/roughness vary
+      const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.35 : 0.5, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: dark ? 0.5 : 0.2, clearcoatRoughness: 0.3 }), [x, 0.03, z])
+      parts.push(vary(tile, 100 + r * N + c, { value: 0.015, rough: 0.025, height: 0.02 }))
+      tile.rotation.set(0, 0, 0) // tiles stay square; tone, roughness and a hair of height vary
     }
     // Lower, heavier pucks: radius +5%, height -10%.
-    const geo = toyPuckGeometry({ radius: 0.258, height: 0.215 })
+    const geo = toyPuckGeometry({ radius: 0.268, height: 0.202 })
     const red = mat('#d80010', { roughness: 0.24, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 0.35, sheen: 0.3, sheenColor: '#ff4040' })
     const black = mat('#1c1917', { roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.4 })
     const pieces = []
@@ -388,7 +391,8 @@ const GAMES = {
       view: { pitch: 0.7, yaw: 0.0, fill: 1.0, shift: [0.04, -0.1], roll: -0.08, fov: 24 },
       look: {
         envIntensity: 0.12, ambient: ['#ffb070', '#3a1a08', 0.9], keyIntensity: 3.2, keyColor: '#ffd8a0',
-        rim: { intensity: 0.08, color: '#ffc080' }, aoIntensity: 1.7, aoRadius: 0.025,
+        rim: { intensity: 0.08, color: '#ffc080' }, aoIntensity: 2.2, aoRadius: 0.016,
+        softbox: { color: '#ffe6c4', intensity: 7, width: 1.8, height: 0.8, from: [-1.0, 2.0, 0.4] },
         // Showcase DOF: nearest and rear pieces soften, centre stays sharpest.
         dof: { aperture: 0.008, maxblur: 0.02 },
       },
@@ -402,6 +406,9 @@ const GAMES = {
           [0.62, 0.02, 0.2, 0.26, '#f0b870', 0.02], [0.63, 0.04, 0.08, 0.22, '#ffd8a0', 0.01],
           [0.86, 0.06, 0.06, 0.08, '#ffe0a0', 0.03], [0.88, 0.14, 0.02, 0.3, '#3a1a0a'],
           [0.3, 0.1, 0.12, 0.3, '#3a1c0c'],
+          [0.44, 0.0, 0.12, 0.09, '#ffcf88', 0.05], [0.47, 0.09, 0.06, 0.04, '#ffeccc', 0.02], // lamp shade + bulb glow
+          [0.24, 0.3, 0.05, 0.05, '#ffb860', 0.025], [0.53, 0.26, 0.04, 0.06, '#e08a40', 0.01], // table objects
+          [0.92, 0.0, 0.08, 0.18, '#ffdca0', 0.01], // second window
         ],
       },
     }
