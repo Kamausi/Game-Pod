@@ -19,7 +19,7 @@ const LIGHTS = [
   { d: dir(65, 10), w: 14, h: 10, soft: 8, c: [1.6, 2.2, 3.8] }, // fill: soft cool blue, front-right
   { d: dir(150, 15), w: 7, h: 16, soft: 5, c: [11, 1.6, 7.5] }, // rim: hot pink, behind-left
   { d: dir(-150, 15), w: 7, h: 16, soft: 5, c: [1.4, 7.5, 11] }, // rim: electric cyan, behind-right
-  { d: dir(180, 48), w: 20, h: 6, soft: 6, c: [3.6, 2.4, 7] }, // back top: violet kicker
+  { d: dir(180, 40), w: 16, h: 5, soft: 6, c: [1.4, 1.0, 2.8] }, // back top: soft violet kicker
 ]
 
 const sub = (a, b) => a.map((v, i) => v - b[i])

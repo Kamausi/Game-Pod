@@ -276,28 +276,68 @@ const GAMES = {
   },
 
   checkers: () => {
-    const tex = canvasTexture(512, 512, (ctx, W) => {
-      const n = 5
-      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-        ctx.fillStyle = (r + c) % 2 ? '#2a1a10' : '#e8c48c'
-        ctx.fillRect((c * W) / n, (r * W) / n, W / n, W / n)
+    const N = 6
+    const SQ = 0.5
+    const surface = canvasTexture(768, 768, (ctx, W) => {
+      const q = W / N
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+        const dark = (r + c) % 2 === 1
+        const g = ctx.createLinearGradient(c * q, r * q, (c + 1) * q, (r + 1) * q)
+        g.addColorStop(0, dark ? '#4a2614' : '#e9c48a')
+        g.addColorStop(1, dark ? '#36190b' : '#d9a96a')
+        ctx.fillStyle = g
+        ctx.fillRect(c * q, r * q, q, q)
+        // fine grain inside each square
+        ctx.strokeStyle = dark ? 'rgba(0,0,0,.18)' : 'rgba(150,90,40,.14)'
+        ctx.lineWidth = 1.5
+        for (let i = 0; i < 6; i++) {
+          const y = r * q + ((i + 0.5) / 6) * q + Math.sin(c + i) * 3
+          ctx.beginPath()
+          ctx.moveTo(c * q, y)
+          ctx.bezierCurveTo(c * q + q / 3, y - 4, c * q + (2 * q) / 3, y + 4, (c + 1) * q, y)
+          ctx.stroke()
+        }
       }
     })
-    const board = mesh(rbox(3.3, 0.28, 3.3, 0.1), wood('#3b2414'))
-    const top = mesh(new THREE.PlaneGeometry(3.05, 3.05), mat('#ffffff', { map: tex, roughness: 0.45 }), [0, 0.145, 0], [-Math.PI / 2, 0, 0])
-    const sq = 3.05 / 5
-    const piece = (c, r, color, h = 0) =>
-      group([
-        mesh(cyl(0.25, 0.26, 0.14), mat(color, { roughness: 0.25 })),
-        mesh(torus(0.17, 0.025, 40), mat(color, { roughness: 0.25 }), [0, 0.075, 0], [Math.PI / 2, 0, 0]),
-      ], [(c - 2) * sq, 0.22 + h * 0.15, (r - 2) * sq])
-    const red = '#e0322f'
-    const blk = '#1c1c24'
-    return {
-      object: group([board, top, piece(1, 0, blk), piece(3, 0, blk), piece(0, 1, blk), piece(2, 1, blk), piece(4, 1, blk),
-        piece(1, 4, red), piece(3, 4, red), piece(0, 3, red), piece(4, 3, red), piece(2, 3, red), piece(2, 3, red, 1), piece(3, 2, blk)]),
-      view: { pitch: 0.72, yaw: -0.5, fill: 1.2 },
+    const walnut = mat('#ffffff', { map: woodTexture({ base: '#5a2e14', dark: '#3a1a08', light: '#6e3a1a', seed: 11 }), roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.35 })
+    const size = N * SQ
+    const base = mesh(rbox(size + 0.5, 0.3, size + 0.5, 0.12), walnut, [0, 0, 0])
+    const rim = [
+      [0, (size + 0.36) / 2, size + 0.5, 0.18], [0, -(size + 0.36) / 2, size + 0.5, 0.18],
+      [(size + 0.36) / 2, 0, 0.18, size + 0.5], [-(size + 0.36) / 2, 0, 0.18, size + 0.5],
+    ].map(([x, z, w, d]) => mesh(rbox(w, 0.12, d, 0.06), walnut, [x, 0.19, z]))
+    const field = mesh(new THREE.PlaneGeometry(size, size), mat('#ffffff', { map: surface, roughness: 0.62, clearcoat: 0.12, clearcoatRoughness: 0.5 }), [0, 0.151, 0], [-Math.PI / 2, 0, 0])
+
+    // Real checker profile: recessed top with an inner ring, ridged rounded edge.
+    const R = 0.2
+    const H = 0.11
+    const profile = [
+      [0, H - 0.004], [R * 0.55, H - 0.004], [R * 0.6, H - 0.01], [R * 0.66, H - 0.004], [R * 0.74, H],
+      [R * 0.9, H], [R, H - 0.02], [R * 1.02, H * 0.75], [R * 0.99, H * 0.62], [R * 1.02, H * 0.5],
+      [R * 0.99, H * 0.38], [R * 1.02, H * 0.25], [R, 0.015], [R * 0.9, 0], [0, 0],
+    ].map(([x, y]) => new THREE.Vector2(x, y))
+    const pieceGeo = new THREE.LatheGeometry(profile, 48)
+    const red = mat('#b30019', { roughness: 0.28, clearcoat: 0.8, clearcoatRoughness: 0.12 })
+    const black = mat('#222228', { roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.3, envMapIntensity: 0.6 })
+    const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0.152, (r - (N - 1) / 2) * SQ]
+    const piece = (c, r, m, stack = 0, tilt = null) => {
+      const [x, y, z] = at(c, r)
+      const p = mesh(pieceGeo, m, [x, y + stack * (H + 0.005), z])
+      if (tilt) {
+        p.position.y += tilt.lift
+        p.position.x += tilt.dx
+        p.rotation.set(tilt.rx, 0, tilt.rz)
+      }
+      return p
     }
+    const pieces = [
+      piece(1, 0, black), piece(3, 0, black), piece(5, 0, black), piece(0, 1, black), piece(4, 1, black),
+      piece(2, 1, black), piece(3, 2, black),
+      piece(0, 5, red), piece(2, 5, red), piece(4, 5, red), piece(1, 4, red), piece(5, 4, red),
+      piece(0, 3, red), piece(0, 3, red, 1), // a crowned king
+      piece(2, 3, red, 0, { lift: 0.32, dx: 0.12, rx: 0.35, rz: -0.25 }), // mid-jump
+    ]
+    return { object: group([base, ...rim, field, ...pieces]), view: { pitch: 0.72, yaw: -0.5, fill: 0.98 }, look: { envIntensity: 0.6, keyIntensity: 1.8 } }
   },
 
   'ring-toss': () => {
