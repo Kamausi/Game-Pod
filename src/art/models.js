@@ -318,11 +318,11 @@ const GAMES = {
     const blue = mat('#0a66f5', { roughness: 0.38, clearcoat: 0.45, clearcoatRoughness: 0.25 })
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
-    const xGeo = mouldedXGeometry({ size: 0.92, arm: 0.22, endRadius: 0.001, innerRadius: 0.001, depth: 0.1, bevelHeight: 0.006, bevelWidth: 0.006 })
+    const xGeo = mouldedXGeometry({ size: 0.92, arm: 0.16, endRadius: 0.001, innerRadius: 0.001, depth: 0.18, bevelHeight: 0.006, bevelWidth: 0.006 })
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#e8101c', { roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.08 })
-    const ringGeo = toyOGeometry({ radius: 0.255, width: 0.21, height: 0.11, round: 0.004 }) // flat top, sharp edges
+    const ringGeo = toyOGeometry({ radius: 0.255, width: 0.15, height: 0.17, round: 0.004 }) // flat top, sharp edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
       const piece = p === 'X' ? X() : mesh(ringGeo, red)
