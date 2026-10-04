@@ -17,7 +17,17 @@ The art is `src/assets/title.webp` (compressed from the 2 MB PNG to about 150 KB
 
 ## App screens
 
-After the title screen, Game Pod has five tabs (Home, All Games, Achievements, Leaderboards, Profile) plus Settings behind the gear. They follow the Game Pod mockups. Artwork is cut from them (`src/assets/`); everything else is live HTML/CSS in the bundled Fredoka font, laid out in container-query units against the 941px-wide mockups with minimum sizes for small phones.
+After the title screen, Game Pod has five tabs (Home, All Games, Achievements, Leaderboards, Profile) plus Settings behind the gear. Their layout follows the Game Pod mockups, laid out in container-query units against the 941px-wide designs with minimum sizes for small phones.
+
+### Art
+
+All in-app art is generated in code; the only bitmap is the title-screen poster (`src/assets/title.webp`).
+
+- **3D models** (`src/art/models.js`): every game, category icon and header decoration is a small Three.js model in the same glossy toy style as the Tic Tac Toe board. `src/art/sprites.js` renders each one once to a transparent image with a shared offscreen renderer (studio lights, reflections, soft contact shadow), queued one per frame and cached.
+- **Vector art**: the Game Pod logo (`Logo.jsx`), cartoon avatars (`Avatar.jsx`, built from face/hair/accessory parts plus frog and shark characters) and winged achievement medals (`Badge.jsx`) are SVG.
+- **Header** (`HeaderArt.jsx`): a live scene with a nebula sky, twinkling stars and floating 3D toys around the logo.
+
+To add a game's art, add a builder to `models.js` under the game's id and give the game `colors` for its backdrop in `src/games.js`.
 
 - **Home**: search, featured carousel, Popular / Categories / New & Trending rows.
 - **All Games**: 20 games, search, sort (popular, A–Z, newest, favorites first), category filters, and a working favorite heart on each tile.
@@ -79,6 +89,7 @@ npm run build:html  # rebuild tic-tac-toe.html
 
 - `src/components/TitleScreen.jsx` / `.css`: animated title screen
 - `src/components/hub/`: the five tabs, Settings and shared pieces (`Hub.jsx` is the shell)
+- `src/art/`: 3D models and their renderer, logo, avatars, badges and the header scene
 - `src/games.js`: game catalog; `src/progress.js`: points, levels, achievements; `src/store.jsx`: saved state; `src/audio.js`: sound
 - `src/game.js`: win/draw detection and the minimax AI (no React, unit-tested)
 - `src/App.jsx`: game state, CPU turns, keyboard input and the on-screen controls

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { avatarSrc, podiumSrc } from '../../avatars.js'
+import Avatar from '../../art/Avatar.jsx'
 import { useStore } from '../../store.jsx'
 import { EmptyState, Header, formatNumber } from './common.jsx'
 import { Icon } from './icons.jsx'
@@ -40,6 +40,49 @@ const TABS = [
 
 const toRows = (raw) => raw.map(([avatar, name, level, points, move], i) => ({ rank: i + 1, avatar, name, level, points, move }))
 
+const METALS = { 1: ['#fff1a8', '#f5b81c', '#a86a00'], 2: ['#ffffff', '#c3cde6', '#6a7896'], 3: ['#ffd2b0', '#e07a45', '#8a3a14'] }
+
+function Crown({ place }) {
+  const [a, b, c] = METALS[place]
+  return (
+    <svg className="hs-podium-crown" viewBox="0 0 60 36" aria-hidden="true">
+      <defs>
+        <linearGradient id={`crown${place}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={a} />
+          <stop offset="0.6" stopColor={b} />
+          <stop offset="1" stopColor={c} />
+        </linearGradient>
+      </defs>
+      <path d="M6 32 L3 8 L17 18 L30 2 L43 18 L57 8 L54 32 Z" fill={`url(#crown${place})`} stroke={c} strokeWidth="1.6" strokeLinejoin="round" />
+      {[[3, 8], [30, 2], [57, 8]].map(([x, y]) => (
+        <circle key={x} cx={x} cy={y} r="3" fill={`url(#crown${place})`} stroke={c} strokeWidth="1.2" />
+      ))}
+      <circle cx="30" cy="23" r="4" fill="#ff3b4e" />
+    </svg>
+  )
+}
+
+function PodiumSpot({ row }) {
+  return (
+    <div className={`hs-podium-spot place${row.rank}`}>
+      <div className="hs-podium-avatar">
+        <Crown place={row.rank} />
+        <div className="hs-podium-ring">
+          <Avatar id={row.avatar} />
+        </div>
+        <span className="hs-podium-num">{row.rank}</span>
+      </div>
+      <div className="hs-podium-base">
+        <strong>{row.name}</strong>
+        <span>
+          <i>{Icon.trophy}</i>
+          {formatNumber(row.points)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function Move({ move }) {
   if (move === null) return <span className="hs-move" />
   if (!move) return <span className="hs-move">–</span>
@@ -64,7 +107,7 @@ function Row({ row, you }) {
     <li className={`hs-lrow ${you ? 'you' : ''} ${row.rank && row.rank <= 3 ? `top${row.rank}` : ''}`}>
       <span className="hs-lrank">{row.rank ?? '—'}</span>
       <span className="hs-lplayer">
-        <img src={avatarSrc(row.avatar)} alt="" />
+        <Avatar id={row.avatar} />
         <span>
           {row.name}
           {row.rank === 1 && <i className="hs-lcrown">{Icon.crown}</i>}
@@ -106,16 +149,7 @@ export default function LeaderboardsPage({ header }) {
           <p className="hs-note">{Icon.info} Sample players for now. Online leaderboards are coming soon; your points are real.</p>
           <div className="hs-podium">
             {[1, 0, 2].map((i) => (
-              <div key={rows[i].rank} className={`hs-podium-spot place${rows[i].rank}`}>
-                <img src={podiumSrc(rows[i].rank)} alt="" />
-                <div className="hs-podium-base">
-                  <strong>{rows[i].name}</strong>
-                  <span>
-                    <i>{Icon.trophy}</i>
-                    {formatNumber(rows[i].points)}
-                  </span>
-                </div>
-              </div>
+              <PodiumSpot key={rows[i].rank} row={rows[i]} />
             ))}
           </div>
           <div className="hs-ltable">

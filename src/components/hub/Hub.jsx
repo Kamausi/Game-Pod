@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AVATARS } from '../../avatars.js'
+import Avatar, { AVATAR_IDS } from '../../art/Avatar.jsx'
 import { sfx } from '../../audio.js'
 import { useStore } from '../../store.jsx'
 import { Sheet } from './common.jsx'
@@ -64,18 +64,19 @@ function AvatarSheet({ onClose }) {
   return (
     <Sheet title="Change Avatar" onClose={onClose}>
       <div className="hs-avatars">
-        {AVATARS.map((a) => (
+        {AVATAR_IDS.map((id) => (
           <button
-            key={a.id}
+            key={id}
             type="button"
-            className={profile.avatar === a.id ? 'on' : ''}
-            aria-pressed={profile.avatar === a.id}
+            className={profile.avatar === id ? 'on' : ''}
+            aria-pressed={profile.avatar === id}
+            aria-label={`Avatar ${id}`}
             onClick={() => {
-              setProfile({ avatar: a.id })
+              setProfile({ avatar: id })
               onClose()
             }}
           >
-            <img src={a.src} alt={a.id} />
+            <Avatar id={id} />
           </button>
         ))}
       </div>

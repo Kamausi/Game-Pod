@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CATEGORIES, FEATURED, GAMES, gameById, searchGames } from '../../games.js'
 import { useStore } from '../../store.jsx'
+import { GameArt, Sprite } from '../../art/Sprite.jsx'
 import { GameTile, GridTile, Header, Section } from './common.jsx'
 import { Icon } from './icons.jsx'
 
@@ -38,9 +39,9 @@ function FeaturedCarousel({ onOpen }) {
     <div className="hs-featured" onPointerDown={() => (pausedUntil.current = Date.now() + 10000)}>
       <div className="hs-featured-track" ref={trackRef} onScroll={onScroll}>
         {slides.map((game) => (
-          <article key={game.id} className="hs-slide" style={{ '--art': `url(${game.banner ?? game.art})` }}>
+          <article key={game.id} className="hs-slide" style={{ '--c1': game.colors[0], '--c2': game.colors[1] }}>
             <div className="hs-slide-bg" />
-            <img className="hs-slide-art" src={game.banner ?? game.art} alt="" draggable="false" />
+            <GameArt game={game} hero className="hs-slide-art" />
             <div className="hs-slide-copy">
               <span className="hs-badge">{Icon.crown} Featured</span>
               <h3>{game.name}</h3>
@@ -81,7 +82,7 @@ export function CategoryChip({ category, active, onClick }) {
       style={{ '--chip': category.color, '--chip-border': category.border }}
       onClick={onClick}
     >
-      <img src={category.icon} alt="" draggable="false" />
+      <Sprite name={category.icon} size={160} />
       <span>{category.name}</span>
     </button>
   )

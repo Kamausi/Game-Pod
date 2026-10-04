@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CATEGORIES, GAMES, searchGames } from '../../games.js'
 import { useStore } from '../../store.jsx'
+import { Sprite } from '../../art/Sprite.jsx'
 import { GridTile, Header } from './common.jsx'
 import { SearchBar } from './HomePage.jsx'
 import { Icon } from './icons.jsx'
@@ -78,7 +79,7 @@ export default function AllGamesPage({ header, onOpen, category, setCategory }) 
       <div className="hs-pills" role="tablist" aria-label="Filter by category">
         {chips.map((c) => (
           <button key={c.name} type="button" role="tab" aria-selected={category === c.id} className={category === c.id ? 'on' : ''} onClick={() => setCategory(c.id)}>
-            {c.icon ? <img src={c.icon} alt="" /> : <span className="hs-pill-svg">{c.svg}</span>}
+            {c.icon ? <Sprite name={c.icon} size={96} className="hs-pill-sprite" /> : <span className="hs-pill-svg">{c.svg}</span>}
             {c.name}
           </button>
         ))}

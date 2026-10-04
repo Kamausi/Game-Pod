@@ -2,14 +2,13 @@ import { useState } from 'react'
 import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, achievementProgress } from '../../progress.js'
 import { ARCADE_IDS } from '../../games.js'
 import { useStore } from '../../store.jsx'
-import emblem from '../../assets/achievements/level-emblem.webp'
-import trophy from '../../assets/achievements/trophy.webp'
-import { Header, ProgressBar, Section, Sheet, achievementIcon, formatDate } from './common.jsx'
+import Badge, { Trophy } from '../../art/Badge.jsx'
+import { AchievementBadge, Header, ProgressBar, Section, Sheet, formatDate } from './common.jsx'
 import { Icon } from './icons.jsx'
 
 const BAR_COLORS = ['gold', 'blue', 'purple', 'green', 'orange', 'pink']
 const CARD_TONES = ['purple', 'gold', 'violet', 'green']
-const CHIP_ICONS = { general: 'icon-star', game: 'tile-tic-tac-toe', challenges: 'icon-target', special: 'icon-crown' }
+const CHIP_ICONS = { general: ['star', 'gold'], game: ['xo', 'blue'], challenges: ['target', 'green'], special: ['crown', 'red'] }
 
 const SORTS = { progress: 'Progress', name: 'Name', xp: 'XP' }
 
@@ -24,7 +23,7 @@ export function LevelCard() {
   const done = list.filter((a) => a.done).length
   return (
     <div className="hs-levelcard">
-      <img className="hs-levelcard-emblem" src={emblem} alt="" />
+      <Badge icon="crown" tone="gold" className="hs-levelcard-emblem" />
       <div className="hs-levelcard-main">
         <span className="hs-levelcard-label">Achievement Level</span>
         <div className="hs-levelcard-row">
@@ -36,7 +35,7 @@ export function LevelCard() {
         <ProgressBar value={level.into} max={level.needed} />
       </div>
       <div className="hs-levelcard-total">
-        <img src={trophy} alt="" />
+        <Trophy className="hs-levelcard-trophy" />
         <div>
           <span>Total Achievements</span>
           <strong>
@@ -53,7 +52,7 @@ export function LevelCard() {
 export function AchievementCard({ a, tone, date }) {
   return (
     <div className={`hs-acard hs-acard-${tone} ${a.done ? 'done' : ''}`}>
-      <img src={achievementIcon(a.icon)} alt="" />
+      <AchievementBadge a={a} className="hs-acard-badge" />
       <h3>{a.name}</h3>
       <p>{a.desc}</p>
       {date ? (
@@ -95,7 +94,7 @@ export default function AchievementsPage({ header }) {
       <div className="hs-pills" role="tablist" aria-label="Filter achievements">
         {[{ id: null, name: 'All' }, ...ACHIEVEMENT_CATEGORIES].map((c) => (
           <button key={c.name} type="button" role="tab" aria-selected={filter === c.id} className={filter === c.id ? 'on' : ''} onClick={() => setFilter(c.id)}>
-            {c.id ? <img src={achievementIcon(CHIP_ICONS[c.id])} alt="" /> : <span className="hs-pill-svg">{Icon.grid}</span>}
+            {c.id ? <Badge icon={CHIP_ICONS[c.id][0]} tone={CHIP_ICONS[c.id][1]} wings={false} className="hs-pill-badge" /> : <span className="hs-pill-svg">{Icon.grid}</span>}
             {c.name}
           </button>
         ))}
@@ -129,7 +128,9 @@ export default function AchievementsPage({ header }) {
           {shown.map((a) => (
             <li key={a.id}>
               <button type="button" className={`hs-arow ${a.done ? 'done' : ''}`} onClick={() => setDetail(a)}>
-                <img className="hs-arow-icon" src={achievementIcon(a.icon)} alt="" />
+                <span className="hs-arow-icon">
+                  <AchievementBadge a={a} />
+                </span>
                 <span className="hs-arow-text">
                   <strong>{a.name}</strong>
                   <small>{a.desc}</small>
@@ -152,7 +153,7 @@ export default function AchievementsPage({ header }) {
       {detail && (
         <Sheet title={detail.name} onClose={() => setDetail(null)}>
           <div className="hs-adetail">
-            <img src={achievementIcon(detail.icon)} alt="" />
+            <AchievementBadge a={detail} className="hs-adetail-badge" />
             <p>{detail.desc}</p>
             <ProgressBar value={detail.current} max={detail.target} />
             <span>

@@ -1,34 +1,29 @@
 import { useEffect } from 'react'
-import homeHeader from '../../assets/home/header.webp'
-import pageHeader from '../../assets/home/subheader.webp'
-import { avatarSrc } from '../../avatars.js'
+import Avatar from '../../art/Avatar.jsx'
+import Badge from '../../art/Badge.jsx'
+import HeaderArt from '../../art/HeaderArt.jsx'
+import { GameArt } from '../../art/Sprite.jsx'
 import { sfx } from '../../audio.js'
 import { useStore } from '../../store.jsx'
 import { Icon } from './icons.jsx'
 
-const achievementArt = import.meta.glob('../../assets/achievements/*.webp', { eager: true, import: 'default' })
-const tileArt = import.meta.glob('../../assets/tiles/*.webp', { eager: true, import: 'default' })
+export const AchievementBadge = ({ a, className = '' }) => <Badge icon={a.icon} tone={a.tone} locked={!a.done} className={className} />
 
-// Achievement icon keys look like 'badge-first-play', 'icon-star' or 'tile-tic-tac-toe'.
-export function achievementIcon(key) {
-  if (key.startsWith('tile-')) return tileArt[`../../assets/tiles/${key.slice(5)}.webp`]
-  return achievementArt[`../../assets/achievements/${key}.webp`]
-}
-
-/**
- * Header art with live controls laid exactly over the avatar, level and gear drawn into it,
- * so the level shown is the player's real one. `variant` is 'home' (258px-tall art) or 'page' (210px).
- */
+/** Live header: floating 3D toys, the Game Pod logo, and the player's avatar, level and settings. */
 export function Header({ variant = 'home', title, subtitle, meta, settingsActive, onProfile, onSettings }) {
   const { profile, level } = useStore()
   return (
     <header className={`hs-header hs-header-${variant}`}>
-      <img className="hs-header-art" src={variant === 'home' ? homeHeader : pageHeader} alt="" draggable="false" />
+      <HeaderArt variant={variant} />
       {variant === 'home' && <h1 className="sr-only">Game Pod</h1>}
-      <button type="button" className="hs-me" onClick={onProfile} aria-label={`Your profile, level ${level.level}`}>
-        <img src={avatarSrc(profile.avatar)} alt="" draggable="false" />
-      </button>
-      <span className="hs-me-level" aria-hidden="true">Lv. {level.level}</span>
+      <div className="hs-me-wrap">
+        <button type="button" className="hs-me" onClick={onProfile} aria-label={`Your profile, level ${level.level}`}>
+          <Avatar id={profile.avatar} />
+        </button>
+        <span className="hs-me-level" aria-hidden="true">
+          Lv. {level.level}
+        </span>
+      </div>
       <button type="button" className={`hs-gear ${settingsActive ? 'on' : ''}`} onClick={onSettings} aria-label="Settings">
         {Icon.gear}
       </button>
@@ -65,25 +60,25 @@ export function Section({ title, icon, onSeeAll, action, children, className = '
   )
 }
 
-// Home-row tile: art from the home mockup, label below.
+// Home-row tile: the game's 3D art with its name below.
 export function GameTile({ game, size = 'large', onOpen }) {
   return (
     <button type="button" className={`hs-tile hs-tile-${size}`} onClick={() => onOpen(game)}>
-      <img src={game.art} alt="" draggable="false" />
+      <GameArt game={game} />
       {!game.playable && <span className="hs-soon">Soon</span>}
       <span className="hs-tile-label">{game.name}</span>
     </button>
   )
 }
 
-// All Games tile: art from the All Games mockup with a working favorite heart.
+// All Games tile: the game's 3D art with a working favorite heart.
 export function GridTile({ game, onOpen }) {
   const { favorites, toggleFavorite } = useStore()
   const fav = favorites.includes(game.id)
   return (
     <div className="hs-gtile">
       <button type="button" className="hs-gtile-main" onClick={() => onOpen(game)}>
-        <img src={game.tile} alt="" draggable="false" />
+        <GameArt game={game} />
         {!game.playable && <span className="hs-soon hs-soon-left">Soon</span>}
         <span className="hs-gtile-label">{game.name}</span>
       </button>

@@ -1,0 +1,27 @@
+/* Shared look for rendered 3D art. */
+.sprite { display: block; width: 100%; height: 100%; object-fit: contain; }
+.sprite-wait {
+  border-radius: 20%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 65%);
+  animation: sprite-wait 1.2s ease-in-out infinite alternate;
+}
+@keyframes sprite-wait { from { opacity: 0.35; } to { opacity: 0.8; } }
+
+/* A game's model on its backdrop: soft spotlight, color gradient, faint confetti dots. */
+.game-art {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(70% 60% at 50% 38%, rgba(255, 255, 255, 0.38), transparent 70%),
+    radial-gradient(2px 2px at 18% 24%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(2px 2px at 82% 18%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 72% 70%, rgba(255, 255, 255, 0.5), transparent),
+    linear-gradient(160deg, var(--c1), var(--c2));
+}
+.game-art .sprite { position: absolute; inset: 4% 4% 10%; width: 92%; height: 86%; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.35)); }
+.game-art-hero { background: none; }
+.game-art-hero .sprite { inset: 0; width: 100%; height: 100%; }
+
+.avatar { display: block; width: 100%; height: 100%; }
+.badge { display: block; width: 100%; height: auto; overflow: visible; }
+.badge.locked { filter: saturate(0.25) brightness(0.75); }

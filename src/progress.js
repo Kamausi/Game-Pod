@@ -51,21 +51,21 @@ export function longestStreak(days) {
 
 const distinct = (map) => Object.values(map).filter((n) => n > 0).length
 
-// `value(stats)` measures progress toward `target`.
+// `value(stats)` measures progress toward `target`. `icon` and `tone` pick the badge art (src/art/Badge.jsx).
 export const ACHIEVEMENTS = [
-  { id: 'first-play', name: 'First Play', desc: 'Play your first game', category: 'general', icon: 'badge-first-play', xp: 50, target: 1, value: (s) => s.games, featured: true },
-  { id: 'game-explorer', name: 'Game Explorer', desc: 'Play 10 different games', category: 'general', icon: 'badge-game-explorer', xp: 200, target: 10, value: (s) => distinct(s.played), featured: true },
-  { id: 'rising-star', name: 'Rising Star', desc: 'Earn 100 total points', category: 'general', icon: 'badge-rising-star', xp: 100, target: 100, value: (s) => s.points, featured: true },
-  { id: 'high-score-hero', name: 'High Score Hero', desc: 'Win in 5 different games', category: 'challenges', icon: 'badge-high-score-hero', xp: 300, target: 5, value: (s) => distinct(s.won), featured: true },
-  { id: 'first-win', name: 'First Win', desc: 'Win your first game', category: 'general', icon: 'icon-star', xp: 50, target: 1, value: (s) => s.wins },
-  { id: 'streak-7', name: '7 Day Streak', desc: 'Play games for 7 days in a row', category: 'general', icon: 'icon-calendar', xp: 150, target: 7, value: (s) => longestStreak(s.days) },
-  { id: 'arcade-enthusiast', name: 'Arcade Enthusiast', desc: 'Play 25 arcade games', category: 'challenges', icon: 'icon-joystick', xp: 100, target: 25, value: (s, arcadeIds = []) => arcadeIds.reduce((n, id) => n + (s.played[id] ?? 0), 0) },
-  { id: 'challenge-master', name: 'Challenge Master', desc: 'Finish 10 games against the Hard CPU', category: 'challenges', icon: 'icon-target', xp: 150, target: 10, value: (s) => s.hardGames },
-  { id: 'ttt-pro', name: 'Tic Tac Pro', desc: 'Win 10 games of Tic Tac Toe', category: 'game', icon: 'tile-tic-tac-toe', xp: 150, target: 10, value: (s) => s.won['tic-tac-toe'] ?? 0 },
-  { id: 'ttt-unbeatable', name: 'Unbeatable?', desc: 'Hold the Hard CPU to a draw in Tic Tac Toe', category: 'game', icon: 'tile-tic-tac-toe', xp: 200, target: 1, value: (s) => s.hardDraws },
-  { id: 'ttt-rivals', name: 'Local Rivals', desc: 'Play a 2-player game of Tic Tac Toe', category: 'game', icon: 'tile-tic-tac-toe', xp: 50, target: 1, value: (s) => s.twoPlayer },
-  { id: 'centurion', name: 'Centurion', desc: 'Earn 1,000 total points', category: 'special', icon: 'icon-crown', xp: 200, target: 1000, value: (s) => s.points },
-  { id: 'game-collector', name: 'Game Collector', desc: 'Play 50 different games', category: 'special', icon: 'icon-diamond', xp: 250, target: 50, value: (s) => distinct(s.played) },
+  { id: 'first-play', name: 'First Play', desc: 'Play your first game', category: 'general', icon: 'star', tone: 'gold', xp: 50, target: 1, value: (s) => s.games, featured: true },
+  { id: 'game-explorer', name: 'Game Explorer', desc: 'Play 10 different games', category: 'general', icon: 'gamepad', tone: 'blue', xp: 200, target: 10, value: (s) => distinct(s.played), featured: true },
+  { id: 'rising-star', name: 'Rising Star', desc: 'Earn 100 total points', category: 'general', icon: 'trophy', tone: 'violet', xp: 100, target: 100, value: (s) => s.points, featured: true },
+  { id: 'high-score-hero', name: 'High Score Hero', desc: 'Win in 5 different games', category: 'challenges', icon: 'diamond', tone: 'green', xp: 300, target: 5, value: (s) => distinct(s.won), featured: true },
+  { id: 'first-win', name: 'First Win', desc: 'Win your first game', category: 'general', icon: 'star', tone: 'red', xp: 50, target: 1, value: (s) => s.wins },
+  { id: 'streak-7', name: '7 Day Streak', desc: 'Play games for 7 days in a row', category: 'general', icon: 'calendar', tone: 'blue', xp: 150, target: 7, value: (s) => longestStreak(s.days) },
+  { id: 'arcade-enthusiast', name: 'Arcade Enthusiast', desc: 'Play 25 arcade games', category: 'challenges', icon: 'joystick', tone: 'red', xp: 100, target: 25, value: (s, arcadeIds = []) => arcadeIds.reduce((n, id) => n + (s.played[id] ?? 0), 0) },
+  { id: 'challenge-master', name: 'Challenge Master', desc: 'Finish 10 games against the Hard CPU', category: 'challenges', icon: 'target', tone: 'green', xp: 150, target: 10, value: (s) => s.hardGames },
+  { id: 'ttt-pro', name: 'Tic Tac Pro', desc: 'Win 10 games of Tic Tac Toe', category: 'game', icon: 'xo', tone: 'gold', xp: 150, target: 10, value: (s) => s.won['tic-tac-toe'] ?? 0 },
+  { id: 'ttt-unbeatable', name: 'Unbeatable?', desc: 'Hold the Hard CPU to a draw in Tic Tac Toe', category: 'game', icon: 'xo', tone: 'violet', xp: 200, target: 1, value: (s) => s.hardDraws },
+  { id: 'ttt-rivals', name: 'Local Rivals', desc: 'Play a 2-player game of Tic Tac Toe', category: 'game', icon: 'users', tone: 'dark', xp: 50, target: 1, value: (s) => s.twoPlayer },
+  { id: 'centurion', name: 'Centurion', desc: 'Earn 1,000 total points', category: 'special', icon: 'crown', tone: 'red', xp: 200, target: 1000, value: (s) => s.points },
+  { id: 'game-collector', name: 'Game Collector', desc: 'Play 50 different games', category: 'special', icon: 'diamond', tone: 'blue', xp: 250, target: 50, value: (s) => distinct(s.played) },
 ]
 
 export const ACHIEVEMENT_CATEGORIES = [

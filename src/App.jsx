@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Scene from './components/Scene.jsx'
 import TitleScreen from './components/TitleScreen.jsx'
 import Hub from './components/hub/Hub.jsx'
-import { achievementIcon } from './components/hub/common.jsx'
+import Badge from './art/Badge.jsx'
 import { getAIMove, getWinner } from './game.js'
 import { useStore } from './store.jsx'
 import { setMusicVolume, setSoundEnabled, sfx, startMusic, stopMusic, unlockAudio, vibrate } from './audio.js'
@@ -130,7 +130,7 @@ export default function App() {
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.icon ? 'with-icon' : ''}`}>
-            {t.icon && <img src={t.icon} alt="" />}
+            {t.icon}
             <span>{t.text}</span>
           </div>
         ))}
@@ -202,7 +202,7 @@ function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, notif
     r.newly.forEach((a, i) =>
       setTimeout(() => {
         sfx('unlock')
-        notify(`Achievement unlocked: ${a.name} (+${a.xp} XP)`, achievementIcon(a.icon))
+        notify(`Achievement unlocked: ${a.name} (+${a.xp} XP)`, <Badge icon={a.icon} tone={a.tone} />)
       }, 700 + i * 900),
     )
   }, [over, gameId]) // eslint-disable-line react-hooks/exhaustive-deps

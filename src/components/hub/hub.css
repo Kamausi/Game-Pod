@@ -46,80 +46,121 @@
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
 
-.home-screen svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.home-screen svg.solid, .home-screen svg .fill { fill: currentColor; stroke: none; }
+/* UI icons only (icons.jsx); illustrations like avatars and badges size themselves. */
+.home-screen svg.icon { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.home-screen svg.icon.solid, .home-screen svg.icon .fill { fill: currentColor; stroke: none; }
 
 .home-screen button { font-family: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; text-transform: none; }
 .home-screen button:focus-visible { outline: 3px solid var(--hs-gold); outline-offset: 2px; }
 
-/* Header art, with live avatar / level / gear laid exactly over the ones drawn into it.
-   The art is 941px wide, so mockup px / 9.41 = cqw. */
-.hs-header { position: relative; --hh: 258; }
-.hs-header-page { --hh: 210; }
-.hs-header-art {
-  display: block;
-  width: 100%;
-  aspect-ratio: 941 / var(--hh);
-  object-fit: cover;
-  object-position: top;
-  -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent);
-  mask-image: linear-gradient(to bottom, #000 80%, transparent);
-  pointer-events: none;
+/* Header: a little live scene (nebula, twinkling stars, floating 3D toys, logo) with the
+   player's avatar, level and settings on the right. */
+.hs-header { position: relative; }
+.hs-scene {
+  position: relative;
+  height: max(118px, 27cqw);
+  overflow: hidden;
+  background:
+    radial-gradient(60% 90% at 22% 40%, rgba(70, 110, 255, 0.55), transparent 70%),
+    radial-gradient(40% 70% at 80% 20%, rgba(170, 70, 255, 0.35), transparent 70%),
+    radial-gradient(50% 60% at 60% 90%, rgba(255, 120, 60, 0.18), transparent 70%),
+    linear-gradient(180deg, #0a0f3a, #141a5a);
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
+  mask-image: linear-gradient(to bottom, #000 78%, transparent);
 }
-.hs-me, .hs-me-level, .hs-gear { position: absolute; }
-.hs-me {
-  left: 79.9cqw;
+.hs-scene-page { height: max(100px, 22cqw); }
+.hs-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 22%, #fff, transparent),
+    radial-gradient(1px 1px at 28% 68%, #cfe0ff, transparent),
+    radial-gradient(1.5px 1.5px at 51% 14%, #fff, transparent),
+    radial-gradient(1px 1px at 67% 74%, #fff, transparent),
+    radial-gradient(2px 2px at 83% 32%, #ffe9a8, transparent),
+    radial-gradient(1px 1px at 92% 82%, #cfe0ff, transparent),
+    radial-gradient(1.5px 1.5px at 38% 40%, #fff, transparent),
+    radial-gradient(1px 1px at 6% 86%, #fff, transparent);
+  animation: hs-twinkle 4s ease-in-out infinite alternate;
+}
+@keyframes hs-twinkle { from { opacity: 0.45; } to { opacity: 1; } }
+.hs-prop {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: rotate(var(--tilt));
+  animation: hs-float 6s ease-in-out infinite;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+}
+.hs-prop .sprite { width: 100%; height: 100%; }
+@keyframes hs-float {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt)); }
+  50% { transform: translateY(-6%) rotate(calc(var(--tilt) + 4deg)); }
+}
+.hs-logo {
+  position: absolute;
+  left: 2.4cqw;
+  top: 1.2cqw;
+  width: 34cqw;
+  min-width: 140px;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+}
+.hs-scene-page .hs-logo { width: 27cqw; min-width: 112px; top: 1cqw; }
+
+.hs-me-wrap {
+  position: absolute;
+  right: 11.6cqw;
   top: 1.7cqw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6cqw;
+}
+.hs-me {
   width: 8.3cqw;
-  min-width: 34px;
+  min-width: 36px;
   aspect-ratio: 1;
   padding: 0;
   border-radius: 50%;
-  border: max(2px, 0.3cqw) solid rgba(120, 165, 255, 0.85);
+  border: max(2px, 0.3cqw) solid rgba(120, 165, 255, 0.9);
   background: #141a4a;
   overflow: hidden;
-  box-shadow: 0 0 0 max(2px, 0.3cqw) #0d1236, 0 0 12px rgba(80, 140, 255, 0.45);
+  box-shadow: 0 0 0 max(2px, 0.3cqw) #0d1236, 0 0 14px rgba(80, 140, 255, 0.5);
 }
-.hs-me img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hs-me .avatar { display: block; width: 100%; height: 100%; }
 .hs-me-level {
-  left: 84.05cqw;
-  top: 9.9cqw;
-  transform: translateX(-50%);
-  min-width: 8.6cqw;
-  padding: 0.15cqw 1cqw;
+  padding: 0.15cqw 1.2cqw;
   border-radius: 999px;
-  background: #0d1236;
+  background: rgba(10, 14, 50, 0.85);
   color: #fff;
   font: 600 max(11px, 2.1cqw) / 1.3 'Fredoka', sans-serif;
-  text-align: center;
   white-space: nowrap;
-  pointer-events: none;
 }
 .hs-gear {
-  left: 90.2cqw;
+  position: absolute;
+  right: 2.4cqw;
   top: 1.7cqw;
   width: 7.9cqw;
-  min-width: 32px;
+  min-width: 34px;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
   padding: 0;
   border-radius: 50%;
   border: max(1.5px, 0.2cqw) solid rgba(140, 160, 255, 0.35);
-  background: #1b2160;
+  background: rgba(27, 33, 96, 0.9);
   font-size: max(17px, 3.6cqw);
 }
 .hs-gear.on { border-color: var(--hs-gold); box-shadow: 0 0 0 2px rgba(255, 197, 49, 0.4), 0 0 16px rgba(255, 197, 49, 0.5); }
 .hs-me:active, .hs-gear:active { transform: scale(0.95); }
 
-/* Page title overlapping the bottom of the page header art. */
+/* Page title overlapping the faded bottom of the header scene. */
 .hs-page-title {
   position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 2cqw;
-  margin-top: -2.2cqw;
+  margin-top: -5cqw;
   padding: 0 3.8cqw;
 }
 .hs-page-title h1 {
@@ -198,23 +239,25 @@
 }
 .hs-slide-bg {
   position: absolute;
-  inset: -20%;
-  background: var(--art) center / cover;
-  filter: blur(18px) saturate(1.2) brightness(0.75);
+  inset: 0;
   z-index: -2;
+  background:
+    radial-gradient(45% 80% at 72% 45%, rgba(255, 255, 255, 0.4), transparent 70%),
+    radial-gradient(6px 6px at 30% 20%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(10px 10px at 55% 80%, rgba(255, 255, 255, 0.25), transparent),
+    radial-gradient(8px 8px at 90% 15%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(5px 5px at 45% 35%, rgba(255, 255, 255, 0.4), transparent),
+    linear-gradient(120deg, var(--c2), var(--c1));
 }
 .hs-slide-art {
   position: absolute;
-  right: 0;
-  top: 0;
-  height: 100%;
-  width: 66%;
-  object-fit: cover;
-  object-position: 40% center;
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 28%);
-  mask-image: linear-gradient(to right, transparent 0%, #000 28%);
+  right: 1%;
+  top: 2%;
+  height: 96%;
+  width: 62%;
   z-index: -1;
 }
+.hs-slide-art .sprite { filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.4)); }
 .hs-slide::after {
   content: '';
   position: absolute;
@@ -361,15 +404,15 @@
 .hs-tile:active { transform: scale(0.97); }
 .hs-tile-large { aspect-ratio: 205 / 203; }
 .hs-tile-small { aspect-ratio: 162 / 185; }
-.hs-tile img {
+.hs-tile .game-art { position: absolute; inset: 0; }
+.hs-tile::after, .hs-gtile-main::after {
+  content: '';
   position: absolute;
-  inset: 0 0 auto 0;
-  width: 100%;
-  height: 86%;
-  object-fit: cover;
-  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+  inset: 55% 0 0;
+  background: linear-gradient(to bottom, transparent, rgba(5, 8, 30, 0.75));
+  pointer-events: none;
 }
+.hs-tile-label, .hs-soon { z-index: 1; }
 .hs-tile-label {
   position: absolute;
   left: 0;
@@ -411,11 +454,7 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--chip) 85%, #fff 8%), var(--chip));
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
-.hs-chip img {
-  width: 56%;
-  -webkit-mask-image: radial-gradient(circle, #000 52%, transparent 72%);
-  mask-image: radial-gradient(circle, #000 52%, transparent 72%);
-}
+.hs-chip .sprite { width: 62%; height: auto; aspect-ratio: 1; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.4)); }
 .hs-chip span { font: 500 max(10px, 2.2cqw) 'Fredoka', sans-serif; }
 .hs-chip.active {
   border-color: var(--hs-gold);

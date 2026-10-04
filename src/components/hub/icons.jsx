@@ -1,6 +1,6 @@
 // Stroke icons (24px grid). Add `className="solid"` to fill instead of stroke.
 const S = ({ children, solid }) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className={solid ? 'solid' : undefined}>
+  <svg viewBox="0 0 24 24" aria-hidden="true" className={solid ? 'icon solid' : 'icon'}>
     {children}
   </svg>
 )

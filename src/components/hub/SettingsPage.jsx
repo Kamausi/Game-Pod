@@ -1,4 +1,4 @@
-import { avatarSrc } from '../../avatars.js'
+import Avatar from '../../art/Avatar.jsx'
 import { useStore } from '../../store.jsx'
 import { Header, Toggle } from './common.jsx'
 import { Icon } from './icons.jsx'
@@ -56,7 +56,7 @@ export default function SettingsPage({ header, notify, onEditProfile, onChangeAv
 
       <Group icon={Icon.user} title="Account">
         <button type="button" className="hs-account" onClick={onEditProfile}>
-          <img src={avatarSrc(profile.avatar)} alt="" />
+          <Avatar id={profile.avatar} />
           <span>
             <strong>{profile.name}</strong>
             <small>@{profile.handle}</small>

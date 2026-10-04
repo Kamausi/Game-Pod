@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react'
-import { avatarSrc } from '../../avatars.js'
+import Avatar from '../../art/Avatar.jsx'
+import Badge from '../../art/Badge.jsx'
+import { GameArt, Sprite } from '../../art/Sprite.jsx'
 import { gameById } from '../../games.js'
 import { timeAgo, winRate } from '../../progress.js'
 import { useStore } from '../../store.jsx'
-import emblem from '../../assets/achievements/level-emblem.webp'
-import trophy from '../../assets/achievements/trophy.webp'
-import target from '../../assets/achievements/icon-target.webp'
-import catAction from '../../assets/home/cat-action.webp'
 import { AchievementCard, useAchievements } from './AchievementsPage.jsx'
 import { EmptyState, GameTile, Header, ProgressBar, Section, formatNumber } from './common.jsx'
 import { Icon } from './icons.jsx'
@@ -31,8 +29,8 @@ function useOnline() {
 // Tags earned from how the player actually plays.
 function playerTags(stats, achievementsDone) {
   const tags = []
-  if (stats.hardGames > 0) tags.push({ icon: catAction, label: 'Competitive' })
-  if (achievementsDone >= 3) tags.push({ icon: trophy, label: 'Achievement Hunter' })
+  if (stats.hardGames > 0) tags.push({ sprite: 'gamepad', label: 'Competitive' })
+  if (achievementsDone >= 3) tags.push({ sprite: 'trophy', label: 'Achievement Hunter' })
   if (stats.twoPlayer > 0) tags.push({ svg: Icon.users, label: 'Social Player' })
   if (!tags.length) tags.push({ svg: Icon.star, label: 'Newcomer' })
   return tags
@@ -55,7 +53,7 @@ export default function ProfilePage({ header, onOpen, onEditProfile, onChangeAva
       <div className="hs-panel hs-profile">
         <div className="hs-profile-top">
           <div className="hs-bigavatar">
-            <img src={avatarSrc(profile.avatar)} alt="" />
+            <Avatar id={profile.avatar} />
             <button type="button" className="hs-bigavatar-edit" onClick={onChangeAvatar} aria-label="Change avatar">
               {Icon.pencil}
             </button>
@@ -76,14 +74,14 @@ export default function ProfilePage({ header, onOpen, onEditProfile, onChangeAva
         <div className="hs-tags">
           {playerTags(stats, done.length).map((t) => (
             <span key={t.label} className="hs-tag">
-              {t.icon ? <img src={t.icon} alt="" /> : t.svg}
+              {t.sprite ? <Sprite name={t.sprite} size={96} /> : t.svg}
               {t.label}
             </span>
           ))}
         </div>
 
         <div className="hs-levelbar">
-          <img src={emblem} alt="" />
+          <Badge icon="crown" tone="gold" wings={false} className="hs-levelbar-badge" />
           <strong>Lv. {level.level}</strong>
           <ProgressBar value={level.into} max={level.needed} />
           <span>
@@ -93,17 +91,17 @@ export default function ProfilePage({ header, onOpen, onEditProfile, onChangeAva
 
         <div className="hs-stats">
           <button type="button" className="hs-stat" onClick={onAchievements}>
-            <img src={trophy} alt="" />
+            <Sprite name="trophy" size={128} />
             <strong>{done.length}</strong>
             <span>Total Achievements</span>
           </button>
           <div className="hs-stat">
-            <img src={catAction} alt="" />
+            <Sprite name="gamepad" size={128} />
             <strong>{formatNumber(stats.games)}</strong>
             <span>Games Played</span>
           </div>
           <div className="hs-stat">
-            <img src={target} alt="" />
+            <Sprite name="target" size={128} />
             <strong>{rate === null ? '—' : `${rate}%`}</strong>
             <span>Win Rate</span>
           </div>
@@ -131,7 +129,7 @@ export default function ProfilePage({ header, onOpen, onEditProfile, onChangeAva
         {favorites.length ? (
           <div className="hs-row hs-row-favs">
             {favorites.map(gameById).filter(Boolean).map((g) => (
-              <GameTile key={g.id} game={{ ...g, art: g.tile }} size="small" onOpen={onOpen} />
+              <GameTile key={g.id} game={g} size="small" onOpen={onOpen} />
             ))}
           </div>
         ) : (
@@ -151,7 +149,7 @@ export default function ProfilePage({ header, onOpen, onEditProfile, onChangeAva
               return (
                 <li key={h.at}>
                   <button type="button" onClick={() => onOpen(g)}>
-                    <img src={g.tile} alt="" />
+                    <GameArt game={g} className="hs-history-art" />
                     <strong>{g.name}</strong>
                     <span className={`hs-result ${h.result}`}>{RESULT_LABEL[h.result]}</span>
                     <span className="hs-pts">+{h.points} pts</span>

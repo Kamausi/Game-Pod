@@ -164,7 +164,7 @@ button:focus-visible { outline: 2px solid var(--o); outline-offset: 2px; }
   animation: toast-in 0.25s ease-out;
 }
 .toast.with-icon { padding: 6px 18px 6px 6px; border-color: rgba(255, 197, 49, 0.7); box-shadow: 0 0 20px rgba(255, 197, 49, 0.35), 0 10px 30px rgba(0, 0, 0, 0.5); }
-.toast img { width: 44px; height: 36px; object-fit: cover; border-radius: 999px; }
+.toast .badge { width: 52px; flex: none; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-10px); } }
 
 .tutorial-backdrop {
