@@ -301,7 +301,7 @@ const GAMES = {
     const floorTop = 0.6 // black cell floor; pieces rest on it
     const H = 0.88 // whole tray height: tall side walls show
     // Pieces rest on the floor; their tops sit PIECE_DROP just below the board face.
-    const PIECE_DROP = 0.04
+    const PIECE_DROP = 0.07
     const PIECE_HEIGHT = H - floorTop - PIECE_DROP
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
