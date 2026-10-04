@@ -386,9 +386,9 @@ const GAMES = {
         gradient: [180, '#5a8af0', '#8a8ad0', '#e0a070', '#5a3a40'],
         masses: [[0.5, 0.0, 0.14, '#ffffff'], [0.06, 0.55, 0.22, '#ffb050'], [0.12, 0.85, 0.25, '#f0a050'], [0.15, 0.25, 0.12, '#ffd090'], [0.88, 0.3, 0.2, '#5a7ae0'], [0.6, 1.0, 0.3, '#4a2a30']],
         bokeh: { n: 16, colors: ['#ffd9a0', '#ffffff', '#ffb060', '#a8c8ff'], min: 0.015, max: 0.05, seed: 5 },
-        // Dark navy dome across the bottom of the tile: peaks ~70% down behind the board and falls away to
+        // Dark dome across the bottom of the tile, warm plum-grey under the board fading to navy at the bottom: peaks ~70% down behind the board and falls away to
         // ~83% at both side edges (traced from the reference).
-        ellipses: [[0.5, 1.2, 0.75, 0.5, '#222b41', 0.012, '#474153']],
+        ellipses: [[0.5, 1.2, 0.75, 0.5, '#32364b', 0.012, '#43373c']],
         shapes: [[0.78, 0.08, 0.12, 0.5, '#3a5ab8'], [0.9, 0.15, 0.08, 0.4, '#5a7ad8'], [0.02, 0.35, 0.05, 0.3, '#e08a40']],
       },
     }

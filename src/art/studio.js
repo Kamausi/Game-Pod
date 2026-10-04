@@ -324,15 +324,14 @@ export function paintBackdrop(width, height, spec) {
     ctx.globalAlpha = 1
   }
   // Defined forms painted over everything else (e.g. a dark stage under the subject):
-  // ellipses: [[cx, cy, rx, ry, color, blur?, edgeColor?]] in fractions of the frame; with edgeColor the
-  // fill shades from color at the centre column out to edgeColor at the sides.
-  for (const [x, y, rx, ry, color, blur = 0.01, edgeColor] of spec.ellipses ?? []) {
+  // ellipses: [[cx, cy, rx, ry, color, blur?, topColor?]] in fractions of the frame; with topColor the
+  // fill shades from topColor near the top of the frame's lower part (y 0.8) down to color (y 0.96).
+  for (const [x, y, rx, ry, color, blur = 0.01, topColor] of spec.ellipses ?? []) {
     ctx.filter = `blur(${Math.round(width * blur)}px)`
-    if (edgeColor) {
-      const g = ctx.createLinearGradient((x - rx) * width, 0, (x + rx) * width, 0)
-      g.addColorStop(0, edgeColor)
-      g.addColorStop(0.5, color)
-      g.addColorStop(1, edgeColor)
+    if (topColor) {
+      const g = ctx.createLinearGradient(0, height * 0.8, 0, height * 0.96)
+      g.addColorStop(0, topColor)
+      g.addColorStop(1, color)
       ctx.fillStyle = g
     } else ctx.fillStyle = color
     ctx.beginPath()
