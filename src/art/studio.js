@@ -49,7 +49,7 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
  * Points the camera from the requested angle and frames the model's actual projected outline
  * (not its bounding sphere), so every asset fills the frame by `fill` without clipping.
  */
-function fitCamera(object, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9 }) {
+function fitCamera(object, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift = null, roll = 0 }) {
   const points = []
   object.updateMatrixWorld(true)
   object.traverse((o) => {
@@ -79,8 +79,21 @@ function fitCamera(object, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9 }) {
     target.addScaledVector(right, ((minX + maxX) / 2) * halfH * aspect).addScaledVector(up, ((minY + maxY) / 2) * halfH)
     dist *= Math.max((maxX - minX) / 2, (maxY - minY) / 2) / fill
   }
+  // Optional placement: shift the subject (in fractions of the frame) and roll the camera.
   camera.position.copy(target).addScaledVector(dirV, dist)
   camera.lookAt(target)
+  if (shift || roll) {
+    camera.updateMatrixWorld()
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+    const halfH = Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * dist
+    const [sx = 0, sy = 0] = shift ?? []
+    const offset = right.multiplyScalar(-sx * 2 * halfH * aspect).add(up.multiplyScalar(-sy * 2 * halfH))
+    camera.position.add(offset)
+    target.add(offset)
+    camera.lookAt(target)
+    if (roll) camera.rotateZ(roll)
+  }
   return camera
 }
 
@@ -112,7 +125,7 @@ function aoBlob(radius) {
 export function renderModel(name, { width, height, tone = 'aces', exposure = 1, rim = {} }) {
   const build = MODELS[name]
   if (!build) throw new Error(`No model named ${name}`)
-  const { object, view = {}, shadow = true, look = {} } = build()
+  const { object, view = {}, shadow = true, look = {}, backdrop = null } = build()
 
   renderer.toneMapping = TONE[look.tone ?? tone]
   renderer.toneMappingExposure = look.exposure ?? exposure
@@ -134,7 +147,7 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   const r = sphere.radius
 
   // Key light matches the HDR's main softbox (front-left, above) and casts the soft shadow.
-  const key = new THREE.DirectionalLight('#fff3e6', look.keyIntensity ?? 1.4)
+  const key = new THREE.DirectionalLight(look.keyColor ?? '#fff3e6', look.keyIntensity ?? 1.4)
   key.position.set(sphere.center.x - r * 2.2, sphere.center.y + r * 3, sphere.center.z + r * 2.4)
   key.target.position.copy(sphere.center)
   key.castShadow = shadow
@@ -146,7 +159,8 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   Object.assign(key.shadow.camera, { left: -r * 1.6, right: r * 1.6, top: r * 1.6, bottom: -r * 1.6, near: 0.1, far: r * 10 })
   scene.add(key, key.target)
 
-  if (shadow) {
+  // Scene tiles (with a painted backdrop) float in front of it, so no floor shadow there.
+  if (shadow && !backdrop) {
     const floorY = box.min.y - 0.002
     const catcher = new THREE.Mesh(new THREE.PlaneGeometry(r * 6, r * 6), new THREE.ShadowMaterial({ opacity: 0.32 }))
     catcher.rotation.x = -Math.PI / 2
@@ -166,6 +180,7 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   out.width = width
   out.height = height
   out.getContext('2d').drawImage(renderer.domElement, 0, 0)
+  out.backdrop = backdrop
 
   scene.traverse((o) => {
     if (!o.isMesh) return
@@ -176,6 +191,77 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
     })
   })
   return out
+}
+
+/**
+ * Paints a soft, out-of-focus backdrop (the depth-of-field background behind a tile's subject):
+ * a base gradient, big blurred color masses (sky, grass, glow) and scattered bokeh discs.
+ *   spec = { gradient: [angleDeg, ...colors], masses: [[x, y, r, color]], bokeh: { n, colors, min, max, seed } }
+ * Coordinates are fractions of the canvas.
+ */
+export function paintBackdrop(width, height, spec) {
+  const c = document.createElement('canvas')
+  c.width = width
+  c.height = height
+  const ctx = c.getContext('2d')
+  const [angle = 160, ...stops] = spec.gradient ?? [160, '#3a2a7a', '#141a4a']
+  const a = (angle * Math.PI) / 180
+  const g = ctx.createLinearGradient(
+    width / 2 - (Math.sin(a) * width) / 2, height / 2 + (Math.cos(a) * height) / 2,
+    width / 2 + (Math.sin(a) * width) / 2, height / 2 - (Math.cos(a) * height) / 2,
+  )
+  stops.forEach((col, i) => g.addColorStop(i / Math.max(1, stops.length - 1), col))
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, width, height)
+
+  ctx.filter = `blur(${Math.round(width * 0.06)}px)`
+  for (const [x, y, r, color] of spec.masses ?? []) {
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.ellipse(x * width, y * height, r * width, r * height * 0.8, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  const b = spec.bokeh
+  if (b) {
+    let seed = b.seed ?? 3
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (let i = 0; i < (b.n ?? 18); i++) {
+      const r = (b.min ?? 0.015) + rand() * ((b.max ?? 0.06) - (b.min ?? 0.015))
+      const x = rand() * width
+      const y = rand() * height * (b.yMax ?? 1)
+      ctx.filter = `blur(${Math.round(width * r * 0.35)}px)`
+      ctx.globalAlpha = 0.35 + rand() * 0.5
+      ctx.fillStyle = b.colors[i % b.colors.length]
+      ctx.beginPath()
+      ctx.arc(x, y, r * width, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
+  }
+  ctx.filter = 'none'
+  // Gentle vignette pulls focus to the subject.
+  const v = ctx.createRadialGradient(width / 2, height * 0.45, width * 0.25, width / 2, height * 0.5, width * 0.8)
+  v.addColorStop(0, 'rgba(0,0,0,0)')
+  v.addColorStop(1, 'rgba(0,0,0,0.35)')
+  ctx.fillStyle = v
+  ctx.fillRect(0, 0, width, height)
+  return c
+}
+
+export function composite(back, front) {
+  const out = document.createElement('canvas')
+  out.width = back.width
+  out.height = back.height
+  const ctx = out.getContext('2d')
+  ctx.drawImage(back, 0, 0)
+  ctx.drawImage(front, 0, 0)
+  return out
+}
+
+/** Renders the model and, when it defines a backdrop, composites it into a full-bleed scene. */
+export function renderAsset(name, opts) {
+  const canvas = renderModel(name, opts)
+  return canvas.backdrop ? composite(paintBackdrop(opts.width, opts.height, canvas.backdrop), canvas) : canvas
 }
 
 /**

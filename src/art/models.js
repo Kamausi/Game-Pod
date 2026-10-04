@@ -243,101 +243,98 @@ function grassTuft(pos, s = 1) {
 
 const GAMES = {
   'tic-tac-toe': () => {
-    // Varnished wooden tray with a raised frame, engraved grid and glossy plastic pieces.
-    const grain = woodTexture({ base: '#c4702a', dark: '#6e3410', light: '#dc8c42', seed: 7 })
-    // Satin varnish: enough sheen to read as finished wood without mirroring the studio lights.
-    const varnish = (color, map) => mat(color, { map, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.45 })
-    const frameWood = varnish('#ffffff', woodTexture({ base: '#9e5520', dark: '#7e4014', light: '#b0642a', seed: 3 }))
-    const tray = mesh(rbox(3.3, 0.3, 3.3, 0.14), frameWood, [0, 0, 0])
-    const field = mesh(new THREE.PlaneGeometry(2.86, 2.86), varnish('#ffffff', grain), [0, 0.151, 0], [-Math.PI / 2, 0, 0])
-    const frame = [
-      [0, 1.53, 3.3, 0.24], [0, -1.53, 3.3, 0.24],
-      [1.53, 0, 0.24, 3.3], [-1.53, 0, 0.24, 3.3],
-    ].map(([x, z, w, d]) => mesh(rbox(w, 0.18, d, 0.08), frameWood, [x, 0.2, z]))
-    const groove = mat('#5a2e10', { roughness: 0.8, clearcoat: 0 })
-    const lines = [-0.48, 0.48].flatMap((o) => [
-      mesh(rbox(2.78, 0.02, 0.07, 0.01), groove, [0, 0.152, o]),
-      mesh(rbox(0.07, 0.02, 2.78, 0.01), groove, [o, 0.152, 0]),
-    ])
-    const blue = mat('#0d3dff', { roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08 })
-    const red = mat('#e8001f', { roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08 })
-    const X = () => group([
-      mesh(capsule(0.1, 0.62), blue, [0, 0, 0], [0, Math.PI / 4, Math.PI / 2]),
-      mesh(capsule(0.1, 0.62), blue, [0, 0, 0], [0, -Math.PI / 4, Math.PI / 2]),
-    ])
-    const O = () => mesh(torus(0.27, 0.105), red, [0, 0, 0], [Math.PI / 2, 0, 0])
-    const layout = ['X', 'O', 'O', 'O', 'X', 'O', 'X', 'X', 'O']
-    const pieces = layout.map((p, i) => {
-      const piece = p === 'X' ? X() : O()
-      piece.position.set(((i % 3) - 1) * 0.96, 0.26, (Math.floor(i / 3) - 1) * 0.96)
-      return piece
+    // Reference: a thick light-wood box, raised divider walls, dark pockets holding chunky pieces,
+    // seen almost from above and turned slightly, over a warm out-of-focus glow.
+    const wood = mat('#ffffff', {
+      map: woodTexture({ base: '#d47a28', dark: '#c06c22', light: '#e8923a', seed: 7 }),
+      roughness: 0.55, clearcoat: 0.2, clearcoatRoughness: 0.5,
     })
-    return { object: group([tray, field, ...frame, ...lines, ...pieces]), view: { pitch: 0.78, yaw: -0.38, fill: 0.98 } }
+    const pocket = mat('#3a1c0c', { roughness: 0.85, clearcoat: 0 })
+    const S = 1.0 // cell pitch
+    const W = 3 * S + 0.62 // outer size
+    const parts = [
+      mesh(rbox(W, 0.34, W, 0.12), wood, [0, 0.05, 0]), // thick base
+      mesh(new THREE.PlaneGeometry(3 * S, 3 * S), pocket, [0, 0.222, 0], [-Math.PI / 2, 0, 0]), // dark pocket floors
+    ]
+    // Outer walls.
+    const wallH = 0.38
+    for (const [x, z, w, d] of [[0, W / 2 - 0.155, W, 0.31], [0, -(W / 2 - 0.155), W, 0.31], [W / 2 - 0.155, 0, 0.31, W], [-(W / 2 - 0.155), 0, 0.31, W]])
+      parts.push(mesh(rbox(w, wallH, d, 0.09), wood, [x, 0.22 + wallH / 2 - 0.02, z]))
+    // Divider walls between cells.
+    for (const o of [-S / 2, S / 2]) {
+      parts.push(mesh(rbox(3 * S, 0.3, 0.14, 0.06), wood, [0, 0.22 + 0.13, o]))
+      parts.push(mesh(rbox(0.14, 0.3, 3 * S, 0.06), wood, [o, 0.22 + 0.13, 0]))
+    }
+    const blue = mat('#1650ff', { roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.4 })
+    const red = mat('#e80c26', { roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.4 })
+    const X = () => group([
+      mesh(rbox(0.86, 0.2, 0.25, 0.1), blue, [0, 0, 0], [0, Math.PI / 4, 0]),
+      mesh(rbox(0.86, 0.2, 0.25, 0.1), blue, [0, 0, 0], [0, -Math.PI / 4, 0]),
+    ])
+    const O = () => mesh(new THREE.TorusGeometry(0.28, 0.13, 32, 72), red, [0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.8])
+    const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
+    layout.forEach((p, i) => {
+      const piece = p === 'X' ? X() : O()
+      piece.position.set(((i % 3) - 1) * S, 0.33, (Math.floor(i / 3) - 1) * S)
+      parts.push(piece)
+    })
+    return {
+      // Tip the right edge up toward the camera so that side reads nearer, like the reference.
+      object: group(parts, [0, 0, 0], [0.12, 0, 0.16]),
+      view: { pitch: 0.98, yaw: 0, fill: 0.86, shift: [-0.03, 0.04], roll: -0.12 },
+      look: { envIntensity: 0.7 },
+      backdrop: {
+        gradient: [180, '#1a2a78', '#4a3a88', '#9a5a50'],
+        masses: [[0.1, 0.12, 0.28, '#4a7aff'], [0.9, 0.2, 0.25, '#8a6ad8'], [0.1, 0.75, 0.3, '#ff9a4a'], [0.85, 0.9, 0.3, '#2a3a9a'], [0.5, 0.05, 0.2, '#6aa0ff']],
+        bokeh: { n: 12, colors: ['#ffd9a0', '#8ab0ff', '#ffb0d8', '#a8c8ff'], min: 0.02, max: 0.06, seed: 5 },
+      },
+    }
   },
 
   checkers: () => {
+    // Reference: close-up of a black-framed board running off the tile, cream and dark squares,
+    // tall glossy red and black pieces, warm amber bokeh behind.
     const N = 6
-    const SQ = 0.5
+    const SQ = 0.55
     const surface = canvasTexture(768, 768, (ctx, W) => {
       const q = W / N
       for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
         const dark = (r + c) % 2 === 1
         const g = ctx.createLinearGradient(c * q, r * q, (c + 1) * q, (r + 1) * q)
-        g.addColorStop(0, dark ? '#4a2614' : '#e9c48a')
-        g.addColorStop(1, dark ? '#36190b' : '#d9a96a')
+        g.addColorStop(0, dark ? '#2a1a10' : '#e8a95c')
+        g.addColorStop(1, dark ? '#1a0f08' : '#c98a44')
         ctx.fillStyle = g
         ctx.fillRect(c * q, r * q, q, q)
-        // fine grain inside each square
-        ctx.strokeStyle = dark ? 'rgba(0,0,0,.18)' : 'rgba(150,90,40,.14)'
-        ctx.lineWidth = 1.5
-        for (let i = 0; i < 6; i++) {
-          const y = r * q + ((i + 0.5) / 6) * q + Math.sin(c + i) * 3
-          ctx.beginPath()
-          ctx.moveTo(c * q, y)
-          ctx.bezierCurveTo(c * q + q / 3, y - 4, c * q + (2 * q) / 3, y + 4, (c + 1) * q, y)
-          ctx.stroke()
-        }
       }
     })
-    const walnut = mat('#ffffff', { map: woodTexture({ base: '#5a2e14', dark: '#3a1a08', light: '#6e3a1a', seed: 11 }), roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.35 })
     const size = N * SQ
-    const base = mesh(rbox(size + 0.5, 0.3, size + 0.5, 0.12), walnut, [0, 0, 0])
-    const rim = [
-      [0, (size + 0.36) / 2, size + 0.5, 0.18], [0, -(size + 0.36) / 2, size + 0.5, 0.18],
-      [(size + 0.36) / 2, 0, 0.18, size + 0.5], [-(size + 0.36) / 2, 0, 0.18, size + 0.5],
-    ].map(([x, z, w, d]) => mesh(rbox(w, 0.12, d, 0.06), walnut, [x, 0.19, z]))
-    const field = mesh(new THREE.PlaneGeometry(size, size), mat('#ffffff', { map: surface, roughness: 0.62, clearcoat: 0.12, clearcoatRoughness: 0.5 }), [0, 0.151, 0], [-Math.PI / 2, 0, 0])
-
-    // Real checker profile: recessed top with an inner ring, ridged rounded edge.
-    const R = 0.2
-    const H = 0.11
-    const profile = [
-      [0, H - 0.004], [R * 0.55, H - 0.004], [R * 0.6, H - 0.01], [R * 0.66, H - 0.004], [R * 0.74, H],
-      [R * 0.9, H], [R, H - 0.02], [R * 1.02, H * 0.75], [R * 0.99, H * 0.62], [R * 1.02, H * 0.5],
-      [R * 0.99, H * 0.38], [R * 1.02, H * 0.25], [R, 0.015], [R * 0.9, 0], [0, 0],
-    ].map(([x, y]) => new THREE.Vector2(x, y))
-    const pieceGeo = new THREE.LatheGeometry(profile, 48)
-    const red = mat('#b30019', { roughness: 0.28, clearcoat: 0.8, clearcoatRoughness: 0.12 })
-    const black = mat('#222228', { roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.3, envMapIntensity: 0.6 })
-    const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0.152, (r - (N - 1) / 2) * SQ]
-    const piece = (c, r, m, stack = 0, tilt = null) => {
-      const [x, y, z] = at(c, r)
-      const p = mesh(pieceGeo, m, [x, y + stack * (H + 0.005), z])
-      if (tilt) {
-        p.position.y += tilt.lift
-        p.position.x += tilt.dx
-        p.rotation.set(tilt.rx, 0, tilt.rz)
-      }
-      return p
-    }
+    const frame = mat('#161210', { roughness: 0.15, clearcoat: 0.8, clearcoatRoughness: 0.1, envMapIntensity: 0.5 })
+    const base = mesh(rbox(size + 0.36, 0.4, size + 0.36, 0.1), frame, [0, -0.05, 0])
+    const field = mesh(new THREE.PlaneGeometry(size, size), mat('#ffffff', { map: surface, roughness: 0.55, clearcoat: 0.15 }), [0, 0.151, 0], [-Math.PI / 2, 0, 0])
+    // Tall rounded cylinders with a slight top bevel, like the reference pieces.
+    const R = 0.21
+    const H = 0.25
+    const profile = [[0, H], [R * 0.85, H], [R * 0.97, H - 0.02], [R, H - 0.05], [R, 0.03], [R * 0.95, 0], [0, 0]].map(([x, y]) => new THREE.Vector2(x, y))
+    const geo = new THREE.LatheGeometry(profile, 48)
+    // Slightly translucent red plastic so light glows through the edges.
+    const red = mat('#e60005', { roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.08, transmission: 0.3, thickness: 0.4, envMapIntensity: 0.6 })
+    const black = mat('#121010', { roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.2, envMapIntensity: 0.12 })
+    const at = (c, r, m) => mesh(geo, m, [(c - (N - 1) / 2) * SQ, 0.152, (r - (N - 1) / 2) * SQ])
+    // Mixed mid-game position, as in the reference.
     const pieces = [
-      piece(1, 0, black), piece(3, 0, black), piece(5, 0, black), piece(0, 1, black), piece(4, 1, black),
-      piece(2, 1, black), piece(3, 2, black),
-      piece(0, 5, red), piece(2, 5, red), piece(4, 5, red), piece(1, 4, red), piece(5, 4, red),
-      piece(0, 3, red), piece(0, 3, red, 1), // a crowned king
-      piece(2, 3, red, 0, { lift: 0.32, dx: 0.12, rx: 0.35, rz: -0.25 }), // mid-jump
+      at(1, 0, black), at(3, 0, black), at(2, 1, black), at(4, 1, black), at(3, 2, black), at(5, 2, black), at(2, 3, black), at(4, 3, black), at(1, 2, black),
+      at(0, 1, red), at(5, 0, red), at(0, 3, red), at(1, 4, red), at(3, 4, red), at(2, 5, red), at(4, 5, red), at(5, 4, red),
     ]
-    return { object: group([base, ...rim, field, ...pieces]), view: { pitch: 0.72, yaw: -0.5, fill: 0.98 }, look: { envIntensity: 0.6, keyIntensity: 1.8 } }
+    return {
+      object: group([base, field, ...pieces], [0, 0, 0], [0, 0.3, 0]),
+      view: { pitch: 0.98, yaw: 0, fill: 1.12, shift: [0.03, 0.04], roll: -0.1 },
+      look: { envIntensity: 0.45, keyIntensity: 2.6, keyColor: '#ffe6bb', rim: { intensity: 0.06 } },
+      backdrop: {
+        gradient: [180, '#3a2010', '#8a4a1a', '#2a1408'],
+        masses: [[0.85, 0.1, 0.3, '#ffb050'], [0.1, 0.15, 0.25, '#d07a30'], [0.9, 0.7, 0.3, '#c86a20'], [0.1, 0.9, 0.3, '#3a1a0a']],
+        bokeh: { n: 14, colors: ['#ffd090', '#ffb060', '#fff0c0'], min: 0.02, max: 0.07, seed: 9 },
+      },
+    }
   },
 
   'ring-toss': () => {
