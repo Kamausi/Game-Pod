@@ -288,7 +288,7 @@ const GAMES = {
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     // Colour gains (linear RGB multipliers on the wood textures), tuned so rendered colours equal the
     // reference's sampled pixels exactly.
-    const WOOD_GAIN = [1.005857, 0.976598, 0.948633]
+    const WOOD_GAIN = [1.005857, 0.966516, 0.948633]
     const RAIL_GAIN = [1.340573, 0.932826, 0.841023]
     const wood = mat(new THREE.Color().setRGB(...WOOD_GAIN), {
       map: woodTexture({ base: '#f97233', dark: '#eb6b31', light: '#ff7c3b', seed: 7 }), // honey caramel, sampled against the reference
@@ -326,15 +326,14 @@ const GAMES = {
       // One-piece frame: rounded outer corners (radius 0.45), rounded inner corners, no seams.
       mesh(frameGeo, wood),
       mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
-      // Soft black shadow pooled under the board, as in the reference.
-      mesh(new THREE.PlaneGeometry(OUTER * 2.1, OUTER_DEPTH * 2.1), new THREE.MeshBasicMaterial({
+      // Soft dark-navy shadow hugging the board's shape, just showing below its front edge (as in the reference).
+      mesh(new THREE.PlaneGeometry(OUTER * 1.5, OUTER_DEPTH * 1.5), new THREE.MeshBasicMaterial({
         map: canvasTexture(256, 256, (ctx, W, Hc) => {
-          const g = ctx.createRadialGradient(W / 2, Hc / 2, 0, W / 2, Hc / 2, W / 2)
-          g.addColorStop(0, 'rgba(0,0,0,1)')
-          g.addColorStop(0.6, 'rgba(0,0,0,0.9)')
-          g.addColorStop(1, 'rgba(0,0,0,0)')
-          ctx.fillStyle = g
-          ctx.fillRect(0, 0, W, Hc)
+          ctx.filter = `blur(${Math.round(W * 0.05)}px)`
+          ctx.fillStyle = 'rgba(10,14,30,0.95)'
+          ctx.beginPath()
+          ctx.roundRect(W * 0.17, Hc * 0.17, W * 0.66, Hc * 0.66, W * 0.06)
+          ctx.fill()
         }),
         transparent: true, depthWrite: false,
       }), [0, -WALL_EXTRA - 0.05, 0.5], [-Math.PI / 2, 0, 0]),
