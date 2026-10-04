@@ -291,15 +291,13 @@ const GAMES = {
       roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
     })
     const black = mat('#050403', { roughness: 1, clearcoat: 0, envMapIntensity: 0 })
-    const S = 1.0 // cell pitch
-    const DIV_W = 0.19 // divider width (squares are S - DIV_W = 0.81, snug around the pieces)
-    // Inner well sized so all nine cells are equal (S - DIV_W) and each cell's centre is on the S pitch,
-    // so pieces placed at -S / 0 / +S sit centred in their squares.
-    const INNER = 3 * S - DIV_W
-    // Front-to-back pitch: the reference's opening is shallower than it is wide (2.406 x 2.81), solved so
-    // the four inner corners land exactly on the reference's.
-    const SZ = 0.8653
-    const INNER_DEPTH = 3 * SZ - DIV_W
+    // The opening is fixed by the reference (its four inner corners are matched exactly by the camera):
+    // 2.81 wide, 2.406 deep. Nine equal cells fill it, so the cell pitch follows the divider width.
+    const INNER = 2.81
+    const INNER_DEPTH = 2.406
+    const DIV_W = 0.14 // divider width
+    const S = (INNER + DIV_W) / 3 // side-to-side cell pitch (pieces and dividers sit on it)
+    const SZ = (INNER_DEPTH + DIV_W) / 3 // front-to-back cell pitch
     const RIM = 0.25 // frame wall thickness
     const OUTER = INNER + 2 * RIM
     const OUTER_DEPTH = INNER_DEPTH + 2 * RIM
