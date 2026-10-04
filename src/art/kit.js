@@ -267,3 +267,35 @@ export function noiseTexture({ size = 256, contrast = 0.12, seed = 1 } = {}) {
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping
   return tex
 }
+
+/** Rounded-rectangle path centred on the origin. */
+export function roundedRectPath(path, w, h, r) {
+  const x = -w / 2
+  const y = -h / 2
+  path.moveTo(x + r, y)
+  path.lineTo(x + w - r, y)
+  path.absarc(x + w - r, y + r, r, -Math.PI / 2, 0)
+  path.lineTo(x + w, y + h - r)
+  path.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2)
+  path.lineTo(x + r, y + h)
+  path.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI)
+  path.lineTo(x, y + r)
+  path.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5)
+  return path
+}
+
+/**
+ * One-piece tray frame: a rounded-rectangle block with a rounded-rectangle opening, bevelled all
+ * round. Rounded outer corners and inner corners, no seams between walls.
+ */
+export function trayFrameGeometry({ outer = 4, inner = 3.1, height = 0.6, outerRadius = 0.4, innerRadius = 0.1, bevel = 0.07 } = {}) {
+  const shape = roundedRectPath(new THREE.Shape(), outer - bevel * 2, outer - bevel * 2, outerRadius)
+  shape.holes.push(roundedRectPath(new THREE.Path(), inner + bevel * 2, inner + bevel * 2, innerRadius))
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: height - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 6, curveSegments: 24,
+  })
+  g.rotateX(-Math.PI / 2)
+  g.translate(0, bevel, 0) // bottom of the bevel sits at y = 0
+  g.computeVertexNormals()
+  return g
+}

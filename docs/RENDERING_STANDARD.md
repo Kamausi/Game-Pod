@@ -19,14 +19,14 @@ reference, but must say why in a comment.
 
 ## Benchmark
 
-**Tic Tac Toe and Checkers are the locked Game Pod visual benchmarks** (`src/assets/art/tic-tac-toe.webp`,
+**Tic Tac Toe and Checkers are the Game Pod visual benchmarks (still being matched to their references)** (`src/assets/art/tic-tac-toe.webp`,
 `src/assets/art/checkers.webp`; models in `src/art/models.js`). Every new game starts from their kit pieces,
 materials, lighting and camera settings, not from primitives, and is not visually complete until its showcase render
 sits next to them without looking like a different product: same bevel language, material response, lighting
 contrast, grounding and backdrop depth.
 
-The benchmark models are **locked**: don't change them while working on other assets. Shared studio changes that
-alter how they render must be re-checked against both before committing.
+Shared studio changes that alter how they render must be re-checked against both before committing.
+Review against the reference at full size (600 px+), not thumbnails: thumbnails hid sharp corners, seams and wrong camera sides.
 
 ## 1. Geometry
 

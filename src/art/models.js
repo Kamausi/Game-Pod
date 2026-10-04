@@ -2,7 +2,7 @@
 // Each returns { object, view } where view = { pitch, yaw, fill } positions the camera.
 import {
   THREE, mat, wood, metal, matte, mesh, group, rbox, cyl, sphere, torus, cone, capsule,
-  canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture, toyXGeometry, toyOGeometry, toyPuckGeometry, vary, noiseTexture,
+  canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture, toyXGeometry, toyOGeometry, toyPuckGeometry, vary, noiseTexture, trayFrameGeometry,
 } from './kit.js'
 
 const C = {
@@ -283,59 +283,69 @@ function grassTuft(pos, s = 1) {
 
 const GAMES = {
   'tic-tac-toe': () => {
-    // LOCKED benchmark (docs/RENDERING_STANDARD.md): don't modify while working on other assets.
-    // Reference: a thick light-wood box, raised divider walls, dark pockets holding chunky pieces,
-    // seen almost from above and turned slightly, over a warm out-of-focus glow.
+    // Reference: one solid caramel wood tray with large rounded outer corners, a glossy rim lit from
+    // the upper right, thin flat dividers over black cells, crisp royal-blue X bars and thick glossy
+    // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     const wood = mat('#ffffff', {
-      // Honey maple, not saturated orange.
-      map: woodTexture({ base: '#c6843e', dark: '#bf7e3a', light: '#cc8c46', seed: 7 }),
-      roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.45,
+      map: woodTexture({ base: '#b8662a', dark: '#9a5220', light: '#cc7c3a', seed: 7 }), // caramel, real but soft grain
+      roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
     })
-    const pocket = mat('#1a0c05', { roughness: 0.95, clearcoat: 0, envMapIntensity: 0.1 })
-    // Toy proportions: chunky frame, thick rounded dividers, deep cells, oversized pieces.
+    const black = mat('#0c0806', { roughness: 0.95, clearcoat: 0, envMapIntensity: 0.05 })
     const S = 1.0 // cell pitch
-    const WALL = 0.42 // outer frame width
-    const W = 3 * S + WALL * 2
-    const floorTop = 0.12 // ~20% deeper cells than before
-    const wallH = 0.6
+    const INNER = 3 * S + 0.08
+    const OUTER = INNER + 2 * 0.4
+    const H = 0.78 // whole tray height: thick side faces show
+    const floorTop = 0.3
+    // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
+    const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.08, bevel: 0.08 })
+    const uv = frameGeo.attributes.uv
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
     const parts = [
-      mesh(rbox(W, 0.32, W, 0.1, 6), wood, [0, -0.04, 0]), // base (slightly shallower frame depth)
-      mesh(new THREE.PlaneGeometry(3 * S, 3 * S), pocket, [0, floorTop + 0.001, 0], [-Math.PI / 2, 0, 0]),
+      // One-piece frame: rounded outer corners (radius 0.45), rounded inner corners, no seams.
+      mesh(frameGeo, wood),
+      mesh(rbox(INNER + 0.1, floorTop, INNER + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
+      mesh(new THREE.PlaneGeometry(INNER, INNER), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
-    for (const [x, z, w, d] of [[0, W / 2 - WALL / 2, W, WALL], [0, -(W / 2 - WALL / 2), W, WALL], [W / 2 - WALL / 2, 0, WALL, W], [-(W / 2 - WALL / 2), 0, WALL, W]])
-      parts.push(mesh(rbox(w, wallH, d, 0.12, 6), wood, [x, floorTop + wallH / 2 - 0.12, z]))
+    // Thin flat-topped dividers, a little below the frame top.
     for (const o of [-S / 2, S / 2]) {
-      // Flat-topped slabs with soft shoulders, not tubes.
-      parts.push(mesh(rbox(3 * S + 0.1, 0.44, 0.17, 0.05, 6), wood, [0, floorTop + 0.2, o]))
-      parts.push(mesh(rbox(0.17, 0.44, 3 * S + 0.1, 0.05, 6), wood, [o, floorTop + 0.2, 0]))
+      parts.push(mesh(rbox(INNER, 0.3, 0.1, 0.03, 4), wood, [0, floorTop + 0.15, o]))
+      parts.push(mesh(rbox(0.1, 0.3, INNER, 0.03, 4), wood, [o, floorTop + 0.15, 0]))
     }
-    // Painted toy plastic: broad soft highlights, not candy gloss.
-    const blue = mat('#1650ff', { roughness: 0.48, clearcoat: 0.15, clearcoatRoughness: 0.5 })
-    const red = mat('#e80c26', { roughness: 0.48, clearcoat: 0.15, clearcoatRoughness: 0.5 })
-    const xGeo = toyXGeometry({ size: 1.04, arm: 0.3, tip: 0.23, depth: 0.15, bevel: 0.04 })
-    const oGeo = toyOGeometry({ radius: 0.29, width: 0.27, height: 0.25, round: 0.1 })
+    // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
+    const blue = mat('#0a50ff', { roughness: 0.28, clearcoat: 0.7, clearcoatRoughness: 0.15 })
+    const bar = rbox(0.98, 0.17, 0.23, 0.045, 4)
+    const X = () => group([mesh(bar, blue, [0, 0, 0], [0, Math.PI / 4, 0]), mesh(bar, blue, [0, 0, 0], [0, -Math.PI / 4, 0])])
+    // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
+    const red = mat('#e8101c', { roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.08 })
+    const ringGeo = toyOGeometry({ radius: 0.265, width: 0.28, height: 0.22, round: 0.08 })
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
-      const piece = p === 'X' ? mesh(xGeo, blue) : mesh(oGeo, red)
-      piece.position.set(((i % 3) - 1) * S, floorTop + 0.14, (Math.floor(i / 3) - 1) * S)
-      parts.push(vary(piece, i + 1))
+      const piece = p === 'X' ? X() : mesh(ringGeo, red)
+      piece.position.set(((i % 3) - 1) * S, floorTop + 0.2, (Math.floor(i / 3) - 1) * S)
+      parts.push(vary(piece, i + 1, { rot: 1.5, scale: 0.005, value: 0.01, rough: 0.02 }))
     })
     return {
-      // Tip the right edge up toward the camera so that side reads nearer, like the reference.
-      object: group(parts, [0, 0, 0], [0.12, 0, 0.16]),
-      view: { pitch: 0.98, yaw: 0, fill: 0.86, shift: [-0.04, 0.04], roll: -0.12, fov: 26 },
-      // Contrast: bright warm key, dark cavities, cool environment, controlled rim.
-      look: { envIntensity: 0.45, keyIntensity: 2.6, keyColor: '#ffe2b8', ambient: ['#7a9cff', '#1a1430', 0.35], rim: { intensity: 0.22, color: '#9fc4ff' }, aoIntensity: 2.0, aoRadius: 0.045, glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] } },
+      // Board rotated in the world and tilted toward the camera, as in the reference.
+      // Camera front-left so the left and front side faces show, as in the reference.
+      object: group(parts, [0, 0, 0], [0.1, 0, -0.1]),
+      view: { pitch: 0.95, yaw: -0.3, fill: 0.92, shift: [-0.02, 0.03], roll: -0.01, fov: 26 },
+      look: {
+        keyFrom: [2.4, 3.0, 0.6], // upper right: bright right/top rim, shaded front face
+        keyIntensity: 2.8, keyColor: '#ffe6c0', envIntensity: 0.5,
+        rim: { intensity: 0.25, color: '#ffd8a0' }, aoIntensity: 1.8, aoRadius: 0.04,
+        glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
+      },
       backdrop: {
-        gradient: [180, '#1a2a78', '#4a3a88', '#9a5a50'],
-        masses: [[0.1, 0.12, 0.28, '#4a7aff'], [0.9, 0.2, 0.25, '#8a6ad8'], [0.1, 0.75, 0.3, '#ff9a4a'], [0.85, 0.9, 0.3, '#2a3a9a'], [0.5, 0.05, 0.2, '#6aa0ff']],
-        bokeh: { n: 12, colors: ['#ffd9a0', '#8ab0ff', '#ffb0d8', '#a8c8ff'], min: 0.02, max: 0.06, seed: 5 },
+        // Blurred carnival / street at dusk.
+        gradient: [180, '#5a8af0', '#8a8ad0', '#e0a070', '#5a3a40'],
+        masses: [[0.5, 0.0, 0.14, '#ffffff'], [0.06, 0.55, 0.22, '#ffb050'], [0.12, 0.85, 0.25, '#f0a050'], [0.15, 0.25, 0.12, '#ffd090'], [0.88, 0.3, 0.2, '#5a7ae0'], [0.6, 1.0, 0.3, '#4a2a30']],
+        bokeh: { n: 16, colors: ['#ffd9a0', '#ffffff', '#ffb060', '#a8c8ff'], min: 0.015, max: 0.05, seed: 5 },
+        shapes: [[0.78, 0.08, 0.12, 0.5, '#3a5ab8'], [0.9, 0.15, 0.08, 0.4, '#5a7ad8'], [0.02, 0.35, 0.05, 0.3, '#e08a40']],
       },
     }
   },
 
   checkers: () => {
-    // LOCKED benchmark (docs/RENDERING_STANDARD.md): don't modify while working on other assets.
     // Reference: a chunky physical toy board photographed on a table: thick casing, individually
     // bevelled inset squares, sculpted pucks with slight variation, warm raking light, shallow focus.
     const N = 6
