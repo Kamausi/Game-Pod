@@ -11,6 +11,7 @@ const SUPERSAMPLE = 2
 async function main() {
   const params = new URLSearchParams(location.search)
   const name = params.get('asset')
+  globalThis.__BAKE_DEBUG = params.has('debug')
   const spec = ASSETS[name]
   if (!spec) throw new Error(`Unknown asset ${name}`)
   await Promise.all([document.fonts.load('700 64px Fredoka'), document.fonts.load('600 64px Fredoka')])

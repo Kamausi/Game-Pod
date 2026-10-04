@@ -29,7 +29,7 @@ All in-app art is generated in code; the only bitmap made outside the project is
 2. **Studio** (`src/art/studio.js`): renders the model with an HDR environment (`npm run make-hdr` generates `src/art/env/studio.hdr`: warm key softbox, overhead strip, cool fill, hot-pink and cyan rim lights), a shadow-casting key light onto an invisible floor, a fresnel rim glow layered onto the model's own materials, ACES tone mapping, a camera fitted to the model's outline, and an alpha-preserving bloom pass.
 3. **Bake** (`npm run bake -- <asset>`): renders at 2x in headless Chromium, downsamples with Lanczos and saves a transparent WebP to `src/assets/art/`. Add `--compare` to get ACES / AgX / Neutral variants for review. Sizes are listed in `src/art/manifest.js`. (Needs Playwright's Chromium: `npx playwright install chromium`.)
 
-**Art standard** (every asset follows it):
+**Art standard**: the full spec with numbers is in [`docs/RENDERING_STANDARD.md`](docs/RENDERING_STANDARD.md). In short:
 
 - **No raw primitives in the foreground.** Hero pieces come from the toy kit in `src/art/kit.js` (`toyXGeometry` pillowy X, `toyOGeometry` flat-topped ring, `toyPuckGeometry` domed checker), or lathe/extrude profiles with heavy, many-segment bevels. Lathe profiles run bottom-to-top, or normals flip and pieces render hollow.
 - **Toy proportions.** Model for readability at 200–400 px: chunky frames, thick dividers, oversized pieces.

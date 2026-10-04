@@ -164,24 +164,25 @@ export function roundRect(ctx, x, y, w, h, r) {
  * Pillowy X: one continuous outline (rounded terminals, rounded inner corners) extruded with a
  * deep, many-segment bevel so the whole piece reads as soft moulded plastic.
  */
-export function toyXGeometry({ size = 0.8, arm = 0.26, depth = 0.08, bevel = 0.09 } = {}) {
+export function toyXGeometry({ size = 0.8, arm = 0.26, tip = 0.2, depth = 0.08, bevel = 0.09 } = {}) {
+  // Arms taper from a thick centre (`arm`) to rounded tips (`tip`), so the X has a heavier middle mass.
   const half = size / 2 - bevel
-  const w = arm / 2 - bevel * 0.6
-  const e = half - w // where each arm's round cap is centred
-  // Plus-sign outline traced clockwise, a half-circle cap on each arm; rotated 45° into an X below.
+  const wc = arm / 2 - bevel * 0.6
+  const wt = tip / 2 - bevel * 0.6
+  const e = half - wt // centre of each tip's round cap
   const s = new THREE.Shape()
-  s.moveTo(w, w)
-  s.lineTo(e, w)
-  s.absarc(e, 0, w, Math.PI / 2, -Math.PI / 2, true)
-  s.lineTo(w, -w)
-  s.lineTo(w, -e)
-  s.absarc(0, -e, w, 0, -Math.PI, true)
-  s.lineTo(-w, -w)
-  s.lineTo(-e, -w)
-  s.absarc(-e, 0, w, -Math.PI / 2, (-3 * Math.PI) / 2, true)
-  s.lineTo(-w, w)
-  s.lineTo(-w, e)
-  s.absarc(0, e, w, Math.PI, 0, true)
+  s.moveTo(wc, wc)
+  s.lineTo(e, wt)
+  s.absarc(e, 0, wt, Math.PI / 2, -Math.PI / 2, true)
+  s.lineTo(wc, -wc)
+  s.lineTo(wt, -e)
+  s.absarc(0, -e, wt, 0, -Math.PI, true)
+  s.lineTo(-wc, -wc)
+  s.lineTo(-e, -wt)
+  s.absarc(-e, 0, wt, -Math.PI / 2, (-3 * Math.PI) / 2, true)
+  s.lineTo(-wc, wc)
+  s.lineTo(-wt, e)
+  s.absarc(0, e, wt, Math.PI, 0, true)
   s.closePath()
   const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 10, curveSegments: 16 })
   g.center()
@@ -211,16 +212,40 @@ export function toyOGeometry({ radius = 0.28, width = 0.24, height = 0.2, round 
   return g
 }
 
-/** Checker puck: gently domed face with a faint inner ring, soft rounded rim, ridged side, tucked base. */
+/** Checker puck: stepped top (raised inner disc inside a recessed ring), rounded rim lip, ridged side, tucked base. */
 export function toyPuckGeometry({ radius = 0.22, height = 0.2 } = {}) {
   const R = radius
   const H = height
   const p = [
-    [0, H * 1.02], [R * 0.4, H * 1.01], [R * 0.62, H * 0.99], [R * 0.68, H * 0.97], [R * 0.72, H * 0.99],
-    [R * 0.86, H * 0.98], [R * 0.96, H * 0.93], [R * 1.01, H * 0.82],
+    [0, H * 1.0], [R * 0.52, H * 0.99], [R * 0.58, H * 0.95], [R * 0.64, H * 0.9], [R * 0.7, H * 0.93],
+    [R * 0.8, H * 0.99], [R * 0.92, H * 0.98], [R * 0.99, H * 0.91], [R * 1.01, H * 0.8],
     [R * 0.985, H * 0.68], [R * 1.01, H * 0.56], [R * 0.985, H * 0.44], [R * 1.01, H * 0.32],
     [R * 0.99, H * 0.12], [R * 0.93, H * 0.02], [R * 0.85, 0], [0, 0],
   ].map(([x, y]) => new THREE.Vector2(x, y))
   // Lathe profiles must run bottom-to-top, or the normals point inward and the piece renders as a hollow cup.
   return new THREE.LatheGeometry(p.reverse(), 64)
+}
+
+/**
+ * Controlled microvariation so repeated pieces don't read as clones. Deterministic per `seed`.
+ * Spec ranges (Game Pod rendering standard): rotation ±1.5°, scale ±1%, height ±0.8%,
+ * colour value ±2.5%, roughness ±0.03.
+ */
+export function vary(object, seed) {
+  let r = (seed * 9301 + 49297) % 233280 || 1
+  const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647) * 2 - 1
+  const deg = Math.PI / 180
+  object.rotation.x += rand() * 1.5 * deg
+  object.rotation.y += rand() * 1.5 * deg
+  object.rotation.z += rand() * 1.5 * deg
+  const sc = 1 + rand() * 0.01
+  object.scale.multiplyScalar(sc)
+  object.scale.y *= 1 + rand() * 0.008
+  object.traverse((o) => {
+    if (!o.isMesh || !o.material?.isMeshStandardMaterial) return
+    o.material = o.material.clone()
+    o.material.color.offsetHSL(0, 0, rand() * 0.025)
+    o.material.roughness = Math.min(1, Math.max(0, o.material.roughness + rand() * 0.03))
+  })
+  return object
 }

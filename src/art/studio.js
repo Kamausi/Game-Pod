@@ -7,6 +7,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
 import { MODELS } from './models.js'
 
 const FOV = 30
@@ -54,7 +55,7 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
  * (the whole model, or the parts a model lists in `frame`)
  * (not its bounding sphere), so every asset fills the frame by `fill` without clipping.
  */
-function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift = null, roll = 0 }) {
+function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift = null, roll = 0, fov = FOV }) {
   const points = []
   ;[].concat(targets).forEach((t) => t.updateMatrixWorld(true))
   ;[].concat(targets).forEach((t) => t.traverse((o) => {
@@ -65,9 +66,9 @@ function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift
   }))
   const sphere = new THREE.Box3().setFromPoints(points).getBoundingSphere(new THREE.Sphere())
   const dirV = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch))
-  const camera = new THREE.PerspectiveCamera(FOV, aspect, 0.01, sphere.radius * 100)
+  const camera = new THREE.PerspectiveCamera(fov, aspect, 0.01, sphere.radius * 100)
   const target = sphere.center.clone()
-  let dist = sphere.radius / Math.sin(THREE.MathUtils.degToRad(FOV / 2))
+  let dist = sphere.radius / Math.sin(THREE.MathUtils.degToRad(fov / 2))
   for (let i = 0; i < 6; i++) {
     camera.position.copy(target).addScaledVector(dirV, dist)
     camera.lookAt(target)
@@ -80,9 +81,10 @@ function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift
     // Recenter on the outline, then scale distance so the larger extent spans `fill` of the frame.
     const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
     const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
-    const halfH = Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * dist
+    const halfH = Math.tan(THREE.MathUtils.degToRad(fov / 2)) * dist
     target.addScaledVector(right, ((minX + maxX) / 2) * halfH * aspect).addScaledVector(up, ((minY + maxY) / 2) * halfH)
     dist *= Math.max((maxX - minX) / 2, (maxY - minY) / 2) / fill
+    if (globalThis.__BAKE_DEBUG) console.log('fit', i, points.length, minX.toFixed(2), maxX.toFixed(2), minY.toFixed(2), maxY.toFixed(2))
   }
   // Optional placement: shift the subject (in fractions of the frame) and roll the camera.
   camera.position.copy(target).addScaledVector(dirV, dist)
@@ -91,7 +93,7 @@ function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift
     camera.updateMatrixWorld()
     const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
     const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
-    const halfH = Math.tan(THREE.MathUtils.degToRad(FOV / 2)) * dist
+    const halfH = Math.tan(THREE.MathUtils.degToRad(fov / 2)) * dist
     const [sx = 0, sy = 0] = shift ?? []
     const offset = right.multiplyScalar(-sx * 2 * halfH * aspect).add(up.multiplyScalar(-sy * 2 * halfH))
     camera.position.add(offset)
@@ -124,6 +126,12 @@ function aoBlob(radius) {
   )
   m.rotation.x = -Math.PI / 2
   return m
+}
+
+const boxOf = (list) => {
+  const box = new THREE.Box3()
+  ;[].concat(list).forEach((o) => box.expandByObject(o))
+  return box
 }
 
 /** Renders one model at width x height pixels and returns the canvas. */
@@ -200,6 +208,16 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
     gtao.updateGtaoMaterial({ radius: r * (look.aoRadius ?? 0.05), distanceExponent: 2, thickness: r * 0.03, scale: 1 })
     gtao.blendIntensity = look.aoIntensity ?? 1.1
     composer.addPass(gtao)
+    if (look.dof) {
+      // Real depth of field: focus on the framed subject, blur the table/scenery that falls away.
+      const focusPoint = boxOf(frame ?? object).getCenter(new THREE.Vector3())
+      const bokeh = new BokehPass(scene, camera, {
+        focus: camera.position.distanceTo(focusPoint),
+        aperture: look.dof.aperture ?? 0.004,
+        maxblur: look.dof.maxblur ?? 0.012,
+      })
+      composer.addPass(bokeh)
+    }
     composer.addPass(new OutputPass())
     composer.render()
     composer.dispose()

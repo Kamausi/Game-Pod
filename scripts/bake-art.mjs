@@ -31,9 +31,10 @@ await server.listen()
 const base = server.resolvedUrls.local[0]
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 const page = await browser.newPage()
+if (process.env.BAKE_DEBUG) page.on('console', (m) => console.log('[page]', m.text()))
 
 async function bake(name, tone) {
-  await page.goto(`${base}studio.html?asset=${encodeURIComponent(name)}${tone ? `&tone=${tone}` : ''}`)
+  await page.goto(`${base}studio.html?asset=${encodeURIComponent(name)}${tone ? `&tone=${tone}` : ''}${process.env.BAKE_DEBUG ? '&debug' : ''}`)
   await page.waitForFunction(() => window.__studio?.done, null, { timeout: 180000 })
   const result = await page.evaluate(() => window.__studio)
   if (result.error) throw new Error(`${name}: ${result.error}`)
