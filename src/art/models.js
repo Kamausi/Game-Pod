@@ -293,7 +293,8 @@ const GAMES = {
     const black = mat('#050403', { roughness: 1, clearcoat: 0, envMapIntensity: 0 })
     const S = 1.0 // cell pitch
     const INNER = 3 * S + 0.08
-    const OUTER = INNER + 2 * 0.4
+    const RIM = 0.3 // frame wall thickness
+    const OUTER = INNER + 2 * RIM
     const floorTop = 0.6 // black cell floor; pieces rest on it
     const H = 0.88 // whole tray height: tall side walls show
     // Pieces rest on the floor; their tops sit PIECE_DROP just below the board face.
