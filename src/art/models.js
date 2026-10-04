@@ -288,8 +288,8 @@ const GAMES = {
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     // Colour gains (linear RGB multipliers on the wood textures), tuned so rendered colours equal the
     // reference's sampled pixels exactly.
-    const WOOD_GAIN = [1.005857, 0.976598, 0.968542]
-    const RAIL_GAIN = [1.332074, 0.932826, 0.855582]
+    const WOOD_GAIN = [1.005857, 0.976598, 0.948633]
+    const RAIL_GAIN = [1.340573, 0.932826, 0.841023]
     const wood = mat(new THREE.Color().setRGB(...WOOD_GAIN), {
       map: woodTexture({ base: '#f97233', dark: '#eb6b31', light: '#ff7c3b', seed: 7 }), // honey caramel, sampled against the reference
       roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
@@ -326,6 +326,18 @@ const GAMES = {
       // One-piece frame: rounded outer corners (radius 0.45), rounded inner corners, no seams.
       mesh(frameGeo, wood),
       mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
+      // Soft black shadow pooled under the board, as in the reference.
+      mesh(new THREE.PlaneGeometry(OUTER * 2.1, OUTER_DEPTH * 2.1), new THREE.MeshBasicMaterial({
+        map: canvasTexture(256, 256, (ctx, W, Hc) => {
+          const g = ctx.createRadialGradient(W / 2, Hc / 2, 0, W / 2, Hc / 2, W / 2)
+          g.addColorStop(0, 'rgba(0,0,0,1)')
+          g.addColorStop(0.6, 'rgba(0,0,0,0.9)')
+          g.addColorStop(1, 'rgba(0,0,0,0)')
+          ctx.fillStyle = g
+          ctx.fillRect(0, 0, W, Hc)
+        }),
+        transparent: true, depthWrite: false,
+      }), [0, -WALL_EXTRA - 0.05, 0.5], [-Math.PI / 2, 0, 0]),
       mesh(new THREE.PlaneGeometry(INNER, INNER_DEPTH), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
@@ -352,7 +364,7 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = [0.010616, 0.170184, 0.798147] // linear RGB, tuned to the reference's sampled X colour
+    const BLUE = [0.010616, 0.168209, 0.798147] // linear RGB, tuned to the reference's sampled X colour
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.5, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0.05 }) // saturated azure: little white specular to wash it out
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
