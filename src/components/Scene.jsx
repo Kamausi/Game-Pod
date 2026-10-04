@@ -44,7 +44,7 @@ export default function Scene(props) {
 
       <Board {...props} />
 
-      {winner && (
+      {winner && !props.reduceMotion && (
         <Sparkles
           key={props.gameId}
           count={80}

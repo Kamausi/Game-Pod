@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useReducer, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import Scene from './components/Scene.jsx'
 import TitleScreen from './components/TitleScreen.jsx'
-import HomeScreen from './components/HomeScreen.jsx'
+import Hub from './components/hub/Hub.jsx'
+import { achievementIcon } from './components/hub/common.jsx'
 import { getAIMove, getWinner } from './game.js'
+import { useStore } from './store.jsx'
+import { setMusicVolume, setSoundEnabled, sfx, startMusic, stopMusic, unlockAudio, vibrate } from './audio.js'
 
 const emptyBoard = () => Array(9).fill(null)
 const other = (p) => (p === 'X' ? 'O' : 'X')
+const HINT_DELAY = 5000
 
 function currentTurn(board, starter) {
   const moves = board.filter(Boolean).length
@@ -48,31 +52,117 @@ function reducer(state, action) {
   }
 }
 
+function useToasts() {
+  const [toasts, setToasts] = useState([])
+  const notify = useCallback((text, icon = null) => {
+    const id = Math.random()
+    setToasts((t) => [...t.slice(-2), { id, text, icon }])
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2600)
+  }, [])
+  return [toasts, notify]
+}
+
+// Keeps sound effects and background music in step with settings. Audio can only start
+// after the first tap or key press, so music waits for that.
+function useAudio() {
+  const { settings } = useStore()
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio()
+      setReady(true)
+    }
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  useEffect(() => setSoundEnabled(settings.sound), [settings.sound])
+  useEffect(() => {
+    if (ready && settings.music) startMusic(settings.volume)
+    else stopMusic()
+  }, [ready, settings.music]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setMusicVolume(settings.volume), [settings.volume])
+}
+
 export default function App() {
+  const { reduceMotion } = useStore()
   const [screen, setScreen] = useState('title')
+  const [hubTab, setHubTab] = useState('home')
   // Game state lives here so scores survive a trip back to the home screen.
   const [state, dispatch] = useReducer(reducer, initialState)
   const [mode, setMode] = useState('ai')
   const [difficulty, setDifficulty] = useState('hard')
+  const [toasts, notify] = useToasts()
+  useAudio()
 
-  if (screen === 'title') return <TitleScreen onStart={() => setScreen('home')} />
-  if (screen === 'home') return <HomeScreen onPlay={() => setScreen('game')} onTitle={() => setScreen('title')} />
+  useEffect(() => {
+    document.documentElement.classList.toggle('reduce-motion', reduceMotion)
+  }, [reduceMotion])
+
+  let view
+  if (screen === 'title') view = <TitleScreen reducedMotion={reduceMotion} onStart={() => setScreen('home')} />
+  else if (screen === 'home')
+    view = (
+      <Hub tab={hubTab} setTab={setHubTab} notify={notify} onPlay={() => setScreen('game')} onTitle={() => setScreen('title')} />
+    )
+  else
+    view = (
+      <Game
+        state={state}
+        dispatch={dispatch}
+        mode={mode}
+        setMode={setMode}
+        difficulty={difficulty}
+        setDifficulty={setDifficulty}
+        notify={notify}
+        onHome={() => setScreen('home')}
+      />
+    )
 
   return (
-    <Game
-      state={state}
-      dispatch={dispatch}
-      mode={mode}
-      setMode={setMode}
-      difficulty={difficulty}
-      setDifficulty={setDifficulty}
-      onHome={() => setScreen('home')}
-    />
+    <>
+      {view}
+      <div className="toasts" role="status" aria-live="polite">
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast ${t.icon ? 'with-icon' : ''}`}>
+            {t.icon && <img src={t.icon} alt="" />}
+            <span>{t.text}</span>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
-function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, onHome }) {
+function Tutorial({ onClose }) {
+  return (
+    <div className="tutorial-backdrop" onClick={onClose}>
+      <div className="tutorial" role="dialog" aria-modal="true" aria-label="How to play" onClick={(e) => e.stopPropagation()}>
+        <h2>How to play</h2>
+        <ol>
+          <li>Take turns placing X and O on the 3×3 board.</li>
+          <li>Get three in a row (across, down or diagonal) to win.</li>
+          <li>Tap a square or press 1–9. Drag to spin the board.</li>
+        </ol>
+        <p>Wins earn points and XP. Hard CPU never loses, so a draw there is an achievement!</p>
+        <button type="button" className="primary" onClick={onClose} autoFocus>
+          Got it
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, notify, onHome }) {
+  const { record, settings, seenTutorials, markTutorialSeen, reduceMotion } = useStore()
   const { board, starter, gameId, scores } = state
+  const [hint, setHint] = useState(null)
+  const recorded = useRef(-1)
 
   const winner = getWinner(board)
   const draw = !winner && board.every(Boolean)
@@ -80,17 +170,54 @@ function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, onHom
   const turn = currentTurn(board, starter)
   const aiTurn = mode === 'ai' && turn === 'O' && !over
   const canPlay = !over && !aiTurn
+  const showTutorial = settings.tutorials && !seenTutorials.includes('tic-tac-toe')
 
-  const play = useCallback((index) => dispatch({ type: 'play', index }), [dispatch])
+  const play = useCallback(
+    (index) => {
+      sfx('place')
+      vibrate(settings.haptics)
+      dispatch({ type: 'play', index })
+    },
+    [dispatch, settings.haptics],
+  )
 
   useEffect(() => {
     if (!aiTurn) return
-    const id = setTimeout(() => play(getAIMove(board, 'O', difficulty)), 550)
+    const id = setTimeout(() => {
+      sfx('cpu')
+      dispatch({ type: 'play', index: getAIMove(board, 'O', difficulty) })
+    }, 550)
     return () => clearTimeout(id)
-  }, [aiTurn, board, difficulty, play])
+  }, [aiTurn, board, difficulty, dispatch])
+
+  // Save each finished game once, then celebrate any achievements it unlocked.
+  useEffect(() => {
+    if (!over || recorded.current === gameId) return
+    recorded.current = gameId
+    const result = mode === 'ai' ? (draw ? 'draw' : winner.player === 'X' ? 'win' : 'loss') : 'played'
+    const r = record({ gameId: 'tic-tac-toe', mode, difficulty, result })
+    sfx(result === 'loss' ? 'lose' : result === 'draw' ? 'draw' : 'win')
+    vibrate(settings.haptics && result === 'win', [20, 40, 20])
+    notify(`+${r.points} points`)
+    r.newly.forEach((a, i) =>
+      setTimeout(() => {
+        sfx('unlock')
+        notify(`Achievement unlocked: ${a.name} (+${a.xp} XP)`, achievementIcon(a.icon))
+      }, 700 + i * 900),
+    )
+  }, [over, gameId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Move hint: if the player pauses on their turn, highlight a strong move.
+  useEffect(() => {
+    setHint(null)
+    if (!settings.hints || !canPlay || showTutorial) return
+    const id = setTimeout(() => setHint(getAIMove(board, turn, 'hard')), HINT_DELAY)
+    return () => clearTimeout(id)
+  }, [board, canPlay, turn, settings.hints, showTutorial])
 
   useEffect(() => {
     const onKey = (e) => {
+      if (showTutorial) return
       if (e.key >= '1' && e.key <= '9') {
         const index = Number(e.key) - 1
         if (canPlay && !board[index]) play(index)
@@ -102,7 +229,7 @@ function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, onHom
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [canPlay, board, play, dispatch, onHome])
+  }, [canPlay, board, play, dispatch, onHome, showTutorial])
 
   const changeMode = (m) => {
     setMode(m)
@@ -124,7 +251,7 @@ function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, onHom
 
   return (
     <div className="app">
-      <Scene board={board} gameId={gameId} winner={winner} canPlay={canPlay} turn={turn} onPlay={play} />
+      <Scene board={board} gameId={gameId} winner={winner} canPlay={canPlay} turn={turn} onPlay={play} hint={hint} reduceMotion={reduceMotion} />
 
       <button className="home" onClick={onHome} aria-label="Back to home screen">
         ← Home
@@ -148,7 +275,7 @@ function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, onHom
             <strong>{scores.O}</strong>
           </div>
         </div>
-        <p className={`status ${winner ? winner.player.toLowerCase() : ''}`}>{status}</p>
+        <p className={`status ${winner ? winner.player.toLowerCase() : ''}`}>{hint !== null && canPlay ? 'Hint: try the glowing square' : status}</p>
       </header>
 
       <footer className="hud bottom">
@@ -173,6 +300,8 @@ function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, onHom
         </div>
         <p className="hint">Click a square or press 1–9 · drag to orbit · scroll to zoom · R for new game · Esc for home</p>
       </footer>
+
+      {showTutorial && <Tutorial onClose={() => markTutorialSeen('tic-tac-toe')} />}
     </div>
   )
 }

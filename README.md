@@ -15,19 +15,31 @@ The app opens on an animated Game Pod title screen made with HTML, CSS, canvas a
 
 The art is `src/assets/title.webp` (compressed from the 2 MB PNG to about 150 KB). To make individual objects float on their own later, cut them into separate transparent layers and position them the same way as the logo layer in `src/components/TitleScreen.jsx`.
 
-## Home screen
+## App screens
 
-The home screen follows the Game Pod mockup. The artwork for the header, featured banner, game tiles and category icons is cut from it (`src/assets/home/`). The text, search, carousel, categories and navigation are live HTML/CSS in the Fredoka font, which is bundled so the app makes no network requests.
+After the title screen, Game Pod has five tabs (Home, All Games, Achievements, Leaderboards, Profile) plus Settings behind the gear. They follow the Game Pod mockups. Artwork is cut from them (`src/assets/`); everything else is live HTML/CSS in the bundled Fredoka font, laid out in container-query units against the 941px-wide mockups with minimum sizes for small phones.
 
-- **Search** filters games by name as you type.
-- **Featured** carousel: swipe or tap the dots; it auto-advances every 5 seconds and pauses while you interact (not under reduced motion).
-- **Popular Right Now**, **Categories** and **New & Trending** rows scroll sideways; **See All** and the category chips open **All Games** with that filter.
-- Only **Tic Tac Toe** is playable so far. The other games carry a "Soon" badge and show a "coming soon" message when tapped.
-- **Achievements** and **Leaderboards** are placeholder tabs for now.
-- The settings gear has **Replay intro**. In a game, **Home** or Esc comes back here with the scores kept.
-- Sizes are in container-query units against the 941px mockup, with minimums for small phones; on wide screens it's a centered phone-width column.
+- **Home**: search, featured carousel, Popular / Categories / New & Trending rows.
+- **All Games**: 20 games, search, sort (popular, A–Z, newest, favorites first), category filters, and a working favorite heart on each tile.
+- **Achievements**: level and XP card, category filters, featured badges, and the full list with progress and details.
+- **Leaderboards**: Global / This Week / All Time standings and a podium. **The other players are sample data** (labeled in the app) because there is no online service yet; your own row and points are real. Friends is a placeholder.
+- **Profile**: avatar, editable name / username / bio, level, stats (achievements, games played, win rate), recent achievements, favorite games and play history.
+- **Settings**: edit profile, change avatar, sound effects, background music with volume, vibration, reduce motion, move hints, tutorials, replay intro, reset progress, privacy and help info. Light/System theme, languages, linked accounts, cloud sync, feedback and sign-out say "coming soon".
 
-The game list is in `src/games.js`: set `playable: true` and route the id in `App.jsx` when a new game is ready.
+Only **Tic Tac Toe** is playable so far; other games carry a "Soon" badge.
+
+### Progress
+
+Everything is real and saved in the browser (`localStorage`), so it survives reloads but stays on that device:
+
+- Each finished game earns points: vs CPU a win is 50 / 100 / 150 (easy / medium / hard), a draw 10 / 30 / 60 and a loss 5 / 10 / 15; a 2-player game is 20.
+- XP = points + achievement rewards; every 500 XP is a level.
+- 13 achievements (`ACHIEVEMENTS` in `src/progress.js`) unlock automatically and pop up in-game.
+- Logic lives in `src/progress.js` (pure, unit-tested); state and saving in `src/store.jsx`.
+
+### Sound
+
+`src/audio.js` synthesizes effects (moves, win/lose/draw, achievement unlocks) and a gentle generative music loop with the Web Audio API, so the app ships no audio files. Browsers only allow sound after the first tap or key press.
 
 ## Tic Tac Toe 3D
 
@@ -66,7 +78,8 @@ npm run build:html  # rebuild tic-tac-toe.html
 ### Layout
 
 - `src/components/TitleScreen.jsx` / `.css`: animated title screen
-- `src/components/HomeScreen.jsx` / `.css`: home screen; `src/games.js` is the game catalog
+- `src/components/hub/`: the five tabs, Settings and shared pieces (`Hub.jsx` is the shell)
+- `src/games.js`: game catalog; `src/progress.js`: points, levels, achievements; `src/store.jsx`: saved state; `src/audio.js`: sound
 - `src/game.js`: win/draw detection and the minimax AI (no React, unit-tested)
 - `src/App.jsx`: game state, CPU turns, keyboard input and the on-screen controls
 - `src/components/Scene.jsx`: canvas, lights, camera, effects

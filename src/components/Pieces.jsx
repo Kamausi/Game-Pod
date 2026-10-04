@@ -5,11 +5,15 @@ import { COLORS } from '../constants.js'
 const REST_Y = 0.35
 
 // Drops the piece in with a decaying bounce, then idles with a gentle spin.
-function useDropIn(ref, { ghost, spin = 0.4 }) {
+function useDropIn(ref, { ghost, still, spin = 0.4 }) {
   const t = useRef(0)
   useFrame((_, delta) => {
     const obj = ref.current
     if (!obj) return
+    if (still) {
+      obj.position.y = REST_Y
+      return
+    }
     t.current += delta
     if (ghost) {
       obj.position.y = REST_Y + 0.15 + Math.sin(t.current * 3) * 0.05
@@ -37,9 +41,9 @@ function PieceMaterial({ color, ghost, dim }) {
   )
 }
 
-export function XPiece({ position, ghost = false, dim = false }) {
+export function XPiece({ position, ghost = false, dim = false, still = false }) {
   const ref = useRef()
-  useDropIn(ref, { ghost })
+  useDropIn(ref, { ghost, still })
   return (
     <group ref={ref} position={position}>
       {[Math.PI / 4, -Math.PI / 4].map((rot) => (
@@ -52,9 +56,9 @@ export function XPiece({ position, ghost = false, dim = false }) {
   )
 }
 
-export function OPiece({ position, ghost = false, dim = false }) {
+export function OPiece({ position, ghost = false, dim = false, still = false }) {
   const ref = useRef()
-  useDropIn(ref, { ghost })
+  useDropIn(ref, { ghost, still })
   return (
     <group ref={ref} position={position}>
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow={!ghost}>

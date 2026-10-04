@@ -182,10 +182,10 @@ function useParallax(ref, enabled) {
   }, [ref, enabled])
 }
 
-export default function TitleScreen({ onStart }) {
+export default function TitleScreen({ onStart, reducedMotion: reducedSetting }) {
   const rootRef = useRef(null)
   const canvasRef = useRef(null)
-  const [reducedMotion] = useState(prefersReducedMotion)
+  const reducedMotion = reducedSetting ?? prefersReducedMotion()
   const [launching, setLaunching] = useState(false)
   const launched = useRef(false)
 

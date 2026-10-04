@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import { cellPosition, COLORS, SPACING } from '../constants.js'
 import { Piece } from './Pieces.jsx'
@@ -61,7 +62,25 @@ function Cell({ index, value, canPlay, turn, onPlay, hovered, setHovered }) {
   )
 }
 
-export default function Board({ board, gameId, winner, canPlay, turn, onPlay }) {
+// Pulsing gold ring marking a suggested move.
+function HintRing({ index, still }) {
+  const ref = useRef()
+  useFrame((state) => {
+    if (still || !ref.current) return
+    const t = state.clock.elapsedTime
+    ref.current.scale.setScalar(1 + Math.sin(t * 4) * 0.08)
+    ref.current.material.opacity = 0.55 + Math.sin(t * 4) * 0.3
+  })
+  const [x, , z] = cellPosition(index)
+  return (
+    <mesh ref={ref} position={[x, 0.1, z]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.52, 0.66, 48]} />
+      <meshBasicMaterial color="#ffc531" transparent opacity={0.7} toneMapped={false} />
+    </mesh>
+  )
+}
+
+export default function Board({ board, gameId, winner, canPlay, turn, onPlay, hint = null, reduceMotion = false }) {
   const [hovered, setHovered] = useState(null)
 
   return (
@@ -91,11 +110,13 @@ export default function Board({ board, gameId, winner, canPlay, turn, onPlay }) 
             player={value}
             position={cellPosition(i)}
             dim={Boolean(winner) && !winner.line.includes(i)}
+            still={reduceMotion}
           />
         ) : null,
       )}
 
-      {winner && <WinLine key={gameId} line={winner.line} player={winner.player} />}
+      {hint !== null && !board[hint] && canPlay && <HintRing index={hint} still={reduceMotion} />}
+      {winner && <WinLine key={gameId} line={winner.line} player={winner.player} still={reduceMotion} />}
     </group>
   )
 }

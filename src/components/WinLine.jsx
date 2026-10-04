@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { cellPosition, COLORS } from '../constants.js'
 
-export default function WinLine({ line, player }) {
+export default function WinLine({ line, player, still = false }) {
   const ref = useRef()
   const progress = useRef(0)
 
@@ -22,7 +22,7 @@ export default function WinLine({ line, player }) {
   }, [line])
 
   useFrame((state, delta) => {
-    progress.current = Math.min(1, progress.current + delta * 2.5)
+    progress.current = still ? 1 : Math.min(1, progress.current + delta * 2.5)
     const eased = 1 - Math.pow(1 - progress.current, 3)
     ref.current.scale.set(1, eased, 1)
     ref.current.material.emissiveIntensity = 1.2 + Math.sin(state.clock.elapsedTime * 6) * 0.4
