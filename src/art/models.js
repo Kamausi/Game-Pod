@@ -287,10 +287,15 @@ const GAMES = {
     // the upper right, thin flat dividers over black cells, crisp royal-blue X bars and thick glossy
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     const wood = mat('#ffffff', {
-      map: woodTexture({ base: '#bf6a28', dark: '#b46226', light: '#c8742e', seed: 7 }), // smooth warm caramel
+      map: woodTexture({ base: '#d07638', dark: '#c46d35', light: '#db8140', seed: 7 }), // honey caramel, sampled against the reference
       roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
     })
-    const black = mat('#050403', { roughness: 1, clearcoat: 0, envMapIntensity: 0 })
+    // Cross bars read a little lighter than the frame in the reference.
+    const railWood = mat('#ffffff', {
+      map: woodTexture({ base: '#d68c42', dark: '#cc833e', light: '#de9548', seed: 11 }),
+      roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
+    })
+    const black = mat('#1e0d1c', { roughness: 1, clearcoat: 0, envMapIntensity: 0 }) // purple-navy cell floor
     // The opening is fixed by the reference (its four inner corners are matched exactly by the camera):
     // 2.81 wide, 2.406 deep. Nine equal cells fill it, so the cell pitch follows the divider width.
     const INNER = 2.81
@@ -324,15 +329,15 @@ const GAMES = {
     const DIV_DROP = 0.065 // dividers sit below the frame's top edge (just above the piece tops)
     const DIV_H = H - floorTop - DIV_DROP
     for (const o of [-0.5, 0.5]) {
-      parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o * SZ]))
-      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH + 0.1, 0.035, 4), wood, [o * S, floorTop + DIV_H / 2, 0]))
+      parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
+      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH + 0.1, 0.035, 4), railWood, [o * S, floorTop + DIV_H / 2, 0]))
     }
     // Raised square blocks where the bars cross: flush with the bars' sides (a hair inside, to avoid
     // z-fighting), standing proud of them only in height.
     const JOINT_W = DIV_W - 0.002
     const JOINT_H = DIV_H + 0.03
     for (const ox of [-0.5, 0.5]) for (const oz of [-0.5, 0.5])
-      parts.push(mesh(rbox(JOINT_W, JOINT_H, JOINT_W, 0.03, 4), wood, [ox * S, floorTop + JOINT_H / 2, oz * SZ]))
+      parts.push(mesh(rbox(JOINT_W, JOINT_H, JOINT_W, 0.03, 4), railWood, [ox * S, floorTop + JOINT_H / 2, oz * SZ]))
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
     // (the X's on-board width matches the O's outer diameter).
@@ -343,7 +348,7 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const blue = mat('#0a66f5', { roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.4 })
+    const blue = mat('#0074ff', { roughness: 0.5, clearcoat: 0, specularIntensity: 0.2, envMapIntensity: 0.2 }) // saturated azure: little white specular to wash it out
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
     const xGeo = mouldedXGeometry({ size: (PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND) * X_ARM, arm: X_BAND, endRadius: 0.006, innerRadius: 0.004, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
