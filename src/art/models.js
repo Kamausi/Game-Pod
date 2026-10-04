@@ -342,8 +342,8 @@ const GAMES = {
     return {
       // Board rotated in the world and tilted toward the camera, as in the reference.
       // Camera front-left so the left and front side faces show, as in the reference.
-      object: group(parts, [0, 0, 0], [0.1, 0, -0.1]),
-      view: { pitch: 0.95, yaw: -0.3, fill: 0.92, shift: [-0.02, 0.03], roll: 0.02, fov: 26 },
+      object: group(parts, [0, 0, 0], [0.15, 0, -0.15]),
+      view: { pitch: 0.95, yaw: -0.3, fill: 0.92, shift: [-0.02, 0.03], roll: -0.02, fov: 26 },
       look: {
         keyFrom: [2.4, 3.0, 0.6], // upper right: bright right/top rim, shaded front face
         keyIntensity: 2.2, keyColor: '#ffe0b0', envIntensity: 0.45,
