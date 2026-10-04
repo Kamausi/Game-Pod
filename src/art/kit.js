@@ -124,7 +124,7 @@ export function drawSuit(ctx, suit, cx, cy, s, color) {
 }
 
 // Varnished wood: warm base with long wavy grain lines and a few darker streaks.
-export function woodTexture({ base = '#d9934f', dark = '#9a5a26', light = '#f0b877', size = 512, seed = 1, grain = 1 } = {}) {
+export function woodTexture({ base = '#d9934f', dark = '#9a5a26', light = '#f0b877', size = 512, seed = 1 } = {}) {
   let r = seed
   const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647)
   return canvasTexture(size, size, (ctx, W, H) => {
@@ -139,8 +139,6 @@ export function woodTexture({ base = '#d9934f', dark = '#9a5a26', light = '#f0b8
       const amp = 4 + rand() * 10
       const freq = 0.004 + rand() * 0.01
       const phase = rand() * 10
-      // grain scales how strongly the lines show (1 = full strength).
-      ctx.globalAlpha = grain
       ctx.strokeStyle = i % 7 === 0 ? dark : `rgba(120,60,20,${0.08 + rand() * 0.16})`
       ctx.lineWidth = i % 7 === 0 ? 2.2 : 1 + rand() * 1.5
       ctx.beginPath()

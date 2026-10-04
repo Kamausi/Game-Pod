@@ -287,10 +287,10 @@ const GAMES = {
     // the upper right, thin flat dividers over black cells, crisp royal-blue X bars and thick glossy
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     const wood = mat('#ffffff', {
-      map: woodTexture({ base: '#bf6a28', dark: '#bb6727', light: '#c36f2c', seed: 7, grain: 0.3 }), // low-contrast grain: wood reads through colour and shading
+      map: woodTexture({ base: '#bf6a28', dark: '#b46226', light: '#c8742e', seed: 7 }), // smooth warm caramel
       roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
     })
-    const black = mat('#03040a', { roughness: 1, clearcoat: 0, envMapIntensity: 0 }) // blue-black cavity floor
+    const black = mat('#050403', { roughness: 1, clearcoat: 0, envMapIntensity: 0 })
     const S = 1.0 // cell pitch
     const INNER = 3 * S + 0.08
     const OUTER = INNER + 2 * 0.4
@@ -299,8 +299,8 @@ const GAMES = {
     // Cells are exactly one piece deep: pieces rest on the floor and their tops are flush with the board face.
     const floorTop = H - PIECE_HEIGHT
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
-    // Moulded-toy frame: larger corner radii and a soft rounded rim and inner lip.
-    const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.36, innerRadius: 0.1, bevel: 0.045 })
+    // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
+    const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
     const uv = frameGeo.attributes.uv
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
     const parts = [
@@ -312,29 +312,24 @@ const GAMES = {
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
     const DIV_H = H - floorTop - 0.003
-    // Rails: ~18% wider than before, with a flat centre and well-rounded sides (radius +30%, 6 segments).
-    const RAIL_W = 0.165
-    const RAIL_R = 0.046
     for (const o of [-S / 2, S / 2]) {
-      parts.push(mesh(rbox(INNER + 0.1, DIV_H, RAIL_W, RAIL_R, 6), wood, [0, floorTop + DIV_H / 2, o]))
-      parts.push(mesh(rbox(RAIL_W, DIV_H, INNER + 0.1, RAIL_R, 6), wood, [o, floorTop + DIV_H / 2, 0]))
+      parts.push(mesh(rbox(INNER + 0.1, DIV_H, 0.14, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o]))
+      parts.push(mesh(rbox(0.14, DIV_H, INNER + 0.1, 0.035, 4), wood, [o, floorTop + DIV_H / 2, 0]))
     }
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
     // (the X's on-board width matches the O's outer diameter).
-    // Slightly wider band than the crisp version: the rounded shoulders eat into the flat top, so this keeps
-    // the same apparent thickness (smaller hole in the O, fuller centre on the X).
-    const PIECE_BAND = 0.21
+    const PIECE_BAND = 0.16
     const PIECE_SPAN = 0.72
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
     const blue = mat('#0a66f5', { roughness: 0.38, clearcoat: 0.45, clearcoatRoughness: 0.25 })
-    // Moulded X: rounded arm ends, filleted inner corners, soft rounded shoulders on the top edge.
-    const X_BEVEL = 0.035
-    const xGeo = mouldedXGeometry({ size: PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND, arm: PIECE_BAND, endRadius: 0.045, innerRadius: 0.03, depth: PIECE_HEIGHT - 2 * X_BEVEL, bevelHeight: X_BEVEL, bevelWidth: 0.03 })
+    // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
+    // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
+    const xGeo = mouldedXGeometry({ size: PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND, arm: PIECE_BAND, endRadius: 0.001, innerRadius: 0.001, depth: PIECE_HEIGHT - 0.012, bevelHeight: 0.006, bevelWidth: 0.006 })
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#e8101c', { roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.08 })
-    const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - PIECE_BAND / 2, width: PIECE_BAND, height: PIECE_HEIGHT, round: 0.06 }) // inflated profile: soft rounded shoulders
+    const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - PIECE_BAND / 2, width: PIECE_BAND, height: PIECE_HEIGHT, round: 0.004 }) // flat top, sharp edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
       // Both pieces are centred on their origin and PIECE_HEIGHT tall: rest on the floor, tops flush with the board face.
@@ -350,7 +345,7 @@ const GAMES = {
       look: {
         keyFrom: [2.4, 3.0, 0.6], // upper right: bright right/top rim, shaded front face
         keyIntensity: 2.2, keyColor: '#ffe0b0', envIntensity: 0.45,
-        rim: { intensity: 0.25, color: '#ffd8a0' }, aoIntensity: 3.0, aoRadius: 0.06,
+        rim: { intensity: 0.25, color: '#ffd8a0' }, aoIntensity: 2.4, aoRadius: 0.04,
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
       },
       backdrop: {
