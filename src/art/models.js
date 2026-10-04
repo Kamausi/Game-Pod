@@ -321,12 +321,17 @@ const GAMES = {
     ]
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
-    const DIV_DROP = 0.04 // dividers sit slightly below the frame's top edge
+    const DIV_DROP = 0.065 // dividers sit below the frame's top edge (just above the piece tops)
     const DIV_H = H - floorTop - DIV_DROP
     for (const o of [-0.5, 0.5]) {
       parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o * SZ]))
       parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH + 0.1, 0.035, 4), wood, [o * S, floorTop + DIV_H / 2, 0]))
     }
+    // Raised square blocks where the bars cross, a little wider than the bars and standing proud of them.
+    const JOINT_W = DIV_W * 1.45
+    const JOINT_H = DIV_H + 0.03
+    for (const ox of [-0.5, 0.5]) for (const oz of [-0.5, 0.5])
+      parts.push(mesh(rbox(JOINT_W, JOINT_H, JOINT_W, 0.03, 4), wood, [ox * S, floorTop + JOINT_H / 2, oz * SZ]))
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
     // (the X's on-board width matches the O's outer diameter).
