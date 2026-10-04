@@ -292,7 +292,10 @@ const GAMES = {
     })
     const black = mat('#050403', { roughness: 1, clearcoat: 0, envMapIntensity: 0 })
     const S = 1.0 // cell pitch
-    const INNER = 3 * S + 0.08
+    const DIV_W = 0.14 // divider width
+    // Inner well sized so all nine cells are equal (S - DIV_W) and each cell's centre is on the S pitch,
+    // so pieces placed at -S / 0 / +S sit centred in their squares.
+    const INNER = 3 * S - DIV_W
     const RIM = 0.3 // frame wall thickness
     const OUTER = INNER + 2 * RIM
     const floorTop = 0.6 // black cell floor; pieces rest on it
@@ -315,8 +318,8 @@ const GAMES = {
     // their ends run into the walls so no rounded stub shows.
     const DIV_H = H - floorTop - 0.003
     for (const o of [-S / 2, S / 2]) {
-      parts.push(mesh(rbox(INNER + 0.1, DIV_H, 0.14, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o]))
-      parts.push(mesh(rbox(0.14, DIV_H, INNER + 0.1, 0.035, 4), wood, [o, floorTop + DIV_H / 2, 0]))
+      parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o]))
+      parts.push(mesh(rbox(DIV_W, DIV_H, INNER + 0.1, 0.035, 4), wood, [o, floorTop + DIV_H / 2, 0]))
     }
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
