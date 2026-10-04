@@ -294,11 +294,10 @@ const GAMES = {
     const S = 1.0 // cell pitch
     const INNER = 3 * S + 0.08
     const OUTER = INNER + 2 * 0.4
-    const PIECE_HEIGHT = 0.18
     const floorTop = 0.6 // black cell floor; pieces rest on it
-    // Walls (frame and dividers) stand WALL_RISE above the piece tops, so the black floor sits deeper.
-    const WALL_RISE = 0.1
-    const H = floorTop + PIECE_HEIGHT + WALL_RISE // whole tray height: thick side faces show
+    const H = 0.88 // whole tray height: tall side walls show
+    // Pieces fill the cell depth: they rest on the floor and their tops are flush with the board face.
+    const PIECE_HEIGHT = H - floorTop
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
     const frameGeo = trayFrameGeometry({ outer: OUTER, inner: INNER, height: H, outerRadius: 0.28, innerRadius: 0.06, bevel: 0.025 })
