@@ -326,17 +326,6 @@ const GAMES = {
       // One-piece frame: rounded outer corners (radius 0.45), rounded inner corners, no seams.
       mesh(frameGeo, wood),
       mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
-      // Soft dark-navy shadow hugging the board's shape, just showing below its front edge (as in the reference).
-      mesh(new THREE.PlaneGeometry(OUTER * 1.5, OUTER_DEPTH * 1.5), new THREE.MeshBasicMaterial({
-        map: canvasTexture(256, 256, (ctx, W, Hc) => {
-          ctx.filter = `blur(${Math.round(W * 0.05)}px)`
-          ctx.fillStyle = 'rgba(10,14,30,0.95)'
-          ctx.beginPath()
-          ctx.roundRect(W * 0.17, Hc * 0.17, W * 0.66, Hc * 0.66, W * 0.06)
-          ctx.fill()
-        }),
-        transparent: true, depthWrite: false,
-      }), [0, -WALL_EXTRA - 0.05, 0.5], [-Math.PI / 2, 0, 0]),
       mesh(new THREE.PlaneGeometry(INNER, INNER_DEPTH), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
@@ -363,7 +352,7 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = [0.010616, 0.168209, 0.798147] // linear RGB, tuned to the reference's sampled X colour
+    const BLUE = [0.010616, 0.170209, 0.798147] // linear RGB, tuned to the reference's sampled X colour
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.5, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0.05 }) // saturated azure: little white specular to wash it out
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
@@ -397,6 +386,9 @@ const GAMES = {
         gradient: [180, '#5a8af0', '#8a8ad0', '#e0a070', '#5a3a40'],
         masses: [[0.5, 0.0, 0.14, '#ffffff'], [0.06, 0.55, 0.22, '#ffb050'], [0.12, 0.85, 0.25, '#f0a050'], [0.15, 0.25, 0.12, '#ffd090'], [0.88, 0.3, 0.2, '#5a7ae0'], [0.6, 1.0, 0.3, '#4a2a30']],
         bokeh: { n: 16, colors: ['#ffd9a0', '#ffffff', '#ffb060', '#a8c8ff'], min: 0.015, max: 0.05, seed: 5 },
+        // Dark navy area across the bottom of the tile under the board: flat top at ~70% height, rounded
+        // down at the left edge (traced from the reference).
+        rects: [[0, 0.7, 1.1, 0.5, 0.2, '#10162a', 0.012]],
         shapes: [[0.78, 0.08, 0.12, 0.5, '#3a5ab8'], [0.9, 0.15, 0.08, 0.4, '#5a7ad8'], [0.02, 0.35, 0.05, 0.3, '#e08a40']],
       },
     }

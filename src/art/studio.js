@@ -323,6 +323,23 @@ export function paintBackdrop(width, height, spec) {
     }
     ctx.globalAlpha = 1
   }
+  // Defined forms painted over everything else (e.g. a dark stage under the subject):
+  // ellipses: [[cx, cy, rx, ry, color, blur?]] in fractions of the frame.
+  for (const [x, y, rx, ry, color, blur = 0.01] of spec.ellipses ?? []) {
+    ctx.filter = `blur(${Math.round(width * blur)}px)`
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.ellipse(x * width, y * height, rx * width, ry * height, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  // rects: [[x, y, w, h, radius, color, blur?]] in fractions of the frame (radius in widths).
+  for (const [x, y, w, h, r, color, blur = 0.01] of spec.rects ?? []) {
+    ctx.filter = `blur(${Math.round(width * blur)}px)`
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.roundRect(x * width, y * height, w * width, h * height, r * width)
+    ctx.fill()
+  }
   ctx.filter = 'none'
   // Gentle vignette pulls focus to the subject.
   const v = ctx.createRadialGradient(width / 2, height * 0.45, width * 0.25, width / 2, height * 0.5, width * 0.8)
