@@ -215,6 +215,9 @@ export default function TitleScreen({ onStart }) {
       ref={rootRef}
       className={`title-screen ${launching ? 'launching' : ''} ${reducedMotion ? 'still' : ''}`}
       onClick={start}
+      role="button"
+      tabIndex={0}
+      aria-label="Game Pod. Tap anywhere to start"
       style={{ '--art': `url(${titleArt})` }}
     >
       <div className="ts-backdrop" />
@@ -240,20 +243,7 @@ export default function TitleScreen({ onStart }) {
       <div className="ts-vignette" />
       <div className="ts-flash" />
 
-      <div className="ts-cta">
-        <button
-          type="button"
-          className="ts-play"
-          onClick={(e) => {
-            e.stopPropagation()
-            start()
-          }}
-          autoFocus
-        >
-          Play
-        </button>
-        <p className="ts-hint">Tap anywhere to start</p>
-      </div>
+      <p className="ts-hint">Tap anywhere to start</p>
     </div>
   )
 }

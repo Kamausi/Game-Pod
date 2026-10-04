@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useState } from 'react'
 import Scene from './components/Scene.jsx'
 import TitleScreen from './components/TitleScreen.jsx'
+import HomeScreen from './components/HomeScreen.jsx'
 import { getAIMove, getWinner } from './game.js'
 
 const emptyBoard = () => Array(9).fill(null)
@@ -49,12 +50,13 @@ function reducer(state, action) {
 
 export default function App() {
   const [screen, setScreen] = useState('title')
-  // Game state lives here so scores survive a trip back to the title screen.
+  // Game state lives here so scores survive a trip back to the home screen.
   const [state, dispatch] = useReducer(reducer, initialState)
   const [mode, setMode] = useState('ai')
   const [difficulty, setDifficulty] = useState('hard')
 
-  if (screen === 'title') return <TitleScreen onStart={() => setScreen('game')} />
+  if (screen === 'title') return <TitleScreen onStart={() => setScreen('home')} />
+  if (screen === 'home') return <HomeScreen onPlay={() => setScreen('game')} onTitle={() => setScreen('title')} />
 
   return (
     <Game
@@ -64,7 +66,7 @@ export default function App() {
       setMode={setMode}
       difficulty={difficulty}
       setDifficulty={setDifficulty}
-      onHome={() => setScreen('title')}
+      onHome={() => setScreen('home')}
     />
   )
 }
@@ -124,7 +126,7 @@ function Game({ state, dispatch, mode, setMode, difficulty, setDifficulty, onHom
     <div className="app">
       <Scene board={board} gameId={gameId} winner={winner} canPlay={canPlay} turn={turn} onPlay={play} />
 
-      <button className="home" onClick={onHome} aria-label="Back to title screen">
+      <button className="home" onClick={onHome} aria-label="Back to home screen">
         ← Home
       </button>
 

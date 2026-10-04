@@ -11,9 +11,23 @@ The app opens on an animated Game Pod title screen made with HTML, CSS, canvas a
 - every animation loops seamlessly, and the particles pause while the tab is hidden
 - the poster fills the screen on phones and sits over a blurred copy of itself on wide screens
 - with the system's reduce-motion setting on, it shows a still poster
-- tap anywhere, click **Play** or press Enter to dive into the pod and start; **Home** or Esc returns to the title
+- tap anywhere or press Enter to dive into the pod and open the home screen
 
 The art is `src/assets/title.webp` (compressed from the 2 MB PNG to about 150 KB). To make individual objects float on their own later, cut them into separate transparent layers and position them the same way as the logo layer in `src/components/TitleScreen.jsx`.
+
+## Home screen
+
+The home screen follows the Game Pod mockup. The artwork for the header, featured banner, game tiles and category icons is cut from it (`src/assets/home/`). The text, search, carousel, categories and navigation are live HTML/CSS in the Fredoka font, which is bundled so the app makes no network requests.
+
+- **Search** filters games by name as you type.
+- **Featured** carousel: swipe or tap the dots; it auto-advances every 5 seconds and pauses while you interact (not under reduced motion).
+- **Popular Right Now**, **Categories** and **New & Trending** rows scroll sideways; **See All** and the category chips open **All Games** with that filter.
+- Only **Tic Tac Toe** is playable so far. The other games carry a "Soon" badge and show a "coming soon" message when tapped.
+- **Achievements** and **Leaderboards** are placeholder tabs for now.
+- The settings gear has **Replay intro**. In a game, **Home** or Esc comes back here with the scores kept.
+- Sizes are in container-query units against the 941px mockup, with minimums for small phones; on wide screens it's a centered phone-width column.
+
+The game list is in `src/games.js`: set `playable: true` and route the id in `App.jsx` when a new game is ready.
 
 ## Tic Tac Toe 3D
 
@@ -52,6 +66,7 @@ npm run build:html  # rebuild tic-tac-toe.html
 ### Layout
 
 - `src/components/TitleScreen.jsx` / `.css`: animated title screen
+- `src/components/HomeScreen.jsx` / `.css`: home screen; `src/games.js` is the game catalog
 - `src/game.js`: win/draw detection and the minimax AI (no React, unit-tested)
 - `src/App.jsx`: game state, CPU turns, keyboard input and the on-screen controls
 - `src/components/Scene.jsx`: canvas, lights, camera, effects

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { getWinner, isDraw, getAIMove } from './game.js'
+import { filterGames } from './catalog.js'
 
 const _ = null
 
@@ -32,4 +33,17 @@ test('hard AI never loses against itself (always draws)', () => {
     player = player === 'X' ? 'O' : 'X'
   }
   assert.equal(isDraw(board), true)
+})
+
+test('catalog filter matches name (case-insensitive) and category', () => {
+  const games = [
+    { id: 'a', name: 'Tic Tac Toe', categories: ['popular', 'puzzle'] },
+    { id: 'b', name: 'Darts', categories: ['popular', 'sports'] },
+    { id: 'c', name: 'Block Blast', categories: ['puzzle'] },
+  ]
+  assert.deepEqual(filterGames(games, ' TIC ', null).map((g) => g.id), ['a'])
+  assert.deepEqual(filterGames(games, '', 'puzzle').map((g) => g.id), ['a', 'c'])
+  assert.deepEqual(filterGames(games, 'bl', 'puzzle').map((g) => g.id), ['c'])
+  assert.deepEqual(filterGames(games, '', 'card'), [])
+  assert.equal(filterGames(games, '', null).length, 3)
 })
