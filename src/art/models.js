@@ -338,27 +338,30 @@ const GAMES = {
   },
 
   'ring-toss': () => {
-    const pine = mat('#ffffff', { map: woodTexture({ base: '#c8813f', dark: '#8a4e1e', light: '#dc9a58', seed: 21 }), roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.4 })
-    // Turned wooden base: wide foot, bevelled top edge, a collar where the peg sits.
-    const base = new THREE.LatheGeometry(
-      [[0, 0], [1.15, 0], [1.22, 0.05], [1.24, 0.16], [1.18, 0.26], [1.0, 0.3], [0.32, 0.32], [0.26, 0.4], [0, 0.4]].map(([x, y]) => new THREE.Vector2(x, y)),
-      64,
-    )
+    // Reference: close-up of a wooden peg rising out of grass, a red ring high and tilted,
+    // a blue ring below it, a yellow ring leaning on the right; blue sky bokeh behind.
+    const pine = mat('#ffffff', { map: woodTexture({ base: '#c8783a', dark: '#b06a30', light: '#dc8c48', seed: 21 }), roughness: 0.55, clearcoat: 0.2, clearcoatRoughness: 0.4 })
     const peg = new THREE.LatheGeometry(
-      [[0, 0], [0.17, 0], [0.15, 0.3], [0.14, 2.0], [0.17, 2.1], [0.19, 2.22], [0.15, 2.34], [0, 2.38]].map(([x, y]) => new THREE.Vector2(x, y)),
+      [[0, 0], [0.24, 0], [0.22, 2.6], [0.24, 2.7], [0.2, 2.82], [0, 2.86]].map(([x, y]) => new THREE.Vector2(x, y)),
       48,
     )
-    const ring = (color) => mat(color, { roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.06 })
-    const tube = (r, t) => new THREE.TorusGeometry(r, t, 32, 96)
+    const ring = (color, emissive) => mat(color, { roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.08, emissive, emissiveIntensity: emissive ? 0.12 : 0 })
+    const tube = (r, t) => new THREE.TorusGeometry(r, t, 40, 100)
     return {
       object: group([
-        mesh(base, pine),
-        mesh(peg, pine, [0, 0.38, 0]),
-        mesh(tube(0.6, 0.17), ring('#1546ff'), [0, 0.57, 0], [Math.PI / 2, 0, 0]),
-        mesh(tube(0.6, 0.17), ring('#e8001f'), [0.04, 0.93, 0], [Math.PI / 2 - 0.16, 0, 0.12]),
-        mesh(tube(0.56, 0.16), mat('#ffaa00', { roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.06, emissive: '#ff7a00', emissiveIntensity: 0.15 }), [0.5, 1.62, 0.12], [Math.PI / 2 - 0.95, 0.35, 0.45]),
+        // Peg leans right; rings are threaded on its axis (point at length t: base + axis * t).
+        mesh(peg, pine, [-0.2, -0.6, 0], [0, 0, -0.38]),
+        mesh(tube(0.95, 0.24), ring('#1446ff'), [-0.2 + 0.37 * 0.9, -0.6 + 0.93 * 0.9, 0], [-1.0, 0, -0.2]),
+        mesh(tube(0.82, 0.24), ring('#e8001a'), [-0.2 + 0.37 * 1.55, -0.6 + 0.93 * 1.55, 0], [-1.05, 0, -0.3]),
+        mesh(tube(0.56, 0.21), ring('#f5a000', '#ff6a00'), [-0.2 + 0.37 * 1.55 + 0.8, -0.6 + 0.93 * 1.55 - 0.3, 0.45], [-0.9, 0.35, 0.25]),
       ]),
-      view: { pitch: 0.32, yaw: -0.45, fill: 0.95 },
+      view: { pitch: 0.35, yaw: 0, fill: 0.88, shift: [0.0, 0.02], roll: 0 },
+      look: { envIntensity: 0.75 },
+      backdrop: {
+        gradient: [180, '#5a8ae0', '#3a6ad0', '#2a7a3a'],
+        masses: [[0.15, 0.2, 0.25, '#ffc070'], [0.85, 0.15, 0.25, '#8ab0ff'], [0.5, 1.0, 0.45, '#2a7a2a'], [0.15, 0.85, 0.25, '#4aa03a'], [0.5, 0.95, 0.2, '#1a3a12']],
+        bokeh: { n: 14, colors: ['#ffffff', '#ffd080', '#a0c8ff'], min: 0.015, max: 0.05, seed: 13, yMax: 0.6 },
+      },
     }
   },
 
@@ -387,7 +390,6 @@ const GAMES = {
   },
 
   darts: () => {
-    const NUMS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5]
     const face = canvasTexture(1024, 1024, (ctx, W) => {
       const c = W / 2
       const seg = (r0, r1, colors) => {
@@ -407,11 +409,15 @@ const GAMES = {
       ctx.beginPath()
       ctx.arc(c, c, c, 0, Math.PI * 2)
       ctx.fill()
-      NUMS.forEach((n, i) => {
-        const a = (i / 20) * Math.PI * 2 - Math.PI / 2
-        text(ctx, String(n), c + Math.cos(a) * c * 0.89, c + Math.sin(a) * c * 0.89, { size: 46, color: '#f4f4f8' })
-      })
-      const rr = c * 0.78
+      // Silver studs around the rim instead of numbers, as in the reference.
+      for (let i = 0; i < 20; i++) {
+        const ang = (i / 20) * Math.PI * 2
+        ctx.beginPath()
+        ctx.arc(c + Math.cos(ang) * c * 0.9, c + Math.sin(ang) * c * 0.9, 9, 0, Math.PI * 2)
+        ctx.fillStyle = '#cfd4de'
+        ctx.fill()
+      }
+      const rr = c * 0.82
       seg(rr * 0.94, rr, ['#e3122b', '#14a34a']) // double
       seg(rr * 0.6, rr * 0.94, ['#16161a', '#f3e2bd'])
       seg(rr * 0.54, rr * 0.6, ['#e3122b', '#14a34a']) // treble
@@ -444,8 +450,8 @@ const GAMES = {
     face.center.set(0.5, 0.5)
     face.rotation = Math.PI / 2
     const sisal = mat('#ffffff', { map: face, roughness: 0.85, clearcoat: 0 })
-    const board = mesh(cyl(1.5, 1.5, 0.3, 128), [matte('#151519'), sisal, matte('#151519')], [0, 0, 0], [Math.PI / 2, 0, 0])
-    const surround = mesh(torus(1.53, 0.1, 128), mat('#1e1e26', { roughness: 0.35 }), [0, 0, 0.06])
+    const board = mesh(cyl(1.5, 1.5, 0.5, 128), [mat('#18181e', { roughness: 0.45 }), sisal, matte('#151519')], [0, 0, 0], [Math.PI / 2, 0, 0])
+    const surround = mesh(torus(1.55, 0.16, 128), mat('#1e1e26', { roughness: 0.3, clearcoat: 0.6 }), [0, 0, 0.16])
 
     const flight = (color) => {
       const s = new THREE.Shape()
@@ -467,15 +473,36 @@ const GAMES = {
         ...[0, 1, 2, 3].map((k) => mesh(fg, fm, [0, 1.0, 0], [0, (k * Math.PI) / 2, 0])),
       ], pos, rot)
     }
+    // Chunky toy dart: red barrel, three wide fins.
+    const red = mat('#ee1520', { roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 })
+    const fin = new THREE.Shape()
+    fin.moveTo(0, 0)
+    fin.quadraticCurveTo(0.32, 0.12, 0.36, 0.55)
+    fin.lineTo(0.06, 0.66)
+    fin.lineTo(0, 0.45)
+    fin.closePath()
+    const finGeo = extrude(fin, 0.03, 0.02)
+    const bigDart = group([
+      mesh(cone(0.04, 0.35, 16), metal('#dfe4ec'), [0, -0.17, 0], [Math.PI, 0, 0]),
+      mesh(capsule(0.1, 0.55), red, [0, 0.35, 0]),
+      mesh(cyl(0.05, 0.05, 0.5, 16), red, [0, 0.85, 0]),
+      ...[0, 1, 2].map((k) => group([mesh(finGeo, red, [0, 0, -0.015])], [0, 0.85, 0], [0, (k * Math.PI * 2) / 3, 0])),
+    ], [0, 0, 0], [0, 0, 0], 1.2)
+    // Stick the tip in the bullseye of the turned board, shaft pointing up-right toward the camera.
+    const turn = 0.5
+    const bull = new THREE.Vector3(Math.sin(turn) * 0.27, 0.0, Math.cos(turn) * 0.27)
+    const dir = new THREE.Vector3(0.7, 0.45, 0.6).normalize()
+    bigDart.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+    bigDart.position.copy(bull).addScaledVector(dir, 0.3 * 1.2)
     return {
-      object: group([
-        board,
-        surround,
-        dart(C.red, [0.06, 0.05, 0.2], [1.2, 0.0, -0.5]),
-        dart('#1f6bff', [-0.42, 0.55, 0.2], [1.1, 0.0, 0.45]),
-      ]),
-      view: { pitch: 0.12, yaw: -0.5, fill: 0.95 },
-      shadow: false,
+      object: group([group([board, surround], [0, 0, 0], [0, turn, 0]), bigDart]),
+      view: { pitch: 0.12, yaw: 0, fill: 0.95, shift: [-0.02, 0.02], roll: 0 },
+      look: { envIntensity: 0.6 },
+      backdrop: {
+        gradient: [180, '#2a3aa8', '#3a2a88', '#1a1a5a'],
+        masses: [[0.1, 0.15, 0.25, '#4a6aff'], [0.15, 0.85, 0.3, '#c0508a'], [0.85, 0.8, 0.25, '#8a3aa8'], [0.8, 0.1, 0.2, '#6a4aff']],
+        bokeh: { n: 26, colors: ['#ffb060', '#ff8a4a', '#a0b0ff', '#ffd0a0'], min: 0.006, max: 0.025, seed: 17 },
+      },
     }
   },
 
