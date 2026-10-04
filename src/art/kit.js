@@ -269,9 +269,9 @@ export function noiseTexture({ size = 256, contrast = 0.12, seed = 1 } = {}) {
 }
 
 /** Rounded-rectangle path centred on the origin. */
-export function roundedRectPath(path, w, h, r) {
-  const x = -w / 2
-  const y = -h / 2
+export function roundedRectPath(path, w, h, r, cx = 0, cy = 0) {
+  const x = cx - w / 2
+  const y = cy - h / 2
   path.moveTo(x + r, y)
   path.lineTo(x + w - r, y)
   path.absarc(x + w - r, y + r, r, -Math.PI / 2, 0)
@@ -288,9 +288,10 @@ export function roundedRectPath(path, w, h, r) {
  * One-piece tray frame: a rounded-rectangle block with a rounded-rectangle opening, bevelled all
  * round. Rounded outer corners and inner corners, no seams between walls.
  */
-export function trayFrameGeometry({ outer = 4, outerDepth = outer, inner = 3.1, height = 0.6, outerRadius = 0.4, innerRadius = 0.1, bevel = 0.07 } = {}) {
-  // outer is the width (x); outerDepth (z) defaults to it for a square tray.
-  const shape = roundedRectPath(new THREE.Shape(), outer - bevel * 2, outerDepth - bevel * 2, outerRadius)
+export function trayFrameGeometry({ outer = 4, outerDepth = outer, outerCenter = [0, 0], inner = 3.1, height = 0.6, outerRadius = 0.4, innerRadius = 0.1, bevel = 0.07 } = {}) {
+  // outer is the width (x); outerDepth (z) defaults to it for a square tray. outerCenter [x, z] moves the
+  // outside relative to the centred opening, for walls of different thickness.
+  const shape = roundedRectPath(new THREE.Shape(), outer - bevel * 2, outerDepth - bevel * 2, outerRadius, outerCenter[0], -outerCenter[1])
   shape.holes.push(roundedRectPath(new THREE.Path(), inner + bevel * 2, inner + bevel * 2, innerRadius))
   const g = new THREE.ExtrudeGeometry(shape, {
     depth: height - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 6, curveSegments: 24,
