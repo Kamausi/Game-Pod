@@ -327,8 +327,9 @@ const GAMES = {
       parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), wood, [0, floorTop + DIV_H / 2, o * SZ]))
       parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH + 0.1, 0.035, 4), wood, [o * S, floorTop + DIV_H / 2, 0]))
     }
-    // Raised square blocks where the bars cross, a little wider than the bars and standing proud of them.
-    const JOINT_W = DIV_W * 1.45
+    // Raised square blocks where the bars cross: flush with the bars' sides (a hair inside, to avoid
+    // z-fighting), standing proud of them only in height.
+    const JOINT_W = DIV_W - 0.002
     const JOINT_H = DIV_H + 0.03
     for (const ox of [-0.5, 0.5]) for (const oz of [-0.5, 0.5])
       parts.push(mesh(rbox(JOINT_W, JOINT_H, JOINT_W, 0.03, 4), wood, [ox * S, floorTop + JOINT_H / 2, oz * SZ]))
