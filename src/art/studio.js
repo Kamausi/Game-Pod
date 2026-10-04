@@ -3,6 +3,10 @@
 // a fresnel rim glow layered onto the models' own materials, and a bloom pass that keeps alpha.
 import * as THREE from 'three'
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { MODELS } from './models.js'
 
 const FOV = 30
@@ -134,12 +138,15 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   const scene = new THREE.Scene()
   scene.environment = envMap
   scene.environmentIntensity = look.envIntensity ?? 1
+  // Warm-lit scenes (tavern, sunset) swap the cool studio fill for a coloured ambient bounce.
+  if (look.ambient) scene.add(new THREE.HemisphereLight(look.ambient[0], look.ambient[1], look.ambient[2] ?? 1))
 
   object.traverse((o) => {
     if (!o.isMesh) return
     o.castShadow = shadow
     o.receiveShadow = true
     ;[].concat(o.material).forEach((m) => m.isMeshStandardMaterial && addRim(m, { ...rim, ...look.rim }))
+    if (look.envTint) [].concat(o.material).forEach((m) => m.isMeshStandardMaterial && (m.envMapIntensity *= look.envTint))
   })
   scene.add(object)
 
@@ -175,13 +182,38 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   const camera = fitCamera(frame ?? object, width / height, view)
   renderer.setPixelRatio(1)
   renderer.setSize(width, height, false)
-  renderer.render(scene, camera)
+
+  if (backdrop) {
+    // Scene tiles: the painted backdrop becomes the background, and the frame goes through
+    // ambient occlusion so pieces sit *in* boards and grass instead of floating on them.
+    const bg = new THREE.CanvasTexture(paintBackdrop(width, height, backdrop))
+    bg.colorSpace = THREE.SRGBColorSpace
+    scene.background = bg
+    scene.backgroundIntensity = look.backgroundIntensity ?? 1.15
+    const target = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: 4 })
+    const composer = new EffectComposer(renderer, target)
+    composer.setPixelRatio(1)
+    composer.setSize(width, height)
+    composer.addPass(new RenderPass(scene, camera))
+    const gtao = new GTAOPass(scene, camera, width, height)
+    // Small radius: darken contact creases and pockets, not whole flat faces near tall neighbours.
+    gtao.updateGtaoMaterial({ radius: r * (look.aoRadius ?? 0.05), distanceExponent: 2, thickness: r * 0.03, scale: 1 })
+    gtao.blendIntensity = look.aoIntensity ?? 1.1
+    composer.addPass(gtao)
+    composer.addPass(new OutputPass())
+    composer.render()
+    composer.dispose()
+    gtao.dispose()
+    target.dispose()
+    bg.dispose()
+  } else {
+    renderer.render(scene, camera)
+  }
 
   const out = document.createElement('canvas')
   out.width = width
   out.height = height
   out.getContext('2d').drawImage(renderer.domElement, 0, 0)
-  out.backdrop = backdrop
 
   scene.traverse((o) => {
     if (!o.isMesh) return
@@ -261,8 +293,7 @@ export function composite(back, front) {
 
 /** Renders the model and, when it defines a backdrop, composites it into a full-bleed scene. */
 export function renderAsset(name, opts) {
-  const canvas = renderModel(name, opts)
-  return canvas.backdrop ? composite(paintBackdrop(opts.width, opts.height, canvas.backdrop), canvas) : canvas
+  return renderModel(name, opts)
 }
 
 /**

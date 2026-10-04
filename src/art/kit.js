@@ -155,3 +155,72 @@ export function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, r)
 }
+
+// ---------- Toy kit: sculpted replacements for raw primitives ----------
+// House rule: no foreground object ships as an untouched primitive. These give pieces the
+// inflated, heavily bevelled, manufactured-toy forms the key art uses.
+
+/**
+ * Pillowy X: one continuous outline (rounded terminals, rounded inner corners) extruded with a
+ * deep, many-segment bevel so the whole piece reads as soft moulded plastic.
+ */
+export function toyXGeometry({ size = 0.8, arm = 0.26, depth = 0.08, bevel = 0.09 } = {}) {
+  const half = size / 2 - bevel
+  const w = arm / 2 - bevel * 0.6
+  const e = half - w // where each arm's round cap is centred
+  // Plus-sign outline traced clockwise, a half-circle cap on each arm; rotated 45° into an X below.
+  const s = new THREE.Shape()
+  s.moveTo(w, w)
+  s.lineTo(e, w)
+  s.absarc(e, 0, w, Math.PI / 2, -Math.PI / 2, true)
+  s.lineTo(w, -w)
+  s.lineTo(w, -e)
+  s.absarc(0, -e, w, 0, -Math.PI, true)
+  s.lineTo(-w, -w)
+  s.lineTo(-e, -w)
+  s.absarc(-e, 0, w, -Math.PI / 2, (-3 * Math.PI) / 2, true)
+  s.lineTo(-w, w)
+  s.lineTo(-w, e)
+  s.absarc(0, e, w, Math.PI, 0, true)
+  s.closePath()
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 10, curveSegments: 16 })
+  g.center()
+  g.rotateZ(Math.PI / 4)
+  g.rotateX(-Math.PI / 2)
+  g.computeVertexNormals()
+  return g
+}
+
+/** Manufactured O: a ring whose cross-section is a rounded rectangle (flat top, soft edges), not a torus tube. */
+export function toyOGeometry({ radius = 0.28, width = 0.24, height = 0.2, round = 0.09 } = {}) {
+  const r0 = radius - width / 2
+  const pts = []
+  const corner = (cx, cy, a0) => {
+    for (let i = 0; i <= 8; i++) {
+      const a = a0 + (i / 8) * (Math.PI / 2)
+      pts.push(new THREE.Vector2(cx + Math.cos(a) * round, cy + Math.sin(a) * round))
+    }
+  }
+  corner(r0 + width - round, round, -Math.PI / 2) // outer bottom
+  corner(r0 + width - round, height - round, 0) // outer top
+  corner(r0 + round, height - round, Math.PI / 2) // inner top
+  corner(r0 + round, round, Math.PI) // inner bottom
+  pts.push(pts[0].clone())
+  const g = new THREE.LatheGeometry(pts, 96)
+  g.translate(0, -height / 2, 0)
+  return g
+}
+
+/** Checker puck: gently domed face with a faint inner ring, soft rounded rim, ridged side, tucked base. */
+export function toyPuckGeometry({ radius = 0.22, height = 0.2 } = {}) {
+  const R = radius
+  const H = height
+  const p = [
+    [0, H * 1.02], [R * 0.4, H * 1.01], [R * 0.62, H * 0.99], [R * 0.68, H * 0.97], [R * 0.72, H * 0.99],
+    [R * 0.86, H * 0.98], [R * 0.96, H * 0.93], [R * 1.01, H * 0.82],
+    [R * 0.985, H * 0.68], [R * 1.01, H * 0.56], [R * 0.985, H * 0.44], [R * 1.01, H * 0.32],
+    [R * 0.99, H * 0.12], [R * 0.93, H * 0.02], [R * 0.85, 0], [0, 0],
+  ].map(([x, y]) => new THREE.Vector2(x, y))
+  // Lathe profiles must run bottom-to-top, or the normals point inward and the piece renders as a hollow cup.
+  return new THREE.LatheGeometry(p.reverse(), 64)
+}

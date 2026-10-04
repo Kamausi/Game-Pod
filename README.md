@@ -29,6 +29,16 @@ All in-app art is generated in code; the only bitmap made outside the project is
 2. **Studio** (`src/art/studio.js`): renders the model with an HDR environment (`npm run make-hdr` generates `src/art/env/studio.hdr`: warm key softbox, overhead strip, cool fill, hot-pink and cyan rim lights), a shadow-casting key light onto an invisible floor, a fresnel rim glow layered onto the model's own materials, ACES tone mapping, a camera fitted to the model's outline, and an alpha-preserving bloom pass.
 3. **Bake** (`npm run bake -- <asset>`): renders at 2x in headless Chromium, downsamples with Lanczos and saves a transparent WebP to `src/assets/art/`. Add `--compare` to get ACES / AgX / Neutral variants for review. Sizes are listed in `src/art/manifest.js`. (Needs Playwright's Chromium: `npx playwright install chromium`.)
 
+**Art standard** (every asset follows it):
+
+- **No raw primitives in the foreground.** Hero pieces come from the toy kit in `src/art/kit.js` (`toyXGeometry` pillowy X, `toyOGeometry` flat-topped ring, `toyPuckGeometry` domed checker), or lathe/extrude profiles with heavy, many-segment bevels. Lathe profiles run bottom-to-top, or normals flip and pieces render hollow.
+- **Toy proportions.** Model for readability at 200–400 px: chunky frames, thick dividers, oversized pieces.
+- **Lighting:** HDR environment + warm key casting soft shadows + rim. Scenes can override with `look` (key colour/intensity, `ambient` hemisphere bounce for warm moods, environment strength).
+- **Grounding:** scene tiles render through GTAO (small radius, contact creases only) so pieces sit in their boards.
+- **Camera:** long lens (30° FOV), framed on the hero parts (`frame`), letting scenery bleed off the tile.
+- **Background:** a painted out-of-focus backdrop (`backdrop`) gives the depth-of-field separation.
+- **Reference check:** each tile is iterated side-by-side against its reference crop until composition, colour and materials match.
+
 The app shows baked images; an asset that hasn't been baked yet falls back to a live render of the same model, so assets can be upgraded individually. Baked so far: Tic Tac Toe, Checkers, Ring Toss, Darts.
 
 The live game scene uses the same HDR (`studio-small.hdr`) for reflections.
