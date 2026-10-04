@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Game Pod art studio</title>
+    <style>
+      body { margin: 0; background: #0d1236; color: #fff; font: 14px system-ui, sans-serif; }
+      #out { display: flex; gap: 12px; padding: 12px; flex-wrap: wrap; }
+      #out canvas { max-width: 48vw; height: auto; background: conic-gradient(#1a2060 25%, #232a78 0 50%, #1a2060 0 75%, #232a78 0) 0 0 / 24px 24px; border-radius: 12px; }
+    </style>
+  </head>
+  <body>
+    <!-- Dev-only page used by scripts/bake-art.mjs; not part of the app build. -->
+    <div id="out"></div>
+    <script type="module" src="/src/art/studio-page.js"></script>
+  </body>
+</html>

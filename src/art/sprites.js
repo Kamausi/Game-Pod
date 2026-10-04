@@ -148,9 +148,11 @@ const subscribe = (l) => {
 }
 
 /** Returns the rendered image URL for a model (undefined while rendering, '' if WebGL is unavailable). */
-export function useSprite(name, size = 320, aspect = 1) {
+export function useSprite(name, size = 320, aspect = 1, enabled = true) {
   const k = keyOf(name, size, aspect)
   const url = useSyncExternalStore(subscribe, () => cache.get(k))
-  useEffect(() => requestSprite(name, size, aspect), [name, size, aspect])
+  useEffect(() => {
+    if (enabled) requestSprite(name, size, aspect)
+  }, [name, size, aspect, enabled])
   return url
 }

@@ -123,6 +123,34 @@ export function drawSuit(ctx, suit, cx, cy, s, color) {
   ctx.restore()
 }
 
+// Varnished wood: warm base with long wavy grain lines and a few darker streaks.
+export function woodTexture({ base = '#d9934f', dark = '#9a5a26', light = '#f0b877', size = 512, seed = 1 } = {}) {
+  let r = seed
+  const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647)
+  return canvasTexture(size, size, (ctx, W, H) => {
+    const g = ctx.createLinearGradient(0, 0, W, H)
+    g.addColorStop(0, light)
+    g.addColorStop(0.5, base)
+    g.addColorStop(1, light)
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, W, H)
+    for (let i = 0; i < 70; i++) {
+      const y0 = rand() * H
+      const amp = 4 + rand() * 10
+      const freq = 0.004 + rand() * 0.01
+      const phase = rand() * 10
+      ctx.strokeStyle = i % 7 === 0 ? dark : `rgba(120,60,20,${0.08 + rand() * 0.16})`
+      ctx.lineWidth = i % 7 === 0 ? 2.2 : 1 + rand() * 1.5
+      ctx.beginPath()
+      for (let x = -10; x <= W + 10; x += 8) {
+        const y = y0 + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 3.1 + phase) * amp * 0.25
+        x === -10 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+      }
+      ctx.stroke()
+    }
+  })
+}
+
 export function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, r)

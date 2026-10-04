@@ -1,6 +1,8 @@
-import { useLayoutEffect } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
-import { ContactShadows, OrbitControls, Sparkles, Stars } from '@react-three/drei'
+import { Suspense, useLayoutEffect } from 'react'
+import { Canvas, useLoader, useThree } from '@react-three/fiber'
+import { ContactShadows, Environment, OrbitControls, Sparkles, Stars } from '@react-three/drei'
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
+import studioHdr from '../art/env/studio-small.hdr?url'
 import { COLORS } from '../constants.js'
 import Board from './Board.jsx'
 
@@ -16,6 +18,12 @@ function ResponsiveCamera() {
     camera.lookAt(0, 0, 0)
   }, [aspect, camera])
   return null
+}
+
+// Same studio HDR the art is baked with, so the live board's reflections match the tiles.
+function StudioEnvironment() {
+  const map = useLoader(HDRLoader, studioHdr)
+  return <Environment map={map} environmentIntensity={0.7} />
 }
 
 export default function Scene(props) {
@@ -42,6 +50,9 @@ export default function Scene(props) {
 
       <Stars radius={40} depth={20} count={1500} factor={3} fade speed={0.6} />
 
+      <Suspense fallback={null}>
+        <StudioEnvironment />
+      </Suspense>
       <Board {...props} />
 
       {winner && !props.reduceMotion && (

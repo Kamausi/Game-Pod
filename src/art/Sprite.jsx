@@ -1,9 +1,15 @@
 import { useSprite } from './sprites.js'
 import './art.css'
 
-// A 3D model rendered to an image (see sprites.js). Shows a soft placeholder while it renders.
+// Studio-baked renders (scripts/bake-art.mjs). Assets not baked yet fall back to a live render.
+const baked = import.meta.glob('../assets/art/*.webp', { eager: true, import: 'default' })
+export const bakedArt = (name) => baked[`../assets/art/${name}.webp`]
+
+// A 3D model as an image. Shows a soft placeholder while a live fallback renders.
 export function Sprite({ name, size = 320, aspect = 1, className = '' }) {
-  const url = useSprite(name, size, aspect)
+  const bakedUrl = bakedArt(name)
+  const liveUrl = useSprite(name, size, aspect, !bakedUrl)
+  const url = bakedUrl ?? liveUrl
   if (url) return <img className={`sprite ${className}`} src={url} alt="" draggable="false" />
   return <span className={`sprite sprite-wait ${className}`} aria-hidden="true" />
 }

@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test src/*.test.js",
-    "build:html": "vite build --mode single && cp dist-single/index.html tic-tac-toe.html"
+    "build:html": "vite build --mode single && cp dist-single/index.html tic-tac-toe.html",
+    "bake": "node scripts/bake-art.mjs",
+    "make-hdr": "node scripts/make-studio-hdr.mjs"
   },
   "dependencies": {
     "@fontsource/fredoka": "^5.3.0",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.0",
+    "playwright": "^1.56.1",
     "vite": "^7.1.0",
     "vite-plugin-singlefile": "^2.3.3"
   }

@@ -2,7 +2,7 @@
 // Each returns { object, view } where view = { pitch, yaw, fill } positions the camera.
 import {
   THREE, mat, wood, metal, matte, mesh, group, rbox, cyl, sphere, torus, cone, capsule,
-  canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect,
+  canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture,
 } from './kit.js'
 
 const C = {
@@ -243,20 +243,36 @@ function grassTuft(pos, s = 1) {
 
 const GAMES = {
   'tic-tac-toe': () => {
-    const board = mesh(rbox(3, 0.32, 3, 0.16), wood('#d29152'))
-    const groove = mat('#7a4a22', { roughness: 0.7, clearcoat: 0 })
-    const lines = [-0.5, 0.5].flatMap((o) => [
-      mesh(rbox(2.7, 0.04, 0.08, 0.02), groove, [0, 0.17, o]),
-      mesh(rbox(0.08, 0.04, 2.7, 0.02), groove, [o, 0.17, 0]),
+    // Varnished wooden tray with a raised frame, engraved grid and glossy plastic pieces.
+    const grain = woodTexture({ base: '#c4702a', dark: '#6e3410', light: '#dc8c42', seed: 7 })
+    // Satin varnish: enough sheen to read as finished wood without mirroring the studio lights.
+    const varnish = (color, map) => mat(color, { map, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.45 })
+    const frameWood = varnish('#ffffff', woodTexture({ base: '#9e5520', dark: '#7e4014', light: '#b0642a', seed: 3 }))
+    const tray = mesh(rbox(3.3, 0.3, 3.3, 0.14), frameWood, [0, 0, 0])
+    const field = mesh(new THREE.PlaneGeometry(2.86, 2.86), varnish('#ffffff', grain), [0, 0.151, 0], [-Math.PI / 2, 0, 0])
+    const frame = [
+      [0, 1.53, 3.3, 0.24], [0, -1.53, 3.3, 0.24],
+      [1.53, 0, 0.24, 3.3], [-1.53, 0, 0.24, 3.3],
+    ].map(([x, z, w, d]) => mesh(rbox(w, 0.18, d, 0.08), frameWood, [x, 0.2, z]))
+    const groove = mat('#5a2e10', { roughness: 0.8, clearcoat: 0 })
+    const lines = [-0.48, 0.48].flatMap((o) => [
+      mesh(rbox(2.78, 0.02, 0.07, 0.01), groove, [0, 0.152, o]),
+      mesh(rbox(0.07, 0.02, 2.78, 0.01), groove, [o, 0.152, 0]),
     ])
+    const blue = mat('#0d3dff', { roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08 })
+    const red = mat('#e8001f', { roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.08 })
+    const X = () => group([
+      mesh(capsule(0.1, 0.62), blue, [0, 0, 0], [0, Math.PI / 4, Math.PI / 2]),
+      mesh(capsule(0.1, 0.62), blue, [0, 0, 0], [0, -Math.PI / 4, Math.PI / 2]),
+    ])
+    const O = () => mesh(torus(0.27, 0.105), red, [0, 0, 0], [Math.PI / 2, 0, 0])
     const layout = ['X', 'O', 'O', 'O', 'X', 'O', 'X', 'X', 'O']
     const pieces = layout.map((p, i) => {
-      const pos = [((i % 3) - 1) * 1, 0.3, (Math.floor(i / 3) - 1) * 1]
-      const piece = p === 'X' ? xPiece() : oPiece()
-      piece.position.set(...pos)
+      const piece = p === 'X' ? X() : O()
+      piece.position.set(((i % 3) - 1) * 0.96, 0.26, (Math.floor(i / 3) - 1) * 0.96)
       return piece
     })
-    return { object: group([board, ...lines, ...pieces]), view: { pitch: 0.82, yaw: -0.35, fill: 1.2 } }
+    return { object: group([tray, field, ...frame, ...lines, ...pieces]), view: { pitch: 0.78, yaw: -0.38, fill: 0.98 } }
   },
 
   checkers: () => {
