@@ -288,7 +288,7 @@ const GAMES = {
     // seen almost from above and turned slightly, over a warm out-of-focus glow.
     const wood = mat('#ffffff', {
       // Honey maple, not saturated orange.
-      map: woodTexture({ base: '#c08844', dark: '#b6803e', light: '#cc9654', seed: 7 }),
+      map: woodTexture({ base: '#c27c3a', dark: '#b87436', light: '#cc8a48', seed: 7 }),
       roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.45,
     })
     const pocket = mat('#1a0c05', { roughness: 0.95, clearcoat: 0, envMapIntensity: 0.1 })
@@ -323,9 +323,9 @@ const GAMES = {
     return {
       // Tip the right edge up toward the camera so that side reads nearer, like the reference.
       object: group(parts, [0, 0, 0], [0.12, 0, 0.16]),
-      view: { pitch: 0.98, yaw: 0, fill: 0.86, shift: [-0.04, 0.04], roll: -0.12, fov: 26 },
+      view: { pitch: 0.75, yaw: 0, fill: 0.94, shift: [-0.03, 0.05], roll: -0.1, fov: 26 },
       // Contrast: bright warm key, dark cavities, cool environment, controlled rim.
-      look: { envIntensity: 0.45, keyIntensity: 2.6, keyColor: '#ffe2b8', ambient: ['#7a9cff', '#1a1430', 0.35], rim: { intensity: 0.22, color: '#9fc4ff' }, aoIntensity: 2.0, aoRadius: 0.045 },
+      look: { envIntensity: 0.45, keyIntensity: 2.6, keyColor: '#ffe2b8', ambient: ['#7a9cff', '#1a1430', 0.35], rim: { intensity: 0.22, color: '#9fc4ff' }, aoIntensity: 2.0, aoRadius: 0.045, glow: { amount: 0.3, radius: 0.03, tint: ['#ffb070', 0.1] } },
       backdrop: {
         gradient: [180, '#1a2a78', '#4a3a88', '#9a5a50'],
         masses: [[0.1, 0.12, 0.28, '#4a7aff'], [0.9, 0.2, 0.25, '#8a6ad8'], [0.1, 0.75, 0.3, '#ff9a4a'], [0.85, 0.9, 0.3, '#2a3a9a'], [0.5, 0.05, 0.2, '#6aa0ff']],
@@ -358,7 +358,7 @@ const GAMES = {
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
       const dark = (r + c) % 2 === 1
       const [x, , z] = at(c, r)
-      const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.35 : 0.5, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: dark ? 0.5 : 0.2, clearcoatRoughness: 0.3 }), [x, 0.03, z])
+      const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.45 : 0.6, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: dark ? 0.25 : 0.05, clearcoatRoughness: 0.3 }), [x, 0.03, z])
       parts.push(vary(tile, 100 + r * N + c, { value: 0.015, rough: 0.025, height: 0.02 }))
       tile.rotation.set(0, 0, 0) // tiles stay square; tone, roughness and a hair of height vary
     }
@@ -388,9 +388,12 @@ const GAMES = {
       // Key art, not the player camera: higher, farther, longer lens, the whole board as an object.
       // Sitting over an active game: close, higher, cropped asymmetrically on the middle pieces.
       frame: pieces.slice(3, 15),
-      view: { pitch: 0.7, yaw: 0.0, fill: 1.0, shift: [0.04, -0.1], roll: -0.08, fov: 24 },
+      view: { pitch: 0.62, yaw: -0.3, fill: 1.05, shift: [0.0, 0.06], roll: 0.04, fov: 24 },
       look: {
-        envIntensity: 0.12, ambient: ['#ffb070', '#3a1a08', 0.9], keyIntensity: 3.2, keyColor: '#ffd8a0',
+        // Backlit: warm light rakes toward the camera across the squares.
+        keyFrom: [-2.0, 3.2, -1.2],
+        glow: { amount: 0.35, radius: 0.035, tint: ['#ff9a40', 0.14] },
+        envIntensity: 0.12, ambient: ['#ffb070', '#3a1a08', 0.9], keyIntensity: 2.0, keyColor: '#ffd8a0',
         rim: { intensity: 0.08, color: '#ffc080' }, aoIntensity: 2.2, aoRadius: 0.016,
         softbox: { color: '#ffe6c4', intensity: 7, width: 1.8, height: 0.8, from: [-1.0, 2.0, 0.4] },
         // Showcase DOF: nearest and rear pieces soften, centre stays sharpest.

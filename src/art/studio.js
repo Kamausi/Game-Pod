@@ -165,7 +165,8 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
 
   // Key light matches the HDR's main softbox (front-left, above) and casts the soft shadow.
   const key = new THREE.DirectionalLight(look.keyColor ?? '#fff3e6', look.keyIntensity ?? 1.4)
-  key.position.set(sphere.center.x - r * 2.2, sphere.center.y + r * 3, sphere.center.z + r * 2.4)
+  const [kx, ky, kz] = look.keyFrom ?? [-2.2, 3, 2.4] // in scene radii; negative z = backlight
+  key.position.set(sphere.center.x + r * kx, sphere.center.y + r * ky, sphere.center.z + r * kz)
   key.target.position.copy(sphere.center)
   key.castShadow = shadow
   key.shadow.mapSize.set(2048, 2048)
@@ -373,6 +374,34 @@ export function bloom(canvas, { threshold = 0.82, strength = 0.55, radius = 0.01
     ctx.drawImage(brightCanvas, 0, 0)
   }
   ctx.filter = 'none'
+  ctx.globalAlpha = 1
+  ctx.globalCompositeOperation = 'source-over'
+  return out
+}
+
+/**
+ * Painterly glow (Orton effect): a heavily blurred, brightened copy screened over the image, plus a
+ * warm tint lift. This is the soft luminous haze over the key art references.
+ */
+export function glow(canvas, { amount = 0.4, radius = 0.025, tint = null } = {}) {
+  const { width: w, height: h } = canvas
+  const out = document.createElement('canvas')
+  out.width = w
+  out.height = h
+  const ctx = out.getContext('2d')
+  ctx.drawImage(canvas, 0, 0)
+  ctx.globalCompositeOperation = 'screen'
+  ctx.globalAlpha = amount
+  // Crush darks before blurring so only highlights bloom; shadows and saturation stay intact.
+  ctx.filter = `contrast(1.8) brightness(0.85) blur(${Math.round(w * radius)}px) saturate(1.3)`
+  ctx.drawImage(canvas, 0, 0)
+  ctx.filter = 'none'
+  if (tint) {
+    ctx.globalCompositeOperation = 'soft-light'
+    ctx.globalAlpha = tint[1]
+    ctx.fillStyle = tint[0]
+    ctx.fillRect(0, 0, w, h)
+  }
   ctx.globalAlpha = 1
   ctx.globalCompositeOperation = 'source-over'
   return out

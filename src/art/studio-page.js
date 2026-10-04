@@ -4,7 +4,8 @@ import '@fontsource/fredoka/latin-600.css'
 import '@fontsource/fredoka/latin-700.css'
 import hdrUrl from './env/studio.hdr?url'
 import { ASSETS } from './manifest.js'
-import { bloom, renderAsset, setupStudio } from './studio.js'
+import { bloom, glow, renderAsset, setupStudio } from './studio.js'
+import { MODELS } from './models.js'
 
 const SUPERSAMPLE = 2
 
@@ -21,6 +22,8 @@ async function main() {
   const height = spec.height * SUPERSAMPLE
   let canvas = renderAsset(name, { width, height, tone })
   canvas = bloom(canvas, spec.bloom)
+  const g = MODELS[name]().look?.glow
+  if (g) canvas = glow(canvas, g)
   document.getElementById('out').append(canvas)
   window.__studio = { done: true, dataUrl: canvas.toDataURL('image/png') }
 }
