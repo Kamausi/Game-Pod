@@ -56,7 +56,15 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
  * (the whole model, or the parts a model lists in `frame`)
  * (not its bounding sphere), so every asset fills the frame by `fill` without clipping.
  */
-function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift = null, roll = 0, fov = FOV }) {
+function fitCamera(targets, aspect, { pitch = 0.5, yaw = -0.3, fill = 0.9, shift = null, roll = 0, fov = FOV, camera: exact = null }) {
+  // An exact camera (position, look-at target, roll, fov), e.g. solved to line a model up with its reference art.
+  if (exact) {
+    const camera = new THREE.PerspectiveCamera(exact.fov, aspect, 0.01, 1000)
+    camera.position.set(...exact.position)
+    camera.lookAt(...exact.target)
+    if (exact.roll) camera.rotateZ(exact.roll)
+    return camera
+  }
   const points = []
   ;[].concat(targets).forEach((t) => t.updateMatrixWorld(true))
   ;[].concat(targets).forEach((t) => t.traverse((o) => {
