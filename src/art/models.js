@@ -292,7 +292,7 @@ const GAMES = {
     })
     const black = mat('#050403', { roughness: 1, clearcoat: 0, envMapIntensity: 0 })
     const S = 1.0 // cell pitch
-    const DIV_W = 0.14 // divider width
+    const DIV_W = 0.19 // divider width (squares are S - DIV_W = 0.81, snug around the pieces)
     // Inner well sized so all nine cells are equal (S - DIV_W) and each cell's centre is on the S pitch,
     // so pieces placed at -S / 0 / +S sit centred in their squares.
     const INNER = 3 * S - DIV_W
