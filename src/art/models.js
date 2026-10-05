@@ -655,10 +655,14 @@ const GAMES = {
     const ARC = 16 // segments per corner
     const corners = [[1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI], [1, -1, Math.PI * 1.5]]
     const ring = []
-    for (const [sx, sz, a0] of corners) for (let k = 0; k <= ARC; k++) ring.push([sx * (width / 2 - CORNER), sz * (depth / 2 - CORNER), a0 + (Math.PI / 2) * k / ARC])
-    for (const [o, y] of profile) for (const [cx0, cz0, a] of ring) {
-      const r = o + CORNER
-      const x = cx0 + r * Math.cos(a), z = cz0 + r * Math.sin(a)
+    for (const [sx, sz, a0] of corners) for (let k = 0; k <= ARC; k++) ring.push([sx, sz, a0 + (Math.PI / 2) * k / ARC])
+    // Outer corners (round A1, A5, E1, E5) are sharp and pointed: the corner rounding is full on the flat strip
+    // and eases to nothing across the slope, so the outer edge, roll and sides meet in crisp points.
+    const SHARP_FROM = STRIP, SHARP_TO = lipW - ROLL
+    for (const [o, y] of profile) for (const [sx, sz, a] of ring) {
+      const k = Math.min(1, Math.max(0, (o - SHARP_FROM) / (SHARP_TO - SHARP_FROM)))
+      const r = (o + CORNER) * (1 - k * k * (3 - 2 * k))
+      const x = sx * (width / 2 + o - r) + r * Math.cos(a), z = sz * (depth / 2 + o - r) + r * Math.sin(a)
       casePos.push(x, y, z)
       caseUv.push(x / 3 + 0.5, z / 3 + 0.5)
     }
