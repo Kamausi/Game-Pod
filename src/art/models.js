@@ -608,7 +608,8 @@ const GAMES = {
     const N = 6
     const ROWS = 5 // the reference's board is a row short at the front and a column short at the right: 5 x 5
     const COLS = 5
-    const SQ = 0.47 // square size (the board shrinks around its centre; pieces keep their size)
+    const SQ = 0.53 // square size (pieces keep their size)
+    const SQ_A1 = 0.47 // the size the A1 corner was placed for: the board grows away from that corner
     const size = N * SQ
     const depth = ROWS * SQ
     const width = COLS * SQ
@@ -720,7 +721,9 @@ const GAMES = {
       map: woodTexture({ base: '#6a3414', dark: '#5a2a0e', light: '#7a3e1c', seed: 31, size: 1024 }),
       roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.2,
     }), [0, -0.475, 0.6])
-    const board = group(parts) // square to the axes: the exact camera below sets the angle
+    // Square to the axes (the exact camera sets the angle); shifted so the A1 corner of the field (-3 SQ, -3 SQ)
+    // stays where it was when the board was smaller, and the board grows toward E5.
+    const board = group(parts, [3 * (SQ - SQ_A1), 0, 3 * (SQ - SQ_A1)])
     return {
       object: group([board, table]),
       // Key art, not the player camera: higher, farther, longer lens, the whole board as an object.
