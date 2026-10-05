@@ -616,7 +616,7 @@ const GAMES = {
     const xc = -(size - width) / 2 // and its left edge; the right edge moves in by the missing column
     const surface = noiseTexture({ contrast: 0.1, seed: 43 })
     const LIP_W = 0.28 // outer wall thickness (base matches it)
-    const casing = mat('#171310', { roughness: 0.75, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0, envMapIntensity: 0.25 }) // matte, no gloss
+    const casing = mat('#171310', { roughness: 0.45, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0.35, clearcoatRoughness: 0.3, envMapIntensity: 0.4 }) // satin gloss
     const parts = [
     ]
     // Casing: one smooth solid from the table (y -0.325) up to the squares (y 0.22), swept round the board as
