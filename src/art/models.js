@@ -380,11 +380,13 @@ const GAMES = {
       mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
       mesh(new THREE.PlaneGeometry(INNER, INNER_DEPTH), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
-    // Glowing top-right edge (teal), as in the reference: a thin bright strip along the outer top edge from the
+    // Glowing top-right edge (white), as in the reference: a thin bright strip along the outer top edge from the
     // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
     // spreads it into a soft halo.
     // back: how far it runs along the back edge from the corner; right: along the right edge.
-    const EDGE_GLOW = { color: '#3fe6d6', width: 0.026, strength: 3.4, back: 2.9, right: 2.45, offset: 0.015 }
+    const EDGE_GLOW = { color: '#ffffff', width: 0.026, strength: 3.4, back: 2.9, right: 2.45, offset: 0.015 }
+    // Slight blur: wider, fainter copies of the strip around it ([width multiple, brightness multiple]).
+    const EDGE_GLOW_BLUR = [[1, 1], [1.5, 0.3], [2.1, 0.16], [2.8, 0.08], [3.6, 0.04]]
     {
       // Hugs the board's outline just outside the outer walls and a hair below the top, following the
       // rounded corner (outer radius 0.2), so the board covers the strip and only its glow shows behind it.
@@ -398,7 +400,8 @@ const GAMES = {
       for (const p of pts) p.y -= TL_DROP * (1 - Math.min(1, Math.max(0, (p.x + OUTER / 2) / OUTER))) * (1 - Math.min(1, Math.max(0, (p.z + OUTER_DEPTH / 2) / OUTER_DEPTH)))
       const curve = new THREE.CatmullRomCurve3(pts)
       const segs = 480, radial = 8
-      const geo = new THREE.TubeGeometry(curve, segs, EDGE_GLOW.width, radial, false)
+      for (const [wm, sm] of EDGE_GLOW_BLUR) {
+      const geo = new THREE.TubeGeometry(curve, segs, EDGE_GLOW.width * wm, radial, false)
       // Taper: full width and brightness at the corner, thinning and fading to nothing at both ends.
       const total = EDGE_GLOW.back + (Math.PI / 2) * cr + EDGE_GLOW.right
       const uc = (EDGE_GLOW.back + (Math.PI / 4) * cr) / total // corner, as a fraction of the length
@@ -410,7 +413,7 @@ const GAMES = {
       for (let i = 0; i <= segs; i++) {
         const f = taper(i / segs)
         curve.getPointAt(i / segs, centre)
-        const c = new THREE.Color(EDGE_GLOW.color).multiplyScalar(f ** 1.2 * EDGE_GLOW.strength)
+        const c = new THREE.Color(EDGE_GLOW.color).multiplyScalar(f ** 1.2 * EDGE_GLOW.strength * sm)
         for (let j = 0; j <= radial; j++) {
           const k = i * (radial + 1) + j
           v.fromBufferAttribute(pos, k).sub(centre).multiplyScalar(f).add(centre)
@@ -420,6 +423,7 @@ const GAMES = {
       }
       geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
       parts.push(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })))
+      }
     }
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
