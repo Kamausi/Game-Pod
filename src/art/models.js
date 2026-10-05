@@ -669,7 +669,7 @@ const GAMES = {
     ;[[0, 2], [1, 3], [2, 4], [4, 4], [3, 1], [0, 4]].forEach(([c, r]) => put(c, r, red))
     // The table it sits on: falls out of focus toward the edges.
     // Ends just behind the board so the warm room bokeh shows past its far edge.
-    const table = mesh(rbox(12, 0.3, 6.2, 0.1), mat('#7a7a7a', { // darker table (the colour multiplies the wood texture)
+    const table = mesh(rbox(12, 0.3, 6.2, 0.1), mat('#4a4a4a', { // darker table (the colour multiplies the wood texture)
       map: woodTexture({ base: '#6a3414', dark: '#5a2a0e', light: '#7a3e1c', seed: 31, size: 1024 }),
       roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.2,
     }), [0, -0.475, 0.6])
