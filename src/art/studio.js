@@ -326,7 +326,9 @@ export function paintBackdrop(width, height, spec) {
   // Defined forms painted over everything else (e.g. a dark stage under the subject):
   // ellipses: [[cx, cy, rx, ry, color, blur?, topColor?]] in fractions of the frame; with topColor the
   // fill shades from topColor near the top of the frame's lower part (y 0.8) down to color (y 0.96).
-  for (const [x, y, rx, ry, color, blur = 0.01, topColor] of spec.ellipses ?? []) {
+  // leftColor / rightColor, if given, tint the ellipse toward the frame's left and right edges (fading out
+  // over the outer 30% of the width).
+  for (const [x, y, rx, ry, color, blur = 0.01, topColor, leftColor, rightColor] of spec.ellipses ?? []) {
     ctx.filter = `blur(${Math.round(width * blur)}px)`
     if (topColor) {
       const g = ctx.createLinearGradient(0, height * 0.8, 0, height * 0.96)
@@ -337,6 +339,14 @@ export function paintBackdrop(width, height, spec) {
     ctx.beginPath()
     ctx.ellipse(x * width, y * height, rx * width, ry * height, 0, 0, Math.PI * 2)
     ctx.fill()
+    if (leftColor || rightColor) {
+      const clear = (hex) => `${hex.slice(0, 7)}00`
+      const g = ctx.createLinearGradient(0, 0, width, 0)
+      if (leftColor) { g.addColorStop(0, leftColor); g.addColorStop(0.3, clear(leftColor)) }
+      if (rightColor) { g.addColorStop(0.7, clear(rightColor)); g.addColorStop(1, rightColor) }
+      ctx.fillStyle = g
+      ctx.fill()
+    }
   }
   // rects: [[x, y, w, h, radius, color, blur?]] in fractions of the frame (radius in widths).
   for (const [x, y, w, h, r, color, blur = 0.01] of spec.rects ?? []) {
