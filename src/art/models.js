@@ -342,7 +342,7 @@ const GAMES = {
     ]
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
-    const DIV_DROP = 0.065 // dividers sit below the frame's top edge (just above the piece tops)
+    const DIV_DROP = 0.035 // dividers sit a little below the frame's top edge
     const DIV_H = H - floorTop - DIV_DROP
     const RAIL_GAP = 0.025 // bars stop just short of the frame: a thin dark gap where they meet it, as in the reference
     for (const o of [-0.5, 0.5]) {
