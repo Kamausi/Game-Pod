@@ -56,7 +56,7 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
       )
     if (!tint) return
     Object.assign(shader.uniforms, {
-      uTintLeft: { value: v3(tint.left) }, uTintFront: { value: v3(tint.front) }, uTintSide: { value: v3(tint.side) }, uTintInner: { value: v3(tint.inner) }, uTintInnerRight: { value: v3(tint.innerRight ?? tint.inner) }, uTintInnerBack: { value: v3(tint.innerBack ?? tint.inner) }, uTintHole: { value: v3(tint.hole) },
+      uTintLeft: { value: v3(tint.left) }, uTintFront: { value: v3(tint.front) }, uTintSide: { value: v3(tint.side) }, uTintInner: { value: v3(tint.inner) }, uTintInnerRight: { value: v3(tint.innerRight ?? tint.inner) }, uTintInnerBack: { value: v3(tint.innerBack ?? tint.inner) }, uTintHole: { value: v3(tint.hole) }, uTintEdge: { value: v3(tint.edge) },
       uOuter: { value: new THREE.Vector2(...(tint.outer ?? [0, 0])) },
       uTopBack: { value: v3(tint.topBack) }, uTopRight: { value: v3(tint.topRight) }, uTopFront: { value: v3(tint.topFront) },
       uExtent: { value: new THREE.Vector2(...(tint.extent ?? [1, 1])) },
@@ -65,7 +65,7 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
       .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nvoid main() {')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjN = objectNormal;\nvObjP = position;')
     shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nuniform vec3 uTintLeft;\nuniform vec3 uTintFront;\nuniform vec3 uTintSide;\nuniform vec3 uTintInner;\nuniform vec3 uTintInnerRight;\nuniform vec3 uTintInnerBack;\nuniform vec3 uTintHole;\nuniform vec2 uOuter;\nuniform vec3 uTopBack;\nuniform vec3 uTopRight;\nuniform vec3 uTopFront;\nuniform vec2 uExtent;\nvoid main() {')
+      .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nuniform vec3 uTintLeft;\nuniform vec3 uTintFront;\nuniform vec3 uTintSide;\nuniform vec3 uTintInner;\nuniform vec3 uTintInnerRight;\nuniform vec3 uTintInnerBack;\nuniform vec3 uTintHole;\nuniform vec3 uTintEdge;\nuniform vec2 uOuter;\nuniform vec3 uTopBack;\nuniform vec3 uTopRight;\nuniform vec3 uTopFront;\nuniform vec2 uExtent;\nvoid main() {')
       .replace(
         '#include <opaque_fragment>',
         `vec3 tn = normalize(vObjN);
@@ -77,6 +77,10 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
         // inner lip included), fading out toward flat tops.
         float wh = step(dot(tn.xz, vObjP.xz), -1e-4) * clamp((1.0 - tn.y) * 2.0, 0.0, 1.0);
         outgoingLight *= vec3(1.0) + wh * (uTintHole - 1.0);
+        // edge: recolours the bevel along the outer border (normals between up and sideways, outside the outer
+        // extents) to uTintEdge at the same brightness.
+        float we = clamp(1.0 - abs(tn.y - 0.6) / 0.4, 0.0, 1.0) * max(outerX, outerZ);
+        outgoingLight = mix(outgoingLight, uTintEdge * dot(outgoingLight, vec3(0.299, 0.587, 0.114)), we);
         // Top faces: linear ramps toward the back (-z), right (+x) and front (+z) of the object's extent.
         float wt = max(0.0, tn.y);
         float zb = clamp(-vObjP.z / uExtent.y, 0.0, 1.0), zf = clamp(vObjP.z / uExtent.y, 0.0, 1.0), xr = clamp(vObjP.x / uExtent.x, 0.0, 1.0);
