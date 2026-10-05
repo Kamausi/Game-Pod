@@ -698,7 +698,10 @@ const GAMES = {
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const dark = (r + c) % 2 === 0 // the reference's colouring: its dark squares carry the pieces
       const [x, , z] = at(c, r)
-      const tile = mesh(tileGeoFor(c, r), mat(dark ? '#24150c' : '#b07d4a', { roughness: dark ? 0.45 : 0.6, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: dark ? 0.25 : 0.05, clearcoatRoughness: 0.3 }), [x, TILE_TOP - 0.12 + 0.004, z]) // a hair above the strip so the squares keep their sharp corners
+      const tile = mesh(tileGeoFor(c, r), mat(dark ? '#24150c' : '#b07d4a', dark
+        // Dark squares: rougher and less reflective, so they stay dark with controlled highlights.
+        ? { metalness: 0.15, roughness: 0.55, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: 0.15, clearcoatRoughness: 0.4, envMapIntensity: 0.45 }
+        : { roughness: 0.6, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: 0.05, clearcoatRoughness: 0.3 }), [x, TILE_TOP - 0.12 + 0.004, z]) // a hair above the strip so the squares keep their sharp corners
       parts.push(vary(tile, 100 + r * N + c, { value: 0.015, rough: 0.025, height: 0.02 }))
       tile.rotation.set(0, 0, 0) // tiles stay square; tone, roughness and a hair of height vary
     }
