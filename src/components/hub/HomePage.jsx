@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CATEGORIES, FEATURED, GAMES, gameById, searchGames } from '../../games.js'
 import { useStore } from '../../store.jsx'
-import { GameArt, Sprite } from '../../art/Sprite.jsx'
+import { GameArt, Sprite, bakedArt } from '../../art/Sprite.jsx'
 import { GameTile, GridTile, Header, Section } from './common.jsx'
 import { Icon } from './icons.jsx'
 
@@ -40,8 +40,18 @@ function FeaturedCarousel({ onOpen }) {
       <div className="hs-featured-track" ref={trackRef} onScroll={onScroll}>
         {slides.map((game) => (
           <article key={game.id} className="hs-slide" style={{ '--c1': game.colors[0], '--c2': game.colors[1] }}>
-            <div className="hs-slide-bg" />
-            <GameArt game={game} hero className="hs-slide-art" />
+            {bakedArt(`${game.id}-banner`) ? (
+              // A fixed banner picture (<id>-banner.webp): blurred behind the banner, sharp on the right.
+              <>
+                <div className="hs-slide-bg hs-slide-bg-pic" style={{ '--art': `url(${bakedArt(`${game.id}-banner`)})` }} />
+                <img className="hs-slide-pic" src={bakedArt(`${game.id}-banner`)} alt="" draggable="false" />
+              </>
+            ) : (
+              <>
+                <div className="hs-slide-bg" />
+                <GameArt game={game} hero className="hs-slide-art" />
+              </>
+            )}
             <div className="hs-slide-copy">
               <span className="hs-badge">{Icon.crown} Featured</span>
               <h3>{game.name}</h3>

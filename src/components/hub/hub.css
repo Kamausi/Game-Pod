@@ -258,6 +258,25 @@
   z-index: -1;
 }
 .hs-slide-art .sprite { filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.4)); }
+/* Fixed banner picture (the original banner layout): blurred picture as the background, the sharp picture
+   on the right fading in from the left. */
+.hs-slide-bg.hs-slide-bg-pic {
+  inset: -20%;
+  background: var(--art) center / cover;
+  filter: blur(18px) saturate(1.2) brightness(0.75);
+}
+.hs-slide-pic {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 66%;
+  object-fit: cover;
+  object-position: 40% center;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 28%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 28%);
+  z-index: -1;
+}
 .hs-slide::after {
   content: '';
   position: absolute;
