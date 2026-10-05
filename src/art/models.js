@@ -305,8 +305,8 @@ const GAMES = {
     const INNER = 2.81
     const INNER_DEPTH = 2.406
     // Painted face shading, tuned so the outer left and front faces equal the reference's sampled colours.
-    const WOOD_LEFT = [0.65087, 1.546565, 4.746508]
-    const WOOD_FRONT = [0.602813, 0.65738, 0.894438]
+    const WOOD_LEFT = [0.665899, 1.582582, 4.868346]
+    const WOOD_FRONT = [0.482445, 0.541188, 0.839459]
     // Top-face gradient, tuned to the reference's rim samples: lighter and yellower toward the back and
     // right, a little darker at the front.
     const TOP_BACK = [1.040722, 2.212584, 3.049769]
@@ -336,6 +336,21 @@ const GAMES = {
     const WALL_EXTRA = 0.15 // outer walls run this much further down below the board, for a taller left side
     const frameGeo = trayFrameGeometry({ outer: OUTER, outerDepth: OUTER_DEPTH, outerCenter: [(RIM_RIGHT - RIM) / 2, -(RIM_BACK - RIM) / 2], inner: INNER, innerDepth: INNER_DEPTH, height: H + WALL_EXTRA, outerRadius: 0.2, innerRadius: 0.06, bevel: 0.025 })
     frameGeo.translate(0, -WALL_EXTRA, 0)
+    // Move the board's bottom front-right corner onto the reference's (about 550, 430 at 600 px): the bottom
+    // shifts right (tapering to nothing at the left wall) and slightly forward; the top face stays put.
+    const BASE_SHIFT = [0.36, 0.125] // [x at the right wall, z]
+    {
+      const pos = frameGeo.attributes.position
+      const bottom = -WALL_EXTRA
+      const xl = -OUTER / 2, w = OUTER
+      for (let i = 0; i < pos.count; i++) {
+        const t = (H - pos.getY(i)) / (H - bottom)
+        const across = Math.min(1, Math.max(0, (pos.getX(i) - xl) / w))
+        pos.setX(i, pos.getX(i) + BASE_SHIFT[0] * t * across)
+        pos.setZ(i, pos.getZ(i) + BASE_SHIFT[1] * t)
+      }
+      frameGeo.computeVertexNormals()
+    }
     const uv = frameGeo.attributes.uv
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
     const parts = [
