@@ -4,7 +4,6 @@ import {
   THREE, mat, wood, metal, matte, mesh, group, rbox, cyl, sphere, torus, cone, capsule,
   canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture, toyXGeometry, toyOGeometry, toyPuckGeometry, vary, noiseTexture, trayFrameGeometry, mouldedXGeometry,
 } from './kit.js'
-import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 const C = {
   red: '#ff2f45', blue: '#2a6bff', yellow: '#ffc51f', green: '#33c94f', orange: '#ff8a1f',
@@ -620,34 +619,59 @@ const GAMES = {
     const casing = mat('#171310', { roughness: 0.75, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0, envMapIntensity: 0.25 }) // matte, no gloss
     const parts = [
     ]
-    // Casing: one smooth solid from the table (y -0.325) up to the squares (y 0.22). A small flat strip runs
-    // round the squares, then the walls slope down and roll smoothly over into the sides (no hard edge).
+    // Casing: one smooth solid from the table (y -0.325) up to the squares (y 0.22), swept round the board as
+    // a profile: a small flat strip round the squares, the wall sloping down, a rounded roll into the sides,
+    // the sides, the base. Every ring of the sweep follows the same rounded outline, so the slope curves round
+    // each corner as one smooth surface.
     const lipW = LIP_W
     const STRIP = 0.06 // flat strip around the squares
-    const SLANT_DROP = 0.13 // how far the outer edge sits below the flat strip
-    const BASE_Y = -0.325, CASE_H = 0.22 - BASE_Y
+    const SLANT_DROP = 0.13 // how far the slope falls below the flat strip
+    const BASE_Y = -0.325, TOP_Y = 0.22
     const ROLL = 0.07 // radius of the rounded edge where the slope meets the sides
-    const caseGeo = trayFrameGeometry({ outer: width + lipW * 2, outerDepth: depth + lipW * 2, inner: width - 0.3, innerDepth: depth - 0.3, height: CASE_H, outerRadius: lipW, innerRadius: 0.05, bevel: ROLL })
+    const CORNER = 0.14 // the slope's contours round a rectangle this far inside the squares' edge: broad corners
+    const profile = [] // [offset from the squares' edge, y]
+    profile.push([-0.12, TOP_Y - 0.006], [-0.001, TOP_Y - 0.006]) // tucked just under the squares
+    for (let k = 0; k <= 4; k++) profile.push([STRIP * k / 4, TOP_Y]) // flat strip
     {
-      const pos = caseGeo.attributes.position
-      for (let i = 0; i < pos.count; i++) {
-        // Rounded distance from the squares' edge: the slope wraps round the corners instead of mitring.
-        const qx = Math.abs(pos.getX(i)) - width / 2, qz = Math.abs(pos.getZ(i)) - depth / 2
-        const out = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0)
-        const t = Math.min(1, Math.max(0, (out - STRIP) / (lipW - STRIP)))
-        // Starts flat off the strip and keeps sloping into the rolled outer edge.
-        const e = t * t * (2 - t)
-        const y = pos.getY(i)
-        let drop = SLANT_DROP * e * (y / CASE_H)
-        if (out < 0) drop += 0.006 * (y / CASE_H) // under the squares: tucked just below them
-        pos.setY(i, y - drop)
+      // Slope: eased off the strip (y = drop * t^2 (2 - t)), then a roll of radius ROLL down to vertical.
+      const slopeEnd = lipW - ROLL * 0.75 // leaves room for the roll inside the wall width
+      const run = slopeEnd - STRIP
+      for (let k = 1; k <= 24; k++) { const t = k / 24; profile.push([STRIP + run * t, TOP_Y - SLANT_DROP * t * t * (2 - t)]) }
+      let [o, y] = profile[profile.length - 1]
+      const a0 = Math.atan2(-SLANT_DROP / run, 1) // tangent angle at the end of the slope
+      const steps = 16
+      for (let k = 1; k <= steps; k++) {
+        const a = a0 + (-Math.PI / 2 - a0) * (k - 0.5) / steps
+        const da = (-Math.PI / 2 - a0) / steps
+        o += ROLL * Math.abs(da) * Math.cos(a)
+        y += ROLL * Math.abs(da) * Math.sin(a)
+        profile.push([o, y])
       }
+      for (let k = 1; k <= 6; k++) profile.push([o, y + (BASE_Y + 0.02 - y) * k / 6]) // side
+      profile.push([o - 0.02, BASE_Y], [-0.12, BASE_Y]) // base
     }
-    caseGeo.deleteAttribute('normal')
-    caseGeo.deleteAttribute('uv')
-    const caseSmooth = mergeVertices(caseGeo, 1e-4)
-    caseSmooth.computeVertexNormals()
-    parts.push(mesh(caseSmooth, casing, [xc, BASE_Y, zc]))
+    const casePos = [], caseUv = [], caseIdx = []
+    const ARC = 16 // segments per corner
+    const corners = [[1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI], [1, -1, Math.PI * 1.5]]
+    const ring = []
+    for (const [sx, sz, a0] of corners) for (let k = 0; k <= ARC; k++) ring.push([sx * (width / 2 - CORNER), sz * (depth / 2 - CORNER), a0 + (Math.PI / 2) * k / ARC])
+    for (const [o, y] of profile) for (const [cx0, cz0, a] of ring) {
+      const r = o + CORNER
+      const x = cx0 + r * Math.cos(a), z = cz0 + r * Math.sin(a)
+      casePos.push(x, y, z)
+      caseUv.push(x / 3 + 0.5, z / 3 + 0.5)
+    }
+    const RN = ring.length
+    for (let p = 0; p < profile.length - 1; p++) for (let k = 0; k < RN; k++) {
+      const a = p * RN + k, b = p * RN + (k + 1) % RN, c = (p + 1) * RN + k, d = (p + 1) * RN + (k + 1) % RN
+      caseIdx.push(a, b, c, b, d, c)
+    }
+    const caseGeo = new THREE.BufferGeometry()
+    caseGeo.setAttribute('position', new THREE.Float32BufferAttribute(casePos, 3))
+    caseGeo.setAttribute('uv', new THREE.Float32BufferAttribute(caseUv, 2))
+    caseGeo.setIndex(caseIdx)
+    caseGeo.computeVertexNormals()
+    parts.push(mesh(caseGeo, casing, [xc, 0, zc]))
     // Individual inset tiles with soft bevels and a little tonal variation.
     const TILE_TOP = 0.22 // flush with the top of the border wall (lip: 0.2 tall at y 0.12)
     const tileGeo = rbox(SQ, 0.24, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
