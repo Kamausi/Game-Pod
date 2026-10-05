@@ -344,7 +344,7 @@ const GAMES = {
     // their ends run into the walls so no rounded stub shows.
     const DIV_DROP = 0.035 // dividers sit a little below the frame's top edge
     const DIV_H = H - floorTop - DIV_DROP
-    const RAIL_GAP = 0.025 // bars stop just short of the frame: a thin dark gap where they meet it, as in the reference
+    const RAIL_GAP = -0.05 // bars run into the frame walls: flush, no gap
     for (const o of [-0.5, 0.5]) {
       parts.push(mesh(rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.025, 4), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
       parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.025, 4), railWood, [o * S, floorTop + DIV_H / 2, 0]))
