@@ -339,7 +339,7 @@ const GAMES = {
     // Move the board's bottom front-right corner onto the reference's (about 550, 430 at 600 px): the bottom
     // shifts right (tapering to nothing at the left wall) and slightly forward; the top face and inside walls stay put.
     const BASE_SHIFT = [0.36, 0.125] // [x at the right wall, z]
-    const BACK_LEFT_SHIFT = [-0.1, -0.46] // [x, z] at the bottom back-left corner
+    const BACK_LEFT_SHIFT = [-0.1, -0.3] // [x, z] at the bottom back-left corner
     {
       const pos = frameGeo.attributes.position
       const bottom = -WALL_EXTRA
