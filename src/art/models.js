@@ -384,7 +384,7 @@ const GAMES = {
     // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
     // spreads it into a soft halo.
     // back: how far it runs along the back edge from the corner; right: along the right edge.
-    const EDGE_GLOW = { color: '#ffffff', width: 0.026, strength: 0.6, back: 2.9, right: 2.45, offset: 0.015 }
+    const EDGE_GLOW = { color: '#ffffff', width: 0.026, opacity: 0.6, back: 2.9, right: 2.45, offset: 0.015 }
     // Optional blur: wider, fainter copies of the strip around it ([width multiple, brightness multiple]); none now.
     const EDGE_GLOW_BLUR = [[1, 1]]
     {
@@ -413,16 +413,17 @@ const GAMES = {
       for (let i = 0; i <= segs; i++) {
         const f = taper(i / segs)
         curve.getPointAt(i / segs, centre)
-        const c = new THREE.Color(EDGE_GLOW.color).multiplyScalar(f ** 1.2 * EDGE_GLOW.strength * sm)
+        const c = new THREE.Color(EDGE_GLOW.color)
+        const a = f ** 1.2 * EDGE_GLOW.opacity * sm // 60% opaque at the corner, fading to clear at both ends
         for (let j = 0; j <= radial; j++) {
           const k = i * (radial + 1) + j
           v.fromBufferAttribute(pos, k).sub(centre).multiplyScalar(f).add(centre)
           pos.setXYZ(k, v.x, v.y, v.z)
-          cols.push(c.r, c.g, c.b)
+          cols.push(c.r, c.g, c.b, a)
         }
       }
-      geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
-      parts.push(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })))
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 4))
+      parts.push(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, toneMapped: false })))
       }
     }
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
