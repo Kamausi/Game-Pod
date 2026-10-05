@@ -341,6 +341,7 @@ const GAMES = {
     frameGeo.translate(0, -WALL_EXTRA, 0)
     // Move the board's bottom front-right corner onto the reference's (about 550, 430 at 600 px): the bottom
     // shifts right (tapering to nothing at the left wall) and slightly forward; the top face and inside walls stay put.
+    const TL_DROP = 0.09 // how far the top back-left corner is lowered (the edge glow follows it)
     const BASE_SHIFT = [0.36, 0.125] // [x at the right wall, z]
     const BACK_LEFT_SHIFT = [0, -0.3] // [x, z] at the bottom back-left corner
     {
@@ -361,7 +362,6 @@ const GAMES = {
         pos.setZ(i, z + BASE_SHIFT[1] * t + BACK_LEFT_SHIFT[1] * t * bl)
       }
       // Lower the top back-left corner: the rim, inner edge included, drops toward that corner.
-      const TL_DROP = 0.09
       const zb = -OUTER_DEPTH / 2 - (RIM_BACK - RIM) / 2
       for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
@@ -384,7 +384,7 @@ const GAMES = {
     // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
     // spreads it into a soft halo.
     // back: how far it runs along the back edge from the corner; right: along the right edge.
-    const EDGE_GLOW = { color: '#3fe6d6', width: 0.026, strength: 3.4, back: 2.4, right: 2.2, offset: 0.022 }
+    const EDGE_GLOW = { color: '#3fe6d6', width: 0.026, strength: 3.4, back: 2.9, right: 2.45, offset: 0.022 }
     {
       // Hugs the board's outline just outside the outer walls and a hair below the top, following the
       // rounded corner (outer radius 0.2), so the board covers the strip and only its glow shows behind it.
@@ -394,6 +394,8 @@ const GAMES = {
       for (let t = 0; t < 1; t += 0.02) pts.push(new THREE.Vector3(hx - cr - EDGE_GLOW.back * (1 - t), y, -hz))
       for (let a = 0; a <= 1; a += 0.05) pts.push(new THREE.Vector3(hx - cr + Math.sin(a * Math.PI / 2) * cr, y, -hz + cr - Math.cos(a * Math.PI / 2) * cr))
       for (let t = 0.02; t <= 1; t += 0.02) pts.push(new THREE.Vector3(hx, y, -hz + cr + EDGE_GLOW.right * t))
+      // Follow the lowered top back-left corner so the strip stays tucked under the edge.
+      for (const p of pts) p.y -= TL_DROP * (1 - Math.min(1, Math.max(0, (p.x + OUTER / 2) / OUTER))) * (1 - Math.min(1, Math.max(0, (p.z + OUTER_DEPTH / 2) / OUTER_DEPTH)))
       const curve = new THREE.CatmullRomCurve3(pts)
       const segs = 480, radial = 8
       const geo = new THREE.TubeGeometry(curve, segs, EDGE_GLOW.width, radial, false)
