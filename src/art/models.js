@@ -606,26 +606,29 @@ const GAMES = {
     // Reference: a chunky physical toy board photographed on a table: thick casing, individually
     // bevelled inset squares, sculpted pucks with slight variation, warm raking light, shallow focus.
     const N = 6
-    const ROWS = 5 // the reference's board is a row short at the front: 6 columns x 5 rows
+    const ROWS = 5 // the reference's board is a row short at the front and a column short at the right: 5 x 5
+    const COLS = 5
     const SQ = 0.55
     const size = N * SQ
     const depth = ROWS * SQ
+    const width = COLS * SQ
     const zc = -(size - depth) / 2 // the field keeps its back edge; the front edge moves in by the missing row
+    const xc = -(size - width) / 2 // and its left edge; the right edge moves in by the missing column
     const surface = noiseTexture({ contrast: 0.1, seed: 43 })
     const casing = mat('#171310', { roughness: 0.2, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.12, envMapIntensity: 0.6 })
     const parts = [
-      mesh(rbox(size + 0.6, 0.4, depth + 0.6, 0.18, 6), casing, [0, -0.125, zc]), // casing: contains the board, doesn't dominate
+      mesh(rbox(width + 0.6, 0.4, depth + 0.6, 0.18, 6), casing, [xc, -0.125, zc]), // casing: contains the board, doesn't dominate
     ]
     // Raised lip around a recessed playing field.
     const lipW = 0.3
-    for (const [x, z, w, d] of [[0, zc + (depth + lipW) / 2, size + lipW * 2, lipW], [0, zc - (depth + lipW) / 2, size + lipW * 2, lipW], [(size + lipW) / 2, zc, lipW, depth], [-(size + lipW) / 2, zc, lipW, depth]])
+    for (const [x, z, w, d] of [[xc, zc + (depth + lipW) / 2, width + lipW * 2, lipW], [xc, zc - (depth + lipW) / 2, width + lipW * 2, lipW], [xc + (width + lipW) / 2, zc, lipW, depth], [xc - (width + lipW) / 2, zc, lipW, depth]])
       parts.push(mesh(rbox(w, 0.2, d, 0.08, 5), casing, [x, 0.12, z]))
     // Individual inset tiles with soft bevels and a little tonal variation.
     const tileGeo = rbox(SQ - 0.04, 0.1, SQ - 0.04, 0.035, 4) // dark micro-gaps + bevel catch light
     // Tactile, not literally rough: faint roughness and bump noise varies the reflections.
     const grain = noiseTexture({ contrast: 0.18, seed: 41 })
     const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0, (r - (N - 1) / 2) * SQ]
-    for (let r = 0; r < ROWS; r++) for (let c = 0; c < N; c++) {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const dark = (r + c) % 2 === 0 // the reference's colouring: its dark squares carry the pieces
       const [x, , z] = at(c, r)
       const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.45 : 0.6, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: dark ? 0.25 : 0.05, clearcoatRoughness: 0.3 }), [x, 0.03, z])
