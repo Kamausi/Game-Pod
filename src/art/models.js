@@ -625,13 +625,15 @@ const GAMES = {
     const lipW = LIP_W
     const STRIP = 0.06 // flat strip around the squares
     const SLANT_DROP = 0.13 // how far the outer edge sits below the flat strip
-    const strip = trayFrameGeometry({ outer: width + STRIP * 2, outerDepth: depth + STRIP * 2, inner: width, innerDepth: depth, height: 0.2, outerRadius: 0.01, innerRadius: 0.004, bevel: 0.006 })
-    const slant = trayFrameGeometry({ outer: width + lipW * 2, outerDepth: depth + lipW * 2, inner: width + STRIP * 2 - 0.02, innerDepth: depth + STRIP * 2 - 0.02, height: 0.2, outerRadius: 0.18, innerRadius: 0.012, bevel: 0.02 })
+    const strip = trayFrameGeometry({ outer: width + STRIP * 2, outerDepth: depth + STRIP * 2, inner: width, innerDepth: depth, height: 0.2, outerRadius: STRIP, innerRadius: 0.004, bevel: 0.006 })
+    const slant = trayFrameGeometry({ outer: width + lipW * 2, outerDepth: depth + lipW * 2, inner: width + STRIP * 2 - 0.02, innerDepth: depth + STRIP * 2 - 0.02, height: 0.2, outerRadius: lipW, innerRadius: STRIP, bevel: 0.02 })
     {
       // Lower the top toward the outside edge: full drop at the outer edge, none where it meets the strip.
       const pos = slant.attributes.position
       for (let i = 0; i < pos.count; i++) {
-        const out = Math.max(Math.abs(pos.getX(i)) - width / 2, Math.abs(pos.getZ(i)) - depth / 2)
+        // Rounded distance from the squares' edge: the slope wraps round the corners instead of mitring.
+        const qx = Math.abs(pos.getX(i)) - width / 2, qz = Math.abs(pos.getZ(i)) - depth / 2
+        const out = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0)
         const t = Math.min(1, Math.max(0, (out - STRIP) / (lipW - STRIP)))
         pos.setY(i, pos.getY(i) - SLANT_DROP * t * (pos.getY(i) / 0.2))
       }
