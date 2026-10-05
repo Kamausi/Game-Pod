@@ -664,7 +664,7 @@ const GAMES = {
       parts.push(p)
     }
     // The reference's position (each piece placed on the square it sits on there).
-    ;[[1, 0], [4, 0], [1, 1], [2, 2], [4.25, 0.75], [4, 2], [3, 3]].forEach(([c, r]) => put(c, r, black))
+    ;[[1.75, 0], [3.25, 0], [1, 1], [2, 2], [4.25, 0.75], [4, 2], [3, 3]].forEach(([c, r]) => put(c, r, black))
     ;[[0, 2], [1, 3], [2, 4], [4, 4], [3, 1], [0, 4]].forEach(([c, r]) => put(c, r, red))
     // The table it sits on: falls out of focus toward the edges.
     // Ends just behind the board so the warm room bokeh shows past its far edge.
