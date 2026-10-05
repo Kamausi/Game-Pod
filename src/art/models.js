@@ -324,7 +324,7 @@ const GAMES = {
     const RIM_RIGHT = 0.31
     const OUTER = INNER + RIM + RIM_RIGHT
     // The back wall is foreshortened too, so it is a little thicker to read as wide as the others.
-    const RIM_BACK = 0.3
+    const RIM_BACK = 0.22
     const OUTER_DEPTH = INNER_DEPTH + RIM + RIM_BACK
     const floorTop = 0.52 // black cell floor (deep wells); pieces rest on it
     const H = 0.88 // whole tray height: tall side walls show
