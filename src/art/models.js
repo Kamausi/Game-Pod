@@ -394,13 +394,13 @@ const GAMES = {
         // Key-art rig: warm key from upper left / front (soft shadows), strong cyan rim from the board's top
         // right, orange bounce from below-front-left, cool sky / warm ground fill, a broad warm softbox for
         // photographic highlights, raised exposure and restrained bloom.
-        keyFrom: [-2.6, 3.6, 0.2],
+        keyFrom: [2.6, 3.6, 0.2],
         keyIntensity: 2.0, keyColor: '#ffb35c', envIntensity: 0.25, exposure: 1.15, shadowSoftness: 14,
         lights: [
           { type: 'hemi', sky: '#68bfff', ground: '#ff8b3d', intensity: 0.42 },
           // Cool cyan key from the upper right: tints the top-right wood, right side of the frame, piece tops and
           // divider edges cyan instead of drawing a white outline.
-          { type: 'dir', color: '#4bbcff', intensity: 3.0, from: [2.0, 2.6, 2.0] },
+          { type: 'dir', color: '#4bbcff', intensity: 3.0, from: [-2.0, 2.6, 2.0] },
           { type: 'point', color: '#ff6b24', intensity: 6, from: [-1.5, -1.0, 2.0], distance: 4 },
         ],
         softbox: { color: '#ffd18a', intensity: 3, width: 1.6, height: 1.6, from: [-1.8, 2.6, 0.4] },
