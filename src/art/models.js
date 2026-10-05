@@ -339,6 +339,7 @@ const GAMES = {
     // Move the board's bottom front-right corner onto the reference's (about 550, 430 at 600 px): the bottom
     // shifts right (tapering to nothing at the left wall) and slightly forward; the top face and inside walls stay put.
     const BASE_SHIFT = [0.36, 0.125] // [x at the right wall, z]
+    const BACK_LEFT_SHIFT = [-0.1, -0.46] // [x, z] at the bottom back-left corner
     {
       const pos = frameGeo.attributes.position
       const bottom = -WALL_EXTRA
@@ -350,8 +351,11 @@ const GAMES = {
         const out = Math.min(1, Math.max(0, (d - 0.03) / 0.05))
         const t = (H - pos.getY(i)) / (H - bottom) * out
         const across = Math.min(1, Math.max(0, (x - xl) / w))
-        pos.setX(i, x + BASE_SHIFT[0] * t * across)
-        pos.setZ(i, z + BASE_SHIFT[1] * t)
+        // The bottom back-left corner moves onto the reference's too (about 26, 146 at 600 px).
+        const back = Math.min(1, Math.max(0, (OUTER_DEPTH / 2 - z) / OUTER_DEPTH))
+        const bl = (1 - across) * back
+        pos.setX(i, x + BASE_SHIFT[0] * t * across + BACK_LEFT_SHIFT[0] * t * bl)
+        pos.setZ(i, z + BASE_SHIFT[1] * t + BACK_LEFT_SHIFT[1] * t * bl)
       }
       // Lower the top back-left corner: the rim, inner edge included, drops toward that corner.
       const TL_DROP = 0.09
