@@ -681,7 +681,7 @@ const GAMES = {
       frame: pieces.slice(3, 15),
       // Exact camera solved so the board's squares land on the reference's (light-square centres, ~6 px rms
       // at 600 px).
-      view: { camera: { position: [1.9733, 7.47954, 6.39442], target: [-0.06797, -0.14775, 0.09204], roll: 0.03284, fov: 17.77753 } },
+      view: { camera: { position: [1.95466, 7.52586, 6.3444], target: [-0.08661, -0.10143, 0.04202], roll: 0.03284, fov: 17.77753 } },
       look: {
         // Backlit: warm light rakes toward the camera across the squares.
         keyFrom: [-2.0, 3.2, -1.2],
