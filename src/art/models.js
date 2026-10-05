@@ -320,7 +320,9 @@ const GAMES = {
     const S = (INNER + DIV_W) / 3 // side-to-side cell pitch (pieces and dividers sit on it)
     const SZ = (INNER_DEPTH + DIV_W) / 3 // front-to-back cell pitch
     const RIM = 0.25 // frame wall thickness
-    const OUTER = INNER + 2 * RIM
+    // The right wall is a little thicker so it looks as wide on screen as the left (it is foreshortened).
+    const RIM_RIGHT = 0.31
+    const OUTER = INNER + RIM + RIM_RIGHT
     const OUTER_DEPTH = INNER_DEPTH + 2 * RIM
     const floorTop = 0.52 // black cell floor (deep wells); pieces rest on it
     const H = 0.88 // whole tray height: tall side walls show
@@ -330,7 +332,7 @@ const GAMES = {
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
     const WALL_EXTRA = 0.15 // outer walls run this much further down below the board, for a taller left side
-    const frameGeo = trayFrameGeometry({ outer: OUTER, outerDepth: OUTER_DEPTH, inner: INNER, innerDepth: INNER_DEPTH, height: H + WALL_EXTRA, outerRadius: 0.2, innerRadius: 0.06, bevel: 0.025 })
+    const frameGeo = trayFrameGeometry({ outer: OUTER, outerDepth: OUTER_DEPTH, outerCenter: [(RIM_RIGHT - RIM) / 2, 0], inner: INNER, innerDepth: INNER_DEPTH, height: H + WALL_EXTRA, outerRadius: 0.2, innerRadius: 0.06, bevel: 0.025 })
     frameGeo.translate(0, -WALL_EXTRA, 0)
     const uv = frameGeo.attributes.uv
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
