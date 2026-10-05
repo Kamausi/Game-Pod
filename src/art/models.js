@@ -288,16 +288,16 @@ const GAMES = {
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     // Colour gains (linear RGB multipliers on the wood textures), tuned so rendered colours equal the
     // reference's sampled pixels exactly.
-    const WOOD_GAIN = [1.005857, 0.966516, 0.948633]
-    const RAIL_GAIN = [1.340573, 0.932826, 0.841023]
+    const WOOD_GAIN = [1.034748, 0.901623, 0.505872]
+    const RAIL_GAIN = [1.449276, 0.988328, 0.953244]
     const wood = mat(new THREE.Color().setRGB(...WOOD_GAIN), {
       map: woodTexture({ base: '#f97233', dark: '#eb6b31', light: '#ff7c3b', seed: 7 }), // honey caramel, sampled against the reference
-      roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
+      roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.4, envMapIntensity: 0.3, specularIntensity: 0.4, // satin, little of the bluish studio reflection
     })
     // Cross bars read a little lighter than the frame in the reference.
     const railWood = mat(new THREE.Color().setRGB(...RAIL_GAIN), {
       map: woodTexture({ base: '#ff9530', dark: '#ff8b2d', light: '#ff9e35', seed: 11 }),
-      roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.22,
+      roughness: 0.6, clearcoat: 0.15, clearcoatRoughness: 0.4, envMapIntensity: 0.3, specularIntensity: 0.4, // satin, little of the bluish studio reflection
     })
     const black = mat('#1e0d1c', { roughness: 1, clearcoat: 0, envMapIntensity: 0 }) // purple-navy cell floor
     // The opening is fixed by the reference (its four inner corners are matched exactly by the camera):
@@ -352,7 +352,7 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = [0.010616, 0.170209, 0.798147] // linear RGB, tuned to the reference's sampled X colour
+    const BLUE = [0.0096094, 0.192687, 0.99] // linear RGB, tuned to the reference's sampled X colour
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.5, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0.05 }) // saturated azure: little white specular to wash it out
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
@@ -376,9 +376,10 @@ const GAMES = {
       // (82,100) (448,60) (158,432) (543,358) at 600 px.
       view: { camera: { position: [-1.72327, 8.96642, 4.44024], target: [0.20528, -0.75146, -0.12564], roll: 0.15066, fov: 25.30057 } },
       look: {
-        keyFrom: [2.4, 3.0, 0.6], // upper right: bright right/top rim, shaded front face
-        keyIntensity: 2.2, keyColor: '#ffe0b0', envIntensity: 0.45,
-        rim: { intensity: 0.25, color: '#ffd8a0' }, aoIntensity: 2.4, aoRadius: 0.04,
+        // Key from above and behind (as in the reference): bright tops, left face lit, front face in shade.
+        keyFrom: [1.0, 3.0, -1.5],
+        keyIntensity: 2.6, keyColor: '#ffe0b0', envIntensity: 0.3,
+        rim: { intensity: 0.05, color: '#ffd8a0' }, aoIntensity: 2.4, aoRadius: 0.04,
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
       },
       backdrop: {
@@ -388,7 +389,7 @@ const GAMES = {
         bokeh: { n: 16, colors: ['#ffd9a0', '#ffffff', '#ffb060', '#a8c8ff'], min: 0.015, max: 0.05, seed: 5 },
         // Dark dome across the bottom of the tile, warm plum-grey under the board fading to navy at the bottom: peaks ~70% down behind the board and falls away to
         // ~83% at both side edges (traced from the reference).
-        ellipses: [[0.5, 1.2, 0.75, 0.5, '#22293f', 0.012, '#33292d', '#494455', '#574e5bfc']],
+        ellipses: [[0.5, 1.2, 0.75, 0.5, '#22293f', 0.012, '#342a2dfc', '#484455', '#574e5bfc']],
         shapes: [[0.78, 0.08, 0.12, 0.5, '#3a5ab8'], [0.9, 0.15, 0.08, 0.4, '#5a7ad8'], [0.02, 0.35, 0.05, 0.3, '#e08a40']],
       },
     }
