@@ -631,8 +631,11 @@ const GAMES = {
     const ROLL = 0.07 // radius of the rounded edge where the slope meets the sides
     const CORNER = 0.14 // the slope's contours round a rectangle this far inside the squares' edge: broad corners
     const profile = [] // [offset from the squares' edge, y]
-    profile.push([-0.12, TOP_Y - 0.006], [-0.001, TOP_Y - 0.006]) // tucked just under the squares
-    for (let k = 0; k <= 4; k++) profile.push([STRIP * k / 4, TOP_Y]) // flat strip
+    profile.push([-0.12, TOP_Y - 0.03], [-0.001, TOP_Y - 0.03]) // tucked under the squares
+    // Flat strip, its inner edge chamfered like the squares' edges (45 degrees, 1/32 square).
+    const STRIP_CHAMFER = SQ / 32
+    profile.push([0, TOP_Y - STRIP_CHAMFER])
+    for (let k = 0; k <= 4; k++) profile.push([STRIP_CHAMFER + (STRIP - STRIP_CHAMFER) * k / 4, TOP_Y])
     {
       // Slope: eased off the strip (y = drop * t^2 (2 - t)), then a roll of radius ROLL down to vertical.
       const slopeEnd = lipW - ROLL * 0.75 // leaves room for the roll inside the wall width
