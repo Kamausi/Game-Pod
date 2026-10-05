@@ -384,12 +384,12 @@ const GAMES = {
     // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
     // spreads it into a soft halo.
     // back: how far it runs along the back edge from the corner; right: along the right edge.
-    const EDGE_GLOW = { color: '#3fe6d6', width: 0.026, strength: 3.4, back: 2.9, right: 2.45, offset: 0.022 }
+    const EDGE_GLOW = { color: '#3fe6d6', width: 0.026, strength: 3.4, back: 2.9, right: 2.45, offset: 0.015 }
     {
       // Hugs the board's outline just outside the outer walls and a hair below the top, following the
       // rounded corner (outer radius 0.2), so the board covers the strip and only its glow shows behind it.
       const o = EDGE_GLOW.offset
-      const hx = OUTER / 2 + o, hz = OUTER_DEPTH / 2 + o, cr = 0.2 + o, y = H - 0.035
+      const hx = INNER / 2 + RIM_RIGHT + o, hz = INNER_DEPTH / 2 + RIM_BACK + o, cr = 0.2 + o, y = H - 0.035 // the real outer right / back edges
       const pts = []
       for (let t = 0; t < 1; t += 0.02) pts.push(new THREE.Vector3(hx - cr - EDGE_GLOW.back * (1 - t), y, -hz))
       for (let a = 0; a <= 1; a += 0.05) pts.push(new THREE.Vector3(hx - cr + Math.sin(a * Math.PI / 2) * cr, y, -hz + cr - Math.cos(a * Math.PI / 2) * cr))
