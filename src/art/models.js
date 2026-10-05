@@ -636,7 +636,7 @@ const GAMES = {
       tile.rotation.set(0, 0, 0) // tiles stay square; tone, roughness and a hair of height vary
     }
     // Lower, heavier pucks: radius +5%, height -10%.
-    const geo = toyPuckGeometry({ radius: 0.215, height: 0.202 }) // narrower, to the reference's piece width
+    const geo = toyPuckGeometry({ radius: 0.185, height: 0.174 }) // smaller pieces
     const red = mat('#d80010', { roughness: 0.24, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 0.35, sheen: 0.3, sheenColor: '#ff4040' })
     const black = mat('#1c1917', { roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.4 })
     const pieces = []
