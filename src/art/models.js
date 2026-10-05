@@ -619,10 +619,10 @@ const GAMES = {
     const parts = [
       mesh(rbox(width + 0.6, 0.4, depth + 0.6, 0.18, 6), casing, [xc, -0.125, zc]), // casing: contains the board, doesn't dominate
     ]
-    // Raised lip around a recessed playing field.
+    // Raised border wall around the playing field: one continuous piece (y 0.02 to 0.22).
     const lipW = 0.3
-    for (const [x, z, w, d] of [[xc, zc + (depth + lipW) / 2, width + lipW * 2, lipW], [xc, zc - (depth + lipW) / 2, width + lipW * 2, lipW], [xc + (width + lipW) / 2, zc, lipW, depth], [xc - (width + lipW) / 2, zc, lipW, depth]])
-      parts.push(mesh(rbox(w, 0.2, d, 0.08, 5), casing, [x, 0.12, z]))
+    const lipGeo = trayFrameGeometry({ outer: width + lipW * 2, outerDepth: depth + lipW * 2, inner: width, innerDepth: depth, height: 0.2, outerRadius: 0.18, innerRadius: 0.004, bevel: 0.03 })
+    parts.push(mesh(lipGeo, casing, [xc, 0.02, zc]))
     // Individual inset tiles with soft bevels and a little tonal variation.
     const TILE_TOP = 0.22 // flush with the top of the border wall (lip: 0.2 tall at y 0.12)
     const tileGeo = rbox(SQ, 0.24, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
