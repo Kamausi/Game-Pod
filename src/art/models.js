@@ -352,7 +352,7 @@ const GAMES = {
     // Raised square blocks where the bars cross: flush with the bars' sides (a hair inside, to avoid
     // z-fighting), standing proud of them only in height.
     const JOINT_W = DIV_W - 0.002
-    const JOINT_H = DIV_H + 0.03
+    const JOINT_H = DIV_H + 0.06
     for (const ox of [-0.5, 0.5]) for (const oz of [-0.5, 0.5])
       parts.push(mesh(rbox(JOINT_W, JOINT_H, JOINT_W, 0.03, 4), railWood, [ox * S, floorTop + JOINT_H / 2, oz * SZ]))
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
