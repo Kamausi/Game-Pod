@@ -431,16 +431,30 @@ const GAMES = {
     const DIV_DROP = 0.05 // dividers sit a little below the frame's top edge
     const DIV_H = H - floorTop - DIV_DROP
     const RAIL_GAP = -0.05 // bars run into the frame walls: flush, no gap
+    // The lowered top back-left corner slopes the wall top down toward that corner; the left vertical bar (and
+    // its joints) follow that slope so they sit as far below the wall top as the other bars do.
+    const followTL = (geo, cx, cy, cz) => {
+      const pos = geo.attributes.position
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i) + cx, y = pos.getY(i) + cy, z = pos.getZ(i) + cz
+        const u = Math.min(1, Math.max(0, (x + OUTER / 2) / OUTER)), v = Math.min(1, Math.max(0, (z + OUTER_DEPTH / 2) / OUTER_DEPTH))
+        pos.setY(i, pos.getY(i) - TL_DROP * (1 - u) * (1 - v) * Math.max(0, (y - floorTop) / (H - floorTop)))
+      }
+      geo.computeVertexNormals()
+      return geo
+    }
     for (const o of [-0.5, 0.5]) {
       parts.push(mesh(rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.025, 4), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
-      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.025, 4), railWood, [o * S, floorTop + DIV_H / 2, 0]))
+      const vBar = rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.025, 4)
+      if (o < 0) followTL(vBar, o * S, floorTop + DIV_H / 2, 0)
+      parts.push(mesh(vBar, railWood, [o * S, floorTop + DIV_H / 2, 0]))
     }
     // Raised square blocks where the bars cross: flush with the bars' sides (a hair inside, to avoid
     // z-fighting), standing proud of them only in height.
     const JOINT_W = DIV_W - 0.002
     const JOINT_H = DIV_H + 0.06
     for (const ox of [-0.5, 0.5]) for (const oz of [-0.5, 0.5])
-      parts.push(mesh(rbox(JOINT_W, JOINT_H, JOINT_W, 0.03, 4), railWood, [ox * S, floorTop + JOINT_H / 2, oz * SZ]))
+      parts.push(mesh(ox < 0 ? followTL(rbox(JOINT_W, JOINT_H, JOINT_W, 0.03, 4), ox * S, floorTop + JOINT_H / 2, oz * SZ) : rbox(JOINT_W, JOINT_H, JOINT_W, 0.03, 4), railWood, [ox * S, floorTop + JOINT_H / 2, oz * SZ]))
     // Crisp X: two long thin bars with flat tops and squared, slightly rounded ends.
     // X and O share one proportion: same band width (X arm = O ring), same height, same footprint
     // (the X's on-board width matches the O's outer diameter).
