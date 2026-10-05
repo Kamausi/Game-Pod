@@ -709,6 +709,9 @@ const GAMES = {
     const geo = toyPuckGeometry({ radius: 0.185, height: 0.174, flat: true }) // smaller pieces, flat tops
     const red = mat('#a8000c', { roughness: 0.24, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 0.35, sheen: 0.3, sheenColor: '#c02a2a' }) // darker red
     const black = mat('#1c1917', { roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.4 })
+    // Darker side faces than tops, so each piece reads as bright top / dark side.
+    red.userData.faceTint = { side: [0.42, 0.3, 0.3] }
+    black.userData.faceTint = { side: [0.25, 0.25, 0.28] }
     const pieces = []
     // c, r may be fractional to sit a piece off-centre (in squares; +c right, -r back). Up to 0.1 square keeps
     // a piece inside its square (piece radius 0.185, half square 0.235).
