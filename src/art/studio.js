@@ -422,6 +422,14 @@ export function paintBackdrop(width, height, spec) {
     ctx.roundRect(x * width, y * height, w * width, h * height, r * width)
     ctx.fill()
   }
+  // spotsOver: like spots, but painted over the ellipses and rects (e.g. to tune colours inside a dark dome).
+  ctx.filter = `blur(${Math.round(width * (spec.spotBlur ?? 0.05))}px)`
+  for (const [x, y, rad, color] of spec.spotsOver ?? []) {
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.arc(x * width, y * height, rad * width, 0, Math.PI * 2)
+    ctx.fill()
+  }
   ctx.filter = 'none'
   // Gentle vignette pulls focus to the subject.
   const v = ctx.createRadialGradient(width / 2, height * 0.45, width * 0.25, width / 2, height * 0.5, width * 0.8)
