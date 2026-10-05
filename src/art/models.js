@@ -415,6 +415,7 @@ const GAMES = {
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
     const red = mat('#ff4930', { roughness: 0.3, clearcoat: 0.22, clearcoatRoughness: 0.3 }) // warm red-orange
+    red.userData.faceTint = { side: [0.5, 0.45, 0.45] } // darker sides and hole walls on the O pieces
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - O_BAND / 2, width: O_BAND, height: PIECE_HEIGHT, round: PIECE_ROUND }) // flat top, slightly rounded edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
