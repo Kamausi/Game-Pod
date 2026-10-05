@@ -417,11 +417,12 @@ const GAMES = {
     const red = mat('#ff4930', { roughness: 0.3, clearcoat: 0.22, clearcoatRoughness: 0.3 }) // warm red-orange
     red.userData.faceTint = { side: [0.5, 0.45, 0.45] } // darker sides and hole walls on the O pieces
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - O_BAND / 2, width: O_BAND, height: PIECE_HEIGHT, round: PIECE_ROUND }) // flat top, slightly rounded edges
+    const O_SHIFT_Z = -0.04 // O pieces sit slightly toward the top (back) wall of their cells
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
       // Both pieces are centred on their origin and PIECE_HEIGHT tall: rest on the floor, tops flush with the board face.
       const piece = p === 'X' ? X() : mesh(ringGeo, red)
-      piece.position.set(((i % 3) - 1) * S, floorTop + PIECE_HEIGHT / 2, (Math.floor(i / 3) - 1) * SZ)
+      piece.position.set(((i % 3) - 1) * S, floorTop + PIECE_HEIGHT / 2, (Math.floor(i / 3) - 1) * SZ + (p === 'O' ? O_SHIFT_Z : 0))
       parts.push(vary(piece, i + 1, { rot: 1.5, scale: 0.005, value: 0.01, rough: 0.02 }))
     })
     return {
