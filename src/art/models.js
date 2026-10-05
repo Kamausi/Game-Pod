@@ -619,35 +619,35 @@ const GAMES = {
     const LIP_W = 0.24 // outer wall thickness (base matches it)
     const casing = mat('#171310', { roughness: 0.75, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0, envMapIntensity: 0.25 }) // matte, no gloss
     const parts = [
-      mesh(rbox(width + LIP_W * 2, 0.4, depth + LIP_W * 2, 0.18, 6), casing, [xc, -0.125, zc]), // casing: contains the board, doesn't dominate
     ]
-    // Raised border wall around the playing field (y 0.02 to 0.22): a small flat strip right around the squares,
-    // then the outer walls slant down to the outside edge. Each part is one continuous frame.
+    // Casing: one smooth solid from the table (y -0.325) up to the squares (y 0.22). A small flat strip runs
+    // round the squares, then the walls slope down and roll smoothly over into the sides (no hard edge).
     const lipW = LIP_W
     const STRIP = 0.06 // flat strip around the squares
     const SLANT_DROP = 0.13 // how far the outer edge sits below the flat strip
-    const strip = trayFrameGeometry({ outer: width + STRIP * 2, outerDepth: depth + STRIP * 2, inner: width, innerDepth: depth, height: 0.2, outerRadius: STRIP, innerRadius: 0.004, bevel: 0.006 })
-    const slant = trayFrameGeometry({ outer: width + lipW * 2, outerDepth: depth + lipW * 2, inner: width + STRIP * 2 - 0.02, innerDepth: depth + STRIP * 2 - 0.02, height: 0.2, outerRadius: lipW, innerRadius: STRIP, bevel: 0.02 })
+    const BASE_Y = -0.325, CASE_H = 0.22 - BASE_Y
+    const ROLL = 0.07 // radius of the rounded edge where the slope meets the sides
+    const caseGeo = trayFrameGeometry({ outer: width + lipW * 2, outerDepth: depth + lipW * 2, inner: width - 0.3, innerDepth: depth - 0.3, height: CASE_H, outerRadius: lipW, innerRadius: 0.05, bevel: ROLL })
     {
-      // Lower the top toward the outside edge: full drop at the outer edge, none where it meets the strip.
-      const pos = slant.attributes.position
+      const pos = caseGeo.attributes.position
       for (let i = 0; i < pos.count; i++) {
         // Rounded distance from the squares' edge: the slope wraps round the corners instead of mitring.
         const qx = Math.abs(pos.getX(i)) - width / 2, qz = Math.abs(pos.getZ(i)) - depth / 2
         const out = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0)
         const t = Math.min(1, Math.max(0, (out - STRIP) / (lipW - STRIP)))
-        // Eased profile: the slope rolls smoothly off the flat strip and down into the outer edge.
-        const e = t * t * (3 - 2 * t)
-        pos.setY(i, pos.getY(i) - SLANT_DROP * e * (pos.getY(i) / 0.2))
+        // Starts flat off the strip and keeps sloping into the rolled outer edge.
+        const e = t * t * (2 - t)
+        const y = pos.getY(i)
+        let drop = SLANT_DROP * e * (y / CASE_H)
+        if (out < 0) drop += 0.006 * (y / CASE_H) // under the squares: tucked just below them
+        pos.setY(i, y - drop)
       }
     }
-    // Shared vertices so normals blend across the faces: the slope reads as one smooth surface round the
-    // corners instead of flat facets.
-    slant.deleteAttribute('normal')
-    slant.deleteAttribute('uv')
-    const slantSmooth = mergeVertices(slant, 1e-4)
-    slantSmooth.computeVertexNormals()
-    parts.push(mesh(strip, casing, [xc, 0.02, zc]), mesh(slantSmooth, casing, [xc, 0.02, zc]))
+    caseGeo.deleteAttribute('normal')
+    caseGeo.deleteAttribute('uv')
+    const caseSmooth = mergeVertices(caseGeo, 1e-4)
+    caseSmooth.computeVertexNormals()
+    parts.push(mesh(caseSmooth, casing, [xc, BASE_Y, zc]))
     // Individual inset tiles with soft bevels and a little tonal variation.
     const TILE_TOP = 0.22 // flush with the top of the border wall (lip: 0.2 tall at y 0.12)
     const tileGeo = rbox(SQ, 0.24, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
