@@ -700,7 +700,7 @@ const GAMES = {
     }
     // The reference's position (each piece placed on the square it sits on there).
     ;[[1.9, 0], [3.1, 0], [1, 1], [2, 2], [4.1, 0.9], [4, 2], [3, 3]].forEach(([c, r]) => put(c, r, black))
-    ;[[0, 2], [1, 3], [2, 4], [4, 4], [3, 1], [0, 4]].forEach(([c, r]) => put(c, r, red))
+    ;[[0, 2], [1, 3.1], [2.1, 4], [4, 4], [3, 1], [0, 4]].forEach(([c, r]) => put(c, r, red))
     // The table it sits on: falls out of focus toward the edges.
     // Ends just behind the board so the warm room bokeh shows past its far edge.
     const table = mesh(rbox(12, 0.3, 6.2, 0.1), mat('#4a4a4a', { // darker table (the colour multiplies the wood texture)
