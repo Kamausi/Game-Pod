@@ -288,8 +288,8 @@ const GAMES = {
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     // Colour gains (linear RGB multipliers on the wood textures), tuned so rendered colours equal the
     // reference's sampled pixels exactly.
-    const WOOD_GAIN = [0.927191, 0.839396, 0.206619]
-    const RAIL_GAIN = [1.377788, 0.914058, 0.610347]
+    const WOOD_GAIN = [0.909383, 0.713585, 0.450957]
+    const RAIL_GAIN = [1.351974, 0.756161, 0.644358]
     const wood = mat(new THREE.Color().setRGB(...WOOD_GAIN), {
       map: woodTexture({ base: '#f97233', dark: '#eb6b31', light: '#ff7c3b', seed: 7 }), // honey caramel, sampled against the reference
       roughness: 0.38, clearcoat: 0.16, clearcoatRoughness: 0.42, envMapIntensity: 0.3, // catches the light without looking lacquered
@@ -305,8 +305,8 @@ const GAMES = {
     const INNER = 2.81
     const INNER_DEPTH = 2.406
     // Painted face shading, tuned so the outer left and front faces equal the reference's sampled colours.
-    const WOOD_LEFT = [0.381052, 1.168395, 5.683]
-    const WOOD_FRONT = [0.454051, 0.67975, 0.58937]
+    const WOOD_LEFT = [0.405058, 1.590761, 3.864102]
+    const WOOD_FRONT = [0.479094, 0.545666, 0.330759]
     wood.userData.faceTint = { left: WOOD_LEFT, front: WOOD_FRONT, side: [1, 1, 1], outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05] }
     const DIV_W = 0.14 // divider width
     const S = (INNER + DIV_W) / 3 // side-to-side cell pitch (pieces and dividers sit on it)
@@ -332,45 +332,6 @@ const GAMES = {
       mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
       mesh(new THREE.PlaneGeometry(INNER, INNER_DEPTH), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
-    // Glowing top-right edge, as in the reference: a thin bright strip along the outer top edge from the
-    // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
-    // spreads it into a soft halo.
-    // back: how far it runs along the back edge from the corner; right: along the right edge.
-    const EDGE_GLOW = { color: '#ffd890', width: 0.026, strength: 3.4, back: 1.3, right: 1.5, offset: 0.022 }
-    {
-      // Hugs the board's outline just outside the outer walls and a hair below the top, following the
-      // rounded corner (outer radius 0.2), so the board covers the strip and only its glow shows behind it.
-      const o = EDGE_GLOW.offset
-      const hx = OUTER / 2 + o, hz = OUTER_DEPTH / 2 + o, cr = 0.2 + o, y = H - 0.035
-      const pts = []
-      for (let t = 0; t < 1; t += 0.02) pts.push(new THREE.Vector3(hx - cr - EDGE_GLOW.back * (1 - t), y, -hz))
-      for (let a = 0; a <= 1; a += 0.05) pts.push(new THREE.Vector3(hx - cr + Math.sin(a * Math.PI / 2) * cr, y, -hz + cr - Math.cos(a * Math.PI / 2) * cr))
-      for (let t = 0.02; t <= 1; t += 0.02) pts.push(new THREE.Vector3(hx, y, -hz + cr + EDGE_GLOW.right * t))
-      const curve = new THREE.CatmullRomCurve3(pts)
-      const segs = 480, radial = 8
-      const geo = new THREE.TubeGeometry(curve, segs, EDGE_GLOW.width, radial, false)
-      // Taper: full width and brightness at the corner, thinning and fading to nothing at both ends.
-      const total = EDGE_GLOW.back + (Math.PI / 2) * cr + EDGE_GLOW.right
-      const uc = (EDGE_GLOW.back + (Math.PI / 4) * cr) / total // corner, as a fraction of the length
-      const taper = (u) => Math.max(0, u < uc ? u / uc : (1 - u) / (1 - uc))
-      const pos = geo.attributes.position
-      const cols = []
-      const centre = new THREE.Vector3()
-      const v = new THREE.Vector3()
-      for (let i = 0; i <= segs; i++) {
-        const f = taper(i / segs)
-        curve.getPointAt(i / segs, centre)
-        const c = new THREE.Color(EDGE_GLOW.color).multiplyScalar(f ** 1.2 * EDGE_GLOW.strength)
-        for (let j = 0; j <= radial; j++) {
-          const k = i * (radial + 1) + j
-          v.fromBufferAttribute(pos, k).sub(centre).multiplyScalar(f).add(centre)
-          pos.setXYZ(k, v.x, v.y, v.z)
-          cols.push(c.r, c.g, c.b)
-        }
-      }
-      geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
-      parts.push(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })))
-    }
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
     const DIV_DROP = 0.065 // dividers sit below the frame's top edge (just above the piece tops)
@@ -395,7 +356,7 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = [0.0082031, 0.1517188, 0.540625] // linear RGB, tuned to the reference's sampled X colour
+    const BLUE = [0.0086719, 0.130625, 0.4351562] // linear RGB, tuned to the reference's sampled X colour
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.28, clearcoat: 0.3, clearcoatRoughness: 0.3, envMapIntensity: 0.05 }) // glossy toy plastic: fat soft highlights
     const X_SIDE = [0, 0.27, 5.2] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
     blue.userData.faceTint = { side: X_SIDE }
@@ -428,12 +389,14 @@ const GAMES = {
         keyIntensity: 2.0, keyColor: '#ffb35c', envIntensity: 0.25, exposure: 1.15, shadowSoftness: 14,
         lights: [
           { type: 'hemi', sky: '#68bfff', ground: '#ff8b3d', intensity: 0.42 },
-          { type: 'dir', color: '#39aaff', intensity: 3.0, from: [3.0, 2.5, -2.5] },
+          // Cool cyan key from the upper right: tints the top-right wood, right side of the frame, piece tops and
+          // divider edges cyan instead of drawing a white outline.
+          { type: 'dir', color: '#4bbcff', intensity: 3.0, from: [2.0, 2.6, 2.0] },
           { type: 'point', color: '#ff6b24', intensity: 6, from: [-1.5, -1.0, 2.0], distance: 4 },
         ],
         softbox: { color: '#ffd18a', intensity: 3, width: 1.6, height: 1.6, from: [-1.8, 2.6, 0.4] },
         bloom: { threshold: 0.78, strength: 0.42, radius: 0.026 },
-        rim: { intensity: 0.05, color: '#ffd8a0' }, aoIntensity: 2.4, aoRadius: 0.04,
+        rim: { intensity: 0.0275, color: '#38a8ff' }, aoIntensity: 2.4, aoRadius: 0.04,
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
       },
       backdrop: {
