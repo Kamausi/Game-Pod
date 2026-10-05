@@ -9,6 +9,9 @@ export const ASSETS = {
   // Games (tiles)
   // Lossless: its colours are tuned to exact reference pixel values, which lossy compression would shift.
   'tic-tac-toe': { ...tile, lossless: true },
+  // Featured banner: our tile, rendered larger and cropped to the same region as the original banner
+  // picture (a close crop of the tile reference), so the banner keeps that framing.
+  'tic-tac-toe-banner': { width: 640, height: 640, model: 'tic-tac-toe', crop: [0.033, 0.029, 0.938, 0.722] },
   checkers: tile,
   'ring-toss': tile,
   darts: tile,

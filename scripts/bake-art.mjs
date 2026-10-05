@@ -58,6 +58,13 @@ for (const name of names) {
     const png = await bake(name)
     const out = join(outDir, `${name}.webp`)
     // Downsample the 2x render with Lanczos for clean edges; keep alpha.
+    // crop: [x, y, w, h] in fractions of the frame, applied to the 2x render before downsampling.
+    const crop = ASSETS[name]?.crop
+    if (crop) {
+      const [W, H] = execFileSync('identify', ['-format', '%w %h', png]).toString().split(' ').map(Number)
+      const [cx, cy, cw, ch] = crop
+      execFileSync('convert', [png, '-crop', `${Math.round(cw * W)}x${Math.round(ch * H)}+${Math.round(cx * W)}+${Math.round(cy * H)}`, '+repage', png])
+    }
     const encode = ASSETS[name]?.lossless ? ['-define', 'webp:lossless=true'] : ['-quality', '90', '-define', 'webp:alpha-quality=95']
     execFileSync('convert', [png, '-filter', 'Lanczos', '-resize', '50%', ...encode, out])
     execFileSync('convert', [png, '-filter', 'Lanczos', '-resize', '50%', join(reviewDir, `${name}.png`)])

@@ -25,8 +25,10 @@ async function main() {
   const tone = params.get('tone') ?? undefined
   const width = spec.width * SUPERSAMPLE
   const height = spec.height * SUPERSAMPLE
-  let canvas = renderAsset(name, { width, height, tone })
-  const look = MODELS[name]().look ?? {}
+  // An asset can be another model rendered at a different size (spec.model), e.g. a banner crop of a tile.
+  const model = spec.model ?? name
+  let canvas = renderAsset(model, { width, height, tone })
+  const look = MODELS[model]().look ?? {}
   canvas = bloom(canvas, look.bloom ?? spec.bloom)
   const g = look.glow
   if (g) canvas = glow(canvas, g)
