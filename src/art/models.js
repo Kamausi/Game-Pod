@@ -335,26 +335,38 @@ const GAMES = {
     // Glowing top-right edge, as in the reference: a thin bright strip along the outer top edge from the
     // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
     // spreads it into a soft halo.
-    const EDGE_GLOW = { color: '#ffd890', width: 0.015, strength: 3.4, reach: 4.0 }
+    // back: how far it runs along the back edge from the corner; right: along the right edge.
+    const EDGE_GLOW = { color: '#ffd890', width: 0.026, strength: 3.4, back: 1.3, right: 1.5, offset: 0.022 }
     {
-      // Just outside the outer walls and a little below the top, so the board itself covers the strip and
-      // only its glow shows around the silhouette, behind the board.
-      const hx = OUTER / 2 + 0.03, hz = OUTER_DEPTH / 2 + 0.07, cr = 0.25, y = H - 0.06
+      // Hugs the board's outline just outside the outer walls and a hair below the top, following the
+      // rounded corner (outer radius 0.2), so the board covers the strip and only its glow shows behind it.
+      const o = EDGE_GLOW.offset
+      const hx = OUTER / 2 + o, hz = OUTER_DEPTH / 2 + o, cr = 0.2 + o, y = H - 0.035
       const pts = []
-      for (let t = 0; t <= 1; t += 0.02) pts.push(new THREE.Vector3(-hx * 0.85 + t * (hx - cr + hx * 0.85), y, -hz))
-      for (let a = 0; a <= 1; a += 0.1) pts.push(new THREE.Vector3(hx - cr + Math.sin(a * Math.PI / 2) * cr, y, -hz + cr - Math.cos(a * Math.PI / 2) * cr))
-      for (let t = 0; t <= 1; t += 0.02) pts.push(new THREE.Vector3(hx, y, -hz + cr + t * (hz * 1.9 - cr)))
+      for (let t = 0; t < 1; t += 0.02) pts.push(new THREE.Vector3(hx - cr - EDGE_GLOW.back * (1 - t), y, -hz))
+      for (let a = 0; a <= 1; a += 0.05) pts.push(new THREE.Vector3(hx - cr + Math.sin(a * Math.PI / 2) * cr, y, -hz + cr - Math.cos(a * Math.PI / 2) * cr))
+      for (let t = 0.02; t <= 1; t += 0.02) pts.push(new THREE.Vector3(hx, y, -hz + cr + EDGE_GLOW.right * t))
       const curve = new THREE.CatmullRomCurve3(pts)
-      const geo = new THREE.TubeGeometry(curve, 480, EDGE_GLOW.width, 8, false)
-      // Fade along the strip: brightest at the corner, gone at both ends.
-      const cols = []
+      const segs = 480, radial = 8
+      const geo = new THREE.TubeGeometry(curve, segs, EDGE_GLOW.width, radial, false)
+      // Taper: full width and brightness at the corner, thinning and fading to nothing at both ends.
+      const total = EDGE_GLOW.back + (Math.PI / 2) * cr + EDGE_GLOW.right
+      const uc = (EDGE_GLOW.back + (Math.PI / 4) * cr) / total // corner, as a fraction of the length
+      const taper = (u) => Math.max(0, u < uc ? u / uc : (1 - u) / (1 - uc))
       const pos = geo.attributes.position
-      const corner = new THREE.Vector3(hx, y, -hz)
-      for (let k = 0; k < pos.count; k++) {
-        const d = new THREE.Vector3().fromBufferAttribute(pos, k).distanceTo(corner)
-        const f = Math.max(0, 1 - d / EDGE_GLOW.reach) ** 1.5 * EDGE_GLOW.strength
-        const c = new THREE.Color(EDGE_GLOW.color).multiplyScalar(f)
-        cols.push(c.r, c.g, c.b)
+      const cols = []
+      const centre = new THREE.Vector3()
+      const v = new THREE.Vector3()
+      for (let i = 0; i <= segs; i++) {
+        const f = taper(i / segs)
+        curve.getPointAt(i / segs, centre)
+        const c = new THREE.Color(EDGE_GLOW.color).multiplyScalar(f ** 1.2 * EDGE_GLOW.strength)
+        for (let j = 0; j <= radial; j++) {
+          const k = i * (radial + 1) + j
+          v.fromBufferAttribute(pos, k).sub(centre).multiplyScalar(f).add(centre)
+          pos.setXYZ(k, v.x, v.y, v.z)
+          cols.push(c.r, c.g, c.b)
+        }
       }
       geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
       parts.push(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })))
