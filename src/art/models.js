@@ -765,7 +765,7 @@ const GAMES = {
           { color: '#ff6325', intensity: 1.5, width: 1.6, height: 1.0, from: [-1.0, -0.6, 0.7] },
         ],
         // Showcase DOF: nearest and rear pieces soften, centre stays sharpest.
-        dof: { aperture: 0.008, maxblur: 0.02 },
+        dof: { aperture: 0.02, maxblur: 0.03 },
       },
       backdrop: {
         gradient: [180, '#3a2010', '#8a4a1a', '#2a1408'],
