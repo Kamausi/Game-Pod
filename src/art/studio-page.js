@@ -32,6 +32,16 @@ async function main() {
   canvas = bloom(canvas, look.bloom ?? spec.bloom)
   const g = look.glow
   if (g) canvas = glow(canvas, g)
+  // look.contrast: a final contrast boost around mid-grey (darker darks, brighter highlights).
+  if (look.contrast) {
+    const c = document.createElement('canvas')
+    c.width = canvas.width
+    c.height = canvas.height
+    const cx = c.getContext('2d')
+    cx.filter = `contrast(${look.contrast})`
+    cx.drawImage(canvas, 0, 0)
+    canvas = c
+  }
   // Photographic softness: blend toward a blurred copy with distance from the centre (look.soften:
   // { blur, inner, outer } in fractions of the frame).
   if (look.soften) {

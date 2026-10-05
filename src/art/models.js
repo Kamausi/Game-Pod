@@ -745,8 +745,9 @@ const GAMES = {
         // Backlit: warm light rakes toward the camera across the squares.
         keyFrom: [-2.0, 3.2, -1.2],
         glow: { amount: 0.25, radius: 0.035, tint: ['#ff9a40', 0.1] },
-        envIntensity: 0.3, ambient: ['#ffb070', '#3a1a08', 1.3], keyIntensity: 2.3, keyColor: '#ffd8a0', exposure: 1.1,
+        envIntensity: 0.3, ambient: ['#ffb070', '#3a1a08', 0.8], keyIntensity: 2.6, keyColor: '#ffd8a0', exposure: 1.1,
         rim: { intensity: 0.08, color: '#ffc080' }, aoIntensity: 3.4, aoRadius: 0.011,
+        contrast: 1.18, // wider range: near-black blacks, brighter highlights
         softbox: { color: '#ffe6c4', intensity: 7, width: 1.8, height: 0.8, from: [-1.0, 2.0, 0.4] },
         // Large off-camera light cards for the squares, pieces and wall to reflect: warm card upper left,
         // hotter card upper right, dim orange bounce low in front.
