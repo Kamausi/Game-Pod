@@ -335,15 +335,17 @@ const GAMES = {
     // Glowing top-right edge, as in the reference: a thin bright strip along the outer top edge from the
     // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
     // spreads it into a soft halo.
-    const EDGE_GLOW = { color: '#ffd890', width: 0.04, strength: 2.2, reach: 2.4 }
+    const EDGE_GLOW = { color: '#ffd890', width: 0.015, strength: 3.4, reach: 4.0 }
     {
-      const hx = OUTER / 2 - 0.01, hz = OUTER_DEPTH / 2 - 0.01, cr = 0.2, y = H - 0.012
+      // Just outside the outer walls and a little below the top, so the board itself covers the strip and
+      // only its glow shows around the silhouette, behind the board.
+      const hx = OUTER / 2 + 0.03, hz = OUTER_DEPTH / 2 + 0.07, cr = 0.25, y = H - 0.06
       const pts = []
-      for (let t = 0; t <= 1; t += 0.02) pts.push(new THREE.Vector3(-hx * 0.15 + t * (hx - cr + hx * 0.15), y, -hz))
+      for (let t = 0; t <= 1; t += 0.02) pts.push(new THREE.Vector3(-hx * 0.85 + t * (hx - cr + hx * 0.85), y, -hz))
       for (let a = 0; a <= 1; a += 0.1) pts.push(new THREE.Vector3(hx - cr + Math.sin(a * Math.PI / 2) * cr, y, -hz + cr - Math.cos(a * Math.PI / 2) * cr))
-      for (let t = 0; t <= 1; t += 0.02) pts.push(new THREE.Vector3(hx, y, -hz + cr + t * (hz * 1.7 - cr)))
+      for (let t = 0; t <= 1; t += 0.02) pts.push(new THREE.Vector3(hx, y, -hz + cr + t * (hz * 1.9 - cr)))
       const curve = new THREE.CatmullRomCurve3(pts)
-      const geo = new THREE.TubeGeometry(curve, 160, EDGE_GLOW.width, 6, false)
+      const geo = new THREE.TubeGeometry(curve, 480, EDGE_GLOW.width, 8, false)
       // Fade along the strip: brightest at the corner, gone at both ends.
       const cols = []
       const pos = geo.attributes.position
