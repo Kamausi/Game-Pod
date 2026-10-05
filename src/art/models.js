@@ -365,9 +365,9 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = [0.0, 0.2, 0.6] // linear RGB, tuned to the reference's X tops
+    const BLUE = [0.0, 0.144, 0.432] // linear RGB, tuned to the reference's X tops
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.4, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0.05 }) // vivid blue: no white reflections washing it out
-    const X_SIDE = [0.0, 0.060367, 2.080877] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
+    const X_SIDE = [0.0, 0.083843, 2.890107] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
     blue.userData.faceTint = { side: X_SIDE }
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
