@@ -39,9 +39,26 @@ async function main() {
     soft.width = w
     soft.height = h
     const sctx = soft.getContext('2d')
-    sctx.filter = `blur(${Math.max(1, Math.round(w * blur))}px)`
-    sctx.drawImage(canvas, 0, 0)
-    sctx.filter = 'none'
+    // Blur an edge-padded copy (border pixels stretched outward) so the frame's edges don't darken by
+    // blurring in transparent pixels from outside it.
+    const px = Math.max(1, Math.round(w * blur))
+    const margin = px * 3
+    const pad = document.createElement('canvas')
+    pad.width = w + 2 * margin
+    pad.height = h + 2 * margin
+    const pctx = pad.getContext('2d')
+    pctx.drawImage(canvas, margin, margin)
+    pctx.drawImage(canvas, 0, 0, w, 1, margin, 0, w, margin) // top
+    pctx.drawImage(canvas, 0, h - 1, w, 1, margin, margin + h, w, margin) // bottom
+    pctx.drawImage(pad, margin, 0, 1, h + 2 * margin, 0, 0, margin, h + 2 * margin) // left (incl. corners)
+    pctx.drawImage(pad, margin + w - 1, 0, 1, h + 2 * margin, margin + w, 0, margin, h + 2 * margin) // right (incl. corners)
+    const blurred = document.createElement('canvas')
+    blurred.width = pad.width
+    blurred.height = pad.height
+    const bctx = blurred.getContext('2d')
+    bctx.filter = `blur(${px}px)`
+    bctx.drawImage(pad, 0, 0)
+    sctx.drawImage(blurred, -margin, -margin)
     const sharp = document.createElement('canvas')
     sharp.width = w
     sharp.height = h

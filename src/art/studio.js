@@ -389,6 +389,27 @@ export function paintBackdrop(width, height, spec) {
     ctx.arc(x * width, y * height, rad * width, 0, Math.PI * 2)
     ctx.fill()
   }
+  // grid: { cols, rows, rows: ['rrggbb rrggbb …', …] } - a low-resolution colour field (e.g. tuned to a reference
+  // background) stretched smoothly over the frame and blurred by grid.blur.
+  if (spec.grid) {
+    const { cols, colors, blur = 0.02 } = spec.grid
+    const rows = colors.length
+    const g = document.createElement('canvas')
+    g.width = cols + 2
+    g.height = rows + 2
+    const gx = g.getContext('2d')
+    const at = (cx, cy) => colors[Math.min(rows - 1, Math.max(0, cy))].split(' ')[Math.min(cols - 1, Math.max(0, cx))]
+    for (let y = -1; y <= rows; y++) for (let x = -1; x <= cols; x++) { // one replicated cell of padding all round
+      gx.fillStyle = `#${at(x, y)}`
+      gx.fillRect(x + 1, y + 1, 1, 1)
+    }
+    const cw = width / cols, ch = height / rows
+    ctx.filter = `blur(${Math.round(width * blur)}px)`
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(g, -cw, -ch, width + 2 * cw, height + 2 * ch)
+    ctx.filter = 'none'
+  }
   // Defined forms painted over everything else (e.g. a dark stage under the subject):
   // ellipses: [[cx, cy, rx, ry, color, blur?, topColor?]] in fractions of the frame; with topColor the
   // fill shades from topColor near the top of the frame's lower part (y 0.8) down to color (y 0.96).
