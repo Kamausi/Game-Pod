@@ -4,6 +4,7 @@ import {
   THREE, mat, wood, metal, matte, mesh, group, rbox, cyl, sphere, torus, cone, capsule,
   canvasTexture, decal, text, starShape, extrude, drawSuit, roundRect, woodTexture, toyXGeometry, toyOGeometry, toyPuckGeometry, vary, noiseTexture, trayFrameGeometry, mouldedXGeometry,
 } from './kit.js'
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 const C = {
   red: '#ff2f45', blue: '#2a6bff', yellow: '#ffc51f', green: '#33c94f', orange: '#ff8a1f',
@@ -635,11 +636,18 @@ const GAMES = {
         const qx = Math.abs(pos.getX(i)) - width / 2, qz = Math.abs(pos.getZ(i)) - depth / 2
         const out = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0)
         const t = Math.min(1, Math.max(0, (out - STRIP) / (lipW - STRIP)))
-        pos.setY(i, pos.getY(i) - SLANT_DROP * t * (pos.getY(i) / 0.2))
+        // Eased profile: the slope rolls smoothly off the flat strip and down into the outer edge.
+        const e = t * t * (3 - 2 * t)
+        pos.setY(i, pos.getY(i) - SLANT_DROP * e * (pos.getY(i) / 0.2))
       }
-      slant.computeVertexNormals()
     }
-    parts.push(mesh(strip, casing, [xc, 0.02, zc]), mesh(slant, casing, [xc, 0.02, zc]))
+    // Shared vertices so normals blend across the faces: the slope reads as one smooth surface round the
+    // corners instead of flat facets.
+    slant.deleteAttribute('normal')
+    slant.deleteAttribute('uv')
+    const slantSmooth = mergeVertices(slant, 1e-4)
+    slantSmooth.computeVertexNormals()
+    parts.push(mesh(strip, casing, [xc, 0.02, zc]), mesh(slantSmooth, casing, [xc, 0.02, zc]))
     // Individual inset tiles with soft bevels and a little tonal variation.
     const TILE_TOP = 0.22 // flush with the top of the border wall (lip: 0.2 tall at y 0.12)
     const tileGeo = rbox(SQ, 0.24, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
