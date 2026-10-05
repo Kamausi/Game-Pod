@@ -237,9 +237,10 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
 
   // Softbox: a large rectangular area light above and to one side, so glossy pieces get a broad
   // gradient highlight that describes their curvature instead of a single specular dot.
-  if (look.softbox) {
+  // look.cards: extra off-camera light cards (same fields as softbox) for glossy surfaces to reflect.
+  for (const sb of [look.softbox, ...(look.cards ?? [])].filter(Boolean)) {
     RectAreaLightUniformsLib.init()
-    const { color = '#fff1dc', intensity = 6, width: sw = 1.6, height: sh = 0.9, from = [-1.2, 2.2, 0.8] } = look.softbox
+    const { color = '#fff1dc', intensity = 6, width: sw = 1.6, height: sh = 0.9, from = [-1.2, 2.2, 0.8] } = sb
     const box = new THREE.RectAreaLight(color, intensity, r * sw, r * sh)
     box.position.set(sphere.center.x + r * from[0], sphere.center.y + r * from[1], sphere.center.z + r * from[2])
     box.lookAt(sphere.center)

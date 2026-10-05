@@ -745,6 +745,13 @@ const GAMES = {
         envIntensity: 0.3, ambient: ['#ffb070', '#3a1a08', 1.3], keyIntensity: 2.3, keyColor: '#ffd8a0', exposure: 1.1,
         rim: { intensity: 0.08, color: '#ffc080' }, aoIntensity: 2.2, aoRadius: 0.016,
         softbox: { color: '#ffe6c4', intensity: 7, width: 1.8, height: 0.8, from: [-1.0, 2.0, 0.4] },
+        // Large off-camera light cards for the squares, pieces and wall to reflect: warm card upper left,
+        // hotter card upper right, dim orange bounce low in front.
+        cards: [
+          { color: '#ffa338', intensity: 4, width: 1.6, height: 2.2, from: [-1.3, 1.9, 1.0] },
+          { color: '#ffd67a', intensity: 3, width: 1.0, height: 1.6, from: [1.0, 1.6, 1.3] },
+          { color: '#ff6325', intensity: 1.5, width: 1.6, height: 1.0, from: [-1.0, -0.6, 0.7] },
+        ],
         // Showcase DOF: nearest and rear pieces soften, centre stays sharpest.
         dof: { aperture: 0.008, maxblur: 0.02 },
       },
