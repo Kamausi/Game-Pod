@@ -288,10 +288,10 @@ const GAMES = {
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     // Colour gains (linear RGB multipliers on the wood textures), tuned so rendered colours equal the
     // reference's sampled pixels exactly.
-    const WOOD_GAIN = [0.909383, 0.713585, 0.450957]
-    const RAIL_GAIN = [1.351974, 0.756161, 0.644358]
+    const WOOD_GAIN = [1.015722, 1.458231, 1.13363]
+    const RAIL_GAIN = [1.63664, 1.759611, 0.040691]
     const wood = mat(new THREE.Color().setRGB(...WOOD_GAIN), {
-      map: woodTexture({ base: '#f97233', dark: '#eb6b31', light: '#ff7c3b', seed: 7 }), // honey caramel, sampled against the reference
+      map: woodTexture({ base: '#f97233', dark: '#eb6b31', light: '#ff7c3b', seed: 7, grain: 0.4 }), // honey caramel, sampled against the reference
       roughness: 0.38, clearcoat: 0.16, clearcoatRoughness: 0.42, envMapIntensity: 0.3, // catches the light without looking lacquered
     })
     // Cross bars read a little lighter than the frame in the reference.
@@ -305,9 +305,17 @@ const GAMES = {
     const INNER = 2.81
     const INNER_DEPTH = 2.406
     // Painted face shading, tuned so the outer left and front faces equal the reference's sampled colours.
-    const WOOD_LEFT = [0.405058, 1.590761, 3.864102]
-    const WOOD_FRONT = [0.479094, 0.545666, 0.330759]
-    wood.userData.faceTint = { left: WOOD_LEFT, front: WOOD_FRONT, side: [1, 1, 1], outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05] }
+    const WOOD_LEFT = [0.483014, 1.262995, 4.359347]
+    const WOOD_FRONT = [0.409416, 0.347634, 0.547864]
+    // Top-face gradient, tuned to the reference's rim samples: lighter and yellower toward the back and
+    // right, a little darker at the front.
+    const TOP_BACK = [1.040722, 2.212584, 3.049769]
+    const TOP_RIGHT = [1.833755, 1.702495, 0.29334]
+    const TOP_FRONT = [0.699675, 0.74028, 1.219953]
+    wood.userData.faceTint = {
+      left: WOOD_LEFT, front: WOOD_FRONT, side: [1, 1, 1], outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05],
+      topBack: TOP_BACK, topRight: TOP_RIGHT, topFront: TOP_FRONT, extent: [INNER / 2 + 0.25, INNER_DEPTH / 2 + 0.25],
+    }
     const DIV_W = 0.14 // divider width
     const S = (INNER + DIV_W) / 3 // side-to-side cell pitch (pieces and dividers sit on it)
     const SZ = (INNER_DEPTH + DIV_W) / 3 // front-to-back cell pitch
@@ -336,9 +344,10 @@ const GAMES = {
     // their ends run into the walls so no rounded stub shows.
     const DIV_DROP = 0.065 // dividers sit below the frame's top edge (just above the piece tops)
     const DIV_H = H - floorTop - DIV_DROP
+    const RAIL_GAP = 0.025 // bars stop just short of the frame: a thin dark gap where they meet it, as in the reference
     for (const o of [-0.5, 0.5]) {
-      parts.push(mesh(rbox(INNER + 0.1, DIV_H, DIV_W, 0.035, 4), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
-      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH + 0.1, 0.035, 4), railWood, [o * S, floorTop + DIV_H / 2, 0]))
+      parts.push(mesh(rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.035, 4), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
+      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.035, 4), railWood, [o * S, floorTop + DIV_H / 2, 0]))
     }
     // Raised square blocks where the bars cross: flush with the bars' sides (a hair inside, to avoid
     // z-fighting), standing proud of them only in height.
@@ -356,9 +365,9 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = [0.0086719, 0.130625, 0.4351562] // linear RGB, tuned to the reference's sampled X colour
-    const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.28, clearcoat: 0.3, clearcoatRoughness: 0.3, envMapIntensity: 0.05 }) // glossy toy plastic: fat soft highlights
-    const X_SIDE = [0, 0.27, 5.2] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
+    const BLUE = [0.0, 0.2, 0.6] // linear RGB, tuned to the reference's sampled X colour
+    const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.4, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0.05 }) // vivid blue: no white reflections washing it out
+    const X_SIDE = [0, 0.14, 3.6] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
     blue.userData.faceTint = { side: X_SIDE }
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
@@ -395,6 +404,9 @@ const GAMES = {
           { type: 'point', color: '#ff6b24', intensity: 6, from: [-1.5, -1.0, 2.0], distance: 4 },
         ],
         softbox: { color: '#ffd18a', intensity: 3, width: 1.6, height: 1.6, from: [-1.8, 2.6, 0.4] },
+        // Neutral tone mapping keeps saturated colours saturated (ACES washes bright blue toward white).
+        tone: 'neutral',
+        backdropUntoned: true, soften: { blur: 0.006, inner: 0.45, outer: 0.85 },
         bloom: { threshold: 0.78, strength: 0.42, radius: 0.026 },
         rim: { intensity: 0.0275, color: '#38a8ff' }, aoIntensity: 2.4, aoRadius: 0.04,
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
@@ -406,9 +418,33 @@ const GAMES = {
         // gold/orange lower left.
         masses: [[0.5, 0.0, 0.14, '#8fdcff'], [0.12, 0.1, 0.2, '#ff6aa8'], [0.86, 0.1, 0.22, '#30b8ff'], [0.14, 0.72, 0.24, '#ffa030'], [0.06, 0.55, 0.22, '#ffb050'], [0.12, 0.85, 0.25, '#f0a050'], [0.15, 0.25, 0.12, '#ffd090'], [0.88, 0.3, 0.2, '#5a7ae0'], [0.6, 1.0, 0.3, '#4a2a30']],
         bokeh: { n: 16, colors: ['#ffd9a0', '#ffffff', '#ffb060', '#a8c8ff'], min: 0.015, max: 0.05, seed: 5 },
+        // Background colours sampled around the reference board, painted as soft spots and tuned until each
+        // sample point equals the reference's (includes the bright blue-white light behind the top-right corner).
+        vignette: 0, spotBlur: 0.025,
+        spots: [
+          [0.183, 0.023, 0.06, '#464779'],
+          [0.300, 0.023, 0.06, '#3991f8'],
+          [0.417, 0.023, 0.06, '#31b0fd'],
+          [0.533, 0.023, 0.06, '#31b9fd'],
+          [0.650, 0.023, 0.06, '#5fbcfc'],
+          [0.767, 0.023, 0.06, '#2d96fb'],
+          [0.883, 0.023, 0.06, '#495bce'],
+          [0.023, 0.117, 0.06, '#214eb0'],
+          [0.023, 0.233, 0.06, '#1a52b2'],
+          [0.023, 0.350, 0.06, '#48417b'],
+          [0.023, 0.467, 0.06, '#f37861'],
+          [0.023, 0.583, 0.06, '#f5895a'],
+          [0.023, 0.700, 0.06, '#523862'],
+          [0.977, 0.117, 0.06, '#4b5dd0'],
+          [0.977, 0.217, 0.06, '#001f3e'],
+          [0.977, 0.317, 0.06, '#47345d'],
+          [0.977, 0.417, 0.06, '#ffc972'],
+          [0.883, 0.100, 0.06, '#8987f0'],
+          [0.933, 0.183, 0.06, '#4f72e8'],
+        ],
         // Dark dome across the bottom of the tile, warm plum-grey under the board fading to navy at the bottom: peaks ~70% down behind the board and falls away to
         // ~83% at both side edges (traced from the reference).
-        ellipses: [[0.5, 1.2, 0.75, 0.5, '#1f263b', 0.012, '#2f272afc', '#433f4ffc', '#514854fc']],
+        ellipses: [[0.5, 1.2, 0.75, 0.5, '#0c1327', 0.012, '#22191cfc', '#2c2738fc', '#3b323ffc']],
         shapes: [[0.78, 0.08, 0.12, 0.5, '#3a5ab8'], [0.9, 0.15, 0.08, 0.4, '#5a7ad8'], [0.02, 0.35, 0.05, 0.3, '#e08a40']],
       },
     }

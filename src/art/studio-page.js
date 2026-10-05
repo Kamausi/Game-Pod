@@ -30,6 +30,32 @@ async function main() {
   canvas = bloom(canvas, look.bloom ?? spec.bloom)
   const g = look.glow
   if (g) canvas = glow(canvas, g)
+  // Photographic softness: blend toward a blurred copy with distance from the centre (look.soften:
+  // { blur, inner, outer } in fractions of the frame).
+  if (look.soften) {
+    const { blur = 0.006, inner = 0.3, outer = 0.75 } = look.soften
+    const w = canvas.width, h = canvas.height
+    const soft = document.createElement('canvas')
+    soft.width = w
+    soft.height = h
+    const sctx = soft.getContext('2d')
+    sctx.filter = `blur(${Math.max(1, Math.round(w * blur))}px)`
+    sctx.drawImage(canvas, 0, 0)
+    sctx.filter = 'none'
+    const sharp = document.createElement('canvas')
+    sharp.width = w
+    sharp.height = h
+    const hctx = sharp.getContext('2d')
+    hctx.drawImage(canvas, 0, 0)
+    hctx.globalCompositeOperation = 'destination-in'
+    const m = hctx.createRadialGradient(w / 2, h * 0.45, w * inner, w / 2, h * 0.45, w * outer)
+    m.addColorStop(0, 'rgba(0,0,0,1)')
+    m.addColorStop(1, 'rgba(0,0,0,0)')
+    hctx.fillStyle = m
+    hctx.fillRect(0, 0, w, h)
+    sctx.drawImage(sharp, 0, 0)
+    canvas = soft
+  }
   document.getElementById('out').append(canvas)
   window.__studio = { done: true, dataUrl: canvas.toDataURL('image/png') }
 }

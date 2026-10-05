@@ -57,12 +57,14 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
     Object.assign(shader.uniforms, {
       uTintLeft: { value: v3(tint.left) }, uTintFront: { value: v3(tint.front) }, uTintSide: { value: v3(tint.side) },
       uOuter: { value: new THREE.Vector2(...(tint.outer ?? [0, 0])) },
+      uTopBack: { value: v3(tint.topBack) }, uTopRight: { value: v3(tint.topRight) }, uTopFront: { value: v3(tint.topFront) },
+      uExtent: { value: new THREE.Vector2(...(tint.extent ?? [1, 1])) },
     })
     shader.vertexShader = shader.vertexShader
       .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nvoid main() {')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjN = objectNormal;\nvObjP = position;')
     shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nuniform vec3 uTintLeft;\nuniform vec3 uTintFront;\nuniform vec3 uTintSide;\nuniform vec2 uOuter;\nvoid main() {')
+      .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nuniform vec3 uTintLeft;\nuniform vec3 uTintFront;\nuniform vec3 uTintSide;\nuniform vec2 uOuter;\nuniform vec3 uTopBack;\nuniform vec3 uTopRight;\nuniform vec3 uTopFront;\nuniform vec2 uExtent;\nvoid main() {')
       .replace(
         '#include <opaque_fragment>',
         `vec3 tn = normalize(vObjN);
@@ -70,6 +72,10 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
         float wl = pow(max(0.0, -tn.x), 2.0) * outerX, wf = pow(max(0.0, tn.z), 2.0) * outerZ;
         float ws = 1.0 - abs(tn.y);
         outgoingLight *= vec3(1.0) + wl * (uTintLeft - 1.0) + wf * (uTintFront - 1.0) + ws * (uTintSide - 1.0);
+        // Top faces: linear ramps toward the back (-z), right (+x) and front (+z) of the object's extent.
+        float wt = max(0.0, tn.y);
+        float zb = clamp(-vObjP.z / uExtent.y, 0.0, 1.0), zf = clamp(vObjP.z / uExtent.y, 0.0, 1.0), xr = clamp(vObjP.x / uExtent.x, 0.0, 1.0);
+        outgoingLight *= vec3(1.0) + wt * (zb * (uTopBack - 1.0) + xr * (uTopRight - 1.0) + zf * (uTopFront - 1.0));
         #include <opaque_fragment>`,
       )
   }
@@ -248,16 +254,24 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   }
 
   const camera = fitCamera(frame ?? object, width / height, view)
+  let backdropBehind = null
   renderer.setPixelRatio(1)
   renderer.setSize(width, height, false)
 
   if (backdrop) {
     // Scene tiles: the painted backdrop becomes the background, and the frame goes through
     // ambient occlusion so pieces sit *in* boards and grass instead of floating on them.
-    const bg = new THREE.CanvasTexture(paintBackdrop(width, height, backdrop))
+    // backdropUntoned: render the subject over a transparent background and lay the painted backdrop
+    // behind it afterwards, so its colours come through exactly instead of being tone mapped.
+    const backCanvas = paintBackdrop(width, height, backdrop)
+    const bg = new THREE.CanvasTexture(backCanvas)
     bg.colorSpace = THREE.SRGBColorSpace
-    scene.background = bg
-    scene.backgroundIntensity = look.backgroundIntensity ?? 1.15
+    if (!look.backdropUntoned) {
+      scene.background = bg
+      scene.backgroundIntensity = look.backgroundIntensity ?? 1.15
+    } else {
+      backdropBehind = backCanvas
+    }
     const target = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: 4 })
     const composer = new EffectComposer(renderer, target)
     composer.setPixelRatio(1)
@@ -291,6 +305,7 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   const out = document.createElement('canvas')
   out.width = width
   out.height = height
+  if (backdropBehind) out.getContext('2d').drawImage(backdropBehind, 0, 0)
   out.getContext('2d').drawImage(renderer.domElement, 0, 0)
 
   scene.traverse((o) => {
@@ -360,6 +375,15 @@ export function paintBackdrop(width, height, spec) {
     }
     ctx.globalAlpha = 1
   }
+  // Soft colour spots (e.g. tuned to sampled colours of a reference background): [[x, y, r, color]] in
+  // fractions of the frame, blurred by spotBlur.
+  ctx.filter = `blur(${Math.round(width * (spec.spotBlur ?? 0.05))}px)`
+  for (const [x, y, rad, color] of spec.spots ?? []) {
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.arc(x * width, y * height, rad * width, 0, Math.PI * 2)
+    ctx.fill()
+  }
   // Defined forms painted over everything else (e.g. a dark stage under the subject):
   // ellipses: [[cx, cy, rx, ry, color, blur?, topColor?]] in fractions of the frame; with topColor the
   // fill shades from topColor near the top of the frame's lower part (y 0.8) down to color (y 0.96).
@@ -397,7 +421,7 @@ export function paintBackdrop(width, height, spec) {
   // Gentle vignette pulls focus to the subject.
   const v = ctx.createRadialGradient(width / 2, height * 0.45, width * 0.25, width / 2, height * 0.5, width * 0.8)
   v.addColorStop(0, 'rgba(0,0,0,0)')
-  v.addColorStop(1, 'rgba(0,0,0,0.35)')
+  v.addColorStop(1, `rgba(0,0,0,${spec.vignette ?? 0.35})`)
   ctx.fillStyle = v
   ctx.fillRect(0, 0, width, height)
   return c
