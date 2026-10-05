@@ -380,6 +380,45 @@ const GAMES = {
       mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
       mesh(new THREE.PlaneGeometry(INNER, INNER_DEPTH), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
+    // Glowing top-right edge (teal), as in the reference: a thin bright strip along the outer top edge from the
+    // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
+    // spreads it into a soft halo.
+    // back: how far it runs along the back edge from the corner; right: along the right edge.
+    const EDGE_GLOW = { color: '#3fe6d6', width: 0.026, strength: 3.4, back: 1.3, right: 1.5, offset: 0.022 }
+    {
+      // Hugs the board's outline just outside the outer walls and a hair below the top, following the
+      // rounded corner (outer radius 0.2), so the board covers the strip and only its glow shows behind it.
+      const o = EDGE_GLOW.offset
+      const hx = OUTER / 2 + o, hz = OUTER_DEPTH / 2 + o, cr = 0.2 + o, y = H - 0.035
+      const pts = []
+      for (let t = 0; t < 1; t += 0.02) pts.push(new THREE.Vector3(hx - cr - EDGE_GLOW.back * (1 - t), y, -hz))
+      for (let a = 0; a <= 1; a += 0.05) pts.push(new THREE.Vector3(hx - cr + Math.sin(a * Math.PI / 2) * cr, y, -hz + cr - Math.cos(a * Math.PI / 2) * cr))
+      for (let t = 0.02; t <= 1; t += 0.02) pts.push(new THREE.Vector3(hx, y, -hz + cr + EDGE_GLOW.right * t))
+      const curve = new THREE.CatmullRomCurve3(pts)
+      const segs = 480, radial = 8
+      const geo = new THREE.TubeGeometry(curve, segs, EDGE_GLOW.width, radial, false)
+      // Taper: full width and brightness at the corner, thinning and fading to nothing at both ends.
+      const total = EDGE_GLOW.back + (Math.PI / 2) * cr + EDGE_GLOW.right
+      const uc = (EDGE_GLOW.back + (Math.PI / 4) * cr) / total // corner, as a fraction of the length
+      const taper = (u) => Math.max(0, u < uc ? u / uc : (1 - u) / (1 - uc))
+      const pos = geo.attributes.position
+      const cols = []
+      const centre = new THREE.Vector3()
+      const v = new THREE.Vector3()
+      for (let i = 0; i <= segs; i++) {
+        const f = taper(i / segs)
+        curve.getPointAt(i / segs, centre)
+        const c = new THREE.Color(EDGE_GLOW.color).multiplyScalar(f ** 1.2 * EDGE_GLOW.strength)
+        for (let j = 0; j <= radial; j++) {
+          const k = i * (radial + 1) + j
+          v.fromBufferAttribute(pos, k).sub(centre).multiplyScalar(f).add(centre)
+          pos.setXYZ(k, v.x, v.y, v.z)
+          cols.push(c.r, c.g, c.b)
+        }
+      }
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
+      parts.push(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })))
+    }
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
     const DIV_DROP = 0.05 // dividers sit a little below the frame's top edge
