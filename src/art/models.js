@@ -656,6 +656,7 @@ const GAMES = {
     const red = mat('#d80010', { roughness: 0.24, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 0.35, sheen: 0.3, sheenColor: '#ff4040' })
     const black = mat('#1c1917', { roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.4 })
     const pieces = []
+    // c, r may be fractional to sit a piece off-centre (in squares; +c right, -r back).
     const put = (c, r, m) => {
       const [x, , z] = at(c, r)
       const p = vary(mesh(geo, m, [x, TILE_TOP, z]), pieces.length + 1, { rot: 2, rough: 0.025, value: 0.015, scale: 0.0075 })
@@ -663,7 +664,7 @@ const GAMES = {
       parts.push(p)
     }
     // The reference's position (each piece placed on the square it sits on there).
-    ;[[2, 0], [3, 0], [1, 1], [2, 2], [4, 1], [4, 2], [3, 3]].forEach(([c, r]) => put(c, r, black))
+    ;[[1, 0], [4, 0], [1, 1], [2, 2], [4.25, 0.75], [4, 2], [3, 3]].forEach(([c, r]) => put(c, r, black))
     ;[[0, 2], [1, 3], [2, 4], [4, 4], [3, 1], [0, 4]].forEach(([c, r]) => put(c, r, red))
     // The table it sits on: falls out of focus toward the edges.
     // Ends just behind the board so the warm room bokeh shows past its far edge.
