@@ -623,7 +623,7 @@ const GAMES = {
     const grain = noiseTexture({ contrast: 0.18, seed: 41 })
     const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0, (r - (N - 1) / 2) * SQ]
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
-      const dark = (r + c) % 2 === 1
+      const dark = (r + c) % 2 === 0 // the reference's colouring: its dark squares carry the pieces
       const [x, , z] = at(c, r)
       const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.45 : 0.6, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: dark ? 0.25 : 0.05, clearcoatRoughness: 0.3 }), [x, 0.03, z])
       parts.push(vary(tile, 100 + r * N + c, { value: 0.015, rough: 0.025, height: 0.02 }))
@@ -640,22 +640,24 @@ const GAMES = {
       pieces.push(p)
       parts.push(p)
     }
-    // Mixed mid-game position.
-    ;[[1, 0], [3, 0], [2, 1], [4, 1], [3, 2], [5, 2], [2, 3], [4, 3], [1, 2]].forEach(([c, r]) => put(c, r, black))
-    ;[[0, 1], [5, 0], [0, 3], [1, 4], [3, 4], [2, 5], [4, 5], [5, 4]].forEach(([c, r]) => put(c, r, red))
+    // The reference's position (each piece placed on the square it sits on there).
+    ;[[2, 0], [3, 0], [1, 1], [2, 2], [4, 1], [4, 2], [3, 3]].forEach(([c, r]) => put(c, r, black))
+    ;[[0, 2], [1, 3], [2, 4], [4, 4], [3, 1], [0, 4]].forEach(([c, r]) => put(c, r, red))
     // The table it sits on: falls out of focus toward the edges.
     // Ends just behind the board so the warm room bokeh shows past its far edge.
     const table = mesh(rbox(12, 0.3, 6.2, 0.1), mat('#ffffff', {
       map: woodTexture({ base: '#6a3414', dark: '#5a2a0e', light: '#7a3e1c', seed: 31, size: 1024 }),
       roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.2,
     }), [0, -0.475, 0.6])
-    const board = group(parts, [0, 0, 0], [0, -0.32, 0])
+    const board = group(parts) // square to the axes: the exact camera below sets the angle
     return {
       object: group([board, table]),
       // Key art, not the player camera: higher, farther, longer lens, the whole board as an object.
       // Sitting over an active game: close, higher, cropped asymmetrically on the middle pieces.
       frame: pieces.slice(3, 15),
-      view: { pitch: 0.7, yaw: 0.0, fill: 1.0, shift: [0.04, -0.1], roll: -0.08, fov: 24 },
+      // Exact camera solved so the board's squares land on the reference's (light-square centres, ~6 px rms
+      // at 600 px).
+      view: { camera: { position: [1.99733, 7.41982, 6.45891], target: [-0.04394, -0.20747, 0.15653], roll: 0.03284, fov: 17.77753 } },
       look: {
         // Backlit: warm light rakes toward the camera across the squares.
         keyFrom: [-2.0, 3.2, -1.2],
