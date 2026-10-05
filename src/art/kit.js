@@ -214,12 +214,16 @@ export function toyOGeometry({ radius = 0.28, width = 0.24, height = 0.2, round 
 }
 
 /** Checker puck: stepped top (raised inner disc inside a recessed ring), rounded rim lip, ridged side, tucked base. */
-export function toyPuckGeometry({ radius = 0.22, height = 0.2 } = {}) {
+export function toyPuckGeometry({ radius = 0.22, height = 0.2, flat = false } = {}) {
   const R = radius
   const H = height
+  // flat: a plain flat top (no raised ring or dished centre), just a small rounded edge into the ridged side.
+  const top = flat
+    ? [[0, H], [R * 0.9, H], [R * 0.96, H * 0.985], [R * 0.995, H * 0.94], [R * 1.01, H * 0.8]]
+    : [[0, H * 1.0], [R * 0.52, H * 0.99], [R * 0.58, H * 0.95], [R * 0.64, H * 0.9], [R * 0.7, H * 0.93],
+      [R * 0.8, H * 0.99], [R * 0.92, H * 0.98], [R * 0.99, H * 0.91], [R * 1.01, H * 0.8]]
   const p = [
-    [0, H * 1.0], [R * 0.52, H * 0.99], [R * 0.58, H * 0.95], [R * 0.64, H * 0.9], [R * 0.7, H * 0.93],
-    [R * 0.8, H * 0.99], [R * 0.92, H * 0.98], [R * 0.99, H * 0.91], [R * 1.01, H * 0.8],
+    ...top,
     [R * 0.985, H * 0.68], [R * 1.01, H * 0.56], [R * 0.985, H * 0.44], [R * 1.01, H * 0.32],
     [R * 0.99, H * 0.12], [R * 0.93, H * 0.02], [R * 0.85, 0], [0, 0],
   ].map(([x, y]) => new THREE.Vector2(x, y))
