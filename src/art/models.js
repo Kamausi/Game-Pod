@@ -675,21 +675,19 @@ const GAMES = {
     // Individual inset tiles with soft bevels and a little tonal variation.
     const TILE_TOP = 0.22 // flush with the top of the border wall (lip: 0.2 tall at y 0.12)
     const tileGeo = rbox(SQ, 0.24, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
-    // Squares on the outside of the field get a slight chamfer along their outer top edges.
+    // Every square gets a slight chamfer along all four top edges.
     const CHAMFER = SQ / 16
-    const tileGeoFor = (c, r) => {
-      const sides = [c === 0 && -1, c === COLS - 1 && 1].filter(Boolean), fronts = [r === 0 && -1, r === ROWS - 1 && 1].filter(Boolean)
-      if (!sides.length && !fronts.length) return tileGeo
+    const chamferGeo = (() => {
       const g = new THREE.BoxGeometry(SQ, 0.24, SQ, 16, 1, 16)
       const pos = g.attributes.position
       for (let i = 0; i < pos.count; i++) {
         if (pos.getY(i) < 0.119) continue
-        const onEdge = sides.some((sx) => Math.abs(pos.getX(i) - sx * SQ / 2) < 1e-6) || fronts.some((sz) => Math.abs(pos.getZ(i) - sz * SQ / 2) < 1e-6)
-        if (onEdge) pos.setY(i, pos.getY(i) - CHAMFER)
+        if (Math.abs(Math.abs(pos.getX(i)) - SQ / 2) < 1e-6 || Math.abs(Math.abs(pos.getZ(i)) - SQ / 2) < 1e-6) pos.setY(i, pos.getY(i) - CHAMFER)
       }
       g.computeVertexNormals()
       return g
-    }
+    })()
+    const tileGeoFor = () => chamferGeo
     // Tactile, not literally rough: faint roughness and bump noise varies the reflections.
     const grain = noiseTexture({ contrast: 0.18, seed: 41 })
     const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0, (r - (N - 1) / 2) * SQ]
