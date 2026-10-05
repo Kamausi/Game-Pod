@@ -374,11 +374,27 @@ const GAMES = {
     }
     const uv = frameGeo.attributes.uv
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / OUTER + 0.5, uv.getY(i) / OUTER + 0.5)
+    // Black cell floor, its top-left (back-left) corner lowered by FLOOR_TL_DROP,
+    // tapering to nothing toward the other corners.
+    const FLOOR_TL_DROP = 0.12
+    const lowerFloorTL = (geo) => {
+      const pos = geo.attributes.position
+      for (let i = 0; i < pos.count; i++) {
+        if (pos.getY(i) < floorTop - 0.05) continue // only the top surface
+        const u = Math.min(1, Math.max(0, (pos.getX(i) + INNER / 2) / INNER)), v = Math.min(1, Math.max(0, (pos.getZ(i) + INNER_DEPTH / 2) / INNER_DEPTH))
+        pos.setY(i, pos.getY(i) - FLOOR_TL_DROP * (1 - u) * (1 - v))
+      }
+      geo.computeVertexNormals()
+      return geo
+    }
+    const slabTop = floorTop - FLOOR_TL_DROP - 0.01 // the slab sits just under the lowest point of the floor
+    const floorSlab = rbox(INNER + 0.1, slabTop, INNER_DEPTH + 0.1, 0.02, 2).translate(0, slabTop / 2, 0)
+    const floorPlane = lowerFloorTL(new THREE.PlaneGeometry(INNER, INNER_DEPTH, 24, 24).rotateX(-Math.PI / 2).translate(0, floorTop + 0.002, 0))
     const parts = [
       // One-piece frame: rounded outer corners (radius 0.45), rounded inner corners, no seams.
       mesh(frameGeo, wood),
-      mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
-      mesh(new THREE.PlaneGeometry(INNER, INNER_DEPTH), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
+      mesh(floorSlab, wood), // floor slab, hidden under cells
+      mesh(floorPlane, black),
     ]
     // Glowing top-right edge (white), as in the reference: a thin bright strip along the outer top edge from the
     // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
@@ -445,7 +461,9 @@ const GAMES = {
       return geo
     }
     for (const o of [-0.5, 0.5]) {
-      parts.push(mesh(rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.025, 4), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
+      const hBar = rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.025, 4)
+      if (o < 0) followTL(hBar, 0, floorTop + DIV_H / 2, o * SZ) // the top (back) bar follows the corner's slope too
+      parts.push(mesh(hBar, railWood, [0, floorTop + DIV_H / 2, o * SZ]))
       const vBar = rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.025, 4)
       followTL(vBar, -0.5 * S, floorTop + DIV_H / 2, 0) // both vertical bars take the left bar's height profile
       parts.push(mesh(vBar, railWood, [o * S, floorTop + DIV_H / 2, 0]))
