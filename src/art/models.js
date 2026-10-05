@@ -316,7 +316,7 @@ const GAMES = {
       left: WOOD_LEFT, front: WOOD_FRONT, side: [0.82, 0.72, 0.68], outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05], // darker reddish-brown sides
       topBack: TOP_BACK, topRight: TOP_RIGHT, topFront: TOP_FRONT, extent: [INNER / 2 + 0.25, INNER_DEPTH / 2 + 0.25],
     }
-    const DIV_W = 0.12 // divider width
+    const DIV_W = 0.10 // divider width
     const S = (INNER + DIV_W) / 3 // side-to-side cell pitch (pieces and dividers sit on it)
     const SZ = (INNER_DEPTH + DIV_W) / 3 // front-to-back cell pitch
     const RIM = 0.25 // frame wall thickness
