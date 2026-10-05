@@ -28,6 +28,28 @@ export async function setupStudio(hdrUrl) {
   hdr.dispose()
 }
 
+// High-contrast environment built from glowing panels (for glossy surfaces to reflect): a dark room with
+// bright cards. panels: [{ color, intensity, dir: [x, y, z], width, height }] (dir points from the subject
+// to the panel); base: the room colour. Cached per spec.
+const panelEnvCache = new Map()
+function panelEnvironment(panels, base = '#050403') {
+  const key = JSON.stringify([panels, base])
+  if (panelEnvCache.has(key)) return panelEnvCache.get(key)
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(base)
+  for (const { color, intensity = 1, dir, width = 4, height = 4 } of panels) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide, toneMapped: false }))
+    m.position.set(...dir).normalize().multiplyScalar(10)
+    m.lookAt(0, 0, 0)
+    scene.add(m)
+  }
+  const pmrem = new THREE.PMREMGenerator(renderer)
+  const tex = pmrem.fromScene(scene, 0.02).texture
+  pmrem.dispose()
+  panelEnvCache.set(key, tex)
+  return tex
+}
+
 /**
  * Adds a view-dependent rim glow (fresnel) on top of a standard/physical material, so silhouettes
  * pick up a colored edge light without replacing the material's own shading.
@@ -191,7 +213,7 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   renderer.toneMappingExposure = look.exposure ?? exposure
 
   const scene = new THREE.Scene()
-  scene.environment = envMap
+  scene.environment = look.envPanels ? panelEnvironment(look.envPanels, look.envBase) : envMap
   scene.environmentIntensity = look.envIntensity ?? 1
   // Warm-lit scenes (tavern, sunset) swap the cool studio fill for a coloured ambient bounce.
   if (look.ambient) scene.add(new THREE.HemisphereLight(look.ambient[0], look.ambient[1], look.ambient[2] ?? 1))

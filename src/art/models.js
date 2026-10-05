@@ -747,6 +747,14 @@ const GAMES = {
         softbox: { color: '#ffe6c4', intensity: 7, width: 1.8, height: 0.8, from: [-1.0, 2.0, 0.4] },
         // Large off-camera light cards for the squares, pieces and wall to reflect: warm card upper left,
         // hotter card upper right, dim orange bounce low in front.
+        // High-contrast reflection environment: dark room, white softbox, warm orange wall, gold panels.
+        envPanels: [
+          { color: '#ffffff', intensity: 6, dir: [0.6, 1, 0.5], width: 6, height: 4 },
+          { color: '#ff8a30', intensity: 2.5, dir: [-1, 0.4, 0.3], width: 9, height: 5 },
+          { color: '#ffc860', intensity: 4, dir: [0.4, 0.6, -1], width: 5, height: 3 },
+          { color: '#fff0d0', intensity: 10, dir: [1, 0.5, -0.2], width: 2, height: 3 },
+          { color: '#ff5020', intensity: 1.5, dir: [-0.3, -0.2, 1], width: 6, height: 2 },
+        ],
         cards: [
           { color: '#ffa338', intensity: 4, width: 1.6, height: 2.2, from: [-1.3, 1.9, 1.0] },
           { color: '#ffd67a', intensity: 3, width: 1.0, height: 1.6, from: [1.0, 1.6, 1.3] },
