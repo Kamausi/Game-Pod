@@ -313,10 +313,10 @@ const GAMES = {
     const TOP_RIGHT = [1.833755, 1.702495, 0.29334]
     const TOP_FRONT = [0.699675, 0.74028, 1.219953]
     wood.userData.faceTint = {
-      left: WOOD_LEFT, front: WOOD_FRONT, side: [1, 1, 1], outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05],
+      left: WOOD_LEFT, front: WOOD_FRONT, side: [0.82, 0.72, 0.68], outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05], // darker reddish-brown sides
       topBack: TOP_BACK, topRight: TOP_RIGHT, topFront: TOP_FRONT, extent: [INNER / 2 + 0.25, INNER_DEPTH / 2 + 0.25],
     }
-    const DIV_W = 0.14 // divider width
+    const DIV_W = 0.12 // divider width
     const S = (INNER + DIV_W) / 3 // side-to-side cell pitch (pieces and dividers sit on it)
     const SZ = (INNER_DEPTH + DIV_W) / 3 // front-to-back cell pitch
     const RIM = 0.25 // frame wall thickness
@@ -346,8 +346,8 @@ const GAMES = {
     const DIV_H = H - floorTop - DIV_DROP
     const RAIL_GAP = 0.025 // bars stop just short of the frame: a thin dark gap where they meet it, as in the reference
     for (const o of [-0.5, 0.5]) {
-      parts.push(mesh(rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.047, 6), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
-      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.047, 6), railWood, [o * S, floorTop + DIV_H / 2, 0]))
+      parts.push(mesh(rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.025, 4), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
+      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.025, 4), railWood, [o * S, floorTop + DIV_H / 2, 0]))
     }
     // Raised square blocks where the bars cross: flush with the bars' sides (a hair inside, to avoid
     // z-fighting), standing proud of them only in height.
@@ -365,16 +365,16 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = new THREE.Color('#0874d9').toArray() // deep royal blue (linear RGB)
+    const BLUE = new THREE.Color('#0876dc').toArray() // deep neutral royal blue (linear RGB)
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.4, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0.05 }) // vivid blue: no white reflections washing it out
-    const X_SIDE = [0, 0.14, 3.6] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
+    const X_SIDE = [0, 0.35, 1.6] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
     blue.userData.faceTint = { side: X_SIDE }
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
     const xGeo = mouldedXGeometry({ size: (PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND) * X_ARM, arm: X_BAND, endRadius: 0.006, innerRadius: 0.004, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
-    const red = mat('#e73a2f', { roughness: 0.3, clearcoat: 0.22, clearcoatRoughness: 0.3 }) // warm red-orange
+    const red = mat('#e83c2f', { roughness: 0.3, clearcoat: 0.22, clearcoatRoughness: 0.3 }) // warm red-orange
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - O_BAND / 2, width: O_BAND, height: PIECE_HEIGHT, round: PIECE_ROUND }) // flat top, slightly rounded edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
@@ -400,7 +400,7 @@ const GAMES = {
           { type: 'hemi', sky: '#68bfff', ground: '#ff8b3d', intensity: 0.42 },
           // Cool cyan key from the upper right: tints the top-right wood, right side of the frame, piece tops and
           // divider edges cyan instead of drawing a white outline.
-          { type: 'dir', color: '#4bbcff', intensity: 2.46, from: [2.0, 2.6, 2.0] },
+          { type: 'dir', color: '#4bbcff', intensity: 2.71, from: [2.0, 2.6, 2.0] },
           { type: 'point', color: '#ff6b24', intensity: 6, from: [-1.5, -1.0, 2.0], distance: 4 },
         ],
         softbox: { color: '#ffd18a', intensity: 3, width: 1.6, height: 1.6, from: [-1.8, 2.6, 0.4] },
