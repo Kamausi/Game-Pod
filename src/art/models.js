@@ -624,7 +624,7 @@ const GAMES = {
     for (const [x, z, w, d] of [[xc, zc + (depth + lipW) / 2, width + lipW * 2, lipW], [xc, zc - (depth + lipW) / 2, width + lipW * 2, lipW], [xc + (width + lipW) / 2, zc, lipW, depth], [xc - (width + lipW) / 2, zc, lipW, depth]])
       parts.push(mesh(rbox(w, 0.2, d, 0.08, 5), casing, [x, 0.12, z]))
     // Individual inset tiles with soft bevels and a little tonal variation.
-    const tileGeo = rbox(SQ - 0.04, 0.1, SQ - 0.04, 0.035, 4) // dark micro-gaps + bevel catch light
+    const tileGeo = rbox(SQ, 0.1, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
     // Tactile, not literally rough: faint roughness and bump noise varies the reflections.
     const grain = noiseTexture({ contrast: 0.18, seed: 41 })
     const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0, (r - (N - 1) / 2) * SQ]
