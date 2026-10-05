@@ -346,8 +346,8 @@ const GAMES = {
     const DIV_H = H - floorTop - DIV_DROP
     const RAIL_GAP = 0.025 // bars stop just short of the frame: a thin dark gap where they meet it, as in the reference
     for (const o of [-0.5, 0.5]) {
-      parts.push(mesh(rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.035, 4), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
-      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.035, 4), railWood, [o * S, floorTop + DIV_H / 2, 0]))
+      parts.push(mesh(rbox(INNER - 2 * RAIL_GAP, DIV_H, DIV_W, 0.047, 6), railWood, [0, floorTop + DIV_H / 2, o * SZ]))
+      parts.push(mesh(rbox(DIV_W, DIV_H, INNER_DEPTH - 2 * RAIL_GAP, 0.047, 6), railWood, [o * S, floorTop + DIV_H / 2, 0]))
     }
     // Raised square blocks where the bars cross: flush with the bars' sides (a hair inside, to avoid
     // z-fighting), standing proud of them only in height.
@@ -365,7 +365,7 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = [0.0, 0.2, 0.6] // linear RGB, tuned to the reference's sampled X colour
+    const BLUE = new THREE.Color('#0874d9').toArray() // deep royal blue (linear RGB)
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.4, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0.05 }) // vivid blue: no white reflections washing it out
     const X_SIDE = [0, 0.14, 3.6] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
     blue.userData.faceTint = { side: X_SIDE }
@@ -374,7 +374,7 @@ const GAMES = {
     const xGeo = mouldedXGeometry({ size: (PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND) * X_ARM, arm: X_BAND, endRadius: 0.006, innerRadius: 0.004, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
-    const red = mat('#e8101c', { roughness: 0.28, clearcoat: 0.3, clearcoatRoughness: 0.3 })
+    const red = mat('#e73a2f', { roughness: 0.3, clearcoat: 0.22, clearcoatRoughness: 0.3 }) // warm red-orange
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - O_BAND / 2, width: O_BAND, height: PIECE_HEIGHT, round: PIECE_ROUND }) // flat top, slightly rounded edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
@@ -395,19 +395,19 @@ const GAMES = {
         // right, orange bounce from below-front-left, cool sky / warm ground fill, a broad warm softbox for
         // photographic highlights, raised exposure and restrained bloom.
         keyFrom: [-2.6, 3.6, 0.2],
-        keyIntensity: 2.0, keyColor: '#ffb35c', envIntensity: 0.25, exposure: 1.15, shadowSoftness: 14,
+        keyIntensity: 2.16, keyColor: '#ffb35c', envIntensity: 0.25, exposure: 1.12, shadowSoftness: 14,
         lights: [
           { type: 'hemi', sky: '#68bfff', ground: '#ff8b3d', intensity: 0.42 },
           // Cool cyan key from the upper right: tints the top-right wood, right side of the frame, piece tops and
           // divider edges cyan instead of drawing a white outline.
-          { type: 'dir', color: '#4bbcff', intensity: 3.0, from: [2.0, 2.6, 2.0] },
+          { type: 'dir', color: '#4bbcff', intensity: 2.46, from: [2.0, 2.6, 2.0] },
           { type: 'point', color: '#ff6b24', intensity: 6, from: [-1.5, -1.0, 2.0], distance: 4 },
         ],
         softbox: { color: '#ffd18a', intensity: 3, width: 1.6, height: 1.6, from: [-1.8, 2.6, 0.4] },
         // Neutral tone mapping keeps saturated colours saturated (ACES washes bright blue toward white).
         tone: 'neutral',
         backdropUntoned: true, soften: { blur: 0.006, inner: 0.45, outer: 0.85 },
-        bloom: { threshold: 0.78, strength: 0.42, radius: 0.026 },
+        bloom: { threshold: 0.9, strength: 0.22, radius: 0.026 },
         rim: { intensity: 0.0275, color: '#38a8ff' }, aoIntensity: 2.4, aoRadius: 0.04,
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
       },
