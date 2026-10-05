@@ -619,10 +619,24 @@ const GAMES = {
     const parts = [
       mesh(rbox(width + 0.6, 0.4, depth + 0.6, 0.18, 6), casing, [xc, -0.125, zc]), // casing: contains the board, doesn't dominate
     ]
-    // Raised border wall around the playing field: one continuous piece (y 0.02 to 0.22).
+    // Raised border wall around the playing field (y 0.02 to 0.22): a small flat strip right around the squares,
+    // then the outer walls slant down to the outside edge. Each part is one continuous frame.
     const lipW = 0.3
-    const lipGeo = trayFrameGeometry({ outer: width + lipW * 2, outerDepth: depth + lipW * 2, inner: width, innerDepth: depth, height: 0.2, outerRadius: 0.18, innerRadius: 0.004, bevel: 0.03 })
-    parts.push(mesh(lipGeo, casing, [xc, 0.02, zc]))
+    const STRIP = 0.06 // flat strip around the squares
+    const SLANT_DROP = 0.13 // how far the outer edge sits below the flat strip
+    const strip = trayFrameGeometry({ outer: width + STRIP * 2, outerDepth: depth + STRIP * 2, inner: width, innerDepth: depth, height: 0.2, outerRadius: 0.01, innerRadius: 0.004, bevel: 0.006 })
+    const slant = trayFrameGeometry({ outer: width + lipW * 2, outerDepth: depth + lipW * 2, inner: width + STRIP * 2 - 0.02, innerDepth: depth + STRIP * 2 - 0.02, height: 0.2, outerRadius: 0.18, innerRadius: 0.012, bevel: 0.02 })
+    {
+      // Lower the top toward the outside edge: full drop at the outer edge, none where it meets the strip.
+      const pos = slant.attributes.position
+      for (let i = 0; i < pos.count; i++) {
+        const out = Math.max(Math.abs(pos.getX(i)) - width / 2, Math.abs(pos.getZ(i)) - depth / 2)
+        const t = Math.min(1, Math.max(0, (out - STRIP) / (lipW - STRIP)))
+        pos.setY(i, pos.getY(i) - SLANT_DROP * t * (pos.getY(i) / 0.2))
+      }
+      slant.computeVertexNormals()
+    }
+    parts.push(mesh(strip, casing, [xc, 0.02, zc]), mesh(slant, casing, [xc, 0.02, zc]))
     // Individual inset tiles with soft bevels and a little tonal variation.
     const TILE_TOP = 0.22 // flush with the top of the border wall (lip: 0.2 tall at y 0.12)
     const tileGeo = rbox(SQ, 0.24, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
