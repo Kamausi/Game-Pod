@@ -258,14 +258,11 @@
   z-index: -1;
 }
 .hs-slide-art .sprite { filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.4)); }
-/* Baked art is a full square picture: fill the banner's height at the right edge and fade its left edge
-   into the banner so it doesn't read as a boxed image. */
-.hs-slide-art.game-art-full { top: 0; right: 0; height: 100%; width: auto; aspect-ratio: 1; }
-.hs-slide-art.game-art-full .sprite {
-  filter: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 28%);
-  mask-image: linear-gradient(90deg, transparent 0%, #000 28%);
-}
+/* Banner built from baked art: the square art sits at the right edge, full height, and its background
+   continues leftward (mirrored, then straight) so the whole banner is one picture. */
+.hs-slide-art.game-art-banner { inset: 0; width: 100%; height: 100%; display: flex; flex-direction: row-reverse; }
+.game-art-banner .sprite { position: static; flex: none; width: auto; height: 100%; aspect-ratio: 1; filter: none; }
+.game-art-banner .banner-fill-mirror { transform: scaleX(-1); }
 .hs-slide::after {
   content: '';
   position: absolute;

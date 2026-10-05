@@ -18,8 +18,20 @@ export function Sprite({ name, size = 320, aspect = 1, className = '' }) {
 // full picture with its own background, so it fills the box edge to edge.
 export function GameArt({ game, hero = false, className = '' }) {
   const full = bakedArt(game.id)
+  // Featured banners: the square art at the right edge, its background (baked on its own) continued to the
+  // left behind the text, mirrored so it joins the art seamlessly.
+  const backdrop = hero && full && bakedArt(`${game.id}-backdrop`)
+  if (backdrop) {
+    return (
+      <div className={`game-art game-art-hero game-art-banner ${className}`}>
+        <Sprite name={game.id} />
+        <img className="sprite banner-fill banner-fill-mirror" src={backdrop} alt="" draggable="false" />
+        <img className="sprite banner-fill" src={backdrop} alt="" draggable="false" />
+      </div>
+    )
+  }
   return (
-    <div className={`game-art ${hero ? 'game-art-hero' : ''} ${full ? 'game-art-full' : ''} ${className}`} style={{ '--c1': game.colors[0], '--c2': game.colors[1] }}>
+    <div className={`game-art ${hero ? 'game-art-hero' : ''} ${full && !hero ? 'game-art-full' : ''} ${className}`} style={{ '--c1': game.colors[0], '--c2': game.colors[1] }}>
       <Sprite name={game.id} size={hero ? 320 : 288} aspect={hero ? 1.4 : 1} />
     </div>
   )

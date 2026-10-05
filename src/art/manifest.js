@@ -9,6 +9,8 @@ export const ASSETS = {
   // Games (tiles)
   // Lossless: its colours are tuned to exact reference pixel values, which lossy compression would shift.
   'tic-tac-toe': { ...tile, lossless: true },
+  // Its background alone (no board, no shadow), mirrored to extend the art across the featured banner.
+  'tic-tac-toe-backdrop': { ...tile, model: 'tic-tac-toe', backdropOnly: true, lossless: true },
   checkers: tile,
   'ring-toss': tile,
   darts: tile,
