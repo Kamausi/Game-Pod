@@ -288,8 +288,8 @@ const GAMES = {
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     // Colour gains (linear RGB multipliers on the wood textures), tuned so rendered colours equal the
     // reference's sampled pixels exactly.
-    const WOOD_GAIN = [0.927191, 0.839396, 0.210955]
-    const RAIL_GAIN = [1.377788, 0.914058, 0.599777]
+    const WOOD_GAIN = [0.927191, 0.839396, 0.206619]
+    const RAIL_GAIN = [1.377788, 0.914058, 0.610347]
     const wood = mat(new THREE.Color().setRGB(...WOOD_GAIN), {
       map: woodTexture({ base: '#f97233', dark: '#eb6b31', light: '#ff7c3b', seed: 7 }), // honey caramel, sampled against the reference
       roughness: 0.38, clearcoat: 0.16, clearcoatRoughness: 0.42, envMapIntensity: 0.3, // catches the light without looking lacquered
@@ -305,7 +305,7 @@ const GAMES = {
     const INNER = 2.81
     const INNER_DEPTH = 2.406
     // Painted face shading, tuned so the outer left and front faces equal the reference's sampled colours.
-    const WOOD_LEFT = [0.381052, 1.168395, 5.5894]
+    const WOOD_LEFT = [0.381052, 1.168395, 5.683]
     const WOOD_FRONT = [0.454051, 0.67975, 0.58937]
     wood.userData.faceTint = { left: WOOD_LEFT, front: WOOD_FRONT, side: [1, 1, 1], outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05] }
     const DIV_W = 0.14 // divider width
@@ -332,6 +332,31 @@ const GAMES = {
       mesh(rbox(INNER + 0.1, floorTop, INNER_DEPTH + 0.1, 0.02, 2), wood, [0, floorTop / 2, 0]), // floor slab, hidden under cells
       mesh(new THREE.PlaneGeometry(INNER, INNER_DEPTH), black, [0, floorTop + 0.002, 0], [-Math.PI / 2, 0, 0]),
     ]
+    // Glowing top-right edge, as in the reference: a thin bright strip along the outer top edge from the
+    // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
+    // spreads it into a soft halo.
+    const EDGE_GLOW = { color: '#ffd890', width: 0.04, strength: 2.2, reach: 2.4 }
+    {
+      const hx = OUTER / 2 - 0.01, hz = OUTER_DEPTH / 2 - 0.01, cr = 0.2, y = H - 0.012
+      const pts = []
+      for (let t = 0; t <= 1; t += 0.02) pts.push(new THREE.Vector3(-hx * 0.15 + t * (hx - cr + hx * 0.15), y, -hz))
+      for (let a = 0; a <= 1; a += 0.1) pts.push(new THREE.Vector3(hx - cr + Math.sin(a * Math.PI / 2) * cr, y, -hz + cr - Math.cos(a * Math.PI / 2) * cr))
+      for (let t = 0; t <= 1; t += 0.02) pts.push(new THREE.Vector3(hx, y, -hz + cr + t * (hz * 1.7 - cr)))
+      const curve = new THREE.CatmullRomCurve3(pts)
+      const geo = new THREE.TubeGeometry(curve, 160, EDGE_GLOW.width, 6, false)
+      // Fade along the strip: brightest at the corner, gone at both ends.
+      const cols = []
+      const pos = geo.attributes.position
+      const corner = new THREE.Vector3(hx, y, -hz)
+      for (let k = 0; k < pos.count; k++) {
+        const d = new THREE.Vector3().fromBufferAttribute(pos, k).distanceTo(corner)
+        const f = Math.max(0, 1 - d / EDGE_GLOW.reach) ** 1.5 * EDGE_GLOW.strength
+        const c = new THREE.Color(EDGE_GLOW.color).multiplyScalar(f)
+        cols.push(c.r, c.g, c.b)
+      }
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3))
+      parts.push(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })))
+    }
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
     const DIV_DROP = 0.065 // dividers sit below the frame's top edge (just above the piece tops)
