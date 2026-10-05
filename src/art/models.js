@@ -385,8 +385,8 @@ const GAMES = {
     // spreads it into a soft halo.
     // back: how far it runs along the back edge from the corner; right: along the right edge.
     const EDGE_GLOW = { color: '#ffffff', width: 0.026, strength: 3.4, back: 2.9, right: 2.45, offset: 0.015 }
-    // Slight blur: wider, fainter copies of the strip around it ([width multiple, brightness multiple]).
-    const EDGE_GLOW_BLUR = [[1, 1], [1.5, 0.3], [2.1, 0.16], [2.8, 0.08], [3.6, 0.04]]
+    // Optional blur: wider, fainter copies of the strip around it ([width multiple, brightness multiple]); none now.
+    const EDGE_GLOW_BLUR = [[1, 1]]
     {
       // Hugs the board's outline just outside the outer walls and a hair below the top, following the
       // rounded corner (outer radius 0.2), so the board covers the strip and only its glow shows behind it.
