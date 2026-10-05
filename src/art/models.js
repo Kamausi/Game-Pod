@@ -615,7 +615,7 @@ const GAMES = {
     const zc = -(size - depth) / 2 // the field keeps its back edge; the front edge moves in by the missing row
     const xc = -(size - width) / 2 // and its left edge; the right edge moves in by the missing column
     const surface = noiseTexture({ contrast: 0.1, seed: 43 })
-    const LIP_W = 0.32 // outer wall thickness (base matches it)
+    const LIP_W = 0.28 // outer wall thickness (base matches it)
     const casing = mat('#171310', { roughness: 0.75, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0, envMapIntensity: 0.25 }) // matte, no gloss
     const parts = [
     ]
