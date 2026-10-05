@@ -384,7 +384,7 @@ const GAMES = {
     // back edge, round the top-right corner and down the right edge, fading out at both ends; bloom
     // spreads it into a soft halo.
     // back: how far it runs along the back edge from the corner; right: along the right edge.
-    const EDGE_GLOW = { color: '#ffffff', width: 0.026, strength: 1.7, back: 2.9, right: 2.45, offset: 0.015 }
+    const EDGE_GLOW = { color: '#ffffff', width: 0.026, strength: 0.6, back: 2.9, right: 2.45, offset: 0.015 }
     // Optional blur: wider, fainter copies of the strip around it ([width multiple, brightness multiple]); none now.
     const EDGE_GLOW_BLUR = [[1, 1]]
     {
