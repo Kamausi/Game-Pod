@@ -615,7 +615,7 @@ const GAMES = {
     const zc = -(size - depth) / 2 // the field keeps its back edge; the front edge moves in by the missing row
     const xc = -(size - width) / 2 // and its left edge; the right edge moves in by the missing column
     const surface = noiseTexture({ contrast: 0.1, seed: 43 })
-    const casing = mat('#171310', { roughness: 0.2, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.12, envMapIntensity: 0.6 })
+    const casing = mat('#171310', { roughness: 0.75, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0, envMapIntensity: 0.25 }) // matte, no gloss
     const parts = [
       mesh(rbox(width + 0.6, 0.4, depth + 0.6, 0.18, 6), casing, [xc, -0.125, zc]), // casing: contains the board, doesn't dominate
     ]
