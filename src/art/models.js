@@ -305,8 +305,8 @@ const GAMES = {
     const INNER = 2.81
     const INNER_DEPTH = 2.406
     // Painted face shading, tuned so the outer left and front faces equal the reference's sampled colours.
-    const WOOD_LEFT = [0.483014, 1.262995, 4.359347]
-    const WOOD_FRONT = [0.409416, 0.347634, 0.547864]
+    const WOOD_LEFT = [0.65087, 1.546565, 4.746508]
+    const WOOD_FRONT = [0.602813, 0.65738, 0.894438]
     // Top-face gradient, tuned to the reference's rim samples: lighter and yellower toward the back and
     // right, a little darker at the front.
     const TOP_BACK = [1.040722, 2.212584, 3.049769]
@@ -365,16 +365,16 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = new THREE.Color('#0876dc').toArray() // deep neutral royal blue (linear RGB)
+    const BLUE = [0.0, 0.2, 0.6] // linear RGB, tuned to the reference's X tops
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.4, clearcoat: 0, specularIntensity: 0, envMapIntensity: 0.05 }) // vivid blue: no white reflections washing it out
-    const X_SIDE = [0, 0.35, 1.6] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
+    const X_SIDE = [0.0, 0.060367, 2.080877] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
     blue.userData.faceTint = { side: X_SIDE }
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
     const xGeo = mouldedXGeometry({ size: (PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND) * X_ARM, arm: X_BAND, endRadius: 0.006, innerRadius: 0.004, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
     const X = () => mesh(xGeo, blue)
     // Thick glossy ring with a small hole; outer diameter ~65% of the cell, so a dark gap shows around it.
-    const red = mat('#e83c2f', { roughness: 0.3, clearcoat: 0.22, clearcoatRoughness: 0.3 }) // warm red-orange
+    const red = mat('#ff4930', { roughness: 0.3, clearcoat: 0.22, clearcoatRoughness: 0.3 }) // warm red-orange
     const ringGeo = toyOGeometry({ radius: PIECE_SPAN / 2 - O_BAND / 2, width: O_BAND, height: PIECE_HEIGHT, round: PIECE_ROUND }) // flat top, slightly rounded edges
     const layout = ['X', 'X', 'O', 'O', 'O', 'O', 'X', 'X', 'O']
     layout.forEach((p, i) => {
