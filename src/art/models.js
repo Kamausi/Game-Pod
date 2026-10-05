@@ -349,16 +349,15 @@ const GAMES = {
         pos.setX(i, pos.getX(i) + BASE_SHIFT[0] * t * across)
         pos.setZ(i, pos.getZ(i) + BASE_SHIFT[1] * t)
       }
-      // Lower the top back-left corner: the outer rim drops toward that corner, the inner edge stays put.
+      // Lower the top back-left corner: the rim, inner edge included, drops toward that corner.
       const TL_DROP = 0.09
       const zb = -OUTER_DEPTH / 2 - (RIM_BACK - RIM) / 2
       for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
         const u = Math.min(1, Math.max(0, (x - xl) / w))
         const v = Math.min(1, Math.max(0, (z - zb) / OUTER_DEPTH))
-        const out = Math.min(1, Math.max((-INNER / 2 - x) / RIM, (-INNER_DEPTH / 2 - z) / RIM_BACK, 0))
         const up = Math.max(0, (y - bottom) / (H - bottom))
-        pos.setY(i, y - TL_DROP * (1 - u) * (1 - v) * out * up)
+        pos.setY(i, y - TL_DROP * (1 - u) * (1 - v) * up)
       }
       frameGeo.computeVertexNormals()
     }
