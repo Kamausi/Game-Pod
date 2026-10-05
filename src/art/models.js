@@ -322,11 +322,11 @@ const GAMES = {
     const RIM = 0.25 // frame wall thickness
     const OUTER = INNER + 2 * RIM
     const OUTER_DEPTH = INNER_DEPTH + 2 * RIM
-    const floorTop = 0.6 // black cell floor; pieces rest on it
+    const floorTop = 0.52 // black cell floor (deep wells); pieces rest on it
     const H = 0.88 // whole tray height: tall side walls show
     // Pieces rest on the floor; their tops sit PIECE_DROP just below the board face.
     const PIECE_DROP = 0.07
-    const PIECE_HEIGHT = H - floorTop - PIECE_DROP
+    const PIECE_HEIGHT = 0.88 - 0.6 - PIECE_DROP // fixed piece height (0.21), independent of the floor depth
     // Map the grain once across the whole frame; repeating it every unit showed up as seams on the rim.
     // Rounded corners in plan, but crisp edges: only a tight bevel where top meets sides.
     const WALL_EXTRA = 0.15 // outer walls run this much further down below the board, for a taller left side
@@ -342,7 +342,7 @@ const GAMES = {
     ]
     // Dividers are flush with the frame top (a hair under, to avoid z-fighting where they run into the walls);
     // their ends run into the walls so no rounded stub shows.
-    const DIV_DROP = 0.035 // dividers sit a little below the frame's top edge
+    const DIV_DROP = 0.05 // dividers sit a little below the frame's top edge
     const DIV_H = H - floorTop - DIV_DROP
     const RAIL_GAP = -0.05 // bars run into the frame walls: flush, no gap
     for (const o of [-0.5, 0.5]) {
