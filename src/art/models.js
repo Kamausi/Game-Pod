@@ -321,7 +321,7 @@ const GAMES = {
     const SZ = (INNER_DEPTH + DIV_W) / 3 // front-to-back cell pitch
     const RIM = 0.25 // frame wall thickness
     // The right wall is a little thicker so it looks as wide on screen as the left (it is foreshortened).
-    const RIM_RIGHT = 0.31
+    const RIM_RIGHT = 0.25
     const OUTER = INNER + RIM + RIM_RIGHT
     // The back wall is foreshortened too, so it is a little thicker to read as wide as the others.
     const RIM_BACK = 0.22
