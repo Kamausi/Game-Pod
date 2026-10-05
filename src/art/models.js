@@ -288,8 +288,8 @@ const GAMES = {
     // red rings with a dark gap around each piece; blurred carnival-at-dusk behind.
     // Colour gains (linear RGB multipliers on the wood textures), tuned so rendered colours equal the
     // reference's sampled pixels exactly.
-    const WOOD_GAIN = [0.909266, 0.920165, 0.465165]
-    const RAIL_GAIN = [1.360375, 0.988398, 0.339024]
+    const WOOD_GAIN = [0.927191, 0.839396, 0.210955]
+    const RAIL_GAIN = [1.377788, 0.914058, 0.599777]
     const wood = mat(new THREE.Color().setRGB(...WOOD_GAIN), {
       map: woodTexture({ base: '#f97233', dark: '#eb6b31', light: '#ff7c3b', seed: 7 }), // honey caramel, sampled against the reference
       roughness: 0.38, clearcoat: 0.16, clearcoatRoughness: 0.42, envMapIntensity: 0.3, // catches the light without looking lacquered
@@ -297,13 +297,17 @@ const GAMES = {
     // Cross bars read a little lighter than the frame in the reference.
     const railWood = mat(new THREE.Color().setRGB(...RAIL_GAIN), {
       map: woodTexture({ base: '#ff9530', dark: '#ff8b2d', light: '#ff9e35', seed: 11 }),
-      roughness: 0.55, clearcoat: 0.08, clearcoatRoughness: 0.5, envMapIntensity: 0.3, specularIntensity: 0.5, // a little less glossy than the frame
+      roughness: 0.55, clearcoat: 0, envMapIntensity: 0.2, specularIntensity: 0.2, // a little less glossy than the frame
     })
-    const black = mat('#1e0d1c', { roughness: 1, clearcoat: 0, envMapIntensity: 0 }) // purple-navy cell floor
+    const black = mat('#120a10', { roughness: 1, clearcoat: 0, envMapIntensity: 0 }) // very dark cell floor: bright piece, dark cavity, bright divider
     // The opening is fixed by the reference (its four inner corners are matched exactly by the camera):
     // 2.81 wide, 2.406 deep. Nine equal cells fill it, so the cell pitch follows the divider width.
     const INNER = 2.81
     const INNER_DEPTH = 2.406
+    // Painted face shading, tuned so the outer left and front faces equal the reference's sampled colours.
+    const WOOD_LEFT = [0.381052, 1.168395, 5.5894]
+    const WOOD_FRONT = [0.454051, 0.67975, 0.58937]
+    wood.userData.faceTint = { left: WOOD_LEFT, front: WOOD_FRONT, side: [1, 1, 1], outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05] }
     const DIV_W = 0.14 // divider width
     const S = (INNER + DIV_W) / 3 // side-to-side cell pitch (pieces and dividers sit on it)
     const SZ = (INNER_DEPTH + DIV_W) / 3 // front-to-back cell pitch
@@ -352,8 +356,10 @@ const GAMES = {
     const X_ARM = 0.9 // X arms a little shorter than the full span
     const PIECE_ROUND = 0.015 // slight edge rounding on X and O
     // Slightly cyan blue; the light, not the colour, makes bright face / mid bevel / dark side.
-    const BLUE = [0.0082031, 0.1685937, 0.653125] // linear RGB, tuned to the reference's sampled X colour
+    const BLUE = [0.0082031, 0.1517188, 0.540625] // linear RGB, tuned to the reference's sampled X colour
     const blue = mat(new THREE.Color().setRGB(...BLUE), { roughness: 0.28, clearcoat: 0.3, clearcoatRoughness: 0.3, envMapIntensity: 0.05 }) // glossy toy plastic: fat soft highlights
+    const X_SIDE = [0, 0.27, 5.2] // painted shading on the X's vertical faces, tuned to the reference's deep-blue sides
+    blue.userData.faceTint = { side: X_SIDE }
     // Moulded X: squared-but-rounded arm ends, small inner fillets, crowned top.
     // No rounding: square arm ends, sharp inner corners, flat top, only a hairline edge bevel.
     const xGeo = mouldedXGeometry({ size: (PIECE_SPAN / Math.SQRT2 * 2 - PIECE_BAND) * X_ARM, arm: X_BAND, endRadius: 0.006, innerRadius: 0.004, depth: PIECE_HEIGHT - 2 * PIECE_ROUND, bevelHeight: PIECE_ROUND, bevelWidth: PIECE_ROUND })
@@ -380,25 +386,27 @@ const GAMES = {
         // right, orange bounce from below-front-left, cool sky / warm ground fill, a broad warm softbox for
         // photographic highlights, raised exposure and restrained bloom.
         keyFrom: [-2.6, 3.6, 0.2],
-        keyIntensity: 2.2, keyColor: '#ffb35c', envIntensity: 0.25, exposure: 1.15, shadowSoftness: 14,
+        keyIntensity: 2.0, keyColor: '#ffb35c', envIntensity: 0.25, exposure: 1.15, shadowSoftness: 14,
         lights: [
-          { type: 'hemi', sky: '#68bfff', ground: '#ff8b3d', intensity: 0.3 },
-          { type: 'dir', color: '#209cff', intensity: 2.2, from: [3.0, 2.5, -2.5] },
+          { type: 'hemi', sky: '#68bfff', ground: '#ff8b3d', intensity: 0.42 },
+          { type: 'dir', color: '#39aaff', intensity: 3.0, from: [3.0, 2.5, -2.5] },
           { type: 'point', color: '#ff6b24', intensity: 6, from: [-1.5, -1.0, 2.0], distance: 4 },
         ],
         softbox: { color: '#ffd18a', intensity: 3, width: 1.6, height: 1.6, from: [-1.8, 2.6, 0.4] },
-        bloom: { threshold: 0.82, strength: 0.35, radius: 0.02 },
+        bloom: { threshold: 0.78, strength: 0.42, radius: 0.026 },
         rim: { intensity: 0.05, color: '#ffd8a0' }, aoIntensity: 2.4, aoRadius: 0.04,
         glow: { amount: 0.22, radius: 0.03, tint: ['#ffb070', 0.08] },
       },
       backdrop: {
         // Blurred carnival / street at dusk.
         gradient: [180, '#5a8af0', '#8a8ad0', '#e0a070', '#5a3a40'],
-        masses: [[0.5, 0.0, 0.14, '#ffffff'], [0.06, 0.55, 0.22, '#ffb050'], [0.12, 0.85, 0.25, '#f0a050'], [0.15, 0.25, 0.12, '#ffd090'], [0.88, 0.3, 0.2, '#5a7ae0'], [0.6, 1.0, 0.3, '#4a2a30']],
+        // Large out-of-focus light masses: pink/orange upper left, cyan upper right (cyan, not white, at the top),
+        // gold/orange lower left.
+        masses: [[0.5, 0.0, 0.14, '#8fdcff'], [0.12, 0.1, 0.2, '#ff6aa8'], [0.86, 0.1, 0.22, '#30b8ff'], [0.14, 0.72, 0.24, '#ffa030'], [0.06, 0.55, 0.22, '#ffb050'], [0.12, 0.85, 0.25, '#f0a050'], [0.15, 0.25, 0.12, '#ffd090'], [0.88, 0.3, 0.2, '#5a7ae0'], [0.6, 1.0, 0.3, '#4a2a30']],
         bokeh: { n: 16, colors: ['#ffd9a0', '#ffffff', '#ffb060', '#a8c8ff'], min: 0.015, max: 0.05, seed: 5 },
         // Dark dome across the bottom of the tile, warm plum-grey under the board fading to navy at the bottom: peaks ~70% down behind the board and falls away to
         // ~83% at both side edges (traced from the reference).
-        ellipses: [[0.5, 1.2, 0.75, 0.5, '#1f263b', 0.012, '#2c272afc', '#433f4ffc', '#514854fc']],
+        ellipses: [[0.5, 1.2, 0.75, 0.5, '#1f263b', 0.012, '#2f272afc', '#433f4ffc', '#514854fc']],
         shapes: [[0.78, 0.08, 0.12, 0.5, '#3a5ab8'], [0.9, 0.15, 0.08, 0.4, '#5a7ad8'], [0.02, 0.35, 0.05, 0.3, '#e08a40']],
       },
     }

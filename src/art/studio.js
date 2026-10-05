@@ -35,6 +35,12 @@ export async function setupStudio(hdrUrl) {
 export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 3 } = {}) {
   if (material.userData.rim) return
   material.userData.rim = true
+  // Optional painted shading (material.userData.faceTint): multiplies the final colour of faces by the
+  // direction they face in the mesh's own space, for matching hand-lit key art face by face.
+  // { left, front, side: [r, g, b] multipliers, outer: [halfX, halfZ] } - left/front apply only outside
+  // the outer half-extents (outer walls), side to every vertical face.
+  const tint = material.userData.faceTint
+  const v3 = (a) => new THREE.Vector3(...(a ?? [1, 1, 1]))
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uRimColor = { value: new THREE.Color(color) }
     shader.uniforms.uRimIntensity = { value: intensity }
@@ -47,8 +53,27 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
         float rimFresnel = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), uRimPower);
         totalEmissiveRadiance += uRimColor * rimFresnel * uRimIntensity;`,
       )
+    if (!tint) return
+    Object.assign(shader.uniforms, {
+      uTintLeft: { value: v3(tint.left) }, uTintFront: { value: v3(tint.front) }, uTintSide: { value: v3(tint.side) },
+      uOuter: { value: new THREE.Vector2(...(tint.outer ?? [0, 0])) },
+    })
+    shader.vertexShader = shader.vertexShader
+      .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nvoid main() {')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjN = objectNormal;\nvObjP = position;')
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nuniform vec3 uTintLeft;\nuniform vec3 uTintFront;\nuniform vec3 uTintSide;\nuniform vec2 uOuter;\nvoid main() {')
+      .replace(
+        '#include <opaque_fragment>',
+        `vec3 tn = normalize(vObjN);
+        float outerX = step(uOuter.x, abs(vObjP.x)), outerZ = step(uOuter.y, abs(vObjP.z));
+        float wl = pow(max(0.0, -tn.x), 2.0) * outerX, wf = pow(max(0.0, tn.z), 2.0) * outerZ;
+        float ws = 1.0 - abs(tn.y);
+        outgoingLight *= vec3(1.0) + wl * (uTintLeft - 1.0) + wf * (uTintFront - 1.0) + ws * (uTintSide - 1.0);
+        #include <opaque_fragment>`,
+      )
   }
-  material.customProgramCacheKey = () => `rim-${color}-${intensity}-${power}`
+  material.customProgramCacheKey = () => `rim-${color}-${intensity}-${power}-${JSON.stringify(tint ?? null)}`
 }
 
 /**
