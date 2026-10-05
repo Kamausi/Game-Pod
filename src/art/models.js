@@ -337,17 +337,21 @@ const GAMES = {
     const frameGeo = trayFrameGeometry({ outer: OUTER, outerDepth: OUTER_DEPTH, outerCenter: [(RIM_RIGHT - RIM) / 2, -(RIM_BACK - RIM) / 2], inner: INNER, innerDepth: INNER_DEPTH, height: H + WALL_EXTRA, outerRadius: 0.2, innerRadius: 0.06, bevel: 0.025 })
     frameGeo.translate(0, -WALL_EXTRA, 0)
     // Move the board's bottom front-right corner onto the reference's (about 550, 430 at 600 px): the bottom
-    // shifts right (tapering to nothing at the left wall) and slightly forward; the top face stays put.
+    // shifts right (tapering to nothing at the left wall) and slightly forward; the top face and inside walls stay put.
     const BASE_SHIFT = [0.36, 0.125] // [x at the right wall, z]
     {
       const pos = frameGeo.attributes.position
       const bottom = -WALL_EXTRA
       const xl = -OUTER / 2, w = OUTER
       for (let i = 0; i < pos.count; i++) {
-        const t = (H - pos.getY(i)) / (H - bottom)
-        const across = Math.min(1, Math.max(0, (pos.getX(i) - xl) / w))
-        pos.setX(i, pos.getX(i) + BASE_SHIFT[0] * t * across)
-        pos.setZ(i, pos.getZ(i) + BASE_SHIFT[1] * t)
+        const x = pos.getX(i), z = pos.getZ(i)
+        // Outer faces only: the inside walls stay upright so no gap opens beside the floor.
+        const d = Math.max(x - INNER / 2, -INNER / 2 - x, z - INNER_DEPTH / 2, -INNER_DEPTH / 2 - z)
+        const out = Math.min(1, Math.max(0, (d - 0.03) / 0.05))
+        const t = (H - pos.getY(i)) / (H - bottom) * out
+        const across = Math.min(1, Math.max(0, (x - xl) / w))
+        pos.setX(i, x + BASE_SHIFT[0] * t * across)
+        pos.setZ(i, z + BASE_SHIFT[1] * t)
       }
       // Lower the top back-left corner: the rim, inner edge included, drops toward that corner.
       const TL_DROP = 0.09
