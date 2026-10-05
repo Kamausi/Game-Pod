@@ -668,7 +668,7 @@ const GAMES = {
         // Backlit: warm light rakes toward the camera across the squares.
         keyFrom: [-2.0, 3.2, -1.2],
         glow: { amount: 0.25, radius: 0.035, tint: ['#ff9a40', 0.1] },
-        envIntensity: 0.12, ambient: ['#ffb070', '#3a1a08', 0.9], keyIntensity: 2.0, keyColor: '#ffd8a0',
+        envIntensity: 0.3, ambient: ['#ffb070', '#3a1a08', 1.3], keyIntensity: 2.3, keyColor: '#ffd8a0', exposure: 1.1,
         rim: { intensity: 0.08, color: '#ffc080' }, aoIntensity: 2.2, aoRadius: 0.016,
         softbox: { color: '#ffe6c4', intensity: 7, width: 1.8, height: 0.8, from: [-1.0, 2.0, 0.4] },
         // Showcase DOF: nearest and rear pieces soften, centre stays sharpest.
