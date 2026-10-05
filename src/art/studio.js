@@ -37,8 +37,8 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
   material.userData.rim = true
   // Optional painted shading (material.userData.faceTint): multiplies the final colour of faces by the
   // direction they face in the mesh's own space, for matching hand-lit key art face by face.
-  // { left, front, side: [r, g, b] multipliers, outer: [halfX, halfZ] } - left/front apply only outside
-  // the outer half-extents (outer walls), side to every vertical face.
+  // { left, front, side, inner: [r, g, b] multipliers, outer: [halfX, halfZ] } - left/front apply only outside
+  // the outer half-extents (outer walls), inner only inside them (inside walls), side to every vertical face.
   const tint = material.userData.faceTint
   const v3 = (a) => new THREE.Vector3(...(a ?? [1, 1, 1]))
   material.onBeforeCompile = (shader) => {
@@ -55,7 +55,7 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
       )
     if (!tint) return
     Object.assign(shader.uniforms, {
-      uTintLeft: { value: v3(tint.left) }, uTintFront: { value: v3(tint.front) }, uTintSide: { value: v3(tint.side) },
+      uTintLeft: { value: v3(tint.left) }, uTintFront: { value: v3(tint.front) }, uTintSide: { value: v3(tint.side) }, uTintInner: { value: v3(tint.inner) },
       uOuter: { value: new THREE.Vector2(...(tint.outer ?? [0, 0])) },
       uTopBack: { value: v3(tint.topBack) }, uTopRight: { value: v3(tint.topRight) }, uTopFront: { value: v3(tint.topFront) },
       uExtent: { value: new THREE.Vector2(...(tint.extent ?? [1, 1])) },
@@ -64,14 +64,14 @@ export function addRim(material, { color = '#9fd4ff', intensity = 0.35, power = 
       .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nvoid main() {')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjN = objectNormal;\nvObjP = position;')
     shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nuniform vec3 uTintLeft;\nuniform vec3 uTintFront;\nuniform vec3 uTintSide;\nuniform vec2 uOuter;\nuniform vec3 uTopBack;\nuniform vec3 uTopRight;\nuniform vec3 uTopFront;\nuniform vec2 uExtent;\nvoid main() {')
+      .replace('void main() {', 'varying vec3 vObjN;\nvarying vec3 vObjP;\nuniform vec3 uTintLeft;\nuniform vec3 uTintFront;\nuniform vec3 uTintSide;\nuniform vec3 uTintInner;\nuniform vec2 uOuter;\nuniform vec3 uTopBack;\nuniform vec3 uTopRight;\nuniform vec3 uTopFront;\nuniform vec2 uExtent;\nvoid main() {')
       .replace(
         '#include <opaque_fragment>',
         `vec3 tn = normalize(vObjN);
         float outerX = step(uOuter.x, abs(vObjP.x)), outerZ = step(uOuter.y, abs(vObjP.z));
         float wl = pow(max(0.0, -tn.x), 2.0) * outerX, wf = pow(max(0.0, tn.z), 2.0) * outerZ;
-        float ws = 1.0 - abs(tn.y);
-        outgoingLight *= vec3(1.0) + wl * (uTintLeft - 1.0) + wf * (uTintFront - 1.0) + ws * (uTintSide - 1.0);
+        float ws = 1.0 - abs(tn.y), wi = ws * (1.0 - outerX) * (1.0 - outerZ);
+        outgoingLight *= vec3(1.0) + wl * (uTintLeft - 1.0) + wf * (uTintFront - 1.0) + ws * (uTintSide - 1.0) + wi * (uTintInner - 1.0);
         // Top faces: linear ramps toward the back (-z), right (+x) and front (+z) of the object's extent.
         float wt = max(0.0, tn.y);
         float zb = clamp(-vObjP.z / uExtent.y, 0.0, 1.0), zf = clamp(vObjP.z / uExtent.y, 0.0, 1.0), xr = clamp(vObjP.x / uExtent.x, 0.0, 1.0);
