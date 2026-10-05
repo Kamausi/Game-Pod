@@ -182,13 +182,10 @@ const boxOf = (list) => {
 }
 
 /** Renders one model at width x height pixels and returns the canvas. */
-export function renderModel(name, { width, height, tone = 'aces', exposure = 1, rim = {}, backdropOnly = false }) {
+export function renderModel(name, { width, height, tone = 'aces', exposure = 1, rim = {} }) {
   const build = MODELS[name]
   if (!build) throw new Error(`No model named ${name}`)
   const { object, view = {}, shadow = true, look = {}, backdrop = null, frame = null } = build()
-  // Just the painted background, without the subject or the shapes drawn for it (e.g. its shadow): used to
-  // extend a scene tile's background sideways (featured banners).
-  if (backdropOnly) return paintBackdrop(width, height, { ...backdrop, ellipses: [], rects: [] })
 
   renderer.toneMapping = TONE[look.tone ?? tone]
   renderer.toneMappingExposure = look.exposure ?? exposure

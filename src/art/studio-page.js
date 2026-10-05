@@ -25,10 +25,8 @@ async function main() {
   const tone = params.get('tone') ?? undefined
   const width = spec.width * SUPERSAMPLE
   const height = spec.height * SUPERSAMPLE
-  // An asset can render another model (spec.model), e.g. just its painted background (spec.backdropOnly).
-  const model = spec.model ?? name
-  let canvas = renderAsset(model, { width, height, tone, backdropOnly: spec.backdropOnly })
-  const look = MODELS[model]().look ?? {}
+  let canvas = renderAsset(name, { width, height, tone })
+  const look = MODELS[name]().look ?? {}
   canvas = bloom(canvas, look.bloom ?? spec.bloom)
   const g = look.glow
   if (g) canvas = glow(canvas, g)
