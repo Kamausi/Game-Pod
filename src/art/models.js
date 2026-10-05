@@ -313,7 +313,7 @@ const GAMES = {
     const TOP_RIGHT = [1.833755, 1.702495, 0.29334]
     const TOP_FRONT = [0.699675, 0.74028, 1.219953]
     // Inside wall faces and cross-bar sides are darker than the lit tops.
-    const INNER_WALL = [0.4, 0.38, 0.36]
+    const INNER_WALL = [0.25, 0.22, 0.2]
     railWood.userData.faceTint = { side: INNER_WALL }
     wood.userData.faceTint = {
       left: WOOD_LEFT, front: WOOD_FRONT, side: [0.82, 0.72, 0.68], inner: INNER_WALL, outer: [INNER / 2 + 0.05, INNER_DEPTH / 2 + 0.05], // darker reddish-brown sides
