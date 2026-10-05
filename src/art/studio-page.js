@@ -26,8 +26,9 @@ async function main() {
   const width = spec.width * SUPERSAMPLE
   const height = spec.height * SUPERSAMPLE
   let canvas = renderAsset(name, { width, height, tone })
-  canvas = bloom(canvas, spec.bloom)
-  const g = MODELS[name]().look?.glow
+  const look = MODELS[name]().look ?? {}
+  canvas = bloom(canvas, look.bloom ?? spec.bloom)
+  const g = look.glow
   if (g) canvas = glow(canvas, g)
   document.getElementById('out').append(canvas)
   window.__studio = { done: true, dataUrl: canvas.toDataURL('image/png') }

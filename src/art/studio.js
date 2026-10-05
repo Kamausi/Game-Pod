@@ -180,12 +180,24 @@ export function renderModel(name, { width, height, tone = 'aces', exposure = 1, 
   key.target.position.copy(sphere.center)
   key.castShadow = shadow
   key.shadow.mapSize.set(2048, 2048)
-  key.shadow.radius = 6
+  key.shadow.radius = look.shadowSoftness ?? 6
   key.shadow.blurSamples = 16
   key.shadow.bias = -0.0004
   key.shadow.normalBias = 0.02
   Object.assign(key.shadow.camera, { left: -r * 1.6, right: r * 1.6, top: r * 1.6, bottom: -r * 1.6, near: 0.1, far: r * 10 })
   scene.add(key, key.target)
+
+  // Extra lights for a multi-light rig, positions in scene radii from the subject's centre:
+  // { type: 'hemi', sky, ground, intensity } | { type: 'dir' | 'point', color, intensity, from, distance? }
+  for (const l of look.lights ?? []) {
+    if (l.type === 'hemi') { scene.add(new THREE.HemisphereLight(l.sky, l.ground, l.intensity)); continue }
+    const light = l.type === 'point'
+      ? new THREE.PointLight(l.color, l.intensity, (l.distance ?? 0) * r, 1.6)
+      : new THREE.DirectionalLight(l.color, l.intensity)
+    light.position.set(sphere.center.x + r * l.from[0], sphere.center.y + r * l.from[1], sphere.center.z + r * l.from[2])
+    if (light.target) { light.target.position.copy(sphere.center); scene.add(light.target) }
+    scene.add(light)
+  }
 
   // Softbox: a large rectangular area light above and to one side, so glossy pieces get a broad
   // gradient highlight that describes their curvature instead of a single specular dot.
