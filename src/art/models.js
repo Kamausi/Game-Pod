@@ -615,13 +615,14 @@ const GAMES = {
     const zc = -(size - depth) / 2 // the field keeps its back edge; the front edge moves in by the missing row
     const xc = -(size - width) / 2 // and its left edge; the right edge moves in by the missing column
     const surface = noiseTexture({ contrast: 0.1, seed: 43 })
+    const LIP_W = 0.24 // outer wall thickness (base matches it)
     const casing = mat('#171310', { roughness: 0.75, roughnessMap: surface, bumpMap: surface, bumpScale: 0.4, clearcoat: 0, envMapIntensity: 0.25 }) // matte, no gloss
     const parts = [
-      mesh(rbox(width + 0.6, 0.4, depth + 0.6, 0.18, 6), casing, [xc, -0.125, zc]), // casing: contains the board, doesn't dominate
+      mesh(rbox(width + LIP_W * 2, 0.4, depth + LIP_W * 2, 0.18, 6), casing, [xc, -0.125, zc]), // casing: contains the board, doesn't dominate
     ]
     // Raised border wall around the playing field (y 0.02 to 0.22): a small flat strip right around the squares,
     // then the outer walls slant down to the outside edge. Each part is one continuous frame.
-    const lipW = 0.3
+    const lipW = LIP_W
     const STRIP = 0.06 // flat strip around the squares
     const SLANT_DROP = 0.13 // how far the outer edge sits below the flat strip
     const strip = trayFrameGeometry({ outer: width + STRIP * 2, outerDepth: depth + STRIP * 2, inner: width, innerDepth: depth, height: 0.2, outerRadius: 0.01, innerRadius: 0.004, bevel: 0.006 })
