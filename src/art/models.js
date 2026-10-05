@@ -624,14 +624,15 @@ const GAMES = {
     for (const [x, z, w, d] of [[xc, zc + (depth + lipW) / 2, width + lipW * 2, lipW], [xc, zc - (depth + lipW) / 2, width + lipW * 2, lipW], [xc + (width + lipW) / 2, zc, lipW, depth], [xc - (width + lipW) / 2, zc, lipW, depth]])
       parts.push(mesh(rbox(w, 0.2, d, 0.08, 5), casing, [x, 0.12, z]))
     // Individual inset tiles with soft bevels and a little tonal variation.
-    const tileGeo = rbox(SQ, 0.1, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
+    const TILE_TOP = 0.22 // flush with the top of the border wall (lip: 0.2 tall at y 0.12)
+    const tileGeo = rbox(SQ, 0.24, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
     // Tactile, not literally rough: faint roughness and bump noise varies the reflections.
     const grain = noiseTexture({ contrast: 0.18, seed: 41 })
     const at = (c, r) => [(c - (N - 1) / 2) * SQ, 0, (r - (N - 1) / 2) * SQ]
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const dark = (r + c) % 2 === 0 // the reference's colouring: its dark squares carry the pieces
       const [x, , z] = at(c, r)
-      const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.45 : 0.6, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: dark ? 0.25 : 0.05, clearcoatRoughness: 0.3 }), [x, 0.03, z])
+      const tile = mesh(tileGeo, mat(dark ? '#24150c' : '#e4a85e', { roughness: dark ? 0.45 : 0.6, roughnessMap: grain, bumpMap: grain, bumpScale: 0.8, clearcoat: dark ? 0.25 : 0.05, clearcoatRoughness: 0.3 }), [x, TILE_TOP - 0.12, z])
       parts.push(vary(tile, 100 + r * N + c, { value: 0.015, rough: 0.025, height: 0.02 }))
       tile.rotation.set(0, 0, 0) // tiles stay square; tone, roughness and a hair of height vary
     }
@@ -642,7 +643,7 @@ const GAMES = {
     const pieces = []
     const put = (c, r, m) => {
       const [x, , z] = at(c, r)
-      const p = vary(mesh(geo, m, [x, 0.08, z]), pieces.length + 1, { rot: 2, rough: 0.025, value: 0.015, scale: 0.0075 })
+      const p = vary(mesh(geo, m, [x, TILE_TOP, z]), pieces.length + 1, { rot: 2, rough: 0.025, value: 0.015, scale: 0.0075 })
       pieces.push(p)
       parts.push(p)
     }
