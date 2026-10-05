@@ -676,9 +676,9 @@ const GAMES = {
     const TILE_TOP = 0.22 // flush with the top of the border wall (lip: 0.2 tall at y 0.12)
     const tileGeo = rbox(SQ, 0.24, SQ, 0.004, 2) // squares butt straight against each other: no gaps or bevels between them
     // Every square gets a slight chamfer along all four top edges.
-    const CHAMFER = SQ / 16
+    const CHAMFER = SQ / 32
     const chamferGeo = (() => {
-      const g = new THREE.BoxGeometry(SQ, 0.24, SQ, 16, 1, 16)
+      const g = new THREE.BoxGeometry(SQ, 0.24, SQ, 32, 1, 32)
       const pos = g.attributes.position
       for (let i = 0; i < pos.count; i++) {
         if (pos.getY(i) < 0.119) continue
