@@ -566,7 +566,10 @@ const GAMES = {
         ],
         // Dark dome across the bottom of the tile, warm plum-grey under the board fading to navy at the bottom: peaks ~70% down behind the board and falls away to
         // ~83% at both side edges (traced from the reference).
-        ellipses: [[0.5, 1.2, 0.75, 0.5, '#0c1327', 0.012, '#22191cfc', '#2c2738fc', '#3b323ffc']],
+        ellipses: [[0.5, 1.2, 0.75, 0.5, '#0c1327', 0.012, '#22191cfc', '#2c2738fc', '#3b323ffc'],
+          // Soft shadow just under the board's bottom edge (a row of blurred dark ellipses following the edge).
+          [0.3, 0.875, 0.16, 0.05, '#00000099', 0.03], [0.5, 0.83, 0.16, 0.05, '#00000099', 0.03],
+          [0.7, 0.785, 0.16, 0.05, '#00000099', 0.03], [0.88, 0.74, 0.12, 0.045, '#00000080', 0.03]],
         shapes: [[0.78, 0.08, 0.12, 0.5, '#3a5ab8'], [0.9, 0.15, 0.08, 0.4, '#5a7ad8'], [0.02, 0.35, 0.05, 0.3, '#e08a40']],
       },
     }
