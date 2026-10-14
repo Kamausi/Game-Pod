@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>tradebot Blueprint</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one readable column (~68ch) with wide tables allowed to scroll; a pinned status strip states the system's mode up top. */
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --fg: #152230;
+  --muted: #586678;
+  --line: #d8dee6;
+  --accent: #2153c0;
+  --accent-soft: #e4ebfa;
+  --risk: #a8461a;
+  --risk-soft: #f8e9e1;
+  --ok: #1d6b4f;
+  --ok-soft: #e1f1ea;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --step-0: 1rem;
+  --step-1: 1.2rem;
+  --step-2: 1.55rem;
+  --step-3: clamp(2rem, 5vw, 2.8rem);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151c; --surface: #16202a; --fg: #e3e9f0; --muted: #98a6b6; --line: #2a3644;
+    --accent: #7ea4ff; --accent-soft: #1b2a47; --risk: #f0956a; --risk-soft: #3a2219;
+    --ok: #6fcfa6; --ok-soft: #15322a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151c; --surface: #16202a; --fg: #e3e9f0; --muted: #98a6b6; --line: #2a3644;
+  --accent: #7ea4ff; --accent-soft: #1b2a47; --risk: #f0956a; --risk-soft: #3a2219;
+  --ok: #6fcfa6; --ok-soft: #15322a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 400 var(--step-0)/1.6 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 52rem; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 2.5rem 4rem;
+  display: grid; gap: 3rem;
+}
+.strip {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.strip-inner {
+  max-width: 52rem; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: .55rem;
+  display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center;
+  font: 500 .8rem/1.3 var(--font-mono);
+}
+.pill { padding: .15rem .55rem; border-radius: 99px; white-space: nowrap; }
+.pill.paper { background: var(--ok-soft); color: var(--ok); }
+.pill.risk { background: var(--risk-soft); color: var(--risk); }
+.pill.info { background: var(--accent-soft); color: var(--accent); }
+header { display: grid; gap: .9rem; }
+.eyebrow { font: 500 .78rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: var(--step-3); font-weight: 700; letter-spacing: -.01em; }
+h2 { font-size: var(--step-2); font-weight: 700; }
+h3 { font-size: var(--step-1); font-weight: 600; }
+.lede { font-size: var(--step-1); color: var(--muted); max-width: 62ch; margin: 0; }
+section { display: grid; gap: 1rem; min-width: 0; }
+p { margin: 0; max-width: 68ch; }
+ul, ol { margin: 0; padding-left: 1.25rem; display: grid; gap: .45rem; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+:not(pre) > code { background: var(--accent-soft); color: var(--fg); padding: .05em .35em; border-radius: 4px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; vertical-align: top; padding: .6rem .8rem; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font: 500 .74rem/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+td.num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); white-space: nowrap; }
+.note { font-size: .9rem; color: var(--muted); }
+.flow { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; font: 500 .85rem/1.3 var(--font-mono); }
+.flow span.node { padding: .45rem .7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.flow span.node.model { border-color: var(--accent); color: var(--accent); }
+.flow span.node.guard { border-color: var(--risk); color: var(--risk); }
+.flow span.arrow { color: var(--muted); }
+.gates { display: grid; gap: .4rem; list-style: none; padding: 0; }
+.gates li { display: grid; grid-template-columns: 6.5rem 1fr; gap: .8rem; padding: .5rem .8rem; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.gates .k { font: 500 .82rem/1.5 var(--font-mono); color: var(--accent); }
+.formula { font: 400 .95rem/1.7 var(--font-mono); background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); padding: .8rem 1rem; border-radius: 0 6px 6px 0; overflow-x: auto; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .6rem; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .75rem .9rem; display: grid; gap: .2rem; }
+.kpi b { font: 600 1.35rem/1.1 var(--font-mono); font-variant-numeric: tabular-nums; }
+.kpi span { font-size: .8rem; color: var(--muted); }
+.callout { background: var(--risk-soft); color: var(--fg); border-radius: 8px; padding: .9rem 1rem; display: grid; gap: .4rem; }
+.callout strong { color: var(--risk); }
+.wrong { display: grid; gap: .8rem; }
+.wrong article { display: grid; gap: .25rem; padding-left: 1rem; border-left: 2px solid var(--line); }
+.start { background: var(--surface); border: 2px solid var(--accent); border-radius: 10px; padding: 1.2rem; display: grid; gap: .9rem; min-width: 0; }
+.codebox { position: relative; min-width: 0; }
+pre { margin: 0; overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: .9rem 1rem; font: 400 .84rem/1.6 var(--font-mono); }
+pre .c { color: var(--muted); }
+.copy { position: absolute; top: .5rem; right: .5rem; font: 500 .75rem/1 var(--font-mono); padding: .4rem .6rem; border-radius: 5px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+.copy:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+footer { font-size: .85rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 1rem; }
+@media (max-width: 480px) {
+  .gates li { grid-template-columns: 1fr; gap: .1rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="strip" role="status">
+  <div class="strip-inner">
+    <span class="pill paper">PAPER ONLY</span>
+    <span class="pill info">BTC_USD · 1h bars</span>
+    <span class="pill info">25 tests passing</span>
+    <span class="pill risk">kill switch at 15% drawdown</span>
+  </div>
+</div>
+
+<main class="wrap">
+
+<header>
+  <p class="eyebrow">Blueprint · 2026-10-14</p>
+  <h1>tradebot: a 24/7 crypto agent that has to earn its way to real money</h1>
+  <p class="lede">A deterministic state engine, a typed model decision, code-owned gates and sizing, a hard risk layer, and a nightly calibration review. No code path in the package can place a real order.</p>
+</header>
+
+<section id="changes">
+  <h2>What changed from the viral prompt</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Prompt said</th><th>This build</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Build through AgenKit (agenkit.xyz)</td><td>Not used. The six phases run as plain Claude Code steps in the repo.</td><td>A search on 2026-10-14 found only the promotional post: no docs, no source. An unverified harness gets your shell.</td></tr>
+        <tr><td>"Jev" as the reflex model</td><td>Pluggable engine: a free rules baseline, or Claude Haiku 5.5 escalating to Claude Opus 5.5.</td><td>No public API docs, so an adapter would mean inventing an API. Anything real fits behind the same interface.</td></tr>
+        <tr><td>Size from the model's "calibrated" probability</td><td>Probabilities shrink halfway to 0.5 until 200 outcomes are scored, then use a nightly isotonic fit.</td><td>Calibration has to be measured, not claimed.</td></tr>
+        <tr><td>Execute live, automatically</td><td>Paper broker only. Live trading is a separate step after the launch gates.</td><td>The prompt says to prioritise survival.</td></tr>
+        <tr><td>5–10 altcoin setups</td><td>Not delivered as picks. A sourced research prompt ships instead.</td><td>Honest picks need live unlock, fee and holder data per token.</td></tr>
+        <tr><td>risk_state <code>mean_limit</code></td><td><code>near_limit</code></td><td>Most likely a typo.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="architecture">
+  <h2>How a decision flows</h2>
+  <p>The model only judges. Code owns every threshold, size, stop and side effect.</p>
+  <div class="flow" aria-label="Decision pipeline">
+    <span class="node">exchange feed</span><span class="arrow">→</span>
+    <span class="node">state engine</span><span class="arrow">→</span>
+    <span class="node">snapshot ≈100 tokens</span><span class="arrow">→</span>
+    <span class="node model">model: typed Decision</span><span class="arrow">→</span>
+    <span class="node">policy: gates + ¼ Kelly</span><span class="arrow">→</span>
+    <span class="node guard">risk check</span><span class="arrow">→</span>
+    <span class="node">paper broker</span><span class="arrow">→</span>
+    <span class="node">journal → nightly review</span>
+  </div>
+  <p class="note">The slow "brain" layer (research and the nightly review) sits outside this loop. It writes proposals that a person approves. Nothing it produces is merged automatically.</p>
+</section>
+
+<section id="regime">
+  <h2>Market regime on 2026-10-14</h2>
+  <p class="note">Source: Crypto.com Exchange public daily candles for BTC_USD and ETH_USD, 50 bars, fetched 2026-10-14. The latest bar was still forming.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Measure</th><th>BTC_USD</th><th>ETH_USD</th></tr></thead>
+      <tbody>
+        <tr><td>Latest print</td><td class="num">83,200</td><td class="num">2,496</td></tr>
+        <tr><td>50-day change</td><td class="num">+5.3%</td><td class="num">−0.4%</td></tr>
+        <tr><td>20-day change</td><td class="num">−1.4%</td><td class="num">−7.1%</td></tr>
+        <tr><td>7-day change</td><td class="num">−0.1%</td><td class="num">−3.0%</td></tr>
+        <tr><td>50-day range</td><td class="num">75,587 – 86,603</td><td class="num">2,392 – 2,776</td></tr>
+        <tr><td>20-day average</td><td class="num">83,891</td><td class="num">2,616</td></tr>
+        <tr><td>20-day realised vol, annualised</td><td class="num">~24%</td><td class="num">~33%</td></tr>
+        <tr><td>ETH/BTC, 50 days</td><td class="num">—</td><td class="num">−5.4%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Interpretation:</strong> BTC is ranging, chopping just under its 20-day average after a sharp mid-September recovery. ETH is lagging BTC. That reads as a range, not a trend, so the trend-following baseline should mostly sit out. Dominance, stablecoin supply, funding, open interest and macro were not fetched.</p>
+</section>
+
+<section id="schema">
+  <h2>The decision schema and its gates</h2>
+  <p>The model returns one JSON object per bar, constrained by a strict schema and validated again in code. Any violation, timeout, refusal or error becomes a hold.</p>
+  <pre>{ "regime": "trending | mean_reverting | high_vol | crisis",
+  "direction": "long | short | neutral",
+  "direction_confidence": 0.0–1.0,
+  "p_win": 0.0–1.0,          <span class="c">// target before stop, 1.5×ATR stop, 2:1 target</span>
+  "toxic_flow": true | false,
+  "setup_quality": 0 | 1 | 2 | 3,
+  "risk_state": "safe | near_limit | reduce",
+  "rationale": "one sentence, logged, never read by code" }</pre>
+  <h3>A trade fires only if every gate passes</h3>
+  <ul class="gates">
+    <li><span class="k">quality</span><span><code>setup_quality ≥ 2</code></span></li>
+    <li><span class="k">confidence</span><span><code>direction_confidence &gt; 0.80</code></span></li>
+    <li><span class="k">risk_state</span><span>the model reads <code>safe</code></span></li>
+    <li><span class="k">flow</span><span>not toxic</span></li>
+    <li><span class="k">regime</span><span>not crisis</span></li>
+    <li><span class="k">side</span><span>long, unless shorts are switched on</span></li>
+  </ul>
+  <h3>Sizing</h3>
+  <div class="formula">p = calibrate(p_win)<br>b = (target − costs) / (stop + costs)<br>f* = p − (1 − p) / b<br>risked = 0.25 × f*   <span class="c">(multiplier hard-capped at 0.25)</span><br>notional = risked / (stop + costs), then clamped to 30% of equity</div>
+</section>
+
+<section id="risk">
+  <h2>Limits the model can't touch</h2>
+  <p>Every order goes through one guarded path that runs these checks first. Closing a position is always allowed. Flipping a position counts as new risk.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Limit</th><th>Default</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr><td>Drawdown from peak</td><td class="num">15%, can't be raised</td><td>Latches the kill switch. It survives restarts and clears only by hand.</td></tr>
+        <tr><td>Daily loss</td><td class="num">3%</td><td>Reduce-only until the next UTC day.</td></tr>
+        <tr><td>Position size</td><td class="num">30% of equity</td><td>Orders are clamped. No leverage is allowed.</td></tr>
+        <tr><td>Single order</td><td class="num">30% of equity</td><td>Orders are clamped.</td></tr>
+        <tr><td>Orders per day</td><td class="num">24</td><td>New risk is blocked.</td></tr>
+        <tr><td>Data age</td><td class="num">120 s</td><td>New risk is blocked.</td></tr>
+        <tr><td>Spread</td><td class="num">25 bps</td><td>New risk is blocked.</td></tr>
+        <tr><td>Loop errors</td><td class="num">5 in a row</td><td>Trips the kill switch.</td></tr>
+        <tr><td>Manual kill</td><td class="num"><code>tradebot kill</code></td><td>Blocks new risk and flattens the position.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="engines">
+  <h2>Decision engines</h2>
+  <ul>
+    <li><strong>rules</strong> (default): a deterministic trend and volatility baseline, free and offline. It is the benchmark any model has to beat, not a claim of edge.</li>
+    <li><strong>claude</strong>: Claude Haiku 5.5 on every bar (low effort, 10 s timeout). It hands off to Claude Opus 5.5 (high effort) when a directional call has confidence under 0.60 or the read is crisis. Hand-offs are limited to one per 5 minutes; past that, the bar is a hold.</li>
+    <li>Any other model plugs in as a class with <code>name</code> and <code>decide(snapshot)</code>.</li>
+  </ul>
+</section>
+
+<section id="phases">
+  <h2>Build plan: six phases, each with a gate you approve</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Phase</th><th>Gate</th><th>Files</th></tr></thead>
+      <tbody>
+        <tr><td>1. Spec</td><td>You agree with the changes and limits above</td><td><code>README.md</code></td></tr>
+        <tr><td>2. Architecture</td><td>Brain and reflex split, data flow</td><td><code>README.md</code></td></tr>
+        <tr><td>3. Plan</td><td>Module boundaries</td><td><code>src/tradebot/*.py</code></td></tr>
+        <tr><td>4. Test-first build</td><td>All tests pass</td><td><code>tests/test_core.py</code></td></tr>
+        <tr><td>5. Review</td><td><code>/code-review</code>, plus reading <code>risk.py</code> yourself</td><td>everything</td></tr>
+        <tr><td>6. Ship to paper</td><td>The launch gates below</td><td><code>runs/paper/</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="review">
+  <h2>The nightly review</h2>
+  <ol>
+    <li>Score each directional call: did price reach the target before the stop within 24 bars?</li>
+    <li>Compare Brier scores for raw probabilities, calibrated ones, and a constant base rate. Raw has to beat the base rate.</li>
+    <li>Refit the calibration curve, which the loop loads on its next start.</li>
+    <li>Write <code>review.md</code> with proposals. Thresholds, limits and the prompt never change automatically.</li>
+    <li>Optionally run <code>prompts/nightly_review.md</code> in Claude Code: one change, on a branch, with a test, for you to merge or reject.</li>
+  </ol>
+</section>
+
+<section id="backtest">
+  <h2>What the included backtest shows</h2>
+  <p>3,000 simulated hourly bars with no pattern to find, starting from $10,000.</p>
+  <div class="kpis">
+    <div class="kpi"><b>−1.2%</b><span>return</span></div>
+    <div class="kpi"><b>$427</b><span>fees paid</span></div>
+    <div class="kpi"><b>118</b><span>round trips</span></div>
+    <div class="kpi"><b>36%</b><span>win rate</span></div>
+    <div class="kpi"><b>5.4%</b><span>max drawdown</span></div>
+  </div>
+  <p>The review then said: <em>"Model p_win is no better than the base rate. Do not go live."</em> That is the correct outcome. With no edge, the system loses roughly its costs, risk stays bounded, and the review catches it. A big profit on this data would mean a bug.</p>
+</section>
+
+<section id="launch">
+  <h2>Launch gates, in order</h2>
+  <ol>
+    <li>Tests pass, and a backtest on real candles beats buy-and-hold on a risk-adjusted basis after fees, across at least 3 separate periods.</li>
+    <li>At least 30 days of paper trading with no unexplained failsafe bursts and no risk-layer bugs.</li>
+    <li>At least 200 resolved calls, with raw Brier clearly below base-rate Brier (by 0.01 or more).</li>
+    <li>Paper P&amp;L is positive after fees, and drawdown stayed under 10%.</li>
+    <li>Only then write a live broker, routed through the same guarded path. Use a trade-only API key with no withdrawal rights and an IP allowlist, and an amount you can lose entirely.</li>
+  </ol>
+</section>
+
+<section id="wrong">
+  <h2>What could I be wrong about?</h2>
+  <div class="wrong">
+    <article><h3>There may be no edge at all</h3><p>Classifying BTC bar by bar from 18 numbers is a crowded game. The likeliest outcome is losing about the fees. Paper trading finds that out cheaply.</p></article>
+    <article><h3>Costs could dominate</h3><p>6 bps fee and 2 bps slippage per side, plus spread, is a real share of each target on hourly bars. Your fee tier matters more than any prompt.</p></article>
+    <article><h3>Model probabilities aren't calibrated</h3><p>Self-reported confidence clusters on round numbers and drifts between model versions. Reset the calibrator after any model upgrade.</p></article>
+    <article><h3>Stops are checked by polling</h3><p>Every 15 s live, and on bar high/low in the backtest. Gaps and outages can skip past a stop, and a large gap can push drawdown beyond 15%.</p></article>
+    <article><h3>The data feed hasn't run against the real API</h3><p>The build environment blocked the exchange. Run <code>tradebot status --probe</code> first.</p></article>
+    <article><h3>Outcome labels are coarse</h3><p>The review uses mid prices at decision times, not full tick paths, so it undercounts stop touches between bars.</p></article>
+    <article><h3>The regime read is thin</h3><p>One venue and 50 daily bars. It's a sketch, not a macro view.</p></article>
+    <article><h3>Nightly tuning can fit noise</h3><p>That's why it's one change per night, a 7-day test window, and nothing goes live the night it was made.</p></article>
+    <article><h3>AgenKit and Jev might be real</h3><p>If they are, this page undersells them. The design doesn't depend on either.</p></article>
+  </div>
+</section>
+
+<section id="start" class="start">
+  <h2>Start here first</h2>
+  <p>Run these from the <code>trading-agent</code> folder. Steps 1 and 2 need no network or keys.</p>
+  <div class="codebox">
+    <button class="copy" type="button" id="copy-start">Copy</button>
+<pre id="start-cmds"><span class="c"># 1. Run the tests</span>
+PYTHONPATH=src python3 -m unittest discover -s tests
+
+<span class="c"># 2. Full pipeline on simulated data, then the review</span>
+PYTHONPATH=src python3 -m tradebot backtest --synthetic 3000 --run-dir runs/bt
+PYTHONPATH=src python3 -m tradebot review --run-dir runs/bt
+
+<span class="c"># 3. Check the exchange feed from your machine</span>
+PYTHONPATH=src python3 -m tradebot status --probe
+
+<span class="c"># 4. Paper trade 24/7 with the free rules engine (run under tmux or systemd)</span>
+PYTHONPATH=src python3 -m tradebot paper --instrument BTC_USD --timeframe 1h --engine rules
+
+<span class="c"># 5. Optional: the Claude engine (API cost on every bar)</span>
+pip install anthropic &amp;&amp; export ANTHROPIC_API_KEY=...
+PYTHONPATH=src python3 -m tradebot paper --engine claude --run-dir runs/paper-claude
+
+<span class="c"># Stop trading instantly (closing positions is still allowed)</span>
+PYTHONPATH=src python3 -m tradebot kill --run-dir runs/paper</pre>
+  </div>
+  <p>Run the rules and Claude engines side by side on paper for 30 days. If Claude doesn't beat the free baseline after fees, you've learned that without risking any capital.</p>
+</section>
+
+<footer>
+  Source: <code>trading-agent/</code> on branch <code>ccr-70055512-ufuyvt</code> of kamausi/game-pod. Not financial advice.
+</footer>
+
+</main>
+
+<script>
+document.getElementById('copy-start').addEventListener('click', function () {
+  var btn = this;
+  var text = document.getElementById('start-cmds').innerText;
+  var done = function (msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = 'Copy'; }, 1600); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { done('Copied'); }, function () { selectText(); done('Selected'); });
+  } else { selectText(); done('Selected'); }
+  function selectText() {
+    var r = document.createRange(); r.selectNodeContents(document.getElementById('start-cmds'));
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+});
+</script>
+</body>
+</html>
