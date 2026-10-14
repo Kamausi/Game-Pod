@@ -1,0 +1,20 @@
+[Unit]
+Description=tradebot paper loop
+After=network-online.target exechub.service
+Wants=network-online.target
+OnFailure=tradebot-alert@%n.service
+
+[Service]
+User=trader
+WorkingDirectory=/srv/tradebot/state
+EnvironmentFile=/srv/tradebot/.env
+ExecStart=/srv/tradebot/venv/bin/tradebot paper --run-dir runs/paper --exechub 127.0.0.1:50051
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/tradebot/state
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

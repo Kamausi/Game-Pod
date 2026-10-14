@@ -1,10 +1,14 @@
-# tradebot: a 24/7 crypto trading agent that starts on paper
+# tradebot: a 24/7 multi-asset trading agent that starts on paper
 
 A complete, tested system: a deterministic state engine, a typed model-decision
 schema, code-owned gates and sizing, a hard risk layer with a kill switch, a paper
 broker that charges realistic costs, a 24/7 loop, and a nightly calibration review.
 
-It is **paper-only by design**. No code in this package can place a real order.
+It **starts on paper**. Real-money trading (Crypto.com, Alpaca, OANDA, Solana via
+Jupiter and Jito) is built in, but every live adapter refuses to construct until
+`tradebot go-live` has checked the launch gates against your paper record and you
+have typed a confirmation. That authorization runs under small dollar "canary" caps
+and expires after 7 days. Deployment and kill procedures: [LAUNCH.md](LAUNCH.md).
 
 ---
 
@@ -15,7 +19,7 @@ It is **paper-only by design**. No code in this package can place a real order.
 | Build through "AgenKit" at agenkit.xyz | Not used. The six phases are run as plain Claude Code steps in this repo (section 6). | A web search on 2026-10-14 turned up only the promotional post itself: no docs, no source, no install instructions. Installing an unverified harness into your coding agent hands it your shell. |
 | "Jev" from console.typesafe.ai as the reflex model | Not used. The reflex is a pluggable `DecisionEngine`: a deterministic `RuleEngine` (default), or `ClaudeEngine` on Claude Haiku 5.5 with escalation to Claude Opus 5.5. | No public API docs could be found, so writing an adapter would mean inventing an API. If it turns out to be real, it fits behind the same interface in about 30 lines (section 4). |
 | Use the model's "calibrated probability" for Kelly sizing | Probabilities are **shrunk toward 0.5** until at least 200 scored outcomes exist, then mapped through an isotonic calibration fitted nightly. | A model saying it is calibrated doesn't make it calibrated. Calibration has to be measured. |
-| Execute automatically, live | Paper broker only. Going live is a separate step you take after passing the launch gates (section 9). | The prompt itself says to prioritise a system that survives. |
+| Execute automatically, live | Paper first. Live trading unlocks only through `tradebot go-live` after the launch gates pass (section 9, section 14), with canary dollar caps. | The prompt itself says to prioritise a system that survives. |
 | 5 to 10 asymmetric altcoin setups | Not delivered as picks. A sourced research prompt is in `prompts/research.md`, and the bot trades **BTC_USD only** to start. | An honest version needs live unlock schedules, fees and holder data for each token. Making up numbers is ruled out by the prompt, and the per-bar bot shouldn't trade a thesis anyway. |
 | risk_state `mean_limit` | `near_limit` | Most likely a typo. |
 
@@ -182,9 +186,10 @@ Cron example (UTC):
 3. At least 200 resolved calls, with raw Brier clearly below base-rate Brier
    (for example by 0.01 or more).
 4. Paper P&L after fees is positive, and max drawdown stayed under 10%.
-5. Only then write a live broker. Route it through `GuardedBroker`, use an
-   exchange API key with **trade-only, no-withdrawal** permissions and an IP
-   allowlist, and start with an amount you'd be fine losing entirely.
+5. Only then run `tradebot go-live`. It checks gates 2–4 plus the operational
+   gate against your paper journal, in code. Use an exchange API key with
+   **trade-only, no-withdrawal** permissions and an IP allowlist, and keep the
+   canary caps until live results match paper (LAUNCH.md).
 
 ## 10. What the included backtest shows
 
@@ -227,7 +232,8 @@ Code can't stop someone who controls the whole machine. In production, run the t
 | Scanner | desk app | Per asset: price, 24h volume, spread, gap vs Crypto.com's multi-exchange index, RSI, %B, trend on both timeframes, regime, signal, flags (illiquid, wide spread, index gap, volume spike, breakout, book imbalance). |
 | Dynamic sizing | `portfolio.py`, `policy.py`, desk | Smallest of quarter Kelly (from *measured* win rate), a daily volatility target (1% of equity per position) and the tier cap; then × drawdown scale (100% → 25% as drawdown approaches 10%, entries paused beyond) × recent-results scale (0.5× after a cold streak). |
 | Correlation / concentration | `portfolio.py`, desk | Rolling correlation matrix; same-side positions correlated above 0.7 share one 40% cap; gross exposure capped at 60%. |
-| Stress testing | `portfolio.py`, desk | Every bar: crypto crash (majors −20%, meme −40%), flash crash with gapped stops, correlations → 1, liquidity crunch. A trade that would push any scenario's loss over 12% of equity is blocked. |
+| Stress testing | `portfolio.py`, desk | Every bar: crypto crash (majors −20%, meme −40%), equity gap down (stocks −10%, penny −35%), USD spike (FX −3%), all three at once, flash crash with gapped stops, correlations → 1, liquidity crunch. A trade that would push any scenario's loss over 12% of equity is blocked. |
+| Stocks and FX in the desk | desk app | AAPL, SPY, SNDL (penny tier), EUR/USD, GBP/USD, AUD/USD. Live: Yahoo Finance one-minute closes through your Firecrawl connector, every 2 minutes, 1 credit each (toggle "Live stocks & FX"). Real hours: NYSE session from Yahoo (so holidays count), FX Sunday 17:00 to Friday 17:00 New York; no trades and no stop checks while closed; simulated prices gap at the open. Each asset decides once per its own new bar. Correlation is pairwise on shared bar times. Yahoo gives no order book: spreads are estimates and the flow and breakout signals stay at 0 for these. |
 | Order types | desk | Bracket orders (stop + target), trailing stops, limit-only entries for the meme tier (must trade through the limit, expire after 3 bars, never chased), TWAP in 3 slices above 10% of equity. |
 | Meme-coin guardrails | desk | Separate tier: 5% max position, limit orders only, spread < 50 bps, $1M+ daily volume. PEPE (≈$130k/day on this venue) is blocked as illiquid. |
 
@@ -241,15 +247,11 @@ Code can't stop someone who controls the whole machine. In production, run the t
 | **Stocks, penny stocks, forex** | `assets.py`, `brokers.py` | Asset classes with market hours (NYSE regular session; FX Sunday 17:00 to Friday 17:00 New York), share/lot rounding (always down), penny-stock tier (under $5: limit only, spread ≤ 1.5%, $500k+ daily volume, 2% max position). Broker adapters for **Alpaca paper** (market, limit, bracket, trailing stop) and **OANDA practice** (market, limit, stop-loss / take-profit / trailing stop on fill), locked to paper hosts: pointing them at live hosts raises. One router with a shared idempotency ledger. | request shapes tested against a fake transport; run `tradebot brokers --check` with your paper keys before relying on them |
 | **News sentiment** | `sentiment.py`, desk app | RSS feeds (CoinDesk, Cointelegraph, Decrypt) or, in the desk, Firecrawl news search. Scored by Claude (strict JSON) or a built-in word list with negation. Counts each headline from when it was **first seen**, not its claimed publish time. Enters the ensemble as one more signal and earns weight only if it beats costs per regime. Feeds with a DTD are refused (XML attack guard). | causality, de-duplication, scoring tests |
 | **Cross-exchange arbitrage** | `arbitrage.py`, desk app | Crypto.com vs Coinbase vs Kraken (Python) or vs Kraken via Firecrawl (desk). Net of both taker fees and a latency allowance; stale or out-of-sync quotes are ignored. Paper book with per-venue inventory shows that inventory, not detection, is what limits arbitrage. | scan, parser and book tests |
-| **Solana safety + DEX paper trading** | `onchain.py`, `tradebot rugcheck` | Read-only rug-pull checks that **fail closed**: mint authority revoked, freeze authority revoked (honeypots), top-10 holder share excluding pool and burn addresses, LP tokens burned. Paper DEX trader takes real Jupiter route quotes and refuses trades with price impact over 1%. | tests against a fake RPC |
+| **Solana safety + DEX trading** | `onchain.py`, `solana_live.py`, `tradebot rugcheck / sol-buy / sol-sell` | Read-only rug-pull checks that **fail closed**: mint authority revoked, freeze authority revoked (honeypots), top-10 holder share excluding pool and burn addresses, LP tokens burned. Paper DEX trader on real Jupiter quotes. Live: Jupiter builds the swap, the bot checks the fee payer and mints, signs locally, simulates with signature verification, sends as a **Jito bundle** [swap, tip] (or plain RPC), waits for confirmation and reads the real balance change. Refuses price impact over 1% on buys; exits are never blocked. | fake RPC/Jupiter/Jito with real local signing |
 | **Deep history** | `datasets.py`, `tradebot import-csv`, `research walkforward` | Import any OHLCV CSV (e.g. 20+ years of daily stock bars): duplicates and broken bars dropped and counted, gaps and outliers listed, nothing clipped, adjusted/unadjusted recorded. Anchored walk-forward: explore on the past, test once on each next fold, every run recorded. | import and walk-forward tests |
 | **Storage** | `storage.py`, `sql/timescale.sql` | SQLite tables for ticks, orders and fills; the same schema for PostgreSQL/TimescaleDB hypertables. | fill aggregation test |
 
-**What's still not done, on purpose:**
-- **Signing and sending on-chain transactions, Jito bundles.** These need a funded wallet's private key and move real money outside every gate in this system. The paper DEX trader uses real quotes so the strategy can be judged first.
-- **Live broker hosts.** Alpaca and OANDA adapters refuse non-paper hosts. Going live means a reviewed code change behind the release gate, not a setting.
-- **Stocks and forex in the hosted desk.** The desk only has the Crypto.com connector. Your Twelve Data connector is installed but disconnected; reconnect it and I can add stocks and FX to the desk.
-- **A Rust engine or a separate Next.js frontend.** The Go hub already fills the execution role in microseconds; the hosted desk and the hub's built-in dashboard cover monitoring and the kill switch.
+**Not built:** a Rust engine or a separate Next.js frontend. The Go hub already does execution in microseconds, and the hosted desk plus the hub's dashboard cover monitoring and the kill switch.
 
 **Running the local stack:**
 ```bash
@@ -262,7 +264,22 @@ python3 -m tradebot rugcheck <mint> --pool-owner <amm authority> --lp-mint <lp m
 python3 -m tradebot import-csv spy_daily.csv --out data/spy.json --adjusted split+dividend
 python3 -m tradebot research walkforward --family spy_v1 --data data/spy.json --folds 5 --grid '{"reward_risk":[1.5,2,3]}'
 ```
-Optional Python packages: `pip install grpcio websockets anthropic`.
+Optional Python packages: `pip install -e ".[all]"` (grpcio, websockets, anthropic, solders).
+
+## 14. Live trading and deployment
+
+| Piece | Where | What it does |
+|---|---|---|
+| **Launch gates in code** | `live.py`, `tradebot go-live` | Checks your paper journal: approved release (not `--dev`), ≥ 30 days, ≥ 200 scored calls, Brier ≥ 0.01 better than base rate, return > 0, max drawdown < 10%, failsafe < 5%, ops gate passed for this engine build. Then you type `GO LIVE`. The authorization is bound to the release, limits, caps and engine hashes, and it expires in 7 days. `--accept-unproven` needs a longer phrase and is flagged in the journal and every start alert. |
+| **Canary caps** | `config/live_caps.json` | $100 per order, $500 position, $50 daily loss, 50 orders/day by default, on top of the percentage limits. Reducing a position is always allowed. Editing the file voids the authorization. |
+| **Crypto.com live** | `venues_live.py` | Private API with HMAC-SHA256 signing. Marketable **IOC limit** orders capped 15 bps through the touch, never unbounded market orders. Polls for the real outcome and mirrors only confirmed fills (real price and fee, including fees taken in the coin). Spot is long-only. Funds you held before the first start are a baseline, never the bot's position. |
+| **Alpaca / OANDA live** | `venues_live.py` | IOC limit orders on the live hosts; an IOC partial fill keeps its filled part. These classes take a live authorization; the paper classes still refuse live hosts. |
+| **Stock and FX data** | `feed.py` | `AlpacaStockFeed` (IEX bars and quotes) and `OandaFxFeed` (mid candles and pricing), both dropping the forming bar. |
+| **Live loop** | `live_runner.py`, `tradebot live` | The paper decision path with real orders. It reconciles at start and every 8 ticks (any mismatch trips the kill switch) and re-checks the authorization every 5 minutes. On kill it cancels all orders, flattens the bot's position and alerts. It respects market hours. An order with no final state after 20 polls triggers cancel-all and a kill. |
+| **Alerts** | `alerts.py`, `tradebot alert` | Slack or Discord webhook on start, fills, rejects, kills, reconciliation failures, loop halts and a daily summary. A failed alert never blocks trading or the kill path. |
+| **Deployment** | `Dockerfile`, `docker-compose.yml`, `deploy/systemd/`, `.github/workflows/tradebot.yml`, `.env.example` | Images for the Go hub (distroless, non-root) and the trader. Compose runs paper by default, with `live` and TimescaleDB as opt-in profiles. Systemd units stop after 3 crashes in 10 minutes and page you via `OnFailure`. CI runs the Go and Python tests and builds both images. |
+
+What has **not** been verified from the build machine: real requests to Crypto.com's private API, Alpaca live, OANDA live, Jupiter `/swap` and Jito. They are written from the public docs and tested against fakes, and the Crypto.com signature is tested against the documented algorithm. The Docker build was also not run, because no Docker daemon was available here; CI builds it. That is why the runbook starts with the read-only `tradebot live-check` and a $100 cap.
 
 ## WHAT COULD I BE WRONG ABOUT?
 
@@ -291,6 +308,13 @@ Optional Python packages: `pip install grpcio websockets anthropic`.
   goes live the same night.
 - **I couldn't verify AgenKit or Jev.** If they're legitimate, I may be
   underselling them. The architecture doesn't depend on them either way.
+- **Live venue code has only met fakes.** A field-name or rounding mismatch
+  with a real API would surface as a rejected order. The ledger, reject kill and
+  reconciliation are built to fail safe on exactly that, but expect a first-day
+  fix. `live-check` and the $100 canary exist for this.
+- **Yahoo data in the desk is unofficial and can lag.** It is fine for
+  watching a paper strategy, not for live stock or FX execution. The live loop
+  uses Alpaca's and OANDA's own feeds instead.
 
 ## START HERE FIRST
 
@@ -300,7 +324,7 @@ Optional Python packages: `pip install grpcio websockets anthropic`.
 
 ```bash
 export PYTHONPATH=src
-python3 -m unittest discover -s tests                      # 62 tests (4 need Go)
+python3 -m unittest discover -s tests                      # 75 tests (4 need Go)
 
 # 1. Data with provenance (or use synthetic:N:seed to practise; it has no real edge)
 python3 -m tradebot data snapshot --instrument BTC_USD --timeframe 1h --out data/btc_1h.json
@@ -326,6 +350,12 @@ python3 -m tradebot paper --dev                             # test run, labelled
 
 # Stop trading instantly (closing positions is still allowed)
 python3 -m tradebot kill --run-dir runs/paper
+
+# 6. After 30+ days of paper: real money under canary caps (full runbook: LAUNCH.md)
+python3 -m tradebot go-live --gates-only --operator you --venue cryptocom
+python3 -m tradebot go-live --operator you --venue cryptocom     # interactive: type GO LIVE
+python3 -m tradebot live-check --venue cryptocom                 # keys and balances, sends nothing
+python3 -m tradebot live --venue cryptocom
 ```
 
 On the synthetic practice data the best of 9 configurations beat buy-and-hold on its training window. Its one holdout evaluation then trailed buy-and-hold by about 45 points after costs, and approval refuses it as weak evidence. That's the workflow doing its job.

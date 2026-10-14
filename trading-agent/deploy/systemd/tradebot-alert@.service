@@ -1,0 +1,9 @@
+[Unit]
+Description=page the operator: %i failed
+
+[Service]
+Type=oneshot
+User=trader
+WorkingDirectory=/srv/tradebot/state
+EnvironmentFile=/srv/tradebot/.env
+ExecStart=/srv/tradebot/venv/bin/tradebot alert --level critical "systemd unit %i failed; trading loop is DOWN"

@@ -4,6 +4,8 @@ Research (no broker access, no limits/release writes):
   data snapshot | research sweep | research freeze | research final | evidence | register
 Operations:
   opsgate | init-limits | approve | paper | review | kill | unkill | status
+Real money (only after launch gates, see LAUNCH.md):
+  go-live | live | sol-buy | sol-sell | live-check
 Quick look:
   backtest
 """
@@ -123,6 +125,36 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--run-dir", default="runs/paper")
     p.add_argument("--cash", type=float, default=10_000.0)
     p.add_argument("--exechub", help="route orders through the Go execution hub at host:port")
+
+    gl = sub.add_parser("go-live", help="operator only: check launch gates and authorize live trading for 7 days")
+    gl.add_argument("--paper-dir", default="runs/paper")
+    gl.add_argument("--operator", required=True)
+    gl.add_argument("--venue", action="append", required=True, choices=["cryptocom", "alpaca", "oanda", "solana"])
+    gl.add_argument("--accept-unproven", action="store_true", help="authorize despite failed gates (longer phrase, flagged everywhere)")
+    gl.add_argument("--gates-only", action="store_true", help="print the launch gates and exit")
+
+    lv = sub.add_parser("live", help="run the live loop on an authorized venue")
+    lv.add_argument("--venue", required=True, choices=["cryptocom", "alpaca", "oanda"])
+    lv.add_argument("--instrument", help="defaults to the release's instrument (crypto) or must be given (stocks/FX)")
+    lv.add_argument("--release", default="releases/approved.json")
+    lv.add_argument("--run-dir", default=None)
+
+    lc = sub.add_parser("live-check", help="read-only: verify live keys, balances and authorization; sends no orders")
+    lc.add_argument("--venue", required=True, choices=["cryptocom", "alpaca", "oanda", "solana"])
+
+    sb = sub.add_parser("sol-buy", help="live Solana swap USDC -> token (rug check, simulate, Jito bundle)")
+    sb.add_argument("mint")
+    sb.add_argument("--usdc", type=float, required=True)
+    sb.add_argument("--pool-owner")
+    sb.add_argument("--lp-mint")
+    sb.add_argument("--no-jito", action="store_true", help="send through RPC instead of a Jito bundle")
+    ss = sub.add_parser("sol-sell", help="live Solana swap: sell the whole token balance to USDC")
+    ss.add_argument("mint")
+    ss.add_argument("--no-jito", action="store_true")
+
+    al = sub.add_parser("alert", help="send one alert to TRADEBOT_ALERT_WEBHOOK (used by systemd OnFailure)")
+    al.add_argument("message")
+    al.add_argument("--level", default="critical", choices=["info", "warn", "critical"])
 
     rv = sub.add_parser("review")
     rv.add_argument("--run-dir", default="runs/paper")
@@ -338,9 +370,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if g["passed"] else 1
 
     if args.cmd == "init-limits":
+        from .live import init_caps
         from .release import init_limits
 
         print(f"limits at {init_limits()}; edit to tighten (code refuses anything looser than the hard caps)")
+        print(f"live canary caps at {init_caps()}; dollars per order / position / day. Start small.")
         return 0
 
     if args.cmd == "approve":
@@ -367,6 +401,77 @@ def main(argv: list[str] | None = None) -> int:
         params = PolicyParams(**{**asdict(PolicyParams()), **spec.params})
         run_paper(spec.instrument, spec.timeframe, spec.engine, Path(args.run_dir), args.cash, params, limits, rel, exechub=args.exechub)
         return 0
+
+    if args.cmd == "go-live":
+        from .experiments import Register
+        from .live import authorize_live, launch_gates
+
+        reg = Register()
+        if args.gates_only:
+            gates = launch_gates(Path(args.paper_dir), reg)
+            for g in gates:
+                print(f"{'PASS' if g.passed else 'FAIL'}  {g.name}: {g.detail}")
+            return 0 if all(g.passed for g in gates) else 1
+        auth = authorize_live(reg, Path(args.paper_dir), args.operator, args.venue, accept_unproven=args.accept_unproven)
+        for g in auth["gates"]:
+            print(f"{'PASS' if g['passed'] else 'FAIL'}  {g['name']}: {g['detail']}")
+        flag = f"  UNPROVEN: {auth['unproven_accepted']}" if auth["unproven_accepted"] else ""
+        print(f"live authorized for {auth['venues']} until {auth['expires_ms']} (7 days), caps {auth['caps']}{flag}")
+        return 0
+
+    if args.cmd == "live":
+        from .live import require_live
+        from .live_runner import run_live
+        from .policy import PolicyParams
+        from .release import verify_release
+
+        require_live(args.venue)
+        spec, limits, rel = verify_release(Path(args.release))
+        params = PolicyParams(**{**asdict(PolicyParams()), **spec.params})
+        inst = args.instrument or spec.instrument
+        run_live(args.venue, inst, spec.timeframe, spec.engine, Path(args.run_dir or f"runs/live_{args.venue}_{inst}"),
+                 params, limits, rel)
+        return 0
+
+    if args.cmd == "live-check":
+        from .live import require_live
+
+        auth = require_live(args.venue)
+        print(f"authorization ok for {args.venue}; expires {auth.record['expires_ms']}; caps {auth.record['caps']}")
+        if args.venue == "solana":
+            from .solana_live import SolanaLiveTrader
+
+            t = SolanaLiveTrader.from_env()
+            from .onchain import USDC_MINT
+
+            print(f"wallet {t.keypair.pubkey()}: USDC {t.token_balance(USDC_MINT) / 1e6:,.2f}")
+            return 0
+        from .venues_live import build_live_client
+
+        c = build_live_client(args.venue, auth)
+        if args.venue == "cryptocom":
+            bal = c.balances()
+            print("balances:", {k: v for k, v in bal.items() if v})
+        elif args.venue == "alpaca":
+            print(f"cash {c.cash():,.2f}; market open {c.clock_open()}")
+        else:
+            print("account summary:", c._call("GET", "/summary")["account"].get("balance"))
+        return 0
+
+    if args.cmd in ("sol-buy", "sol-sell"):
+        from .solana_live import SolanaLiveTrader
+
+        t = SolanaLiveTrader.from_env(use_jito=not args.no_jito)
+        out = t.buy(args.mint, args.usdc, args.pool_owner, args.lp_mint) if args.cmd == "sol-buy" else t.sell_all(args.mint)
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "alert":
+        from .alerts import Alerts
+
+        ok = Alerts()(args.level, args.message)
+        print("sent" if ok else "not sent (TRADEBOT_ALERT_WEBHOOK unset or unreachable)")
+        return 0 if ok else 1
 
     if args.cmd == "review":
         print(run_review(Path(args.run_dir)))
@@ -402,7 +507,7 @@ def entry() -> int:
 
     try:
         return main()
-    except (FrozenError, ReleaseError, ValueError, KeyError) as e:
+    except (FrozenError, ReleaseError, ValueError, KeyError, RuntimeError) as e:
         print(f"refused: {e}", file=sys.stderr)
         return 2
 

@@ -1,0 +1,24 @@
+# One unit per venue: systemctl enable --now tradebot-live@cryptocom
+[Unit]
+Description=tradebot LIVE loop on %i
+After=network-online.target
+Wants=network-online.target
+OnFailure=tradebot-alert@%n.service
+# three crashes in ten minutes and it stays down until a human looks
+StartLimitIntervalSec=600
+StartLimitBurst=3
+
+[Service]
+User=trader
+WorkingDirectory=/srv/tradebot/state
+EnvironmentFile=/srv/tradebot/.env
+ExecStart=/srv/tradebot/venv/bin/tradebot live --venue %i
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/tradebot/state
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

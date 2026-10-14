@@ -1,0 +1,27 @@
+name: tradebot
+on:
+  push:
+    paths: ["trading-agent/**", ".github/workflows/tradebot.yml"]
+  pull_request:
+    paths: ["trading-agent/**", ".github/workflows/tradebot.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trading-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.25", cache-dependency-path: trading-agent/services/exechub/go.sum }
+      - run: pip install --only-binary=":all:" grpcio==1.66.2 && pip install -e ".[all]"
+      - name: Go tests
+        working-directory: trading-agent/services/exechub
+        run: go vet ./... && go test ./...
+      - name: Python tests (includes the Go hub integration tests)
+        run: python -m unittest discover -s tests -v
+      - name: Docker images build
+        run: docker build --target exechub -t exechub . && docker build --target tradebot -t tradebot .

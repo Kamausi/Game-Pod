@@ -1,0 +1,16 @@
+[Unit]
+Description=tradebot Go execution hub
+After=network-online.target
+
+[Service]
+User=trader
+WorkingDirectory=/srv/tradebot/state
+ExecStart=/srv/tradebot/bin/exechub -grpc 127.0.0.1:50051 -http 127.0.0.1:8080 -journal /srv/tradebot/state/exechub.jsonl
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/tradebot/state
+
+[Install]
+WantedBy=multi-user.target

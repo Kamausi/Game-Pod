@@ -1,8 +1,7 @@
 """Execution. PaperBroker simulates fills with fees and slippage.
 
-There is deliberately no live exchange broker in this package. Add one only
-after paper results pass the launch gates in README.md, and route it through
-GuardedBroker exactly like the paper one.
+Live venues (venues_live.py) mirror their real fills into a PaperBroker with
+`apply_fill`, so the agent, risk layer and journal see one book either way.
 """
 from __future__ import annotations
 
@@ -47,6 +46,10 @@ class PaperBroker:
         slip = (self.slippage_bps if slip_bps is None else slip_bps) / 1e4
         price = ref_price * (1 + slip) if side == "buy" else ref_price * (1 - slip)
         fee = qty * price * self.fee_bps / 1e4
+        return self.apply_fill(ts, instrument, side, qty, price, fee, reason)
+
+    def apply_fill(self, ts: int, instrument: str, side: str, qty: float, price: float, fee: float, reason: str) -> Fill:
+        """Book a fill at a known price and fee (paper fills, or a mirrored live fill)."""
         pos = self.position(instrument)
         signed = qty if side == "buy" else -qty
         new_qty = pos.qty + signed

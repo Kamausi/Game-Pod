@@ -178,7 +178,8 @@ tr.click { cursor: pointer; }
     </section>
 
     <section class="panel" aria-label="Market scanner">
-      <h2><span>Market scanner</span><span class="note">Click a row to chart it</span></h2>
+      <h2><span>Market scanner</span><span class="row"><label class="field" for="mktToggle"><input type="checkbox" id="mktToggle"> Live stocks &amp; FX</label><span class="note">Click a row to chart it</span></span></h2>
+      <p class="note" id="mktNote"></p>
       <div class="tw" style="max-height:none">
         <table>
           <thead><tr>
@@ -299,10 +300,10 @@ tr.click { cursor: pointer; }
         <label for="sGross">Max gross exposure %<div class="row"><input type="number" id="sGross" step="5" min="10" max="60" value="60"><span class="lock">10–60</span></div></label>
         <label for="sShort">Shorts<div class="row"><select id="sShort"><option value="0">Off (spot, long only)</option><option value="1">On</option></select></div></label>
       </div>
-      <p class="note">Per-asset tiers are fixed in code. Majors (BTC, ETH, SOL): up to 25% of equity, market orders, spread under 25 bps, $5M+ daily volume. Meme coins (DOGE, PEPE): up to 5% of equity, limit orders only, spread under 50 bps, $1M+ daily volume. Orders above 10% of equity are split into 3 TWAP slices.</p>
+      <p class="note">Per-asset tiers are fixed in code. Crypto majors (BTC, ETH, SOL): up to 25% of equity, market orders, spread under 25 bps, $5M+ daily volume. Meme coins (DOGE, PEPE): up to 5%, limit orders only, spread under 50 bps, $1M+ volume. Stocks (AAPL, SPY): up to 20%, spread under 20 bps, $20M+ volume, NYSE hours only. Penny stocks under $5 (SNDL): up to 2%, limit orders only, spread under 150 bps, $500k+ volume. FX majors (EUR, GBP, AUD vs USD): up to 30%, spread under 3 bps, Sunday 17:00 to Friday 17:00 New York. Orders above 10% of equity are split into 3 TWAP slices.</p>
     </section>
 
-    <p class="note">Live mode reads real prices through your Crypto.com connector and trades paper money only; nothing is sent to an exchange. The simulated market is a correlated random walk with regime changes and no edge to find, useful for watching the machinery at speed.</p>
+    <p class="note">Live mode reads real prices through your Crypto.com connector (and, when switched on, stocks and FX from Yahoo Finance through Firecrawl) and trades paper money only; nothing is sent to an exchange from this page. Real-money trading runs from the command-line app after the launch gates in LAUNCH.md. The simulated market is a correlated random walk with regime changes and no edge to find, useful for watching the machinery at speed.</p>
   </div>
 </main>
 
@@ -313,19 +314,44 @@ tr.click { cursor: pointer; }
 // Universe and fixed per-tier rules (code-owned; the UI can only tighten global limits)
 // =====================================================================================
 const ASSETS = [
-  { sym: 'BTC_USD', idx: 'BTCUSD-INDEX', tier: 'major', p0: 83300, beta: 1.0, ivol: 0.0006 },
-  { sym: 'ETH_USD', idx: 'ETHUSD-INDEX', tier: 'major', p0: 2496, beta: 1.2, ivol: 0.0008 },
-  { sym: 'SOL_USD', idx: 'SOLUSD-INDEX', tier: 'major', p0: 107, beta: 1.4, ivol: 0.0012 },
-  { sym: 'DOGE_USD', idx: 'DOGEUSD-INDEX', tier: 'meme', p0: 0.0842, beta: 1.6, ivol: 0.0018 },
-  { sym: 'PEPE_USD', idx: 'PEPEUSD-INDEX', tier: 'meme', p0: 0.000004176, beta: 1.9, ivol: 0.0026 },
+  { sym: 'BTC_USD', idx: 'BTCUSD-INDEX', tier: 'major', src: 'cc', p0: 83300, beta: 1.0, ivol: 0.0006, spreadBps: 1, simVol: 2e7 },
+  { sym: 'ETH_USD', idx: 'ETHUSD-INDEX', tier: 'major', src: 'cc', p0: 2496, beta: 1.2, ivol: 0.0008, spreadBps: 1, simVol: 4e7 },
+  { sym: 'SOL_USD', idx: 'SOLUSD-INDEX', tier: 'major', src: 'cc', p0: 107, beta: 1.4, ivol: 0.0012, spreadBps: 1, simVol: 6e7 },
+  { sym: 'DOGE_USD', idx: 'DOGEUSD-INDEX', tier: 'meme', src: 'cc', p0: 0.0842, beta: 1.6, ivol: 0.0018, spreadBps: 3, simVol: 1.2e6 },
+  { sym: 'PEPE_USD', idx: 'PEPEUSD-INDEX', tier: 'meme', src: 'cc', p0: 0.000004176, beta: 1.9, ivol: 0.0026, spreadBps: 6, simVol: 1.3e5 },
+  // Stocks and FX: Yahoo Finance 1-minute closes via the Firecrawl connector. No order book: spreads are estimates.
+  { sym: 'AAPL', ysym: 'AAPL', tier: 'stock', src: 'yahoo', p0: 231, beta: 0.45, ivol: 0.0005, spreadBps: 1.5, simVol: 1.1e10 },
+  { sym: 'SPY', ysym: 'SPY', tier: 'stock', src: 'yahoo', p0: 574, beta: 0.35, ivol: 0.0003, spreadBps: 0.5, simVol: 3e10 },
+  { sym: 'SNDL', ysym: 'SNDL', tier: 'penny', src: 'yahoo', p0: 2.12, beta: 0.6, ivol: 0.002, spreadBps: 45, simVol: 1.5e7 },
+  { sym: 'EUR_USD', ysym: 'EURUSD=X', tier: 'fx', src: 'yahoo', p0: 1.0912, beta: 0.04, ivol: 0.00008, spreadBps: 0.8, simVol: 0 },
+  { sym: 'GBP_USD', ysym: 'GBPUSD=X', tier: 'fx', src: 'yahoo', p0: 1.3065, beta: 0.05, ivol: 0.0001, spreadBps: 1.2, simVol: 0 },
+  { sym: 'AUD_USD', ysym: 'AUDUSD=X', tier: 'fx', src: 'yahoo', p0: 0.6618, beta: 0.08, ivol: 0.00012, spreadBps: 1.5, simVol: 0 },
 ];
+// group: which stress scenario hits it; bpd: one-minute bars per trading day; hours: when it can trade
 const TIER = {
-  major: { maxPos: 0.25, maxSpread: 25, minVol: 5e6, limitOnly: false, stressMove: -0.20 },
-  meme: { maxPos: 0.05, maxSpread: 50, minVol: 1e6, limitOnly: true, stressMove: -0.40 },
+  major: { label: 'crypto major', group: 'crypto', maxPos: 0.25, maxSpread: 25, minVol: 5e6, limitOnly: false, stressMove: -0.20, bpd: 1440, hours: 'always', maxAgeMs: 120000 },
+  meme: { label: 'meme coin', group: 'crypto', maxPos: 0.05, maxSpread: 50, minVol: 1e6, limitOnly: true, stressMove: -0.40, bpd: 1440, hours: 'always', maxAgeMs: 120000 },
+  stock: { label: 'stock', group: 'equity', maxPos: 0.20, maxSpread: 20, minVol: 2e7, limitOnly: false, stressMove: -0.10, bpd: 390, hours: 'nyse', maxAgeMs: 300000 },
+  penny: { label: 'penny stock', group: 'equity', maxPos: 0.02, maxSpread: 150, minVol: 5e5, limitOnly: true, stressMove: -0.35, bpd: 390, hours: 'nyse', maxAgeMs: 300000 },
+  fx: { label: 'FX major', group: 'fx', maxPos: 0.30, maxSpread: 3, minVol: 0, limitOnly: false, stressMove: -0.03, bpd: 1440, hours: 'fx', maxAgeMs: 300000 },
 };
+// US Eastern offset (hours) with US daylight saving: 2nd Sunday of March 07:00 UTC to 1st Sunday of November 06:00 UTC
+function nyOffset(ts) {
+  const y = new Date(ts).getUTCFullYear();
+  const nthSunday = (m, n) => { const d = new Date(Date.UTC(y, m, 1)); return Date.UTC(y, m, 1 + ((7 - d.getUTCDay()) % 7) + 7 * (n - 1)); };
+  return ts >= nthSunday(2, 2) + 7 * 3600e3 && ts < nthSunday(10, 1) + 6 * 3600e3 ? -4 : -5;
+}
+function isOpen(a, ts) {
+  const h = TIER[a.tier].hours; if (h === 'always') return true;
+  if (h === 'nyse' && a.session && S.mode === 'live') return ts >= a.session.start && ts < a.session.end;  // Yahoo's session: knows holidays
+  const ny = new Date(ts + nyOffset(ts) * 3600e3), dow = ny.getUTCDay(), mins = ny.getUTCHours() * 60 + ny.getUTCMinutes();
+  if (h === 'nyse') return dow >= 1 && dow <= 5 && mins >= 570 && mins < 960;  // 09:30–16:00 New York, no holiday calendar in simulation
+  return !(dow === 6 || (dow === 5 && mins >= 1020) || (dow === 0 && mins < 1020));  // FX: Sunday 17:00 to Friday 17:00 New York
+}
 const FEE = 6e-4, SLIP = 2e-4, BAR = 60000, START_CASH = 10000;
 const SIGNALS = ['trend', 'momentum', 'meanrev', 'breakout', 'flow', 'basis', 'sentiment'];
 const SIG_LABEL = { trend: 'Trend (MA 9/21, 1m + 15m)', momentum: 'Momentum (MACD 12/26/9)', meanrev: 'Mean reversion (RSI + Bollinger)', breakout: 'Breakout (30-bar range + volume)', flow: 'Order flow (top-of-book imbalance)', basis: 'Index gap (price vs multi-exchange index)', sentiment: 'News sentiment (last 6h)' };
+const NO_BOOK = 'no order book or per-minute volume from Yahoo: flow and breakout signals stay at 0, spread is an estimate';
 const REGIMES = ['trending', 'mean_reverting', 'high_vol', 'crisis'];
 const SIG_H = 15, CALL_H = 30, CLUSTER_RHO = 0.7, CLUSTER_CAP = 0.40, STRESS_GATE = 0.12, TWAP_ABOVE = 0.10;
 const P = { minConf: 0.75, minQ: 2, kelly: 0.25, volTarget: 0.01, rr: 2, stopAtr: 2, minStop: 0.003, allowShort: false };
@@ -433,19 +459,28 @@ function pWinFromHistory(regime) {  // empirical and shrunk; the prior sits just
 function markOf(a) { return a.tick ? (a.tick.bid + a.tick.ask) / 2 : a.bars.length ? a.bars[a.bars.length - 1].c : a.p0; }
 function equity() { return S.cash + S.assets.reduce((s, a) => s + a.pos.qty * markOf(a), 0); }
 function grossExposure(eq) { return S.assets.reduce((s, a) => s + Math.abs(a.pos.qty * markOf(a)), 0) / eq; }
-function correlation() {
-  const R = S.assets.map(a => logrets(a.bars.slice(-61).map(b => b.c)));
-  const n = Math.min(...R.map(r => r.length));
-  if (n < 20) return null;
-  const Z = R.map(r => { const x = r.slice(-n), m = mean(x), s = std(x) || 1e-12; return x.map(v => (v - m) / s); });
-  return Z.map(a => Z.map(b => a.reduce((s, v, i) => s + v * b[i], 0) / n));
+function correlation() {  // pairwise, on one-minute returns over bar times both assets share (markets keep different hours)
+  const R = S.assets.map(a => { const b = a.bars.slice(-121), m = new Map(); for (let k = 1; k < b.length; k++) if (b[k].t - b[k - 1].t === BAR) m.set(b[k].ct, Math.log(b[k].c / b[k - 1].c)); return m; });
+  let any = false;
+  const C = R.map((ri, i) => R.map((rj, j) => {
+    if (i === j) return 1;
+    const xs = [], ys = []; ri.forEach((v, k) => { if (rj.has(k)) { xs.push(v); ys.push(rj.get(k)); } });
+    if (xs.length < 20) return null;
+    const mx = mean(xs), my = mean(ys), sx = std(xs) || 1e-12, sy = std(ys) || 1e-12; any = true;
+    return xs.reduce((s, v, k) => s + (v - mx) * (ys[k] - my), 0) / xs.length / (sx * sy);
+  }));
+  return any ? C : null;
 }
 function stressTests(extra) {
   const eq = equity();
   const book = S.assets.map((a, i) => ({ a, notional: a.pos.qty * markOf(a) + (extra && extra.i === i ? extra.notional : 0) }));
-  const dailyVol = a => Math.max(std(logrets(a.bars.slice(-61).map(b => b.c))), 1e-6) * Math.sqrt(1440);
+  const dailyVol = a => Math.max(std(logrets(a.bars.slice(-61).map(b => b.c))), 1e-6) * Math.sqrt(TIER[a.tier].bpd);
+  const shock = grp => book.reduce((s, x) => s + (TIER[x.a.tier].group === grp ? x.notional * TIER[x.a.tier].stressMove : 0), 0);
   const sc = [
-    { name: 'Crypto crash: majors −20%, meme coins −40%', loss: book.reduce((s, x) => s + x.notional * TIER[x.a.tier].stressMove, 0) },
+    { name: 'Crypto crash: majors −20%, meme coins −40%', loss: shock('crypto') },
+    { name: 'Equity gap down: stocks −10%, penny stocks −35%', loss: shock('equity') },
+    { name: 'USD spike: FX majors −3% vs the dollar', loss: shock('fx') },
+    { name: 'Risk-off: all three at once', loss: shock('crypto') + shock('equity') + shock('fx') },
     { name: 'Flash crash −10%, stops gap 3% further', loss: book.reduce((s, x) => s - Math.abs(x.notional) * 0.13, 0) },
     { name: 'Correlations go to 1: every position −3 daily σ', loss: book.reduce((s, x) => s - Math.abs(x.notional) * Math.min(0.5, 3 * dailyVol(x.a)), 0) },
     { name: 'Liquidity crunch: spreads ×10, 1% exit slippage', loss: book.reduce((s, x) => s - Math.abs(x.notional) * (0.01 + 10 * (x.a.feat ? x.a.feat.spreadBps : 5) / 2e4), 0) },
@@ -459,7 +494,7 @@ function sizeTrade(a, f, d) {
   const win = take - cost, loss = stop + cost, b = win / loss;
   const fstar = win > 0 ? Math.max(0, d.p_win - (1 - d.p_win) / b) : 0;
   const kelly = P.kelly * fstar / loss;
-  const dailyVol = Math.max(f.rv24, 1e-6) * Math.sqrt(1440);
+  const dailyVol = Math.max(f.rv24, 1e-6) * Math.sqrt(TIER[a.tier].bpd);
   const volCap = P.volTarget / dailyVol;
   const dd = Math.max(0, 1 - eq / Math.max(S.peak, eq));
   const ddScale = dd >= 0.10 ? 0 : clamp(1 - dd / 0.10, 0.25, 1);
@@ -502,13 +537,14 @@ function policy(i, a, f, d) {
   const eq = equity(), tier = TIER[a.tier];
   const gates = [];
   const g = (name, ok, detail) => gates.push([name, ok, detail]);
-  g('Liquid (' + (tier.minVol / 1e6) + 'M+ daily, spread < ' + tier.maxSpread + ' bps)', !d.toxic_flow, '$' + fmtBig(f.vol24) + ' · ' + f.spreadBps.toFixed(1) + ' bps');
+  g(tier.minVol ? 'Liquid ($' + fmtBig(tier.minVol) + '+ daily, spread < ' + tier.maxSpread + ' bps)' : 'Spread < ' + tier.maxSpread + ' bps', !d.toxic_flow, (tier.minVol ? '$' + fmtBig(f.vol24) + ' · ' : '') + f.spreadBps.toFixed(1) + ' bps' + (a.src === 'yahoo' ? ' est.' : ''));
   g('Setup quality ≥ ' + P.minQ, d.setup_quality >= P.minQ, d.setup_quality + '/3');
   g('Confidence > ' + P.minConf.toFixed(2), d.direction_confidence > P.minConf, d.direction_confidence.toFixed(2));
   g('Has a direction', d.direction !== 'neutral', d.direction);
   g('Regime not crisis', d.regime !== 'crisis', d.regime.replace('_', ' '));
   g('Portfolio risk state safe', d.risk_state === 'safe', d.risk_state.replace('_', ' '));
   g('Side allowed', d.direction !== 'short' || P.allowShort, P.allowShort ? 'shorts on' : 'long only');
+  g('Market open', isOpen(a, S.now), tier.hours === 'always' ? '24/7' : isOpen(a, S.now) ? 'open' : tier.hours === 'fx' ? 'closed for the weekend' : 'closed (NYSE 09:30–16:00 New York)');
   if (S.killed) return { action: side ? 'exit' : 'hold', reason: 'kill switch: ' + S.killed, gates };
   if (side) {
     if (d.regime === 'crisis') return { action: 'exit', reason: 'crisis regime while in position', gates };
@@ -526,7 +562,7 @@ function policy(i, a, f, d) {
   const gross = grossExposure(eq) + Math.abs(notional) / eq;
   g('Gross exposure ≤ ' + Math.round(L.gross * 100) + '%', gross <= L.gross + 1e-9, (gross * 100).toFixed(0) + '% after');
   const C = S.corr; let cluster = Math.abs(notional) / eq;
-  if (C) S.assets.forEach((b, j) => { if (j !== i && b.pos.qty && Math.sign(b.pos.qty) === Math.sign(notional) && C[i][j] > CLUSTER_RHO) cluster += Math.abs(b.pos.qty * markOf(b)) / eq; });
+  if (C) S.assets.forEach((b, j) => { if (j !== i && b.pos.qty && Math.sign(b.pos.qty) === Math.sign(notional) && C[i][j] != null && C[i][j] > CLUSTER_RHO) cluster += Math.abs(b.pos.qty * markOf(b)) / eq; });
   g('Correlated cluster ≤ ' + (CLUSTER_CAP * 100) + '%', cluster <= CLUSTER_CAP + 1e-9, (cluster * 100).toFixed(0) + '% after');
   const worst = Math.max(...stressTests({ i, notional }).map(s => s.pct));
   g('Worst stress loss ≤ ' + (STRESS_GATE * 100) + '%', worst <= STRESS_GATE, (worst * 100).toFixed(1) + '% after');
@@ -552,7 +588,8 @@ function checkOrder(a, side, qty, price, ts, dataTs) {
   const why = [];
   if (S.killed) why.push('kill switch on');
   if (S.halted) why.push('daily loss limit');
-  if (ts - dataTs > L.maxAgeMs) why.push('stale data');
+  if (ts - dataTs > Math.max(L.maxAgeMs, TIER[a.tier].maxAgeMs)) why.push('stale data');
+  if (!isOpen(a, ts)) why.push('market closed');
   if (S.ordersToday >= L.maxOrders) why.push('order count limit');
   if (why.length) return { ok: false, why: why.join(', ') };
   const eq = equity(), cap = TIER[a.tier].maxPos * eq / price;
@@ -604,7 +641,7 @@ function act(i, intent, ts, bid, ask, dataTs) {
   if (TIER[a.tier].limitOnly) {
     const limit = side === 'buy' ? bid : ask;
     a.pendingLimit = { side, qty, limit, ttl: 3, intent };
-    log(ts, a.sym, 'limit', 'Limit ' + side + ' ' + fmtQty(qty) + ' at ' + fmtPx(limit) + ' (meme tier: limit orders only, expires in 3 bars)', 'info');
+    log(ts, a.sym, 'limit', 'Limit ' + side + ' ' + fmtQty(qty) + ' at ' + fmtPx(limit) + ' (' + TIER[a.tier].label + ' tier: limit orders only, expires in 3 bars)', 'info');
   } else if (intent.size > TWAP_ABOVE) {
     a.twap = { side, left: 3, slice: qty / 3, intent };
     log(ts, a.sym, 'twap', 'Order of ' + (intent.size * 100).toFixed(0) + '% of equity split into 3 TWAP slices', 'info');
@@ -673,7 +710,7 @@ function pushBar(i, b) {
   const a = S.assets[i];
   a.bars.push(b);
   if (a.bars.length > 900) { a.bars.splice(0, 300); shiftIndex(i, 300); }
-  if (S.mode === 'sim' && b.ct % 900000 === 0) {
+  if ((S.mode === 'sim' || a.src === 'yahoo') && b.ct % 900000 === 0) {
     const chunk = a.bars.filter(x => x.ct > b.ct - 900000 && x.ct <= b.ct);
     if (chunk.length) { a.bars15.push({ t: chunk[0].t, ct: b.ct, o: chunk[0].o, h: Math.max(...chunk.map(x => x.h)), l: Math.min(...chunk.map(x => x.l)), c: b.c, v: chunk.reduce((s, x) => s + x.v, 0) }); if (a.bars15.length > 200) a.bars15.splice(0, 100); }
   }
@@ -683,23 +720,27 @@ function simBar(t) {
   if (r() < 0.01) { S.mDrift = [-0.0004, 0, 0, 0, 0.0004][Math.floor(r() * 5)]; S.mVol = [0.0008, 0.0012, 0.0012, 0.0025][Math.floor(r() * 4)]; }
   const m = S.mDrift + gauss(r) * S.mVol;
   S.assets.forEach((a, i) => {
-    const prev = a.bars[a.bars.length - 1], o = prev ? prev.c : a.p0;
+    if (!isOpen(a, t)) { a.gap = (a.gap || 0) + a.beta * m + gauss(r) * a.ivol * 0.3; return; }  // closed: news still arrives, price gaps at the open
+    const prev = a.bars[a.bars.length - 1], o = (prev ? prev.c : a.p0) * Math.exp(a.gap || 0); a.gap = 0;
     const ret = a.beta * m + gauss(r) * a.ivol;
     const c = o * Math.exp(ret), h = Math.max(o, c) * (1 + Math.abs(gauss(r)) * a.ivol * 0.5), l = Math.min(o, c) * (1 - Math.abs(gauss(r)) * a.ivol * 0.5);
     const v = (1 + Math.abs(ret) / a.ivol) * (0.5 + r());
-    pushBar(i, { t, ct: t + BAR, o, h, l, c, v });
-    const hs = c * (a.tier === 'major' ? 1 : a.sym === 'PEPE_USD' ? 6 : 3) / 2e4;
-    a.tick = { bid: c - hs, ask: c + hs, bidSize: 1 + r() * 4, askSize: 1 + r() * 4, vol24: a.sym === 'PEPE_USD' ? 1.3e5 : a.tier === 'major' ? 2e7 * (i + 1) : 1.2e6, ts: t + BAR };
+    pushBar(i, { t, ct: t + BAR, o, h, l, c, v: book_v(a, v) });
+    const hs = c * a.spreadBps / 2e4, book = a.src !== 'yahoo';
+    a.tick = { bid: c - hs, ask: c + hs, bidSize: book ? 1 + r() * 4 : 1, askSize: book ? 1 + r() * 4 : 1, vol24: a.simVol, ts: t + BAR };
+    if (!a.idx) return;
     if (r() < 0.004) S.basisShock[i] = (r() < 0.5 ? -1 : 1) * (15 + r() * 20);
     const sh = S.basisShock[i] || 0; S.basisShock[i] = sh * 0.7;
     a.index = c * (1 - sh / 1e4 + gauss(r) * 0.0001);
   });
 }
+const book_v = (a, v) => a.src === 'yahoo' ? 0 : v;  // mirror the live source: Yahoo gives no per-minute volume
 function simStep() {
   const pending = S.pendingActs; S.pendingActs = [];
   const t = S.now;
   simBar(t); S.now = t + BAR;
   S.assets.forEach((a, i) => {
+    if (!isOpen(a, t) || !a.bars.length) return;  // nothing trades while its market is closed; the decision waits for a fresh bar
     const b = a.bars[a.bars.length - 1], hs = (a.tick.ask - a.tick.bid) / 2;
     const pa = pending.find(x => x.i === i);
     if (pa) act(i, pa.intent, b.t, b.o - hs, b.o + hs, pa.dataTs);   // decided at the last close, filled at this open
@@ -717,6 +758,9 @@ function afterBar(ts, sim) {
   riskUpdate(ts);
   S.assets.forEach((a, i) => {
     if (a.bars.length < 49 || a.err) return;
+    const lastCt = a.bars[a.bars.length - 1].ct;
+    if (a.decidedCt === lastCt) return;  // one decision per closed bar per asset (stocks and FX keep their own clocks)
+    a.decidedCt = lastCt;
     const r = decide(i); if (!r) return;
     a.last = { ...r, ts };
     if (r.intent.action !== 'hold') log(ts, a.sym, 'decision', r.d.regime.replace('_', ' ') + ' / ' + r.d.direction + ' (' + r.d.direction_confidence.toFixed(2) + ') → ' + r.intent.action + ': ' + r.intent.reason, 'muted');
@@ -786,11 +830,12 @@ async function liveTick() {
   liveBusy = true; const mine = S;
   try {
     const with15 = S.polls % 10 === 0; S.polls++;
-    const res = await Promise.allSettled(S.assets.map(a => fetchAsset(a, with15)));
+    const res = await Promise.allSettled(S.assets.map(a => a.src === 'cc' ? fetchAsset(a, with15) : Promise.resolve(null)));
     if (S !== mine) return;
     const now = Date.now(); let newBar = false, okCount = 0;
     res.forEach((r, i) => {
       const a = S.assets[i];
+      if (a.src !== 'cc') return;
       if (r.status !== 'fulfilled') { const e = r.reason || {}; a.err = { code: e.code || 'error', message: e.message || String(e) }; return; }
       okCount++; a.err = null;
       const m = r.value, lastCt = a.bars.length ? a.bars[a.bars.length - 1].ct : 0;
@@ -805,10 +850,65 @@ async function liveTick() {
     S.now = now;
     if (okCount === 0) { const e = res[0].reason || {}; S.liveErr = { code: e.code || 'error', message: e.message || String(e) }; }
     else S.liveErr = null;
-    if (!S.bh0 && S.assets.every(a => a.tick)) S.bh0 = S.assets.map(markOf);
+    benchmarkAnchor();
     if (newBar) afterBar(now, false);
     else if (okCount) { riskUpdate(now); S.stress = stressTests(); const eq = equity(); S.eq.push({ ts: now, eq, peak: Math.max(S.peak, eq) }); }
   } finally { liveBusy = false; render(); }
+}
+function benchmarkAnchor() {  // equal-weight buy and hold from the first price seen for each asset
+  if (!S.bh0) S.bh0 = S.assets.map(() => null);
+  S.assets.forEach((a, i) => { if (S.bh0[i] == null && a.tick) S.bh0[i] = markOf(a); });
+}
+// Stocks and FX in live mode: one Firecrawl read of Yahoo's spark endpoint covers all six (1 credit, every 2 minutes)
+const YAHOO_URL = 'https://query1.finance.yahoo.com/v7/finance/spark?symbols=' + ASSETS.filter(a => a.ysym).map(a => encodeURIComponent(a.ysym)).join(',') + '&range=1d&interval=1m';
+let MKT = { lastFetch: 0, err: null, busy: false };
+function applyYahoo(js, now) {
+  let newBar = false;
+  const res = (js && js.spark && js.spark.result) || [];
+  res.forEach(x => {
+    const i = S.assets.findIndex(a => a.ysym === x.symbol), r = x.response && x.response[0];
+    if (i < 0 || !r) return;
+    const a = S.assets[i], m = r.meta || {}, ts = r.timestamp || [], cl = (r.indicators && r.indicators.quote && r.indicators.quote[0].close) || [];
+    const lastCt = a.bars.length ? a.bars[a.bars.length - 1].ct : 0;
+    let prev = a.bars.length ? a.bars[a.bars.length - 1].c : null;
+    for (let k = 0; k < ts.length; k++) {
+      const c = cl[k], t = ts[k] * 1000, ct = t + BAR;
+      if (!isFinite(c) || c == null || ct > now) continue;      // never the still-forming minute
+      if (ct <= lastCt) { prev = c; continue; }
+      const o = prev == null ? c : prev;
+      pushBar(i, { t, ct, o, h: Math.max(o, c), l: Math.min(o, c), c, v: 0 }); newBar = true; prev = c;
+    }
+    const px = +m.regularMarketPrice || (a.bars.length ? a.bars[a.bars.length - 1].c : NaN);
+    if (!isFinite(px)) return;
+    const hs = px * a.spreadBps / 2e4, reg = m.currentTradingPeriod && m.currentTradingPeriod.regular;
+    a.tick = { bid: px - hs, ask: px + hs, bidSize: 1, askSize: 1, vol24: TIER[a.tier].group === 'equity' ? (+m.regularMarketVolume || 0) * px : 0,
+      ts: (+m.regularMarketTime || now / 1000) * 1000, recv: now };
+    if (reg && TIER[a.tier].hours === 'nyse') a.session = { start: reg.start * 1000, end: reg.end * 1000 };
+    a.err = null;
+    if (isOpen(a, now)) {
+      const lb = a.bars[a.bars.length - 1];
+      workLimit(a, now, lb ? lb.l : px, lb ? lb.h : px, a.tick.ts);
+      checkExits(a, now, px, px, px, hs, a.tick.ts);
+      if (a.twap && S.running) workTwap(a, now, a.tick.bid, a.tick.ask, a.tick.ts);
+    }
+  });
+  return newBar;
+}
+async function fetchMarkets() {
+  if (!FEEDS.mkt || S.mode !== 'live' || !MCP || MKT.busy) return;
+  MKT.busy = true; const mine = S;
+  try {
+    const r = await MCP.callTool(FC, 'firecrawl_scrape', { url: YAHOO_URL, objective: 'Read one-minute stock and FX prices (AAPL, SPY, SNDL, EUR/USD, GBP/USD, AUD/USD) for a paper trading dashboard.', formats: ['rawHtml'], maxAge: 0 }, { cache: false });
+    if (S !== mine) return;
+    const p = unwrap(r), raw = (p && (p.rawHtml || (p.data && p.data.rawHtml))) || '';
+    const js = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+    const now = Date.now();
+    const nb = applyYahoo(js, now);
+    MKT.err = null; MKT.lastFetch = now; S.now = Math.max(S.now, now);
+    benchmarkAnchor();
+    if (nb) afterBar(now, false);
+  } catch (e) { MKT.err = (e && e.code) ? e.code + (e.message ? ': ' + e.message : '') : (e && e.message) || String(e); }
+  finally { MKT.busy = false; render(); }
 }
 function pickTools(list) {
   const names = (list || []).map(t => t.name);
@@ -836,7 +936,7 @@ if (window.claude && typeof window.claude.use === 'function') {
 // =====================================================================================
 // Extra feeds: news sentiment and cross-exchange gaps (opt-in; live mode uses the Firecrawl connector)
 // =====================================================================================
-const FEEDS = { news: false, arb: false };
+const FEEDS = { news: false, arb: false, mkt: false };
 let FC = 'Firecrawl', SAMPLE = null;
 let SENT, ARB;
 function resetFeeds() {
@@ -844,7 +944,8 @@ function resetFeeds() {
   ARB = { rows: [], lastFetch: 0, err: null, pnl: 0, trades: 0, krTs: 0 };
 }
 resetFeeds();
-const KW = { BTC_USD: ['bitcoin', 'btc'], ETH_USD: ['ethereum', 'ether', 'eth'], SOL_USD: ['solana', 'sol'], DOGE_USD: ['dogecoin', 'doge'], PEPE_USD: ['pepe'] };
+const KW = { BTC_USD: ['bitcoin', 'btc'], ETH_USD: ['ethereum', 'ether', 'eth'], SOL_USD: ['solana', 'sol'], DOGE_USD: ['dogecoin', 'doge'], PEPE_USD: ['pepe'],
+  AAPL: ['apple', 'aapl', 'iphone'], SPY: ['spy', 'stocks', 'equities', 'nasdaq'], SNDL: ['sndl', 'sundial'], EUR_USD: ['euro', 'ecb'], GBP_USD: ['sterling', 'pound', 'boe'], AUD_USD: ['aussie', 'rba'] };
 const POSW = new Set('surge surges rally rallies soar soars gain gains jump jumps record high approve approved approval inflow inflows bullish upgrade adopt adoption partnership launch beat rebound rise rises climbs'.split(' '));
 const NEGW = new Set('crash crashes plunge plunges drop drops fall falls hack hacked exploit lawsuit sue sued ban bans outflow outflows bearish liquidation liquidations fraud selloff dump reject rejected delay delays probe fine fined low slump sliding slides slide'.split(' '));
 const NEGATORS = new Set('not no never denies deny without'.split(' '));
@@ -879,7 +980,8 @@ async function fetchNews() {
   if (!MCP || SENT.busy) return;
   SENT.busy = true;
   try {
-    const r = await MCP.callTool(FC, 'firecrawl_search', { query: 'bitcoin OR ethereum OR solana OR dogecoin OR pepe crypto', objective: 'Recent crypto news headlines to score short-term market sentiment for a paper trading dashboard.', sources: ['news'], limit: 10, tbs: 'qdr:h' }, { cache: false });
+    const q = 'bitcoin OR ethereum OR solana OR dogecoin OR pepe crypto' + (FEEDS.mkt ? ' OR Apple stock OR stock market OR euro OR sterling OR Australian dollar' : '');
+    const r = await MCP.callTool(FC, 'firecrawl_search', { query: q, objective: 'Recent market news headlines to score short-term sentiment for a paper trading dashboard.', sources: ['news'], limit: FEEDS.mkt ? 15 : 10, tbs: 'qdr:h' }, { cache: false });
     const p = unwrap(r), news = (p && p.data && p.data.news) || [];
     const added = addHeadlines(news.map(n => ({ id: n.url || n.title, title: n.title, src: (n.url || '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0] })), Date.now());
     SENT.err = null; SENT.lastFetch = Date.now(); SENT.lastAdded = added;
@@ -935,15 +1037,22 @@ async function fetchArb() {
   });
   render();
 }
-let newsTimer = null, arbTimer = null;
+let newsTimer = null, arbTimer = null, mktTimer = null;
 function scheduleFeeds() {
-  clearInterval(newsTimer); clearInterval(arbTimer);
+  clearInterval(newsTimer); clearInterval(arbTimer); clearInterval(mktTimer);
   if (S.mode !== 'live') return;  // simulated mode drives feeds from the bar clock
+  S.assets.forEach(a => { if (a.src === 'yahoo' && !FEEDS.mkt) a.err = { code: 'off', message: 'stocks & FX feed is off' }; else if (a.src === 'yahoo' && a.err && a.err.code === 'off') a.err = null; });
+  if (FEEDS.mkt) { fetchMarkets(); mktTimer = setInterval(fetchMarkets, 2 * 60e3); }
   if (FEEDS.news) { fetchNews(); newsTimer = setInterval(fetchNews, 15 * 60e3); }
   if (FEEDS.arb) { fetchArb(); arbTimer = setInterval(fetchArb, 2 * 60e3); }
 }
 function renderFeeds() {
   const live = S.mode === 'live';
+  $('mktToggle').checked = FEEDS.mkt; $('mktToggle').disabled = !live;
+  $('mktNote').textContent = !live ? 'Stocks and FX are simulated here with real trading hours: NYSE 09:30–16:00 New York for AAPL, SPY and SNDL; Sunday 17:00 to Friday 17:00 for FX. Prices gap at the open. ' + NO_BOOK + '.'
+    : !FEEDS.mkt ? 'Stocks & FX are off. Turn on to read AAPL, SPY, SNDL, EUR/USD, GBP/USD and AUD/USD from Yahoo Finance through your Firecrawl connector every 2 minutes (1 credit each time). Crypto keeps updating every 30 s from Crypto.com.'
+    : MKT.err ? 'Stock and FX prices didn\'t load: ' + MKT.err + '. Trying again in 2 minutes.'
+    : MKT.lastFetch ? 'Yahoo read ' + new Date(MKT.lastFetch).toISOString().slice(11, 19) + ' UTC via Firecrawl; next in 2 minutes. Yahoo prices can lag the exchange; the stale-data limit for these is 5 minutes. ' + NO_BOOK + '.' : 'Reading Yahoo Finance…';
   $('newsNote').textContent = !FEEDS.news ? 'Off. Turn on to pull crypto headlines through your Firecrawl connector every 15 minutes (about 2 credits each time). Headlines are scored instantly with a built-in word list; press "Re-score with Claude" for a closer read.'
     : !live ? 'Simulated headlines (random, no information about future prices), one every 15 bars. They show how the signal is weighted and scored.'
     : SENT.err ? 'News didn\'t load: ' + SENT.err + '. The sentiment signal stays at 0 until it does.'
@@ -973,7 +1082,7 @@ const fmtPx = p => !isFinite(p) ? '—' : p >= 1000 ? p.toLocaleString('en-US', 
 const fmtQty = q => Math.abs(q) >= 1e6 ? (q / 1e6).toFixed(2) + 'M' : Math.abs(q) >= 1000 ? q.toFixed(0) : Math.abs(q) >= 1 ? q.toFixed(3) : q.toPrecision(3);
 const fmtBig = v => !v ? '—' : v >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k' : v.toFixed(0);
 const tfmt = ts => new Date(ts).toISOString().slice(5, 16).replace('T', ' ');
-const short = s => s.replace('_USD', '');
+const short = s => TIER[(ASSETS.find(a => a.sym === s) || {}).tier] === TIER.fx ? s.replace('_', '/') : s.replace('_USD', '');
 const $ = id => document.getElementById(id);
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
@@ -1057,7 +1166,7 @@ function render() {
   else if (S.halted) { sp.textContent = 'Halted today'; sp.className = 'pill p-warn'; }
   else if (S.running) { sp.textContent = 'Running'; sp.className = 'pill p-good'; }
   else { sp.textContent = 'Paused'; sp.className = 'pill p-warn'; }
-  $('srcPill').textContent = S.mode === 'sim' ? 'Simulated · 5 assets' : 'Live · 5 assets';
+  $('srcPill').textContent = (S.mode === 'sim' ? 'Simulated · ' : 'Live · ') + S.assets.length + ' assets';
   $('src').value = S.mode;
   $('runBtn').textContent = S.running ? 'Pause' : 'Start';
   $('stepBtn').disabled = S.mode === 'live';
@@ -1066,22 +1175,23 @@ function render() {
   if (S.killed) kb.innerHTML = '<b>Kill switch on:</b> ' + esc(S.killed) + '. No new trades. Open positions are closed on the next bar.';
 
   const lb = $('liveBanner'); let html = '';
-  const ready = S.assets.filter(a => a.bars.length >= 49).length;
+  const want = S.assets.filter(a => !(a.err && a.err.code === 'off')), ready = want.filter(a => a.bars.length >= 49).length;
   if (S.mode === 'live' && S.liveErr) {
     const e = S.liveErr;
     const fix = MCP_HELP[e.code] || (e.code === 'server_unavailable' ? 'Crypto.com didn\'t answer. Trying again every 30 seconds; last prices stay on screen.' : e.code === 'tool_error' ? 'Crypto.com reported an error: ' + e.message : e.code === 'http' ? 'Live prices didn\'t load (' + e.message + '). Open the page on claude.ai with the Crypto.com connector added.' : 'Live prices didn\'t load.');
     html = '<b>Live prices:</b> ' + esc(fix) + ' <button type="button" id="liveRetry">Retry now</button><button type="button" id="toSim">Use simulated market</button><span class="note">Details: code <code>' + esc(e.code) + '</code> · ' + esc(e.message || '') + (mcpDiag ? ' · ' + esc(mcpDiag) : '') + '</span>';
   } else if (S.mode === 'sim' && liveUnavailable) {
     html = '<b>Showing the simulated market.</b> Live prices need Crypto.com connector access, which this view doesn\'t allow. Open the page signed in on claude.ai with the Crypto.com connector added.';
-  } else if (S.mode === 'live' && ready < S.assets.length) {
-    const failing = S.assets.filter(a => a.err).map(a => short(a.sym));
-    html = ready === 0 && !S.assets.some(a => a.bars.length) ? '<b>Connecting to Crypto.com…</b> first prices arrive in a few seconds.' : '<b>Warming up:</b> ' + ready + ' of ' + S.assets.length + ' assets have enough history (49 one-minute bars).' + (failing.length ? ' No data for ' + failing.join(', ') + '.' : '');
+  } else if (S.mode === 'live' && ready < want.length) {
+    const failing = want.filter(a => a.err).map(a => short(a.sym)), shut = want.filter(a => a.bars.length < 49 && !a.err && !isOpen(a, S.now)).map(a => short(a.sym));
+    html = ready === 0 && !S.assets.some(a => a.bars.length) ? '<b>Connecting to Crypto.com…</b> first prices arrive in a few seconds.' : '<b>Warming up:</b> ' + ready + ' of ' + want.length + ' assets have enough history (49 one-minute bars).' + (failing.length ? ' No data for ' + failing.join(', ') + '.' : '') + (shut.length ? ' Market closed for ' + shut.join(', ') + '; they start at the next open.' : '');
   }
   lb.hidden = !html; lb.innerHTML = html;
   const rb = $('liveRetry'); if (rb) rb.onclick = () => liveTick();
   const ts = $('toSim'); if (ts) ts.onclick = () => start('sim');
 
-  const bh = S.bh0 ? mean(S.assets.map((a, i) => markOf(a) / S.bh0[i] - 1)) : 0;
+  const bhx = S.bh0 ? S.assets.map((a, i) => S.bh0[i] ? markOf(a) / S.bh0[i] - 1 : null).filter(x => x != null) : [];
+  const bh = bhx.length ? mean(bhx) : 0;
   $('kEq').textContent = usd(eq);
   $('kEqSub').textContent = pct(eq / START_CASH - 1) + ' · equal-weight hold ' + pct(bh);
   const dd = Math.max(0, 1 - eq / Math.max(S.peak, eq));
@@ -1098,7 +1208,9 @@ function render() {
 
   $('scanBody').innerHTML = S.assets.map((a, i) => {
     const f = a.feat, d = a.last && a.last.d, tier = TIER[a.tier], flags = [];
-    if (a.err) flags.push('<span class="tag p-risk">no data</span>');
+    if (a.err) flags.push(a.err.code === 'off' ? '<span class="tag p-mute">feed off</span>' : '<span class="tag p-risk">no data</span>');
+    if (!isOpen(a, S.now)) flags.push('<span class="tag p-mute">market closed</span>');
+    if (a.src === 'yahoo') flags.push('<span class="tag p-mute">spread est.</span>');
     if (f) {
       if (f.vol24 && f.vol24 < tier.minVol) flags.push('<span class="tag p-risk">illiquid</span>');
       if (f.spreadBps > tier.maxSpread) flags.push('<span class="tag p-risk">wide spread</span>');
@@ -1107,7 +1219,7 @@ function render() {
       if (f.breakoutUp || f.breakoutDn) flags.push('<span class="tag p-info">breakout</span>');
       if (Math.abs(f.imbalance) > 0.6) flags.push('<span class="tag p-info">book imbalance</span>');
     }
-    if (a.tier === 'meme') flags.push('<span class="tag p-mute">meme · limit only</span>');
+    if (TIER[a.tier].limitOnly) flags.push('<span class="tag p-mute">' + TIER[a.tier].label + ' · limit only</span>');
     const arrow = t => t > 0 ? '▲' : t < 0 ? '▼' : '–';
     const posTxt = a.pos.qty ? (a.pos.qty > 0 ? 'Long ' : 'Short ') + (Math.abs(a.pos.qty * markOf(a)) / eq * 100).toFixed(0) + '% · ' + pct((markOf(a) / a.pos.avg - 1) * Math.sign(a.pos.qty), 1) : a.pendingLimit ? 'limit working' : a.twap ? 'TWAP working' : '—';
     return '<tr class="click' + (i === S.sel ? ' sel' : '') + '" data-i="' + i + '"><td class="sym">' + short(a.sym) + '</td>' +
@@ -1125,7 +1237,7 @@ function render() {
 
   $('assetTabs').innerHTML = S.assets.map((x, i) => '<button type="button" role="tab" aria-selected="' + (i === S.sel) + '" data-i="' + i + '">' + short(x.sym) + '</button>').join('');
   const a = S.assets[S.sel];
-  $('priceTitle').textContent = short(a.sym) + ' · 1m bars' + (S.mode === 'sim' ? ' · simulated' : MCP ? ' · via Crypto.com connector' : '');
+  $('priceTitle').textContent = short(a.sym) + ' · 1m bars' + (S.mode === 'sim' ? ' · simulated' : a.src === 'yahoo' ? ' · Yahoo Finance via Firecrawl' : MCP ? ' · via Crypto.com connector' : '');
   $('priceLast').textContent = a.bars.length ? fmtPx(markOf(a)) : '';
   $('eqLast').textContent = usd(eq);
 
@@ -1150,7 +1262,7 @@ function render() {
 
   const C = S.corr;
   $('corrHead').innerHTML = '<tr><th></th>' + S.assets.map(x => '<th class="n">' + short(x.sym) + '</th>').join('') + '</tr>';
-  $('corrBody').innerHTML = C ? S.assets.map((x, i) => '<tr><td class="sym">' + short(x.sym) + '</td>' + C[i].map((r, j) => '<td class="n" style="background:' + (i === j ? 'transparent' : corrColor(r)) + '">' + (i === j ? '—' : r.toFixed(2)) + '</td>').join('') + '</tr>').join('') : '<tr><td class="note" colspan="6">Needs 20 one-minute bars for every asset.</td></tr>';
+  $('corrBody').innerHTML = C ? S.assets.map((x, i) => '<tr><td class="sym">' + short(x.sym) + '</td>' + C[i].map((r, j) => '<td class="n" style="background:' + (i === j || r == null ? 'transparent' : corrColor(r)) + '">' + (i === j ? '—' : r == null ? '<span class="note">n/a</span>' : r.toFixed(2)) + '</td>').join('') + '</tr>').join('') : '<tr><td class="note" colspan="' + (S.assets.length + 1) + '">Needs 20 shared one-minute bars for a pair of assets.</td></tr>';
 
   const sp2 = $('stressPill');
   sp2.textContent = worst.pct > STRESS_GATE ? 'Over gate' : worst.pct > STRESS_GATE / 2 ? 'Elevated' : 'Within limits';
@@ -1191,14 +1303,14 @@ function schedule() {
 function start(mode) {
   S = freshState(mode); S.speed = +$('speed').value; resetFeeds();
   if (mode === 'sim') {
-    S.now = Math.floor(Date.UTC(2026, 9, 1) / 900000) * 900000;
+    S.now = Date.UTC(2026, 9, 1, 2, 0);  // opens at 15:00 UTC on a Thursday: crypto, FX and the NYSE session all trading
     for (let k = 0; k < 420; k++) { simBar(S.now); S.now += BAR; }
-    S.bh0 = S.assets.map(markOf);
-    log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + ' on a simulated 5-asset market.', 'info');
+    benchmarkAnchor();
+    log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + ' on a simulated ' + S.assets.length + '-asset market: 5 crypto, 3 stocks, 3 FX pairs, each with its real trading hours.', 'info');
     for (let k = 0; k < 360; k++) simStep();  // open in a working state: six simulated hours already traded
   } else {
     S.now = Date.now();
-    log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + '. Reading live prices for BTC, ETH, SOL, DOGE and PEPE every 30 s; deciding once per closed 1-minute bar.', 'info');
+    log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + '. Reading live prices for BTC, ETH, SOL, DOGE and PEPE every 30 s' + (FEEDS.mkt ? ', and stocks and FX every 2 minutes' : '') + '; deciding once per closed 1-minute bar.', 'info');
   }
   render(); schedule(); scheduleFeeds();
 }
@@ -1226,6 +1338,7 @@ bindSetting('sDay', 0.5, 3, v => L.dayLoss = v / 100);
 bindSetting('sGross', 10, 60, v => L.gross = v / 100);
 $('newsToggle').addEventListener('change', e => { FEEDS.news = e.target.checked; log(S.now, '—', 'setting', 'Live news ' + (FEEDS.news ? 'on' : 'off'), 'muted'); scheduleFeeds(); if (S.mode === 'sim' && FEEDS.news) fetchNews(); render(); });
 $('arbToggle').addEventListener('change', e => { FEEDS.arb = e.target.checked; log(S.now, '—', 'setting', 'Cross-exchange scan ' + (FEEDS.arb ? 'on' : 'off'), 'muted'); scheduleFeeds(); if (S.mode === 'sim' && FEEDS.arb) fetchArb(); render(); });
+$('mktToggle').addEventListener('change', e => { FEEDS.mkt = e.target.checked; log(S.now, '—', 'setting', 'Stocks & FX feed ' + (FEEDS.mkt ? 'on' : 'off'), 'muted'); scheduleFeeds(); render(); });
 $('claudeBtn').addEventListener('click', scoreWithClaude);
 $('sShort').addEventListener('change', e => { P.allowShort = e.target.value === '1'; log(S.now, '—', 'setting', 'Shorts ' + (P.allowShort ? 'on' : 'off'), 'muted'); render(); });
 bindHover($('cPrice'), $('tipPrice'), 'price', i => { const p = pricePts[i].c; return tfmt(p.ct) + '<br>O ' + fmtPx(p.o) + '  H ' + fmtPx(p.h) + '<br>L ' + fmtPx(p.l) + '  C ' + fmtPx(p.c); });

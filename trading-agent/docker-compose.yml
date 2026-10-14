@@ -1,0 +1,38 @@
+# Paper trading by default. Live trading is a separate profile and still refuses
+# to start without `tradebot go-live` having been run (interactively) first:
+#   docker compose run --rm -it trader go-live --operator you --venue cryptocom
+#   docker compose --profile live up -d
+# Optional TimescaleDB: docker compose --profile db up -d timescaledb
+services:
+  exechub:
+    build: { context: ., target: exechub }
+    restart: unless-stopped
+    volumes: ["./state/exechub:/data"]
+    ports: ["127.0.0.1:8080:8080"]   # dashboard: local only
+    expose: ["50051"]
+
+  trader:
+    build: { context: ., target: tradebot }
+    restart: unless-stopped
+    env_file: .env
+    volumes: ["./state:/state"]
+    depends_on: [exechub]
+    command: ["paper", "--run-dir", "runs/paper", "--exechub", "exechub:50051"]
+
+  live:
+    profiles: ["live"]
+    build: { context: ., target: tradebot }
+    restart: on-failure:3            # a crash loop must stop and page, not keep trading
+    env_file: .env
+    volumes: ["./state:/state"]
+    command: ["live", "--venue", "${LIVE_VENUE:-cryptocom}"]
+
+  timescaledb:
+    profiles: ["db"]
+    image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: tradebot
+    volumes: ["./state/pg:/var/lib/postgresql/data", "./sql/timescale.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro"]
+    ports: ["127.0.0.1:5432:5432"]

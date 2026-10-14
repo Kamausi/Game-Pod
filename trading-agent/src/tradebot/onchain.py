@@ -9,10 +9,9 @@ complete counts as a failure. Checks:
 
 DexPaperTrader gets a real route quote from Jupiter, refuses trades whose price
 impact exceeds the cap, and records a paper fill at the quoted output minus
-extra slippage. It never builds, signs or sends a transaction. Signing and
-sending (including Jito bundles) is intentionally absent: it needs a funded
-wallet and private keys, and it would bypass the release gate that every other
-live path in this system goes through.
+extra slippage. It never builds, signs or sends a transaction. Real swaps
+(signing, simulation, RPC or Jito bundle sending) live in solana_live.py and
+require a go-live authorization like every other live path.
 
 Not tested against a live RPC or Jupiter from the build environment.
 """

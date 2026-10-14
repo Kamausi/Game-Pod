@@ -4,3 +4,5 @@ runs/
 KILL
 services/exechub/exechub
 exechub.jsonl
+state/
+.env

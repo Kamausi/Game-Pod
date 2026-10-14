@@ -1,8 +1,9 @@
 """Direct broker adapters for stocks (Alpaca) and forex (OANDA), plus a router.
 
 Both adapters are locked to the brokers' PAPER / PRACTICE hosts. Pointing them
-at a live host raises, by design: going live is a separate, reviewed change
-behind the release gate, not a config flag.
+at a live host raises, by design. The live-host versions are AlpacaLive and
+OandaLive in venues_live.py, which refuse to construct without a go-live
+authorization (live.py), not a config flag.
 
 Order shapes follow the brokers' public REST docs (Alpaca Trading API v2,
 OANDA v20). They are covered by tests against a fake transport but have NOT
