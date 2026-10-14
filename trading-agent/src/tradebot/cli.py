@@ -64,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "unkill":
         # Deliberately manual: clearing a drawdown kill is a human decision.
         risk.latched = None
+        risk.peak_equity = 0.0  # re-anchor the drawdown peak, or the next update re-trips the kill
         risk.kill_file.unlink(missing_ok=True)
         risk._save()
         print("kill switch cleared")
