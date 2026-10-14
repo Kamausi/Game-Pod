@@ -197,6 +197,27 @@ base rate. Do not go live."*
 risk stays bounded, and the review catches it. A big profit on that data would
 mean a bug.
 
+## 11. Research, validation, release, execution: kept separate
+
+Each stage is its own module with a hard boundary. A research agent (Claude or anything else) can run the first four rows but holds no broker credentials and can't approve its own work.
+
+| Stage | Module | What it does | Boundary enforced in code |
+|---|---|---|---|
+| Data | `experiments.DataSnapshot`, `tradebot data snapshot` | Fingerprints every dataset (sha256 of the exact bars) and keeps a copy; snapshots record source, fetch time and availability rule | A run can't cite data that isn't stored byte for byte |
+| Explore | `validation.sweep` | Runs a parameter grid on a training window | **Every** configuration goes into the append-only register (`runs/research/register.jsonl`), failures included |
+| Freeze | `Register.freeze` | Turns one configuration into a candidate whose id is the hash of its spec | Changing any parameter makes a new candidate |
+| Final | `validation.final_evaluation` | One evaluation on a holdout window | Refused if the candidate isn't frozen, if the holdout overlaps any training window of that family, or if it was already evaluated once |
+| Statistics | `validation.assess` | Sharpe, skew, kurtosis, and the **Deflated Sharpe Ratio** using the number of configurations actually tried | Trial count comes from the register, not from what the researcher reports |
+| Benchmark | `backtest.benchmark_net` | Buy-and-hold under the *same* execution model and costs | Strategy and benchmark pay the same spread, slippage and fees |
+| Evidence | `tradebot evidence --run ID` | Writes `evidence.json` + `evidence.md`: spec, data hash, engine version (package, git commit, source hash), assumptions, cost model, benchmark, every variation tried, orders, equity curve | Reconciles before it says "reconciled": identical fills on re-run, independent ledger replay of equity, match with the register, and optionally a second engine's results (`--external`, e.g. LEAN/QuantConnect/QuantGPT output) compared trade by trade |
+| Ops gate | `tradebot opsgate` | Fault scenarios: duplicate orders (including across a restart), partial fills, stale data, rejected orders, restart recovery (unknown-outcome orders and position drift), kill-switch latency, limits that try to loosen | Recorded against the engine source hash; any code change invalidates it |
+| Approve | `tradebot approve` | Operator only. Needs a successful final run, a reconciled evidence package, a passed ops gate for the current code, and a typed confirmation in an interactive terminal | Can't be piped or scripted; weak evidence (lost to the benchmark, or DSR < 0.95) is refused unless `--accept-weak-evidence`, which is written into the release |
+| Execute | `tradebot paper`, `execution.OrderManager` | Starts only if the release, the risk-limits file hash and the engine source hash all still match. Orders carry idempotent client ids written to a ledger before sending; restart reconciles the ledger with the venue and stops on any mismatch | Research output can't change limits (`config/risk_limits.json` is hashed into the release) or redeploy code (source hash) without a new approval |
+
+Code can't stop someone who controls the whole machine. In production, run the trader as a separate OS user that owns `config/` and `releases/`, and keep broker keys only in that user's environment.
+
+**Not done yet:** an independent re-implementation of the *signal logic* (reconciliation currently checks determinism and accounting; supply an external engine's results to check the signals), equity-specific data handling (total-return series, survivorship-free universes, delisting returns), and a live broker adapter. Paper trading tests the machinery (scheduling, orders, restarts), not profitability: a month of 1-hour bars is far too few independent decisions to prove an edge.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
@@ -227,28 +248,38 @@ mean a bug.
 
 ## START HERE FIRST
 
+**Fastest:** open the hosted desk app (`app/tradebot.html`, published on claude.ai). It trades paper money on live Crypto.com prices through your Crypto.com connector.
+
+**The full research → release workflow, from the `trading-agent` folder:**
+
 ```bash
-cd trading-agent
-PYTHONPATH=src python3 -m unittest discover -s tests
+export PYTHONPATH=src
+python3 -m unittest discover -s tests                      # 32 tests
 
-# 1. See the full pipeline on synthetic data (no network, no keys)
-PYTHONPATH=src python3 -m tradebot backtest --synthetic 3000 --run-dir runs/bt
-PYTHONPATH=src python3 -m tradebot review --run-dir runs/bt
+# 1. Data with provenance (or use synthetic:N:seed to practise; it has no real edge)
+python3 -m tradebot data snapshot --instrument BTC_USD --timeframe 1h --out data/btc_1h.json
 
-# 2. Check the exchange feed from your machine
-PYTHONPATH=src python3 -m tradebot status --probe
+# 2. Explore on the training window only; every run is recorded
+python3 -m tradebot research sweep --family trend_v1 --data synthetic:4000:11 --train 0:2500 \
+  --grid '{"reward_risk":[1.5,2,3],"stop_atr_mult":[1.0,1.5,2.0]}'
+python3 -m tradebot register
 
-# 3. Paper trade 24/7 with the free rules engine (run under tmux/systemd)
-PYTHONPATH=src python3 -m tradebot paper --instrument BTC_USD --timeframe 1h --engine rules
+# 3. Freeze one configuration, then evaluate it once on the untouched holdout
+python3 -m tradebot research freeze --run <run_id> --reason "why this one"
+python3 -m tradebot research final --candidate <cand_id> --data synthetic:4000:11 --holdout 2500:4000
 
-# 4. Optional: the Claude reflex (costs API credits on every bar)
-pip install anthropic && export ANTHROPIC_API_KEY=...
-PYTHONPATH=src python3 -m tradebot paper --engine claude --run-dir runs/paper-claude
+# 4. Evidence package + reconciliation, then the operational gate
+python3 -m tradebot evidence --run <final_run_id>
+python3 -m tradebot opsgate
 
-# Stop trading instantly (exits still allowed):
-PYTHONPATH=src python3 -m tradebot kill --run-dir runs/paper
+# 5. Operator: limits file, approval (interactive), paper runner
+python3 -m tradebot init-limits
+python3 -m tradebot approve --candidate <cand_id> --approver "your name"
+python3 -m tradebot paper                                   # refuses without a valid release
+python3 -m tradebot paper --dev                             # test run, labelled DEV, never promotable
+
+# Stop trading instantly (closing positions is still allowed)
+python3 -m tradebot kill --run-dir runs/paper
 ```
 
-Run `rules` and `claude` side by side on paper for 30 days. If Claude doesn't
-beat the free baseline after fees, you've learned that for $0 of trading
-capital.
+On the synthetic practice data the best of 9 configurations beat buy-and-hold on its training window. Its one holdout evaluation then trailed buy-and-hold by about 45 points after costs, and approval refuses it as weak evidence. That's the workflow doing its job.

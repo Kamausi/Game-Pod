@@ -9,7 +9,7 @@ dependencies = []
 claude = ["anthropic>=0.70"]
 
 [project.scripts]
-tradebot = "tradebot.cli:main"
+tradebot = "tradebot.cli:entry"
 
 [build-system]
 requires = ["setuptools>=68"]

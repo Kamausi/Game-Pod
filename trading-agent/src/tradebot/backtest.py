@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .agent import Agent
@@ -33,9 +33,18 @@ class Result:
     fees: float
     win_rate: float
     killed: str | None
+    # Benchmark paying the same costs: buy at the first tradable open, sell at the last close.
+    benchmark_net_return: float = 0.0
+    equity_curve: list[float] = field(default_factory=list, repr=False)
+    fills: list = field(default_factory=list, repr=False)
+
+    def summary(self) -> dict:
+        return {k: v for k, v in self.__dict__.items() if k not in ("equity_curve", "fills")}
 
     def __str__(self) -> str:
-        return "\n".join(f"{k:>16}: {v:.4f}" if isinstance(v, float) else f"{k:>16}: {v}" for k, v in self.__dict__.items())
+        return "\n".join(
+            f"{k:>20}: {v:.4f}" if isinstance(v, float) else f"{k:>20}: {v}" for k, v in self.summary().items()
+        )
 
 
 def synthetic_candles(n: int, seed: int = 7, start_price: float = 80_000.0, bar_ms: int = 3_600_000) -> list[Candle]:
@@ -97,6 +106,7 @@ def run_backtest(
     )
     hs = spread_bps / 2e4
     peak, max_dd = start_cash, 0.0
+    curve = [start_cash]
     for i in range(warmup, len(candles) - 1):
         bar, nxt = candles[i], candles[i + 1]
         book = OrderBook(bar.close_ts, ((bar.close * (1 - hs), 10.0),), ((bar.close * (1 + hs), 10.0),))
@@ -105,6 +115,7 @@ def run_backtest(
         agent.act(intent, nxt.open_ts, o * (1 - hs), o * (1 + hs), bar.close_ts, spread_bps)
         agent.check_exits(nxt.close_ts, o, nxt.high, nxt.low, o * hs, nxt.close_ts, spread_bps)
         eq = agent.equity(nxt.close)
+        curve.append(eq)
         peak = max(peak, eq)
         max_dd = max(max_dd, 1 - eq / peak)
 
@@ -123,4 +134,19 @@ def run_backtest(
         fees=sum(f.fee for f in broker.fills),
         win_rate=wins / n if n else 0.0,
         killed=risk.kill_reason(),
+        benchmark_net_return=benchmark_net(candles, warmup, spread_bps, broker.fee_bps, broker.slippage_bps),
+        equity_curve=curve,
+        fills=list(broker.fills),
     )
+
+
+def benchmark_net(candles: list[Candle], warmup: int, spread_bps: float, fee_bps: float, slip_bps: float) -> float:
+    """Buy-and-hold under the strategy's own execution model: entry at the open
+    of the first bar the strategy could trade, exit at the final close, paying
+    half-spread, slippage and fees on both legs. Crypto has no dividends; for
+    equities, use a total-return series here or the comparison is biased."""
+    c = (spread_bps / 2 + slip_bps) / 1e4
+    f = fee_bps / 1e4
+    buy = candles[warmup + 1].open * (1 + c)
+    sell = candles[-1].close * (1 - c)
+    return (sell * (1 - f)) / (buy * (1 + f)) - 1

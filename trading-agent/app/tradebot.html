@@ -149,7 +149,7 @@ td.t { font-family: var(--font-mono); white-space: nowrap; color: var(--muted); 
   <div class="inner">
     <span class="brand">tradebot desk</span>
     <span class="pill p-good">Paper money</span>
-    <span class="pill p-info" id="srcPill">Simulated BTC</span>
+    <span class="pill p-info" id="srcPill">Live BTC_USD</span>
     <span class="pill p-info" id="statusPill">Running</span>
     <span class="clock" id="clock">—</span>
   </div>
@@ -161,8 +161,8 @@ td.t { font-family: var(--font-mono); white-space: nowrap; color: var(--muted); 
     <div class="controls" role="toolbar" aria-label="Agent controls">
       <label class="field" for="src">Market
         <select id="src">
-          <option value="sim">Simulated BTC (1h bars)</option>
           <option value="live">Live Crypto.com BTC_USD (1m bars)</option>
+          <option value="sim">Simulated BTC (1h bars)</option>
         </select>
       </label>
       <button class="primary" id="runBtn" type="button">Pause</button>
@@ -270,7 +270,7 @@ td.t { font-family: var(--font-mono); white-space: nowrap; color: var(--muted); 
       </div>
     </section>
 
-    <p class="note">The simulated market is a random walk with regime changes, so there's no real edge to find; expect roughly the fees to be lost. Live mode reads Crypto.com public prices and trades paper money only. The Claude decision engine runs in the Python app (<code>trading-agent/</code>), not in this page, so no API key ever sits in a browser.</p>
+    <p class="note">Live mode reads real BTC_USD prices through your Crypto.com connector and trades paper money only; nothing is sent to an exchange. The simulated market is a random walk with no edge to find, useful for watching the machinery at speed. The Claude decision engine runs in the Python app (<code>trading-agent/</code>), not in this page, so no API key ever sits in a browser.</p>
   </div>
 </main>
 
@@ -542,47 +542,107 @@ function simStep() {
   scoreCalls(cs.length - 1);
 }
 
-// ---------- live data (Crypto.com public REST) ----------
+// ---------- live data ----------
+// Hosted on claude.ai: prices come through the viewer's Crypto.com connector (MCP),
+// called as the viewer. Opened as a local file: falls back to the public REST API.
+let MCP = null, MCP_SERVER = 'Crypto.com', mcpState = 'pending', liveBusy = false, liveUnavailable = false;
 const API = 'https://api.crypto.com/exchange/v1/public/';
-async function getJSON(path) {
+const MCP_HELP = {
+  needs_reauth: 'Your Crypto.com connector needs reconnecting. Reconnect it in claude.ai Settings → Connectors, then reload this page.',
+  server_not_connected: 'Live prices need the Crypto.com connector. Add it in claude.ai Settings → Connectors, then reload this page.',
+  selection_required: 'You have more than one Crypto.com connector. Choose one when claude.ai asks, then reload.',
+  not_in_manifest: 'Crypto.com is turned off for this page. Turn it on from the page\'s Permissions menu, then reload.',
+  blocked_by_policy: 'Your organization blocks the Crypto.com connector for this page.',
+  not_granted: 'Live prices aren\'t available in this view.',
+  capability_disabled: 'Live prices aren\'t available in this view.',
+  capability_removed: 'Live prices aren\'t available in this view.',
+  consent_required: 'Allow Crypto.com for this page when asked, then press Retry.',
+};
+async function restJSON(path) {
   const r = await fetch(API + path, { cache: 'no-store' });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
+  if (!r.ok) throw { code: 'http', message: 'HTTP ' + r.status };
   const j = await r.json();
-  if (j.code && j.code !== 0) throw new Error('exchange error ' + j.code);
+  if (j.code && j.code !== 0) throw { code: 'http', message: 'exchange error ' + j.code };
   return j.result;
 }
-let liveBusy = false;
-async function liveTick() {
-  if (liveBusy) return; liveBusy = true;
-  try {
+async function fetchMarket() {
+  if (MCP) {
+    const opt = { cache: false };
     const [cr, br] = await Promise.all([
-      getJSON('get-candlestick?instrument_name=BTC_USD&timeframe=1m&count=300'),
-      getJSON('get-book?instrument_name=BTC_USD&depth=10'),
+      MCP.callTool(MCP_SERVER, 'get_candlestick', { instrument_name: 'BTC_USD', timeframe: '1m' }, opt),
+      MCP.callTool(MCP_SERVER, 'get_book', { instrument_name: 'BTC_USD', depth: 10 }, opt),
     ]);
+    const c = cr.payload, b = br.payload;
+    return {
+      bars: c.data.map(x => ({ t: Date.parse(x.timestamp), o: +x.open, h: +x.high, l: +x.low, c: +x.close, v: +x.volume })),
+      bids: b.bids.map(x => [+x.price, +x.qty]), asks: b.asks.map(x => [+x.price, +x.qty]),
+      bookTs: Date.parse(b.timestamp), via: 'Crypto.com connector',
+    };
+  }
+  const [cr, br] = await Promise.all([
+    restJSON('get-candlestick?instrument_name=BTC_USD&timeframe=1m&count=300'),
+    restJSON('get-book?instrument_name=BTC_USD&depth=10'),
+  ]);
+  const bd = br.data[0];
+  return {
+    bars: cr.data.map(x => ({ t: +x.t, o: +x.o, h: +x.h, l: +x.l, c: +x.c, v: +x.v })),
+    bids: bd.bids.map(x => [+x[0], +x[1]]), asks: bd.asks.map(x => [+x[0], +x[1]]),
+    bookTs: +bd.t || Date.now(), via: 'Crypto.com public API',
+  };
+}
+async function liveTick() {
+  if (liveBusy || S.mode !== 'live') return;
+  if (mcpState === 'pending') return;  // the connector answer arrives shortly; it starts the first tick
+  liveBusy = true;
+  const mode = S;
+  try {
+    const m = await fetchMarket();
+    if (S !== mode) return;  // account was reset while we waited
     const now = Date.now();
-    const bd = br.data[0];
-    const bq = bd.bids.reduce((a, x) => a + +x[1], 0), aq = bd.asks.reduce((a, x) => a + +x[1], 0);
-    const bookTs = Math.min(+bd.t || now, now);
-    const book = { ts: bookTs, bid: +bd.bids[0][0], ask: +bd.asks[0][0], bq, aq };
-    const cs = cr.data.map(c => ({ t: +c.t, ct: +c.t + BAR_LIVE, o: +c.o, h: +c.h, l: +c.l, c: +c.c, v: +c.v, bq: 0, aq: 0 }))
-      .filter(c => c.ct <= now).sort((a, b) => a.ct - b.ct);
-    if (cs.length < 60) throw new Error('not enough closed bars');
-    S.candles = cs; S.now = now; S.liveErr = null;
-    const mid = (book.bid + book.ask) / 2, spread = (book.ask - book.bid) / mid * 1e4;
-    checkExits(now, mid, mid, mid, (book.ask - book.bid) / 2, book.ts, spread);
-    const lastBar = cs[cs.length - 1].ct;
-    if (lastBar > S.lastLiveBar && S.running) {
-      S.lastLiveBar = lastBar;
-      const intent = decideAt(cs.length - 1, book, now);
+    const closed = m.bars.map(x => ({ ...x, ct: x.t + BAR_LIVE, bq: 0, aq: 0 })).filter(x => x.ct <= now).sort((a, b) => a.ct - b.ct);
+    const lastCt = S.candles.length ? S.candles[S.candles.length - 1].ct : 0;
+    closed.forEach(x => { if (x.ct > lastCt) S.candles.push(x); });  // append only: indices stay stable
+    if (S.candles.length > 600) { S.candles.splice(0, 200); S.pending.forEach(p => p.i -= 200); S.pending = S.pending.filter(p => p.i >= 0); }
+    const book = { ts: Math.min(m.bookTs, now), bid: m.bids[0][0], ask: m.asks[0][0],
+      bq: m.bids.reduce((a, x) => a + x[1], 0), aq: m.asks.reduce((a, x) => a + x[1], 0) };
+    S.now = now; S.liveErr = null; S.liveVia = m.via; S.lastMid = (book.bid + book.ask) / 2; S.lastQuoteAt = m.bookTs;
+    if (!S.bhStart) S.bhStart = S.lastMid;
+    const spread = (book.ask - book.bid) / S.lastMid * 1e4;
+    checkExits(now, S.lastMid, S.lastMid, S.lastMid, (book.ask - book.bid) / 2, book.ts, spread);
+    const lastBar = S.candles[S.candles.length - 1];
+    if (S.candles.length >= 49 && lastBar.ct > S.lastLiveBar && S.running) {
+      S.lastLiveBar = lastBar.ct;
+      const intent = decideAt(S.candles.length - 1, book, now);
       act(intent, now, book.bid, book.ask, book.ts, spread);
-      scoreCalls(cs.length - 1);
+      scoreCalls(S.candles.length - 1);
+    } else if (S.candles.length < 49) {
+      S.liveErr = null; S.warming = 49 - S.candles.length;
     }
-    const eq = equity(mid);
+    const eq = equity(S.lastMid);
     S.eq.push({ ts: now, eq, peak: Math.max(S.peak, eq) });
+    if (S.eq.length > 2000) S.eq.splice(0, 500);
   } catch (e) {
-    S.liveErr = e.message || String(e);
+    if (S === mode) S.liveErr = { code: (e && e.code) || 'error', message: (e && e.message) || String(e), retryable: !!(e && e.retryable) };
   } finally { liveBusy = false; render(); }
 }
+// Connect to the viewer's connector when the page runs inside claude.ai.
+if (window.claude && typeof window.claude.use === 'function') {
+  window.claude.use('mcp').then(async ns => {
+    if (!ns) {
+      mcpState = 'absent'; liveUnavailable = true;
+      if (S.mode === 'live') start('sim'); else render();
+      return;
+    }
+    MCP = ns; mcpState = 'ready';
+    try {
+      const lt = await ns.listTools();
+      const hit = lt.servers.find(s => /crypto/i.test(s.server));
+      if (hit) MCP_SERVER = hit.server;
+    } catch (_) { /* listing is optional; calls report their own errors */ }
+    if (S.mode === 'live') liveTick();
+    render();
+  });
+} else { mcpState = 'absent'; }
 
 // ---------- journal ----------
 function log(ts, kind, text, tone) {
@@ -707,7 +767,7 @@ function setMeter(el, frac, warnAt, riskAt) {
 }
 function render() {
   const cs = S.candles, lastC = cs[cs.length - 1];
-  const mark = lastC ? lastC.c : 0, eq = mark ? equity(mark) : START_CASH;
+  const mark = S.mode === 'live' && S.lastMid ? S.lastMid : (lastC ? lastC.c : 0), eq = mark ? equity(mark) : START_CASH;
   $('clock').textContent = S.now ? new Date(S.now).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '—';
   const sp = $('statusPill');
   if (S.killed) { sp.textContent = 'Killed'; sp.className = 'pill p-risk'; }
@@ -715,15 +775,28 @@ function render() {
   else if (S.running) { sp.textContent = 'Running'; sp.className = 'pill p-good'; }
   else { sp.textContent = 'Paused'; sp.className = 'pill p-warn'; }
   $('srcPill').textContent = S.mode === 'sim' ? 'Simulated BTC' : 'Live BTC_USD';
+  $('src').value = S.mode;
   $('runBtn').textContent = S.running ? 'Pause' : 'Start';
   $('stepBtn').disabled = S.mode === 'live';
   $('killBtn').textContent = S.killed ? 'Clear kill switch' : 'Kill switch';
   const kb = $('killBanner'); kb.hidden = !S.killed;
   if (S.killed) kb.innerHTML = '<b>Kill switch on:</b> ' + esc(S.killed) + '. No new trades. Any open position is closed on the next bar.';
   const lb = $('liveBanner');
-  lb.hidden = !(S.mode === 'live' && S.liveErr);
-  if (S.mode === 'live' && S.liveErr) lb.innerHTML = '<b>Live prices didn\'t load</b> (' + esc(S.liveErr) + '). Pages hosted on claude.ai can\'t reach outside websites, and some browsers block this exchange for pages opened from a file. Run the Python app for live trading, or switch back to the simulated market.';
-
+  const err = S.mode === 'live' ? S.liveErr : null;
+  lb.hidden = !((S.mode === 'live' && (err || S.candles.length < 49)) || (S.mode === 'sim' && liveUnavailable));
+  if (err) {
+    const fix = MCP_HELP[err.code] || (err.code === 'server_unavailable' ? 'Crypto.com didn\'t answer. The page tries again every 20 seconds and keeps the last prices meanwhile.'
+      : err.code === 'tool_error' ? 'Crypto.com reported an error: ' + err.message
+      : err.code === 'http' ? 'Live prices didn\'t load (' + err.message + '). Open this page on claude.ai with the Crypto.com connector added, or switch to the simulated market.'
+      : 'Live prices didn\'t load (' + err.message + ').');
+    lb.innerHTML = '<b>Live prices:</b> ' + esc(fix) + ' <button type="button" id="liveRetry">Retry now</button>';
+    const rb = $('liveRetry'); if (rb) rb.onclick = () => liveTick();
+  } else if (S.mode === 'sim' && liveUnavailable) {
+    lb.hidden = false;
+    lb.innerHTML = '<b>Showing the simulated market.</b> Live prices need this page to have Crypto.com connector access, which this view doesn\'t allow. Open the page signed in on claude.ai with the Crypto.com connector added.';
+  } else if (S.mode === 'live' && S.candles.length < 49) {
+    lb.innerHTML = S.candles.length ? '<b>Warming up:</b> ' + S.candles.length + ' of 49 one-minute bars collected.' : '<b>Connecting to Crypto.com…</b> first prices arrive in a few seconds.';
+  }
   const base = S.eq.length ? S.eq[0].eq : START_CASH;
   $('kEq').textContent = usd(eq);
   const bh = cs.length > 1 && S.bhStart ? lastC.c / S.bhStart - 1 : 0;
@@ -740,8 +813,8 @@ function render() {
   const n = S.trips.length, wins = S.trips.filter(x => x > 0).length;
   $('kTrades').textContent = n; $('kTradesSub').textContent = n ? (wins / n * 100).toFixed(0) + '% winners · net ' + signedUsd(S.trips.reduce((a, b) => a + b, 0)) : 'none yet';
   $('kFees').textContent = usd(S.fees);
-  $('priceTitle').textContent = S.mode === 'sim' ? 'BTC price · simulated, 1h bars' : 'BTC_USD · Crypto.com, 1m bars';
-  $('priceLast').textContent = lastC ? usd(lastC.c) : '';
+  $('priceTitle').textContent = S.mode === 'sim' ? 'BTC price · simulated, 1h bars' : 'BTC_USD · live, 1m bars' + (S.liveVia ? ' · via ' + S.liveVia : '');
+  $('priceLast').textContent = S.mode === 'live' && S.lastMid ? usd(S.lastMid) + ' mid · ' + new Date(S.lastQuoteAt).toISOString().slice(11, 19) + ' UTC' : (lastC ? usd(lastC.c) : '');
   $('eqLast').textContent = usd(eq);
 
   // decision panel
@@ -807,7 +880,7 @@ function schedule() {
       render();
     }, Math.max(16, 1000 / Math.min(S.speed, 10)));
   } else {
-    liveTick(); liveTimer = setInterval(liveTick, 15000);
+    liveTick(); liveTimer = setInterval(liveTick, 20000);
   }
 }
 function start(mode) {
@@ -821,7 +894,7 @@ function start(mode) {
     log(t, 'start', 'Paper account opened with ' + usd(START_CASH) + ' on a simulated BTC market.', 'info');
     for (let k = 0; k < 240; k++) simStep();   // open in a working state: ten simulated days already traded
   } else {
-    log(Date.now(), 'start', 'Paper account opened with ' + usd(START_CASH) + '. Reading live Crypto.com prices every 15 s; deciding once per closed 1-minute bar.', 'info');
+    log(Date.now(), 'start', 'Paper account opened with ' + usd(START_CASH) + '. Reading live Crypto.com prices every 20 s; deciding once per closed 1-minute bar.', 'info');
     S.now = Date.now();
   }
   render(); schedule();
@@ -871,6 +944,6 @@ if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEven
 new MutationObserver(drawCharts).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { $('speed').value = 2; $('speedLbl').textContent = '2 bars/s'; }
 
-start('sim');
+start('live');
 })();
 </script>

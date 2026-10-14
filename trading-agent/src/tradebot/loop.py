@@ -1,5 +1,8 @@
 """24/7 paper-trading loop.
 
+- Starts only from an approved release (or `--dev`, which is labelled as such
+  in the journal and can never be promoted).
+- Reconciles the order ledger with the venue before placing anything.
 - Decides once per closed bar (never on a forming bar).
 - Between bars, polls the book every `poll_s` to enforce stops/targets.
 - Any exception -> no trade this tick; N consecutive failures trips the kill switch.
@@ -14,6 +17,7 @@ from pathlib import Path
 from .agent import Agent
 from .broker import PaperBroker, Position
 from .engines import build_engine
+from .execution import OrderManager, SimVenue
 from .feed import CryptoComFeed
 from .journal import Journal
 from .policy import Calibrator, PolicyParams
@@ -33,19 +37,26 @@ def _load_broker(path: Path, start_cash: float) -> PaperBroker:
     return PaperBroker(cash=d["cash"], positions={k: Position(**v) for k, v in d["positions"].items()})
 
 
-def run_paper(instrument: str, timeframe: str, engine_kind: str, run_dir: Path, start_cash: float, poll_s: float = 15.0):
+def run_paper(instrument: str, timeframe: str, engine_kind: str, run_dir: Path, start_cash: float,
+              params: PolicyParams, limits: RiskLimits, release: dict | None, poll_s: float = 15.0):
     run_dir.mkdir(parents=True, exist_ok=True)
-    risk = RiskManager(RiskLimits(), run_dir / "KILL", run_dir / "risk_state.json")
+    risk = RiskManager(limits, run_dir / "KILL", run_dir / "risk_state.json")
     broker = _load_broker(run_dir / "broker.json", start_cash)
     journal = Journal(run_dir / "journal.jsonl")
+    om = OrderManager(SimVenue(broker), risk, run_dir / "orders.jsonl")
+    rec = om.recover(instrument)
+    journal.write("startup", int(time.time() * 1000), release=release or "DEV (not promotable)", reconciliation=rec)
+    if not rec["ok"]:
+        print("Restart reconciliation failed; kill switch is on until you resolve it:\n  " + "\n  ".join(rec["problems"]))
     engine = build_engine(engine_kind, risk)
     if hasattr(engine, "on_escalate"):
         engine.on_escalate = lambda d: journal.write("escalation", int(time.time() * 1000), fast=d)
-    agent = Agent(instrument, engine, broker, risk, PolicyParams(), Calibrator.load(run_dir / "calibration.json"), journal)
+    agent = Agent(instrument, engine, broker, risk, params, Calibrator.load(run_dir / "calibration.json"), journal, guard=om)
     feed = CryptoComFeed(instrument, timeframe)
     last_bar = 0
     errors = 0
-    print(f"paper loop: {instrument} {timeframe} engine={engine_kind} dir={run_dir}  (touch {run_dir/'KILL'} to stop trading)")
+    label = f"release {release['candidate_id']}" if release else "DEV MODE"
+    print(f"paper loop [{label}]: {instrument} {timeframe} engine={engine_kind} dir={run_dir}  (touch {run_dir/'KILL'} to stop trading)")
     while True:
         now = int(time.time() * 1000)
         try:

@@ -23,11 +23,14 @@ class Agent:
         params: PolicyParams,
         calibrator: Calibrator,
         journal: Journal,
+        guard=None,
     ):
         self.instrument = instrument
         self.engine = engine
         self.broker = broker
-        self.guard = GuardedBroker(broker, risk)
+        # The only order path. Defaults to GuardedBroker; the paper loop passes an
+        # OrderManager (idempotent client ids, persistent ledger, recovery).
+        self.guard = guard or GuardedBroker(broker, risk)
         self.risk = risk
         self.params = params
         self.calibrator = calibrator
