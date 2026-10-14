@@ -1,0 +1,19 @@
+[project]
+name = "tradebot"
+version = "0.1.0"
+description = "Paper-first crypto trading agent: deterministic state engine, typed LLM decisions, hard-coded risk layer, nightly calibration review."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+claude = ["anthropic>=0.70"]
+
+[project.scripts]
+tradebot = "tradebot.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
