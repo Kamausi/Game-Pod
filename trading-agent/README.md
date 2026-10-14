@@ -279,7 +279,7 @@ Optional Python packages: `pip install -e ".[all]"` (grpcio, websockets, anthrop
 | **Alerts** | `alerts.py`, `tradebot alert` | Slack or Discord webhook on start, fills, rejects, kills, reconciliation failures, loop halts and a daily summary. A failed alert never blocks trading or the kill path. |
 | **Deployment** | `Dockerfile`, `docker-compose.yml`, `deploy/systemd/`, `.github/workflows/tradebot.yml`, `.env.example` | Images for the Go hub (distroless, non-root) and the trader. Compose runs paper by default, with `live` and TimescaleDB as opt-in profiles. Systemd units stop after 3 crashes in 10 minutes and page you via `OnFailure`. CI runs the Go and Python tests and builds both images. |
 
-What has **not** been verified from the build machine: real requests to Crypto.com's private API, Alpaca live, OANDA live, Jupiter `/swap` and Jito. They are written from the public docs and tested against fakes, and the Crypto.com signature is tested against the documented algorithm. The Docker build was also not run, because no Docker daemon was available here; CI builds it. That is why the runbook starts with the read-only `tradebot live-check` and a $100 cap.
+The venue request formats were checked against each venue's official docs (section 16). Three mismatches were found and fixed. Authenticated calls still haven't been sent, because there are no keys here. That is why the runbook starts with the read-only `tradebot live-check` and a $100 cap. The Docker images were built and run here.
 
 ## 15. Survival rules, news overlay, Jev, run memory
 
@@ -330,6 +330,40 @@ Seven rules from a study that put 3,505 agents on real money, implemented in cod
 - **GPT-6 Astra, Kimi K3, Grok Bot desks.** Engines are pluggable. `replay` is how to decide whether a pricier model earns its bill.
 - **AgenKit.** Still unverifiable.
 
+## 16. Verification record (2026-10-14)
+
+Everything that was marked "not verified" has been checked against primary sources, and live where no key was needed.
+
+| Item | How it was checked | Result |
+|---|---|---|
+| Crypto.com request signing | Official v1 docs, reference JS/Python | Matches: keys sorted and recursed, `method+id+api_key+params+nonce`, HMAC-SHA256 hex |
+| Crypto.com create-order / get-order-detail | Official docs | Matches: `IMMEDIATE_OR_CANCEL`; terminal statuses `FILLED/CANCELED/REJECTED/EXPIRED`; `cumulative_quantity`, `avg_price`, `cumulative_fee`, `fee_instrument_name`; `POST /exchange/v1/private/...` |
+| Crypto.com balances | Official docs | Structure matches. **Fixed:** cash for sizing now subtracts `reserved_qty` |
+| Crypto.com instruments | **Live** public call | BTC/ETH/SOL/DOGE/PEPE_USD listed with `price_tick_size` / `qty_tick_size`. PEPE trades in 10,000-coin lots, which the rounding handles |
+| Alpaca orders | Official docs | IOC allowed, lookup path `orders:by_client_order_id` correct. **Fixed:** fractional quantities are only allowed on market/day orders, so IOC limits now round down to whole shares |
+| OANDA orders | Official v20 docs | IOC valid for limit orders; `stopLossOnFill` / `takeProfitOnFill`; `@clientID` order lookup |
+| Jupiter swap | Docs and SDK example | `POST /swap/v1/swap`, priority fee nested under `prioritizationFeeLamports.priorityLevelWithMaxLamports` |
+| Jito bundles | Official docs | **Fixed:** `sendBundle` goes to `/api/v1/bundles`; other methods to `/api/v1/<method>`. Tip last in the bundle; 1,000-lamport minimum |
+| TypeSafe Jev | Official API reference | Request and answer shapes match |
+| Docker images | Built and run here | Both images build. The hub serves gRPC and the dashboard; the trader runs as uid 10001 and reaches the hub over gRPC (2 µs in the hub). Compose resolves all four services. Building here needed the sandbox's TLS CA, added through a throwaway Dockerfile; the shipped Dockerfile is unchanged |
+| The 3,505-agent study | Read the paper: arXiv 2609.05663, DX Research Group, Sep 2026 | Real. Fixed 2%/4% bracket +39.0 bps per position (60% of it blow-up prevention); 5.0× leverage in every volatility band; 1.75× at the top-3 cut; research sub-agent null; frontier models indistinguishable on 416 replayed scenarios; **no edge in either fleet** |
+| AgenKit | agenkit.xyz | Real now: an npm CLI and a paid licensed kit of agents and skills for Claude Code. It is a coding harness, not part of the bot; it needs your licence key |
+
+**What the paper changed here**
+- **The paper's "second model" is an activation probe, not an LLM opinion.** It is a small model (Qwen3.5-4B) whose internal activations are read after the order text is written. It caught 71/205 liquidations at a 10% flag budget; plain features caught 57/205. `order_review.py` is the plain-feature version, plus an optional LLM probability, which is a different thing. Judge it by the nightly reviewer report, not by the paper's number.
+- **Its single highest-value fix is "an atomic open-with-protection order path". That is now built:**
+  - **Crypto.com:** `private/advanced/create-otoco`, entry `FILL_OR_KILL` so the stop and target arm only on a full fill.
+  - **OANDA:** stop and target attached on fill.
+  - **Alpaca:** OCO exit right after the IOC fill, because Alpaca brackets must be day/gtc.
+
+  The loop mirrors exchange-side exits into the local book, cancels the legs before any kill-flatten, and persists them across restarts.
+- **Provenance.** Every decision now records the engine source hash and a policy-config hash alongside the full trace.
+
+**Added this round**
+- **Market making (research only).** `research mm` runs Avellaneda–Stoikov quoting on candles. A quote fills only if the next bar trades through it. It charges maker fees and per-requote costs, and checks captured half-spread against fees plus 5-bar adverse selection. On the synthetic data it captured 9.1 bps per fill against 28.6 bps of adverse selection: it does not earn. There is no live path.
+- **Prediction-market gap scanner (read-only).** `predmarkets --pairs pairs.json` compares Polymarket and Kalshi on pairs you confirmed resolve identically, net of each venue's taker fee, plus Polymarket complete sets. It never matches pairs automatically and never orders.
+- **Still declined.** Free TradingView "premium" access, and the "leaked" bot repos and copy-trading desks. The pasted FrondEnt repo could not even be found.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
@@ -379,7 +413,7 @@ Seven rules from a study that put 3,505 agents on real money, implemented in cod
 
 ```bash
 export PYTHONPATH=src
-python3 -m unittest discover -s tests                      # 92 tests (4 need Go)
+python3 -m unittest discover -s tests                      # 100 tests (4 need Go)
 
 # 1. Data with provenance (or use synthetic:N:seed to practise; it has no real edge)
 python3 -m tradebot data snapshot --instrument BTC_USD --timeframe 1h --out data/btc_1h.json

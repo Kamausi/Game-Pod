@@ -144,6 +144,40 @@ class CryptoComLive:
     def order_detail(self, client_id: str) -> dict:
         return self._private("private/get-order-detail", {"client_oid": client_id[:36]})
 
+    # Protected entry (docs: private/advanced/create-otoco). The two trigger legs only take effect once the
+    # primary is FULLY executed, so the primary is FILL_OR_KILL: either the whole position opens with its
+    # stop and target already resting on the exchange, or nothing opens.
+    @staticmethod
+    def leg_ids(client_id: str) -> tuple[str, str, str]:
+        base = client_id[:32]
+        return base, base + "-sl", base + "-tp"
+
+    def create_protected(self, client_id: str, instrument: str, side: str, qty: float, limit_price: float,
+                         stop_price: float, take_price: float) -> dict:
+        ptick, qtick = self.ticks(instrument)
+        q = _round_step(qty, qtick)
+        if q <= 0:
+            raise ValueError("quantity rounds to zero at this instrument's lot size")
+        rnd = lambda x: _num(_round_step(x, ptick))
+        px = _round_step(limit_price, ptick) if side == "buy" else _round_step(limit_price + ptick - 1e-12, ptick)
+        exit_side = "SELL" if side == "buy" else "BUY"
+        primary, sl, tp = self.leg_ids(client_id)
+        order_list = [
+            {"instrument_name": instrument, "side": side.upper(), "type": "LIMIT", "price": _num(px), "quantity": _num(q),
+             "client_oid": primary, "time_in_force": "FILL_OR_KILL"},
+            {"instrument_name": instrument, "side": exit_side, "type": "STOP_LOSS", "quantity": _num(q), "ref_price": rnd(stop_price),
+             "ref_price_type": "LAST_PRICE", "client_oid": sl},
+            {"instrument_name": instrument, "side": exit_side, "type": "TAKE_PROFIT", "quantity": _num(q), "ref_price": rnd(take_price),
+             "ref_price_type": "LAST_PRICE", "client_oid": tp},
+        ]
+        return self._private("private/advanced/create-otoco", {"order_list": order_list})
+
+    def advanced_detail(self, client_oid: str) -> dict:
+        return self._private("private/advanced/get-order-detail", {"client_oid": client_oid[:36]})
+
+    def cancel_protection(self, instrument: str) -> None:
+        self._private("private/advanced/cancel-all-orders", {"instrument_name": instrument, "type": "ALL"})
+
     def cancel_all(self, instrument: str | None = None) -> None:
         self._private("private/cancel-all-orders", {"instrument_name": instrument} if instrument else {})
 
@@ -151,6 +185,13 @@ class CryptoComLive:
         res = self._private("private/user-balance", {})
         data = (res.get("data") or [{}])[0]
         return {b["instrument_name"]: float(b["quantity"]) for b in data.get("position_balances", [])}
+
+    def available(self) -> dict[str, float]:
+        """Quantity minus reserved_qty (held by open orders): what new orders can actually use."""
+        res = self._private("private/user-balance", {})
+        data = (res.get("data") or [{}])[0]
+        return {b["instrument_name"]: float(b["quantity"]) - float(b.get("reserved_qty") or 0)
+                for b in data.get("position_balances", [])}
 
 
 # ---------------------------------------------------------- Alpaca / OANDA live
@@ -179,12 +220,23 @@ class AlpacaLive:
         return js
 
     def create_ioc_limit(self, client_id: str, inst: Instrument, side: str, qty: float, limit_price: float) -> dict:
-        q = normalize_qty(inst, qty)
+        # Alpaca accepts fractional quantities only on market / day orders (docs: postorder), so an
+        # IOC limit is always whole shares, rounded down.
+        q = float(int(normalize_qty(inst, qty) + 1e-9))
         if q <= 0:
-            raise ValueError("quantity rounds to zero for this instrument")
+            raise ValueError("quantity rounds to zero whole shares; IOC limit orders can't be fractional on Alpaca")
         px = f"{limit_price:.4f}" if limit_price < 1 else f"{limit_price:.2f}"
         return self._call("POST", "/v2/orders", {"symbol": inst.symbol, "qty": _num(q), "side": side, "type": "limit",
                                                  "limit_price": px, "time_in_force": "ioc", "client_order_id": client_id})
+
+    def attach_exit(self, client_id: str, inst: Instrument, exit_side: str, qty: float, stop_price: float, take_price: float) -> dict:
+        """OCO exit (limit take-profit + stop-loss), sent the moment the IOC entry is confirmed. Alpaca
+        only accepts bracket entries as day/gtc, so this is the closest it gets to open-with-protection."""
+        fmt = lambda x: f"{x:.4f}" if x < 1 else f"{x:.2f}"
+        return self._call("POST", "/v2/orders", {"symbol": inst.symbol, "qty": _num(float(int(qty + 1e-9))), "side": exit_side,
+                                                 "type": "limit", "time_in_force": "gtc", "order_class": "oco",
+                                                 "take_profit": {"limit_price": fmt(take_price)},
+                                                 "stop_loss": {"stop_price": fmt(stop_price)}, "client_order_id": client_id + "-x"})
 
     def order_detail(self, client_id: str) -> dict:
         js = self._call("GET", "/v2/orders:by_client_order_id?client_order_id=" + urllib.parse.quote(client_id))
@@ -236,13 +288,17 @@ class OandaLive:
     def _px(p: float) -> str:
         return f"{p:.5f}" if p < 50 else f"{p:.3f}"
 
-    def create_ioc_limit(self, client_id: str, inst: Instrument, side: str, qty: float, limit_price: float) -> dict:
+    def create_ioc_limit(self, client_id: str, inst: Instrument, side: str, qty: float, limit_price: float,
+                         bracket: tuple[float, float] | None = None) -> dict:
         units = int(normalize_qty(inst, qty))
         if units <= 0:
             raise ValueError("units round to zero")
         order = {"type": "LIMIT", "instrument": inst.symbol, "units": str(units if side == "buy" else -units),
                  "price": self._px(limit_price), "timeInForce": "IOC", "positionFill": "DEFAULT",
                  "clientExtensions": {"id": client_id}}
+        if bracket:  # (stop price, take price): attached by OANDA on fill, atomically with the entry
+            order["stopLossOnFill"] = {"price": self._px(bracket[0])}
+            order["takeProfitOnFill"] = {"price": self._px(bracket[1])}
         js = self._call("POST", "/orders", {"order": order})
         f = js.get("orderFillTransaction")
         self._fills[client_id] = (
@@ -298,7 +354,7 @@ class LiveVenue:
     def __init__(self, client, instrument: str, broker: PaperBroker, baseline_path: Path,
                  inst: Instrument | None = None, max_slip_bps: float = 15.0, poll_s: float = 0.5, max_polls: int = 20,
                  on_event: Callable[[str, dict], None] | None = None, sleep: Callable[[float], None] = time.sleep,
-                 long_only: bool | None = None):
+                 long_only: bool | None = None, protect: bool = True):
         self.client, self.instrument, self.broker, self.inst = client, instrument, broker, inst
         self.canary = CanaryGuard(client.auth.caps)
         self.max_slip_bps, self.poll_s, self.max_polls = max_slip_bps, poll_s, max_polls
@@ -307,6 +363,20 @@ class LiveVenue:
         self.sent: list[str] = []
         self.long_only = long_only if long_only is not None else not isinstance(client, OandaLive)
         self.baseline = Baseline.load_or_record(baseline_path, self._raw_position())
+        # Exchange-side protection: the stop and target rest on the venue from the moment the entry fills,
+        # so a crash, a network partition or a dead loop cannot leave a position naked.
+        self.protect = protect
+        self.protection_path = Path(baseline_path).with_name("protection.json")
+        self.protection: dict | None = json.loads(self.protection_path.read_text()) if self.protection_path.exists() else None
+
+    def _save_protection(self):
+        if self.protection is None:
+            self.protection_path.unlink(missing_ok=True)
+        else:
+            self.protection_path.write_text(json.dumps(self.protection))
+
+    def protected(self, instrument: str | None = None) -> bool:
+        return self.protection is not None
 
     # positions -------------------------------------------------------------
     def _base_asset(self) -> str:
@@ -321,7 +391,8 @@ class LiveVenue:
         return self._raw_position() - self.baseline.base_qty
 
     # orders ----------------------------------------------------------------
-    def place(self, client_id: str, ts: int, instrument: str, side: str, qty: float, ref: float, reason: str) -> VenueReply:
+    def place(self, client_id: str, ts: int, instrument: str, side: str, qty: float, ref: float, reason: str,
+              bracket: tuple[float, float] | None = None) -> VenueReply:
         self.sent.append(client_id)
         pos = self.broker.position(instrument).qty
         equity = self.broker.equity({instrument: ref})
@@ -337,15 +408,27 @@ class LiveVenue:
         cap = self.max_slip_bps / 1e4
         limit = ref * (1 + cap) if side == "buy" else ref * (1 - cap)
         target = self.inst or instrument
+        opening = pos == 0 or pos * signed > 0
+        prot = None
+        if self.protect and bracket and opening and self.protection is None:
+            sgn = 1 if side == "buy" else -1
+            prot = (ref * (1 - sgn * bracket[0]), ref * (1 + sgn * bracket[1]))  # stop price, take price
+        detail = self.client.order_detail
         try:
-            self.client.create_ioc_limit(client_id, target, side, qty, limit)
+            if prot and isinstance(self.client, CryptoComLive):
+                self.client.create_protected(client_id, target, side, qty, limit, *prot)
+                detail = lambda cid: self.client.advanced_detail(CryptoComLive.leg_ids(cid)[0])
+            elif prot and isinstance(self.client, OandaLive):
+                self.client.create_ioc_limit(client_id, target, side, qty, limit, bracket=prot)
+            else:
+                self.client.create_ioc_limit(client_id, target, side, qty, limit)
         except (BrokerError, ValueError) as e:
             self.on_event("order_rejected", {"client_id": client_id, "error": str(e)[:300]})
             return VenueReply("rejected", 0.0, None, str(e)[:200])
         self.canary.record()
         d = {}
         for _ in range(self.max_polls):
-            d = self.client.order_detail(client_id)
+            d = detail(client_id)
             if d.get("status") in TERMINAL:
                 break
             self.sleep(self.poll_s)
@@ -365,9 +448,67 @@ class LiveVenue:
             book_qty = filled - fee if side == "buy" else filled
         fill = self.broker.apply_fill(ts, instrument, side, book_qty, px, fee_quote, reason)
         self.on_event("fill", {"client_id": client_id, "side": side, "qty": filled, "price": px, "fee": fee_quote})
+        if prot:
+            legs = {}
+            if isinstance(self.client, CryptoComLive):
+                _, sl, tp = CryptoComLive.leg_ids(client_id)
+                legs = {"stop": sl, "take": tp}
+            elif isinstance(self.client, AlpacaLive):
+                try:
+                    self.client.attach_exit(client_id, target, "sell" if side == "buy" else "buy", book_qty, *prot)
+                    legs = {"oco": client_id + "-x"}
+                except (BrokerError, ValueError) as e:  # no exchange stop: say so loudly; the loop's own stop still runs
+                    self.on_event("protection_failed", {"client_id": client_id, "error": str(e)[:300]})
+                    prot = None
+            if prot:
+                self.protection = {"instrument": instrument, "side": side, "qty": book_qty, "stop_px": prot[0], "take_px": prot[1],
+                                   "legs": legs, "opened_ms": ts}
+                self._save_protection()
+                self.on_event("protected", {"client_id": client_id, "stop_px": prot[0], "take_px": prot[1]})
         return VenueReply("filled" if filled >= qty * (1 - 1e-6) else "partial", filled, fill)
 
+    def sync_protection(self, ts: int, mark: float) -> dict | None:
+        """Mirror an exchange-side stop or target fill into the local book. Crypto.com reports the leg's
+        real fill; Alpaca and OANDA are detected from the position going flat (price approximated by mark)."""
+        p = self.protection
+        if p is None:
+            return None
+        exit_side = "sell" if p["side"] == "buy" else "buy"
+        local = self.broker.position(p["instrument"]).qty
+        if abs(local) < 1e-12:  # closed by us (kill / flatten): drop the stale record
+            self.protection = None
+            self._save_protection()
+            return None
+        if isinstance(self.client, CryptoComLive):
+            for which in ("stop", "take"):
+                d = self.client.advanced_detail(p["legs"][which])
+                q = float(d.get("cumulative_quantity") or 0)
+                if d.get("status") == "FILLED" and q > 0:
+                    px = float(d.get("avg_price") or mark)
+                    fee = abs(float(d.get("cumulative_fee") or 0))
+                    if d.get("fee_instrument_name") == self._base_asset():
+                        fee *= px
+                    self.broker.apply_fill(ts, p["instrument"], exit_side, min(q, abs(local)), px, fee, f"exchange {which}")
+                    self.protection = None
+                    self._save_protection()
+                    out = {"exit": which, "qty": q, "price": px, "fee": fee, "approximated": False}
+                    self.on_event("protected_exit", out)
+                    return out
+            return None
+        if abs(self.position_qty(p["instrument"])) <= max(1e-9, abs(local) * 1e-6):
+            which = "stop" if (mark <= p["stop_px"]) == (p["side"] == "buy") else "take"
+            px = p["stop_px"] if which == "stop" else p["take_px"]
+            self.broker.apply_fill(ts, p["instrument"], exit_side, abs(local), px, 0.0, f"exchange {which} (price from bracket level)")
+            self.protection = None
+            self._save_protection()
+            out = {"exit": which, "qty": abs(local), "price": px, "fee": 0.0, "approximated": True}
+            self.on_event("protected_exit", out)
+            return out
+        return None
+
     def cancel_all(self):
+        if self.protection is not None and isinstance(self.client, CryptoComLive):
+            self.client.cancel_protection(self.instrument)  # trigger legs are advanced orders: cancelled separately
         self.client.cancel_all(self.instrument)
 
     def reconcile(self) -> list[str]:

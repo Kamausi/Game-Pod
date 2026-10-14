@@ -91,6 +91,15 @@ def main(argv: list[str] | None = None) -> int:
     na.add_argument("--timeframe", default="4h")
     na.add_argument("--base-params", default="{}")
 
+    mm = rs.add_parser("mm", help="Avellaneda-Stoikov market making simulation with a fee / adverse-selection honesty check")
+    mm.add_argument("--data", required=True)
+    mm.add_argument("--gamma", type=float, default=1e-4)
+    mm.add_argument("--kappa", type=float, default=0.5)
+    mm.add_argument("--horizon", type=int, default=60)
+    mm.add_argument("--maker-fee-bps", type=float, default=2.0)
+    mm.add_argument("--quote-cost-bps", type=float, default=0.0, help="per requote, e.g. gas as bps of order notional")
+    mm.add_argument("--max-inventory", type=int, default=5)
+
     nw = sub.add_parser("news", help="headline history for the news overlay: import a CSV, classify")
     nws = nw.add_subparsers(dest="ncmd", required=True)
     ni = nws.add_parser("import", help="CSV with columns time,title[,source]")
@@ -116,6 +125,10 @@ def main(argv: list[str] | None = None) -> int:
     rl.add_argument("-n", type=int, default=5)
 
     sub.add_parser("jev-check", help="one Jev call to prove the key, model version and latency")
+
+    pmk = sub.add_parser("predmarkets", help="read-only Polymarket vs Kalshi gap scan over pairs YOU confirmed resolve identically")
+    pmk.add_argument("--pairs", required=True, help='JSON: [{"polymarket_slug": ..., "kalshi_ticker": ..., "note": ...}]')
+    pmk.add_argument("--contracts", type=float, default=100.0)
 
     imp = sub.add_parser("import-csv", help="import a long OHLCV history (e.g. 20+ years of daily bars) with validation")
     imp.add_argument("path")
@@ -400,6 +413,20 @@ def main(argv: list[str] | None = None) -> int:
                 diffs = ", ".join(f"{d:+.2%}" for d in v["improvement_by_fee"])
                 print(f"  {mode:<5} vs no news, by fee level: {diffs}  -> {'helps at every fee level' if v['helps_at_every_fee'] else 'NO consistent improvement'}")
             return 0
+        if args.rcmd == "mm":
+            from .marketmaking import MMParams, simulate
+
+            candles, source = _load_data(args.data)
+            r = simulate(candles, MMParams(gamma=args.gamma, kappa=args.kappa, horizon_bars=args.horizon, max_inventory=args.max_inventory,
+                                           maker_fee_bps=args.maker_fee_bps, quote_cost_bps=args.quote_cost_bps))
+            h = r["honesty"]
+            print(f"{source}: {r['fills']} fills ({r['buys']} buys / {r['sells']} sells), inventory peak {r['max_abs_inventory']}, "
+                  f"P&L ${r['pnl_usd']:,.2f} on ${r['volume_usd']:,.0f} volume ({r['pnl_bps_of_volume']:+.1f} bps)")
+            print(f"quoted spread {r['avg_spread_quoted_bps']:.1f} bps; captured {h['captured_bps']:.2f} bps per fill; "
+                  f"fees + quote costs {h['fees_and_quote_costs_bps']:.2f}; adverse selection (5-bar markout) {h['adverse_selection_bps']:.2f}")
+            print(f"net edge {h['net_edge_bps']:+.2f} bps per fill -> {h['verdict']}")
+            print("research only: there is no live path for market making in this system")
+            return 0
         if args.rcmd == "freeze":
             rec = reg.find(args.run)
             out = reg.freeze(Spec(**rec["spec"]), args.reason)
@@ -576,6 +603,23 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("--add needs at least one --done")
             print(runlog.append(Path(args.run_dir), args.done, args.decided, args.open_items, args.rejected))
         print(runlog.recent(Path(args.run_dir), args.n) or "(empty)")
+        return 0
+
+    if args.cmd == "predmarkets":
+        from .predmarkets import scan
+
+        rows = scan(json.loads(Path(args.pairs).read_text()), contracts=args.contracts)
+        for r in rows:
+            pr = r["pair"]
+            if r["error"]:
+                print(f"{pr['polymarket_slug']} / {pr['kalshi_ticker']}: {r['error']}")
+                continue
+            b = r["best"]
+            flag = "LOCKED (if the rules truly match)" if b["locked"] and r["tradable"] else "no locked edge"
+            print(f"{pr['polymarket_slug'][:40]} / {pr['kalshi_ticker']}: YES on {b['buy_yes_on']} @{b['yes_ask']:.3f} + NO on "
+                  f"{b['buy_no_on']} @{b['no_ask']:.3f}: gross {b['gross_per_contract']:+.4f}, fees {b['fees_per_contract']:.4f}, "
+                  f"net {b['net_per_contract']:+.4f}/contract (${b['net_usd']:+.2f} on {args.contracts:g}) -> {flag}")
+        print("read-only: nothing was ordered. Check both venues' resolution rules before treating any gap as risk-free.")
         return 0
 
     if args.cmd == "jev-check":

@@ -308,5 +308,71 @@ class RunLog(unittest.TestCase):
         self.assertEqual(text.count("## "), 2)
 
 
+class MarketMaking(unittest.TestCase):
+    def test_formula(self):
+        import math
+
+        from tradebot.marketmaking import MMParams, as_quotes
+
+        p = MMParams(gamma=1e-4, kappa=0.5)
+        r, s = as_quotes(0, 60.0, 60, p)
+        self.assertEqual(r, 0)
+        self.assertAlmostEqual(s, 1e-4 * 3600 * 60 + (2 / 1e-4) * math.log(1 + 1e-4 / 0.5))
+        r_long, _ = as_quotes(2, 60.0, 60, p)
+        self.assertLess(r_long, 0)  # long inventory leans quotes down to sell it off
+
+    def test_simulation_is_honest(self):
+        from tradebot.marketmaking import MMParams, simulate
+
+        c = synthetic_candles(1500, seed=4, bar_ms=60_000)
+        cheap = simulate(c, MMParams(maker_fee_bps=0.0))
+        dear = simulate(c, MMParams(maker_fee_bps=5.0, quote_cost_bps=2.0))
+        self.assertLessEqual(cheap["max_abs_inventory"], 5)
+        self.assertGreater(cheap["fills"], 0)
+        self.assertEqual(cheap["fills"], dear["fills"])  # same quotes, same fills: only costs differ
+        self.assertLess(dear["pnl_usd"], cheap["pnl_usd"])
+        h = dear["honesty"]
+        self.assertAlmostEqual(h["net_edge_bps"], h["captured_bps"] - h["fees_and_quote_costs_bps"] - h["adverse_selection_bps"])
+
+
+class PredictionMarkets(unittest.TestCase):
+    # shapes copied from live responses on 2026-10-14
+    POLY = {"slug": "fed-oct-no-change", "question": "Will there be no change in Fed interest rates after the October 2026 meeting?",
+            "outcomes": "[\"Yes\", \"No\"]", "outcomePrices": "[\"0.705\", \"0.295\"]", "bestBid": 0.7, "bestAsk": 0.71,
+            "acceptingOrders": True, "closed": False, "feesEnabled": True,
+            "feeSchedule": {"exponent": 1, "rate": 0.05, "takerOnly": True, "rebateRate": 0.25}}
+    KAL = {"market": {"ticker": "KXFED-26OCT-T0", "title": "Fed holds in October", "status": "active", "yes_bid_dollars": "0.6200",
+                      "yes_ask_dollars": "0.6300", "no_ask_dollars": "0.3800", "no_bid_dollars": "0.3700"}}
+
+    def get(self, url):
+        return [self.POLY] if "gamma-api" in url else self.KAL
+
+    def test_scan_finds_and_prices_the_gap(self):
+        from tradebot.predmarkets import fee, scan
+
+        rows = scan([{"polymarket_slug": "fed-oct-no-change", "kalshi_ticker": "KXFED-26OCT-T0"}], get=self.get)
+        r = rows[0]
+        self.assertIsNone(r["error"])
+        b = r["best"]
+        # YES on Kalshi at 0.63 + NO on Polymarket at 1 - 0.70 = 0.30 -> $0.93 for a $1 payoff
+        self.assertEqual((b["buy_yes_on"], b["buy_no_on"]), ("kalshi", "polymarket"))
+        self.assertAlmostEqual(b["gross_per_contract"], 0.07, places=6)
+        self.assertAlmostEqual(b["fees_per_contract"], fee(0.63, 0.07) + fee(0.30, 0.05), places=9)
+        self.assertTrue(b["locked"])
+        self.assertFalse(r["polymarket_complete_set"]["locked"])  # 0.71 + 0.30 > 1
+
+    def test_broken_pair_does_not_stop_scan(self):
+        from tradebot.predmarkets import scan
+
+        def get(url):
+            if "bad" in url:
+                raise OSError("404")
+            return self.get(url)
+
+        rows = scan([{"polymarket_slug": "bad", "kalshi_ticker": "X"}, {"polymarket_slug": "ok", "kalshi_ticker": "Y"}], get=get)
+        self.assertIn("OSError", rows[0]["error"])
+        self.assertIsNone(rows[1]["error"])
+
+
 if __name__ == "__main__":
     unittest.main()

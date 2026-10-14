@@ -34,7 +34,7 @@ from typing import Callable
 from .live import CanaryGuard, LiveAuthorization, require_live
 from .onchain import USDC_MINT, Jupiter, RugGuard, SolanaRPC, _post
 
-JITO_BUNDLES = "https://mainnet.block-engine.jito.wtf/api/v1/bundles"
+JITO_API = "https://mainnet.block-engine.jito.wtf/api/v1"  # sendBundle -> /bundles; other methods -> /<method> (docs.jito.wtf)
 MIN_JITO_TIP = 1_000  # lamports
 Post = Callable[[str, dict], dict]
 
@@ -75,14 +75,17 @@ class JitoSender:
 
     name = "jito"
 
-    def __init__(self, tip_lamports: int = 10_000, url: str = JITO_BUNDLES, post: Post = _post):
+    def __init__(self, tip_lamports: int = 10_000, url: str = JITO_API, post: Post = _post):
         if tip_lamports < MIN_JITO_TIP:
             raise ValueError(f"Jito tip must be at least {MIN_JITO_TIP} lamports")
         self.tip, self.url, self.post = tip_lamports, url, post
+        self.urls_called: list[str] = []
         self.last_bundle_id: str | None = None
 
     def _rpc(self, method: str, params: list):
-        js = self.post(self.url, {"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+        path = "bundles" if method == "sendBundle" else method
+        self.urls_called.append(path)
+        js = self.post(f"{self.url.rstrip('/')}/{path}", {"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
         if "error" in js:
             raise RuntimeError(f"jito {method}: {js['error']}")
         return js["result"]

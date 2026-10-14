@@ -44,7 +44,8 @@ class SimVenue:
         self.reject_next = 0
         self.sent: list[str] = []
 
-    def place(self, client_id: str, ts: int, instrument: str, side: str, qty: float, ref: float, reason: str) -> VenueReply:
+    def place(self, client_id: str, ts: int, instrument: str, side: str, qty: float, ref: float, reason: str,
+              bracket: tuple[float, float] | None = None) -> VenueReply:
         self.sent.append(client_id)
         if self.reject_next > 0:
             self.reject_next -= 1
@@ -84,7 +85,8 @@ class OrderManager:
         kind = "open" if reason in ("entry",) or reason.startswith("p_raw") else "close"
         return f"{instrument}:{ts}:{kind}:{side}"
 
-    def submit(self, ts, instrument, side, qty, ref_price, equity, data_ts, spread_bps, reason, client_id: str | None = None):
+    def submit(self, ts, instrument, side, qty, ref_price, equity, data_ts, spread_bps, reason, client_id: str | None = None,
+               bracket: tuple[float, float] | None = None):
         cid = client_id or self.client_id(instrument, ts, side, reason)
         if cid in self.ledger:
             return Verdict(False, 0.0, (f"duplicate client id {cid}; not resent",)), None
@@ -94,7 +96,7 @@ class OrderManager:
             self._write({"client_id": cid, "ts": ts, "side": side, "qty": qty, "state": "blocked", "reasons": list(v.reasons)})
             return v, None
         self._write({"client_id": cid, "ts": ts, "side": side, "qty": v.qty, "state": "sent"})  # before sending
-        reply = self.venue.place(cid, ts, instrument, side, v.qty, ref_price, reason)
+        reply = self.venue.place(cid, ts, instrument, side, v.qty, ref_price, reason, bracket=bracket)
         self._write({"client_id": cid, "state": reply.status, "filled_qty": reply.filled_qty,
                      "fill": asdict(reply.fill) if reply.fill else None, "venue_reason": reply.reason})
         self.risk.record_order()

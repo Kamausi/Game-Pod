@@ -84,6 +84,15 @@ Resuming after a kill is always manual: `tradebot unkill --run-dir ...` (re-anch
 - **Daily loss limit or 15% drawdown**: new risk blocked; latching across restarts.
 - **Systemd crash loop**: `tradebot-live@` stops after 3 failures in 10 minutes and the `OnFailure` unit pages you.
 
+## Exchange-side protection
+
+Every live entry opens with its stop and target already on the exchange, so a crash or network partition can't leave a position unprotected:
+- **Crypto.com:** OTOCO with a fill-or-kill entry.
+- **OANDA:** stop and target attached on fill.
+- **Alpaca:** OCO exit sent right after the fill.
+
+While the legs rest, the loop does not run its own stop; it mirrors the exchange's exit instead. On kill it cancels the legs, then flattens. After the first live entry, open the exchange UI and confirm both legs are visible.
+
 ## What is not verified from the build environment
 
 The venue request formats (Crypto.com private API and its signature, Alpaca live, OANDA live, Jupiter `/swap`, Jito `sendBundle`) are implemented from the public docs and tested against fakes. They have not been sent to the real services from here. That is why step 3 starts with `live-check` (read-only) and a $100 cap.

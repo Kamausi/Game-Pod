@@ -74,7 +74,37 @@ class FakeCryptoCom:
                 {"instrument_name": k, "quantity": str(v)} for k, v in self.bal.items()]}]}}
         if m == "private/cancel-all-orders":
             return 200, {"code": 0, "result": {}}
+        if m == "private/advanced/create-otoco":
+            prim, sl, tp = p["order_list"]
+            self.otoco = p["order_list"]
+            q = float(prim["quantity"]) if self.fill_frac >= 1 else 0.0  # FILL_OR_KILL: all or nothing
+            px = min(self.price, float(prim["price"]))
+            self.orders[prim["client_oid"]] = {"status": "FILLED" if q else "CANCELED", "cumulative_quantity": str(q),
+                                               "avg_price": str(px), "cumulative_fee": "0", "fee_instrument_name": "USD"}
+            for leg in (sl, tp):
+                self.orders[leg["client_oid"]] = {"status": "ACTIVE" if q else "CANCELED", "cumulative_quantity": "0"}
+            self.bal["BTC"] += q
+            self.bal["USD"] -= q * px
+            return 200, {"code": 0, "result": {"list_id": 7}}
+        if m == "private/advanced/get-order-detail":
+            return 200, {"code": 0, "result": self.orders[p["client_oid"]]}
+        if m == "private/advanced/cancel-all-orders":
+            self.adv_cancels = getattr(self, "adv_cancels", 0) + 1
+            for k, o in self.orders.items():
+                if o["status"] == "ACTIVE":
+                    o["status"] = "CANCELED"
+            return 200, {"code": 0, "result": {}}
         return 400, {"code": 1}
+
+    def trigger(self, leg_oid, px):
+        """The exchange fires a resting trigger leg."""
+        q = float(self.otoco[0]["quantity"])
+        self.orders[leg_oid] = {"status": "FILLED", "cumulative_quantity": str(q), "avg_price": str(px), "cumulative_fee": "0.01",
+                                "fee_instrument_name": "USD"}
+        other = [l["client_oid"] for l in self.otoco[1:] if l["client_oid"] != leg_oid][0]
+        self.orders[other]["status"] = "CANCELED"  # SpotAttach: one fires, the other is cancelled
+        self.bal["BTC"] -= q
+        self.bal["USD"] += q * px
 
 
 class LiveTests(unittest.TestCase):
@@ -175,6 +205,77 @@ class LiveTests(unittest.TestCase):
         self.assertEqual(om.ledger["BTC_USD:0:open:buy"]["state"], "partial")
         self.assertEqual(lv.reconcile(), [])
 
+    def test_protected_entry_otoco_and_exchange_stop(self):
+        rd = Path(tempfile.mkdtemp())
+        fake = FakeCryptoCom()
+        lv, om, broker = self._venue(fake, rd)
+        v, fill = om.submit(0, "BTC_USD", "buy", 0.5, 100.0, 500.0, 0, 1.0, "entry", bracket=(0.02, 0.04))
+        self.assertTrue(v.allowed)
+        prim, sl, tp = fake.otoco
+        self.assertEqual(prim["time_in_force"], "FILL_OR_KILL")  # legs only arm on a FULL fill
+        self.assertEqual((sl["type"], sl["side"], tp["type"], tp["side"]), ("STOP_LOSS", "SELL", "TAKE_PROFIT", "SELL"))
+        self.assertAlmostEqual(float(sl["ref_price"]), 98.0)
+        self.assertAlmostEqual(float(tp["ref_price"]), 104.0)
+        self.assertTrue(all(len(x["client_oid"]) <= 36 for x in fake.otoco))  # docs: client_oid max 36 chars
+        self.assertTrue(lv.protected())
+        self.assertTrue((rd / "protection.json").exists())  # survives a restart
+        self.assertIsNone(lv.sync_protection(1, 100.5))  # legs resting, nothing to do
+        fake.trigger(sl["client_oid"], 97.9)
+        out = lv.sync_protection(2, 97.9)
+        self.assertEqual((out["exit"], out["approximated"]), ("stop", False))
+        self.assertAlmostEqual(broker.position("BTC_USD").qty, 0.0)
+        self.assertEqual(lv.reconcile(), [])
+        self.assertFalse(lv.protected())
+
+    def test_protected_entry_fok_miss_opens_nothing(self):
+        rd = Path(tempfile.mkdtemp())
+        fake = FakeCryptoCom(fill_frac=0.5)
+        lv, om, broker = self._venue(fake, rd)
+        v, _ = om.submit(0, "BTC_USD", "buy", 0.5, 100.0, 500.0, 0, 1.0, "entry", bracket=(0.02, 0.04))
+        self.assertFalse(v.allowed)
+        self.assertFalse(lv.protected())
+        self.assertEqual(broker.position("BTC_USD").qty, 0.0)
+
+    def test_kill_cancels_exchange_legs_before_flatten(self):
+        rd = Path(tempfile.mkdtemp())
+        fake = FakeCryptoCom()
+        lv, om, broker = self._venue(fake, rd)
+        om.submit(0, "BTC_USD", "buy", 0.5, 100.0, 500.0, 0, 1.0, "entry", bracket=(0.02, 0.04))
+        lv.cancel_all()
+        self.assertEqual(fake.adv_cancels, 1)
+        om.submit(1, "BTC_USD", "sell", 0.5, 100.0, 500.0, 1, 1.0, "kill_flatten", client_id="BTC_USD:1:flatten:sell")
+        self.assertIsNone(lv.sync_protection(2, 100.0))
+        self.assertFalse(lv.protected())
+        self.assertEqual(lv.reconcile(), [])
+
+    def test_oanda_and_alpaca_protection_shapes(self):
+        from tradebot.assets import AssetClass, Instrument, classify_stock
+        from tradebot.live import LiveAuthorization
+        from tradebot.venues_live import AlpacaLive, OandaLive
+
+        calls = []
+
+        def oan(method, url, h, body):
+            calls.append(body)
+            return 201, {"orderFillTransaction": {"units": "1000", "price": "1.08412", "commission": "0"}}
+
+        o = OandaLive(LiveAuthorization("oanda", LiveCaps(), {}), "acct", "tok", transport=oan)
+        o.create_ioc_limit("fx", Instrument("EUR_USD", AssetClass.FOREX, "forex_major", qty_step=1.0), "buy", 1000, 1.0843,
+                           bracket=(1.0627, 1.1276))
+        self.assertEqual(calls[-1]["order"]["stopLossOnFill"], {"price": "1.06270"})
+        self.assertEqual(calls[-1]["order"]["takeProfitOnFill"], {"price": "1.12760"})
+        acalls = []
+
+        def alp(method, url, h, body):
+            acalls.append(body)
+            return 200, {"id": "x", "status": "accepted"}
+
+        a = AlpacaLive(LiveAuthorization("alpaca", LiveCaps(), {}), "i", "s", transport=alp)
+        a.attach_exit("cid", classify_stock("AAPL", 187.0), "sell", 3.0, 183.26, 194.48)
+        b = acalls[-1]
+        self.assertEqual((b["order_class"], b["type"], b["time_in_force"], b["qty"]), ("oco", "limit", "gtc", "3"))
+        self.assertEqual((b["stop_loss"]["stop_price"], b["take_profit"]["limit_price"]), ("183.26", "194.48"))
+
     def test_alpaca_and_oanda_live_shapes(self):
         from tradebot.assets import AssetClass, Instrument, classify_stock
         from tradebot.live import LiveAuthorization
@@ -196,6 +297,10 @@ class LiveTests(unittest.TestCase):
         self.assertEqual(calls[0][2]["time_in_force"], "ioc")
         self.assertEqual(calls[0][2]["qty"], "3")
         self.assertEqual(a.order_detail("cid")["status"], "FILLED")  # IOC remainder cancelled, fill stands
+        a.create_ioc_limit("cid2", classify_stock("AAPL", 187.0, fractional=True), "buy", 2.6, 187.4)
+        self.assertEqual(calls[-1][2]["qty"], "2")  # Alpaca: fractional qty only on market/day orders, never IOC
+        with self.assertRaises(ValueError):
+            a.create_ioc_limit("cid3", classify_stock("AAPL", 187.0, fractional=True), "buy", 0.6, 187.4)
 
         def oan(method, url, h, body):
             calls.append((method, url, body))
@@ -349,6 +454,7 @@ class SolanaLive(unittest.TestCase):
 
         self.assertTrue(swap.signatures[0].verify(self.kp.pubkey(), to_bytes_versioned(swap.message)))
         self.assertIn(self.tip_acct, [str(k) for k in tip.message.account_keys])
+        self.assertEqual(self.t.sender.urls_called, ["getTipAccounts", "bundles"])  # per-method paths (docs.jito.wtf)
 
     def test_refusals(self):
         from tradebot.solana_live import SwapRefused

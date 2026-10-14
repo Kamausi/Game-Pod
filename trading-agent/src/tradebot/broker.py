@@ -84,6 +84,7 @@ class GuardedBroker:
         data_ts: int,
         spread_bps: float,
         reason: str,
+        bracket: tuple[float, float] | None = None,  # used by venues that hold the stop on the exchange
     ) -> tuple[Verdict, Fill | None]:
         pos = self.broker.position(instrument)
         v = self.risk.check_order(side, qty, ref_price, pos.qty, equity, ts, data_ts, spread_bps)

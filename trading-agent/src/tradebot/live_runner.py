@@ -52,7 +52,7 @@ def make_instrument(venue: str, instrument: str, price: float) -> Instrument:
 def venue_cash(client, instrument: str) -> float:
     if isinstance(client, CryptoComLive):
         quote = instrument.split("_")[1]
-        return client.balances().get(quote, 0.0)
+        return client.available().get(quote, 0.0)
     if hasattr(client, "cash"):
         return client.cash()
     return float(client._call("GET", "/summary")["account"]["balance"])  # OANDA
@@ -143,7 +143,10 @@ def run_live(venue: str, instrument: str, timeframe: str, engine_kind: str, run_
                                position=broker.position(instrument).qty, equity=round(agent.equity(m), 2))
                     flattened_for = reason
             elif is_open(inst, now):
-                agent.check_exits(now, m, m, m, (book.best_ask - book.best_bid) / 2, book.ts, spread)
+                if lv.protected():
+                    lv.sync_protection(now, m)  # the exchange holds the stop and target; mirror its exit
+                else:
+                    agent.check_exits(now, m, m, m, (book.best_ask - book.best_bid) / 2, book.ts, spread)
                 bar_close = now - now % feed.bar_ms
                 if bar_close > last_bar:
                     candles = feed.closed_candles(now)

@@ -56,7 +56,7 @@ class HubGuard:
         self.client, self.broker, self.risk = client, broker, risk
         self.asset_class, self.tier = asset_class, tier
 
-    def submit(self, ts, instrument, side, qty, ref_price, equity, data_ts, spread_bps, reason, client_id=None):
+    def submit(self, ts, instrument, side, qty, ref_price, equity, data_ts, spread_bps, reason, client_id=None, bracket=None):
         pos = self.broker.position(instrument)
         v = self.risk.check_order(side, qty, ref_price, pos.qty, equity, ts, data_ts, spread_bps)
         if not v.allowed:

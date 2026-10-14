@@ -39,6 +39,15 @@ class Agent:
         self.state = StateEngine()
         self.reviewer = reviewer  # order_review.OrderReviewer: second check on every entry
         self._last: tuple[Snapshot, Decision] | None = None
+        # provenance: which code and which configuration produced each decision (computed once)
+        import hashlib, json
+        from dataclasses import asdict
+
+        from .experiments import engine_version
+
+        self.revisions = {"engine_source_sha256": engine_version()["source_sha256"][:16],
+                          "params_sha256": hashlib.sha256(json.dumps(asdict(params), sort_keys=True).encode()).hexdigest()[:16],
+                          "engine": getattr(engine, "name", type(engine).__name__)}
 
     def equity(self, mark: float) -> float:
         return self.broker.equity({self.instrument: mark})
@@ -69,7 +78,8 @@ class Agent:
         trace = getattr(self.engine, "last_trace", None) if not self.risk.is_killed() else None
         # Exactly what the model saw and said, so a bad trade can be traced to the model, the prompt or the data.
         self.journal.write(
-            "decision", as_of, snapshot=snap, decision=d, intent=intent, equity=self.equity(book.mid), trace=trace
+            "decision", as_of, snapshot=snap, decision=d, intent=intent, equity=self.equity(book.mid), trace=trace,
+            revisions=self.revisions,
         )
         self._last = (snap, d)
         return snap, d, intent
@@ -98,7 +108,8 @@ class Agent:
             ref = ask if side == "buy" else bid
             qty = intent.size_frac * eq / ref
             v, fill = self.guard.submit(
-                ts, self.instrument, side, qty, ref, eq, data_ts, spread_bps, intent.reason
+                ts, self.instrument, side, qty, ref, eq, data_ts, spread_bps, intent.reason,
+                bracket=(intent.stop_pct, intent.take_pct),
             )
             self.journal.write("order", ts, side=side, qty=qty, verdict=v, fill=fill)
             if fill:
