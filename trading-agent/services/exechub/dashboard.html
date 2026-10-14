@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>exechub Control</title>
+<style>
+:root { --bg:#eef1f5; --surface:#fff; --fg:#142130; --muted:#5a6879; --line:#d6dde6; --accent:#2153c0; --good:#1b6e50; --good-soft:#def1e8; --risk:#a8401a; --risk-soft:#f9e7de; --warn:#8a5a00; --warn-soft:#fbf0d6;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; --sans: system-ui, "Segoe UI", sans-serif; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0d131a; --surface:#151e28; --fg:#e2e8ef; --muted:#96a4b4; --line:#283443; --accent:#82a6ff; --good:#66cf9f; --good-soft:#133025; --risk:#f2946a; --risk-soft:#3a2118; --warn:#e8b84f; --warn-soft:#33290f; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
+header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+h1 { font-size: 1.15rem; margin: 0 auto 0 0; }
+.pill { font: 600 .72rem/1 var(--mono); padding: .35rem .55rem; border-radius: 99px; text-transform: uppercase; letter-spacing: .05em; }
+.ok { background: var(--good-soft); color: var(--good); } .bad { background: var(--risk-soft); color: var(--risk); } .mid { background: var(--warn-soft); color: var(--warn); }
+button { font: 600 .85rem var(--sans); padding: .55rem .9rem; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+button.halt { border-color: var(--risk); color: var(--risk); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.kpi span { display: block; font: 500 .7rem var(--mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.kpi b { font: 600 1.2rem var(--mono); font-variant-numeric: tabular-nums; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: auto; max-height: 60vh; }
+table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--surface); font: 600 .66rem var(--mono); text-transform: uppercase; color: var(--muted); }
+td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.note { color: var(--muted); font-size: .8rem; margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>exechub control</h1>
+    <span class="pill ok">Paper venue</span>
+    <span class="pill mid" id="conn">Connecting…</span>
+    <span class="pill ok" id="haltPill">Trading</span>
+    <button class="halt" id="haltBtn" type="button">Emergency halt</button>
+    <button id="resumeBtn" type="button">Resume</button>
+  </header>
+  <section class="kpis">
+    <div class="kpi"><span>Orders accepted</span><b id="orders">0</b></div>
+    <div class="kpi"><span>Rejected by hub</span><b id="rejects">0</b></div>
+    <div class="kpi"><span>Hub latency p50</span><b id="p50">—</b></div>
+    <div class="kpi"><span>Hub latency p99</span><b id="p99">—</b></div>
+    <div class="kpi"><span>Open positions</span><b id="pos">—</b></div>
+  </section>
+  <p class="note">Latency is receipt-to-decision inside the hub. Network time to a real exchange is not included and is usually far larger.</p>
+  <div class="panel">
+    <table><thead><tr><th>Time</th><th>Event</th><th>Class</th><th>Asset</th><th>Side</th><th class="n">Qty</th><th class="n">Price</th><th>Status / detail</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="8" class="note">Waiting for events from the strategy…</td></tr></tbody></table>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id), rows = [];
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function state(s) {
+  $('orders').textContent = s.orders; $('rejects').textContent = s.rejects;
+  $('p50').textContent = s.latency_p50_us ? s.latency_p50_us + ' µs' : '—'; $('p99').textContent = s.latency_p99_us ? s.latency_p99_us + ' µs' : '—';
+  const p = Object.entries(s.positions || {}); $('pos').textContent = p.length ? p.map(([k, v]) => k + ' ' + (+v.toPrecision(4))).join(' · ') : 'flat';
+  $('haltPill').textContent = s.halted ? 'Halted: ' + s.halt_reason : 'Trading'; $('haltPill').className = 'pill ' + (s.halted ? 'bad' : 'ok');
+}
+function event(e) {
+  rows.unshift(e); if (rows.length > 200) rows.pop();
+  $('rows').innerHTML = rows.map(r => '<tr><td>' + new Date(r.ts_ms).toISOString().slice(11, 23) + '</td><td>' + esc(r.kind) + '</td><td>' + esc(r.asset_class) + '</td><td>' + esc(r.asset_id) +
+    '</td><td>' + esc(r.side) + '</td><td class="n">' + (r.qty ? +r.qty.toPrecision(6) : '') + '</td><td class="n">' + (r.price ? +r.price.toPrecision(8) : '') + '</td><td>' + esc(r.status || '') + (r.detail ? ' · ' + esc(r.detail) : '') + '</td></tr>').join('');
+}
+function connect() {
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/stream/orders');
+  ws.onopen = () => { $('conn').textContent = 'Live'; $('conn').className = 'pill ok'; };
+  ws.onclose = () => { $('conn').textContent = 'Disconnected, retrying'; $('conn').className = 'pill bad'; setTimeout(connect, 2000); };
+  ws.onmessage = m => { const d = JSON.parse(m.data); if (d.kind === 'state') state(d.state); else event(d); };
+}
+async function control(path, reason) {
+  const r = await fetch('/api/v1/control/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
+  if (r.ok) state(await r.json());
+}
+$('haltBtn').onclick = () => control('halt', 'manual emergency halt from dashboard');
+$('resumeBtn').onclick = () => control('resume', 'dashboard operator');
+connect();
+</script>
+</body>
+</html>

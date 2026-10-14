@@ -42,9 +42,9 @@ class PaperBroker:
     def equity(self, marks: dict[str, float]) -> float:
         return self.cash + sum(p.qty * marks[i] for i, p in self.positions.items() if p.qty)
 
-    def market(self, ts: int, instrument: str, side: str, qty: float, ref_price: float, reason: str) -> Fill:
+    def market(self, ts: int, instrument: str, side: str, qty: float, ref_price: float, reason: str, slip_bps: float | None = None) -> Fill:
         """Fill at ref_price (the touch) worsened by slippage, plus fees."""
-        slip = self.slippage_bps / 1e4
+        slip = (self.slippage_bps if slip_bps is None else slip_bps) / 1e4
         price = ref_price * (1 + slip) if side == "buy" else ref_price * (1 - slip)
         fee = qty * price * self.fee_bps / 1e4
         pos = self.position(instrument)

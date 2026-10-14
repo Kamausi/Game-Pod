@@ -7,6 +7,8 @@ dependencies = []
 
 [project.optional-dependencies]
 claude = ["anthropic>=0.70"]
+services = ["grpcio>=1.66", "protobuf>=5.27"]
+stream = ["websockets>=12"]
 
 [project.scripts]
 tradebot = "tradebot.cli:entry"

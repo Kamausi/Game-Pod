@@ -155,3 +155,37 @@ def final_evaluation(reg: Register, candidate_id: str, candles: list[Candle], sn
         return reg.record_run("final", spec, snap, snap.slice_note(lo, hi), res)
     except Exception as e:
         return reg.record_run("final", spec, snap, snap.slice_note(lo, hi), None, f"{type(e).__name__}: {e}")
+
+
+def walk_forward(reg: Register, base: Spec, grid: dict[str, list], candles: list[Candle], snap: DataSnapshot,
+                 folds: int, work: Path, min_train: int | None = None) -> list[dict]:
+    """Anchored walk-forward: for each fold, explore on everything before it, pick the
+    best configuration by excess return, then test it ONCE on the fold. Every run of
+    every fold is recorded. The out-of-sample folds never inform each other's choice."""
+    n = len(candles)
+    test_len = n // (folds + 1)
+    min_train = min_train or test_len
+    out = []
+    for k in range(folds):
+        train_end = min_train + k * test_len
+        test_end = min(n, train_end + test_len)
+        if test_end - train_end < 120:
+            break
+        fold_spec = replace(base, name=f"{base.name}@wf{k}")
+        recs = sweep(reg, fold_spec, grid, candles, snap, 0, train_end, work)
+        ok = [r for r in recs if r["status"] == "ok"]
+        if not ok:
+            out.append({"fold": k, "error": "no successful configuration"})
+            continue
+        best = max(ok, key=lambda r: r["result"]["excess_vs_benchmark"])
+        spec = Spec(**best["spec"])
+        try:
+            reg.freeze(spec, f"walk-forward fold {k}: best training excess")
+        except Exception:
+            pass  # identical spec already frozen by an earlier fold
+        test = reg.record_run("explore", replace(spec, name=f"{base.name}@wf{k}-oos"), snap,
+                              snap.slice_note(train_end, test_end), summarize(run_spec(spec, candles[train_end:test_end], work / f"wf{k}")))
+        out.append({"fold": k, "train": [0, train_end], "test": [train_end, test_end], "params": spec.params,
+                    "train_excess": best["result"]["excess_vs_benchmark"], "test_excess": test["result"]["excess_vs_benchmark"],
+                    "test_return": test["result"]["total_return"], "test_benchmark": test["result"]["benchmark_net_return"]})
+    return out

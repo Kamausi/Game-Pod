@@ -261,6 +261,22 @@ tr.click { cursor: pointer; }
       </section>
     </div>
 
+    <div class="grid2">
+      <section class="panel" aria-label="News sentiment">
+        <h2><span>News sentiment</span><label class="field" for="newsToggle"><input type="checkbox" id="newsToggle"> Live news</label></h2>
+        <p class="note" id="newsNote">Off. Turn on to pull crypto headlines through your Firecrawl connector every 15 minutes (about 2 credits each time). Headlines are scored instantly with a built-in word list; press "Re-score with Claude" for a closer read.</p>
+        <div class="controls"><button type="button" id="claudeBtn" hidden>Re-score with Claude</button><span class="note" id="claudeNote"></span></div>
+        <div class="tw" style="max-height:none"><table><thead><tr><th>Asset</th><th class="n">Sentiment</th><th class="n">Headlines (6h)</th></tr></thead><tbody id="sentBody"></tbody></table></div>
+        <div class="tw" style="max-height:16rem"><table><thead><tr><th>Seen</th><th>Headline</th><th>Assets</th><th class="n">Score</th></tr></thead><tbody id="newsBody"></tbody></table></div>
+      </section>
+      <section class="panel" aria-label="Cross-exchange gaps">
+        <h2><span>Cross-exchange gaps · Crypto.com vs Kraken</span><label class="field" for="arbToggle"><input type="checkbox" id="arbToggle"> Live scan</label></h2>
+        <p class="note" id="arbNote">Off. Turn on to read Kraken's public prices through your Firecrawl connector every 2 minutes (1 credit each time) and compare them with Crypto.com.</p>
+        <div class="tw" style="max-height:none"><table><thead><tr><th>Asset</th><th class="n">Crypto.com bid / ask</th><th class="n">Kraken bid / ask</th><th>Best direction</th><th class="n">Gross</th><th class="n">After fees</th></tr></thead><tbody id="arbBody"></tbody></table></div>
+        <p class="note" id="arbSummary">Fees assumed: Crypto.com 7.5 bps, Kraken 40 bps taker, plus 3 bps for latency. Paper arbitrage trades only when the gap is positive after all of that and both quotes are less than 30 s apart.</p>
+      </section>
+    </div>
+
     <section class="panel" aria-label="Journal">
       <h2><span>Journal</span><span class="note" id="jCount"></span></h2>
       <div class="tw">
@@ -308,8 +324,8 @@ const TIER = {
   meme: { maxPos: 0.05, maxSpread: 50, minVol: 1e6, limitOnly: true, stressMove: -0.40 },
 };
 const FEE = 6e-4, SLIP = 2e-4, BAR = 60000, START_CASH = 10000;
-const SIGNALS = ['trend', 'momentum', 'meanrev', 'breakout', 'flow', 'basis'];
-const SIG_LABEL = { trend: 'Trend (MA 9/21, 1m + 15m)', momentum: 'Momentum (MACD 12/26/9)', meanrev: 'Mean reversion (RSI + Bollinger)', breakout: 'Breakout (30-bar range + volume)', flow: 'Order flow (top-of-book imbalance)', basis: 'Index gap (price vs multi-exchange index)' };
+const SIGNALS = ['trend', 'momentum', 'meanrev', 'breakout', 'flow', 'basis', 'sentiment'];
+const SIG_LABEL = { trend: 'Trend (MA 9/21, 1m + 15m)', momentum: 'Momentum (MACD 12/26/9)', meanrev: 'Mean reversion (RSI + Bollinger)', breakout: 'Breakout (30-bar range + volume)', flow: 'Order flow (top-of-book imbalance)', basis: 'Index gap (price vs multi-exchange index)', sentiment: 'News sentiment (last 6h)' };
 const REGIMES = ['trending', 'mean_reverting', 'high_vol', 'crisis'];
 const SIG_H = 15, CALL_H = 30, CLUSTER_RHO = 0.7, CLUSTER_CAP = 0.40, STRESS_GATE = 0.12, TWAP_ABOVE = 0.10;
 const P = { minConf: 0.75, minQ: 2, kelly: 0.25, volTarget: 0.01, rr: 2, stopAtr: 2, minStop: 0.003, allowShort: false };
@@ -372,6 +388,7 @@ function features(a) {
     trend1: Math.sign(e9[n - 1] - e21[n - 1]), trend15, rsi15, breakoutUp: last.c > hi30, breakoutDn: last.c < lo30, volSpike,
     spreadBps: t ? (t.ask - t.bid) / mid * 1e4 : 2, imbalance: bidV + askV > 0 ? (bidV - askV) / (bidV + askV) : 0,
     vol24: t ? t.vol24 : 0, basisBps: a.index ? (mid / a.index - 1) * 1e4 : 0,
+    ...(() => { const r = sentimentFor(a.sym, S.now); return { sentiment: r.s, sentN: r.n }; })(),
   };
 }
 
@@ -386,6 +403,7 @@ function signals(f) {
     breakout: f.breakoutUp && f.volSpike > 1.5 ? 1 : f.breakoutDn && f.volSpike > 1.5 ? -1 : 0,
     flow: clamp(f.imbalance * 1.5, -1, 1) * 0.6,
     basis: Math.abs(f.basisBps) > 8 ? -Math.sign(f.basisBps) * clamp(Math.abs(f.basisBps) / 30, 0, 1) : 0,
+    sentiment: f.sentN > 0 ? clamp(f.sentiment, -1, 1) : 0,
   };
 }
 function regimeOf(f) {
@@ -690,6 +708,9 @@ function simStep() {
     checkExits(a, b.ct, b.o, b.h, b.l, hs, b.ct);
   });
   afterBar(S.now, true);
+  S.simBars = (S.simBars || 0) + 1;
+  if (FEEDS.news && S.simBars % 15 === 0) fetchNews();
+  if (FEEDS.arb && S.simBars % 2 === 0) fetchArb();
 }
 function afterBar(ts, sim) {
   S.corr = correlation();
@@ -775,7 +796,7 @@ async function liveTick() {
       const m = r.value, lastCt = a.bars.length ? a.bars[a.bars.length - 1].ct : 0;
       m.bars.map(b => ({ ...b, ct: b.t + BAR })).filter(b => b.ct <= now && isFinite(b.c)).sort((x, y) => x.ct - y.ct).forEach(b => { if (b.ct > lastCt) { pushBar(i, b); newBar = true; } });
       if (m.bars15) a.bars15 = m.bars15.map(b => ({ ...b, ct: b.t + 900000 })).filter(b => b.ct <= now).sort((x, y) => x.ct - y.ct);
-      a.tick = m.tick; if (m.index) a.index = m.index;
+      a.tick = { ...m.tick, recv: now }; if (m.index) a.index = m.index;
       const mid = (a.tick.bid + a.tick.ask) / 2, hs = (a.tick.ask - a.tick.bid) / 2, lb = a.bars[a.bars.length - 1];
       workLimit(a, now, lb ? lb.l : mid, lb ? lb.h : mid, a.tick.ts);
       checkExits(a, now, mid, mid, mid, hs, a.tick.ts);
@@ -800,6 +821,7 @@ if (window.claude && typeof window.claude.use === 'function') {
     MCP = ns;
     try {
       const lt = await ns.listTools();
+      const fc = lt.servers.find(s => /firecrawl/i.test(s.server)); if (fc) FC = fc.server;
       const hit = lt.servers.find(s => /crypto/i.test(s.server));
       if (hit) { SERVER = hit.server; const names = pickTools(hit.tools); mcpDiag = 'connector "' + hit.server + '" (' + hit.authStatus + '), tools: ' + (names.join(', ') || 'none listed'); }
       else mcpDiag = 'connectors visible to this page: ' + (lt.servers.map(s => s.server + ' [' + s.tools.map(t => t.name).join(', ') + ']').join('; ') || 'none');
@@ -808,7 +830,136 @@ if (window.claude && typeof window.claude.use === 'function') {
     if (S.mode === 'live') liveTick();
     render();
   });
+  window.claude.use('sample').then(sm => { SAMPLE = sm; render(); });
 } else { mcpState = 'absent'; }
+
+// =====================================================================================
+// Extra feeds: news sentiment and cross-exchange gaps (opt-in; live mode uses the Firecrawl connector)
+// =====================================================================================
+const FEEDS = { news: false, arb: false };
+let FC = 'Firecrawl', SAMPLE = null;
+let SENT, ARB;
+function resetFeeds() {
+  SENT = { items: [], lastFetch: 0, err: null, busy: false, claudeNote: '' };
+  ARB = { rows: [], lastFetch: 0, err: null, pnl: 0, trades: 0, krTs: 0 };
+}
+resetFeeds();
+const KW = { BTC_USD: ['bitcoin', 'btc'], ETH_USD: ['ethereum', 'ether', 'eth'], SOL_USD: ['solana', 'sol'], DOGE_USD: ['dogecoin', 'doge'], PEPE_USD: ['pepe'] };
+const POSW = new Set('surge surges rally rallies soar soars gain gains jump jumps record high approve approved approval inflow inflows bullish upgrade adopt adoption partnership launch beat rebound rise rises climbs'.split(' '));
+const NEGW = new Set('crash crashes plunge plunges drop drops fall falls hack hacked exploit lawsuit sue sued ban bans outflow outflows bearish liquidation liquidations fraud selloff dump reject rejected delay delays probe fine fined low slump sliding slides slide'.split(' '));
+const NEGATORS = new Set('not no never denies deny without'.split(' '));
+function lexScore(title) {
+  const toks = title.toLowerCase().match(/[a-z]+/g) || []; let sc = 0;
+  toks.forEach((t, i) => { let v = POSW.has(t) ? 1 : NEGW.has(t) ? -1 : 0; if (v && toks.slice(Math.max(0, i - 3), i).some(w => NEGATORS.has(w))) v = -v; sc += v; });
+  return Math.tanh(sc / 2);
+}
+function assetsIn(title) { const w = new Set(title.toLowerCase().match(/[a-z]+/g) || []); return Object.keys(KW).filter(k => KW[k].some(x => w.has(x))); }
+function sentimentFor(sym, now) {  // decayed mean of headlines SEEN in the last 6h (never their claimed publish time)
+  let num = 0, den = 0, n = 0;
+  (SENT ? SENT.items : []).forEach(h => { if (h.score == null || !h.assets.includes(sym) || h.seen > now || now - h.seen > 6 * 3600e3) return; const w = Math.pow(0.5, (now - h.seen) / (2 * 3600e3)); num += w * h.score; den += w; n++; });
+  return { s: den ? num / den : 0, n };
+}
+function addHeadlines(list, now) {
+  let added = 0;
+  list.forEach(x => { if (!x.title || SENT.items.some(h => h.id === x.id)) return; const assets = assetsIn(x.title); if (!assets.length) return;
+    SENT.items.unshift({ id: x.id, title: x.title, src: x.src, seen: now, assets, score: lexScore(x.title), scorer: 'word list' }); added++; });
+  if (SENT.items.length > 120) SENT.items.length = 120;
+  return added;
+}
+const SIM_HEAD = ['{a} edges higher as traders eye macro data', '{a} slides after hot inflation print', 'Analysts split on {a} outlook', '{a} rally stalls near resistance',
+  'Exchange outflows of {a} jump', '{a} network upgrade approved', 'Regulator probe weighs on {a}', '{a} funding rates turn negative'];
+async function fetchNews() {
+  if (!FEEDS.news) return;
+  const now = S.now || Date.now();
+  if (S.mode === 'sim') {  // simulated headlines are pure noise: they carry no information about future prices
+    const names = { BTC_USD: 'Bitcoin', ETH_USD: 'Ethereum', SOL_USD: 'Solana', DOGE_USD: 'Dogecoin', PEPE_USD: 'Pepe' };
+    const k = Object.keys(names)[Math.floor(S.rand() * 5)], tpl = SIM_HEAD[Math.floor(S.rand() * SIM_HEAD.length)];
+    addHeadlines([{ id: 'sim' + now + k, title: tpl.replace('{a}', names[k]), src: 'simulated' }], now); SENT.lastFetch = now; return;
+  }
+  if (!MCP || SENT.busy) return;
+  SENT.busy = true;
+  try {
+    const r = await MCP.callTool(FC, 'firecrawl_search', { query: 'bitcoin OR ethereum OR solana OR dogecoin OR pepe crypto', objective: 'Recent crypto news headlines to score short-term market sentiment for a paper trading dashboard.', sources: ['news'], limit: 10, tbs: 'qdr:h' }, { cache: false });
+    const p = unwrap(r), news = (p && p.data && p.data.news) || [];
+    const added = addHeadlines(news.map(n => ({ id: n.url || n.title, title: n.title, src: (n.url || '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0] })), Date.now());
+    SENT.err = null; SENT.lastFetch = Date.now(); SENT.lastAdded = added;
+  } catch (e) { SENT.err = (e && e.code) ? e.code + (e.message ? ': ' + e.message : '') : String(e); }
+  finally { SENT.busy = false; render(); }
+}
+async function scoreWithClaude() {
+  if (!SAMPLE) return;
+  const items = SENT.items.filter(h => h.scorer !== 'Claude').slice(0, 25);
+  if (!items.length) { SENT.claudeNote = 'Nothing new to score.'; render(); return; }
+  $('claudeBtn').disabled = true; SENT.claudeNote = 'Thinking…'; render();
+  try {
+    const prompt = 'Rate each crypto news headline for its likely short-term price impact on the assets it mentions. ' +
+      'Return JSON only: {"scores":[{"i":<index>,"score":<number from -1 (clearly negative) to 1 (clearly positive), 0 if neutral or unclear>,"relevant":<false for opinion pieces, recaps of moves that already happened, prediction-market listings and ads>}]}.\n\n' +
+      items.map((h, i) => i + '. ' + h.title).join('\n');
+    const out = await SAMPLE.json(prompt, { modelTier: 'quick' });
+    (out.scores || []).forEach(x => { const h = items[x.i]; if (!h) return; h.score = x.relevant ? clamp(+x.score || 0, -1, 1) : 0; h.scorer = 'Claude'; });
+    SENT.claudeNote = 'Scored ' + items.length + ' headlines with Claude.';
+  } catch (e) {
+    SENT.claudeNote = e && e.code === 'not_granted' ? 'Claude access wasn\'t allowed for this page; word-list scores stay in use.' : e && e.code === 'rate_limited' ? 'Claude is busy; try again in a minute.' : 'Claude scoring failed (' + ((e && e.code) || 'error') + '); word-list scores stay in use.';
+  } finally { $('claudeBtn').disabled = false; render(); }
+}
+const KRAKEN = { BTC_USD: 'XXBTZUSD', ETH_USD: 'XETHZUSD', SOL_USD: 'SOLUSD', DOGE_USD: 'XDGUSD' };
+const ARB_FEES = { cc: 7.5, kr: 40 }, ARB_LAT = 3, ARB_NOTIONAL = 1000, ARB_MAX_SKEW = 30000;
+async function fetchArb() {
+  if (!FEEDS.arb) return;
+  let kr = {}, krTs;
+  if (S.mode === 'sim') {
+    S.assets.forEach(a => { if (!KRAKEN[a.sym] || !a.tick) return; const m = markOf(a) * (1 + gauss(S.rand) * 0.0008), hs = m * 0.5e-4; kr[a.sym] = { bid: m - hs, ask: m + hs }; });
+    krTs = S.now;
+  } else {
+    if (!MCP || ARB.busy) return;
+    ARB.busy = true;
+    try {
+      const r = await MCP.callTool(FC, 'firecrawl_scrape', { url: 'https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD,SOLUSD,XDGUSD', objective: 'Read Kraken public ticker prices to compare with Crypto.com for a paper arbitrage scanner.', formats: ['rawHtml'], maxAge: 0 }, { cache: false });
+      const p = unwrap(r), raw = (p && (p.rawHtml || (p.data && p.data.rawHtml))) || '';
+      const js = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+      if (js.error && js.error.length) throw { code: 'kraken', message: js.error.join(', ') };
+      Object.entries(KRAKEN).forEach(([sym, key]) => { const d = js.result[key]; if (d) kr[sym] = { bid: +d.b[0], ask: +d.a[0] }; });
+      krTs = Date.now(); ARB.err = null;
+    } catch (e) { ARB.err = (e && e.code) ? e.code + (e.message ? ': ' + e.message : '') : String(e); ARB.busy = false; render(); return; }
+    ARB.busy = false;
+  }
+  ARB.krTs = krTs; ARB.lastFetch = krTs;
+  ARB.rows = S.assets.filter(a => kr[a.sym] && a.tick).map(a => {
+    const c = a.tick, k = kr[a.sym], skew = Math.abs(krTs - (c.recv || c.ts || krTs));
+    const g1 = (k.bid / c.ask - 1) * 1e4, g2 = (c.bid / k.ask - 1) * 1e4;  // buy CC sell KR | buy KR sell CC
+    const best = g1 >= g2 ? { dir: 'buy Crypto.com, sell Kraken', gross: g1 } : { dir: 'buy Kraken, sell Crypto.com', gross: g2 };
+    best.net = best.gross - ARB_FEES.cc - ARB_FEES.kr - ARB_LAT;
+    const row = { sym: a.sym, c, k, ...best, skew, stale: skew > ARB_MAX_SKEW };
+    if (row.net > 0 && !row.stale) { const pnl = ARB_NOTIONAL * row.net / 1e4; ARB.pnl += pnl; ARB.trades++; log(krTs, a.sym, 'arb', 'Paper arbitrage: ' + row.dir + ', net ' + row.net.toFixed(1) + ' bps on $' + ARB_NOTIONAL + ' = ' + signedUsd(pnl), 'good'); }
+    return row;
+  });
+  render();
+}
+let newsTimer = null, arbTimer = null;
+function scheduleFeeds() {
+  clearInterval(newsTimer); clearInterval(arbTimer);
+  if (S.mode !== 'live') return;  // simulated mode drives feeds from the bar clock
+  if (FEEDS.news) { fetchNews(); newsTimer = setInterval(fetchNews, 15 * 60e3); }
+  if (FEEDS.arb) { fetchArb(); arbTimer = setInterval(fetchArb, 2 * 60e3); }
+}
+function renderFeeds() {
+  const live = S.mode === 'live';
+  $('newsNote').textContent = !FEEDS.news ? 'Off. Turn on to pull crypto headlines through your Firecrawl connector every 15 minutes (about 2 credits each time). Headlines are scored instantly with a built-in word list; press "Re-score with Claude" for a closer read.'
+    : !live ? 'Simulated headlines (random, no information about future prices), one every 15 bars. They show how the signal is weighted and scored.'
+    : SENT.err ? 'News didn\'t load: ' + SENT.err + '. The sentiment signal stays at 0 until it does.'
+    : SENT.lastFetch ? 'Last pulled ' + new Date(SENT.lastFetch).toISOString().slice(11, 16) + ' UTC via Firecrawl. Next pull in 15 minutes.' : 'Fetching headlines…';
+  $('claudeBtn').hidden = !SAMPLE || !FEEDS.news; $('claudeNote').textContent = SENT.claudeNote || '';
+  const sNow = S.mode === 'live' ? Date.now() : S.now;
+  $('sentBody').innerHTML = S.assets.map(a => { const r = sentimentFor(a.sym, sNow); return '<tr><td class="sym">' + short(a.sym) + '</td><td class="n">' + (r.n ? (r.s >= 0 ? '+' : '') + r.s.toFixed(2) : '—') + '</td><td class="n">' + r.n + '</td></tr>'; }).join('');
+  $('newsBody').innerHTML = SENT.items.slice(0, 30).map(h => '<tr><td class="t">' + tfmt(h.seen).slice(6) + '</td><td style="white-space:normal">' + esc(h.title) + ' <span class="note">' + esc(h.src) + '</span></td><td>' + h.assets.map(short).join(', ') + '</td><td class="n">' + (h.score >= 0 ? '+' : '') + h.score.toFixed(2) + ' <span class="note">' + h.scorer + '</span></td></tr>').join('')
+    || '<tr><td colspan="4" class="note">No headlines yet.</td></tr>';
+  $('arbNote').textContent = !FEEDS.arb ? 'Off. Turn on to read Kraken\'s public prices through your Firecrawl connector every 2 minutes (1 credit each time) and compare them with Crypto.com.'
+    : !live ? 'Simulated Kraken quotes around the simulated price, every 2 bars.'
+    : ARB.err ? 'Kraken prices didn\'t load: ' + ARB.err + '.' : ARB.lastFetch ? 'Kraken read ' + new Date(ARB.lastFetch).toISOString().slice(11, 19) + ' UTC via Firecrawl.' : 'Reading Kraken…';
+  $('arbBody').innerHTML = ARB.rows.map(r => '<tr><td class="sym">' + short(r.sym) + '</td><td class="n">' + fmtPx(r.c.bid) + ' / ' + fmtPx(r.c.ask) + '</td><td class="n">' + fmtPx(r.k.bid) + ' / ' + fmtPx(r.k.ask) + '</td><td>' + r.dir + (r.stale ? ' <span class="tag p-warn">quotes ' + Math.round(r.skew / 1000) + ' s apart</span>' : '') + '</td><td class="n">' + (r.gross >= 0 ? '+' : '') + r.gross.toFixed(1) + ' bps</td><td class="n"><span class="tag ' + (r.net > 0 ? 'p-good' : 'p-mute') + '">' + (r.net >= 0 ? '+' : '') + r.net.toFixed(1) + ' bps</span></td></tr>').join('')
+    || '<tr><td colspan="6" class="note">' + (FEEDS.arb ? 'Waiting for quotes from both exchanges.' : 'Scan is off.') + '</td></tr>';
+  $('arbSummary').textContent = 'Fees assumed: Crypto.com 7.5 bps, Kraken 40 bps taker, plus 3 bps for latency. Paper arbitrage trades $' + ARB_NOTIONAL + ' only when the gap is positive after all of that and both quotes are less than 30 s apart. So far: ' + ARB.trades + ' paper trades, ' + signedUsd(ARB.pnl) + '.';
+}
 
 // =====================================================================================
 // Journal + formatting
@@ -1020,6 +1171,7 @@ function render() {
     else { v.textContent = 'No signal · don\'t go live'; v.className = 'pill p-risk'; }
   } else { ['rHit', 'rBrier', 'rBase'].forEach(id => $(id).textContent = '—'); $('verdict').textContent = 'Waiting'; $('verdict').className = 'pill p-info'; }
 
+  renderFeeds();
   $('jCount').textContent = S.journal.length + ' events';
   $('jBody').innerHTML = S.journal.slice(0, 150).map(j => { const tone = { good: 'p-good', risk: 'p-risk', warn: 'p-warn', info: 'p-info', muted: 'p-mute' }[j.tone] || '';
     return '<tr><td class="t">' + tfmt(j.ts) + '</td><td class="sym">' + esc(short(j.sym)) + '</td><td><span class="tag ' + tone + '">' + esc(j.kind) + '</span></td><td>' + esc(j.text) + '</td></tr>'; }).join('') || '<tr><td colspan="4" class="note">Events appear here as the agent trades.</td></tr>';
@@ -1037,7 +1189,7 @@ function schedule() {
   } else { liveTick(); liveTimer = setInterval(liveTick, 30000); }
 }
 function start(mode) {
-  S = freshState(mode); S.speed = +$('speed').value;
+  S = freshState(mode); S.speed = +$('speed').value; resetFeeds();
   if (mode === 'sim') {
     S.now = Math.floor(Date.UTC(2026, 9, 1) / 900000) * 900000;
     for (let k = 0; k < 420; k++) { simBar(S.now); S.now += BAR; }
@@ -1048,7 +1200,7 @@ function start(mode) {
     S.now = Date.now();
     log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + '. Reading live prices for BTC, ETH, SOL, DOGE and PEPE every 30 s; deciding once per closed 1-minute bar.', 'info');
   }
-  render(); schedule();
+  render(); schedule(); scheduleFeeds();
 }
 $('src').addEventListener('change', e => start(e.target.value));
 $('runBtn').addEventListener('click', () => { S.running = !S.running; render(); });
@@ -1072,6 +1224,9 @@ bindSetting('sVol', 0.2, 1.5, v => P.volTarget = v / 100);
 bindSetting('sDD', 5, 15, v => L.maxDD = v / 100);
 bindSetting('sDay', 0.5, 3, v => L.dayLoss = v / 100);
 bindSetting('sGross', 10, 60, v => L.gross = v / 100);
+$('newsToggle').addEventListener('change', e => { FEEDS.news = e.target.checked; log(S.now, '—', 'setting', 'Live news ' + (FEEDS.news ? 'on' : 'off'), 'muted'); scheduleFeeds(); if (S.mode === 'sim' && FEEDS.news) fetchNews(); render(); });
+$('arbToggle').addEventListener('change', e => { FEEDS.arb = e.target.checked; log(S.now, '—', 'setting', 'Cross-exchange scan ' + (FEEDS.arb ? 'on' : 'off'), 'muted'); scheduleFeeds(); if (S.mode === 'sim' && FEEDS.arb) fetchArb(); render(); });
+$('claudeBtn').addEventListener('click', scoreWithClaude);
 $('sShort').addEventListener('change', e => { P.allowShort = e.target.value === '1'; log(S.now, '—', 'setting', 'Shorts ' + (P.allowShort ? 'on' : 'off'), 'muted'); render(); });
 bindHover($('cPrice'), $('tipPrice'), 'price', i => { const p = pricePts[i].c; return tfmt(p.ct) + '<br>O ' + fmtPx(p.o) + '  H ' + fmtPx(p.h) + '<br>L ' + fmtPx(p.l) + '  C ' + fmtPx(p.c); });
 bindHover($('cEq'), $('tipEq'), 'eq', i => { const p = eqPts[i]; return tfmt(p.ts) + '<br>equity ' + usd(p.y) + '<br>kill line ' + usd(p.peak * (1 - L.maxDD)); });

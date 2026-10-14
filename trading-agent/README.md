@@ -231,14 +231,38 @@ Code can't stop someone who controls the whole machine. In production, run the t
 | Order types | desk | Bracket orders (stop + target), trailing stops, limit-only entries for the meme tier (must trade through the limit, expire after 3 bars, never chased), TWAP in 3 slices above 10% of equity. |
 | Meme-coin guardrails | desk | Separate tier: 5% max position, limit orders only, spread < 50 bps, $1M+ daily volume. PEPE (≈$130k/day on this venue) is blocked as illiquid. |
 
-**Deliberately not built, and why:**
-- *10–50 ms execution.* This system decides once per closed bar. Speed matters only for strategies that compete on speed, which a paper bot reading a connector every 30 s shouldn't attempt.
-- *News / social sentiment.* No news or social feed is connected. Add a news connector and it becomes one more scored signal in the ensemble, judged like the others.
-- *Cross-exchange arbitrage.* Only one venue is connected. The index-gap signal compares Crypto.com against its own multi-exchange index, which is the honest single-venue version.
-- *Stocks, forex, penny stocks.* Different data, hours, and brokers; the Crypto.com connector covers crypto only. The engine is asset-agnostic, so a stock or FX feed plugs into the same pipeline.
-- *Go/Rust/gRPC/Next.js/TimescaleDB microservices.* A rewrite with no benefit at this scale; it would add failure points, not edge.
-- *Solana DEX trading, Jito bundles, honeypot checks.* Requires a funded wallet and private keys and sends real transactions; out of scope for a paper system. The honeypot code in the source material hard-codes its safety checks to "pass", so it would give false assurance.
-- *20+ years of history.* Crypto doesn't have it. The research pipeline accepts any data you supply and fingerprints it.
+## 13. Execution services, more markets, sentiment, arbitrage, on-chain
+
+| Piece | Where | What it does | Tested how |
+|---|---|---|---|
+| **Go execution hub** | `services/exechub/` | gRPC service (`proto/trading.proto`) that receives order intents from Python, applies its **own** risk checks (tier caps, spread, stale quotes, limit-only tiers, daily order cap, halt), fills on a paper venue, journals every event (replayed on restart so idempotency and halts survive), streams events over gRPC and WebSocket, and serves a local control dashboard with an emergency halt. | `go test` (5), plus 4 end-to-end tests that build the binary and drive it from Python over gRPC and HTTP |
+| **Latency** | `tradebot hub-bench` | Measured on the build machine: Python → Go → Python round trip **0.52 ms p50, 1.7 ms p99**; decision inside the hub **~1 µs**. | 2,000-order benchmark |
+| **Streaming data** | `marketstream.py` | Crypto.com WebSocket order-book stream with heartbeat handling, reconnect, and p50/p99 of exchange→us and us→decision. | parser + stats tests; live stream not reachable from the build machine |
+| **Stocks, penny stocks, forex** | `assets.py`, `brokers.py` | Asset classes with market hours (NYSE regular session; FX Sunday 17:00 to Friday 17:00 New York), share/lot rounding (always down), penny-stock tier (under $5: limit only, spread ≤ 1.5%, $500k+ daily volume, 2% max position). Broker adapters for **Alpaca paper** (market, limit, bracket, trailing stop) and **OANDA practice** (market, limit, stop-loss / take-profit / trailing stop on fill), locked to paper hosts: pointing them at live hosts raises. One router with a shared idempotency ledger. | request shapes tested against a fake transport; run `tradebot brokers --check` with your paper keys before relying on them |
+| **News sentiment** | `sentiment.py`, desk app | RSS feeds (CoinDesk, Cointelegraph, Decrypt) or, in the desk, Firecrawl news search. Scored by Claude (strict JSON) or a built-in word list with negation. Counts each headline from when it was **first seen**, not its claimed publish time. Enters the ensemble as one more signal and earns weight only if it beats costs per regime. Feeds with a DTD are refused (XML attack guard). | causality, de-duplication, scoring tests |
+| **Cross-exchange arbitrage** | `arbitrage.py`, desk app | Crypto.com vs Coinbase vs Kraken (Python) or vs Kraken via Firecrawl (desk). Net of both taker fees and a latency allowance; stale or out-of-sync quotes are ignored. Paper book with per-venue inventory shows that inventory, not detection, is what limits arbitrage. | scan, parser and book tests |
+| **Solana safety + DEX paper trading** | `onchain.py`, `tradebot rugcheck` | Read-only rug-pull checks that **fail closed**: mint authority revoked, freeze authority revoked (honeypots), top-10 holder share excluding pool and burn addresses, LP tokens burned. Paper DEX trader takes real Jupiter route quotes and refuses trades with price impact over 1%. | tests against a fake RPC |
+| **Deep history** | `datasets.py`, `tradebot import-csv`, `research walkforward` | Import any OHLCV CSV (e.g. 20+ years of daily stock bars): duplicates and broken bars dropped and counted, gaps and outliers listed, nothing clipped, adjusted/unadjusted recorded. Anchored walk-forward: explore on the past, test once on each next fold, every run recorded. | import and walk-forward tests |
+| **Storage** | `storage.py`, `sql/timescale.sql` | SQLite tables for ticks, orders and fills; the same schema for PostgreSQL/TimescaleDB hypertables. | fill aggregation test |
+
+**What's still not done, on purpose:**
+- **Signing and sending on-chain transactions, Jito bundles.** These need a funded wallet's private key and move real money outside every gate in this system. The paper DEX trader uses real quotes so the strategy can be judged first.
+- **Live broker hosts.** Alpaca and OANDA adapters refuse non-paper hosts. Going live means a reviewed code change behind the release gate, not a setting.
+- **Stocks and forex in the hosted desk.** The desk only has the Crypto.com connector. Your Twelve Data connector is installed but disconnected; reconnect it and I can add stocks and FX to the desk.
+- **A Rust engine or a separate Next.js frontend.** The Go hub already fills the execution role in microseconds; the hosted desk and the hub's built-in dashboard cover monitoring and the kill switch.
+
+**Running the local stack:**
+```bash
+cd services/exechub && go build -o exechub . && ./exechub        # gRPC :50051, dashboard http://127.0.0.1:8080
+python3 -m tradebot hub-bench                                     # latency through the hub
+python3 -m tradebot paper --dev --exechub 127.0.0.1:50051         # paper loop routed through the hub
+python3 -m tradebot sentiment            # or --claude
+python3 -m tradebot arb
+python3 -m tradebot rugcheck <mint> --pool-owner <amm authority> --lp-mint <lp mint>
+python3 -m tradebot import-csv spy_daily.csv --out data/spy.json --adjusted split+dividend
+python3 -m tradebot research walkforward --family spy_v1 --data data/spy.json --folds 5 --grid '{"reward_risk":[1.5,2,3]}'
+```
+Optional Python packages: `pip install grpcio websockets anthropic`.
 
 ## WHAT COULD I BE WRONG ABOUT?
 
@@ -276,7 +300,7 @@ Code can't stop someone who controls the whole machine. In production, run the t
 
 ```bash
 export PYTHONPATH=src
-python3 -m unittest discover -s tests                      # 41 tests
+python3 -m unittest discover -s tests                      # 62 tests (4 need Go)
 
 # 1. Data with provenance (or use synthetic:N:seed to practise; it has no real edge)
 python3 -m tradebot data snapshot --instrument BTC_USD --timeframe 1h --out data/btc_1h.json

@@ -38,7 +38,7 @@ def _load_broker(path: Path, start_cash: float) -> PaperBroker:
 
 
 def run_paper(instrument: str, timeframe: str, engine_kind: str, run_dir: Path, start_cash: float,
-              params: PolicyParams, limits: RiskLimits, release: dict | None, poll_s: float = 15.0):
+              params: PolicyParams, limits: RiskLimits, release: dict | None, poll_s: float = 15.0, exechub: str | None = None):
     run_dir.mkdir(parents=True, exist_ok=True)
     risk = RiskManager(limits, run_dir / "KILL", run_dir / "risk_state.json")
     broker = _load_broker(run_dir / "broker.json", start_cash)
@@ -51,7 +51,13 @@ def run_paper(instrument: str, timeframe: str, engine_kind: str, run_dir: Path, 
     engine = build_engine(engine_kind, risk)
     if hasattr(engine, "on_escalate"):
         engine.on_escalate = lambda d: journal.write("escalation", int(time.time() * 1000), fast=d)
-    agent = Agent(instrument, engine, broker, risk, params, Calibrator.load(run_dir / "calibration.json"), journal, guard=om)
+    guard = om
+    if exechub:
+        from .hubclient import HubClient, HubGuard
+
+        guard = HubGuard(HubClient(exechub), broker, risk)
+        print(f"routing orders through the Go execution hub at {exechub}")
+    agent = Agent(instrument, engine, broker, risk, params, Calibrator.load(run_dir / "calibration.json"), journal, guard=guard)
     feed = CryptoComFeed(instrument, timeframe)
     last_bar = 0
     errors = 0

@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+// Contract between the Python strategy/research side and the Go execution hub.
+// The strategy proposes; the hub enforces its own limits and can refuse.
+package trading;
+option go_package = "tradebot/exechub/pb";
+
+service ExecutionHub {
+  // Submit one order intent. Idempotent on client_order_id: a repeat returns the
+  // original result and sends nothing.
+  rpc Submit(OrderIntent) returns (OrderResult);
+  // Server stream of every order/fill/halt event, for monitors and dashboards.
+  rpc StreamEvents(StreamRequest) returns (stream Event);
+  rpc Halt(HaltRequest) returns (HubState);
+  rpc Resume(ResumeRequest) returns (HubState);
+  rpc State(StateRequest) returns (HubState);
+}
+
+enum AssetClass {
+  ASSET_CLASS_UNSPECIFIED = 0;
+  CRYPTO = 1;
+  STOCK = 2;
+  FOREX = 3;
+}
+
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  BUY = 1;
+  SELL = 2;
+}
+
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  MARKET = 1;
+  LIMIT = 2;
+}
+
+message OrderIntent {
+  string client_order_id = 1;
+  string asset_id = 2;          // "BTC_USD", "AAPL", "EUR_USD"
+  AssetClass asset_class = 3;
+  string tier = 4;              // crypto_major | crypto_high_vol | stock | penny_stock | forex_major
+  Side side = 5;
+  OrderType order_type = 6;
+  double quantity = 7;
+  double limit_price = 8;       // required for LIMIT
+  double ref_bid = 9;           // quote the strategy decided on
+  double ref_ask = 10;
+  int64 quote_ts_ms = 11;       // when that quote was valid
+  double equity = 12;           // account equity the strategy sized against
+  bool reduce_only = 13;        // closing orders are allowed even when halted
+  double confidence = 14;       // for the record only; the hub never sizes from it
+  string strategy_id = 15;
+  int64 sent_ns = 16;           // client send time, for latency measurement
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  FILLED = 1;
+  ACCEPTED = 2;                 // resting limit order
+  REJECTED = 3;
+  DUPLICATE = 4;
+}
+
+message OrderResult {
+  string client_order_id = 1;
+  Status status = 2;
+  double filled_qty = 3;
+  double avg_price = 4;
+  double fee = 5;
+  repeated string reasons = 6;
+  int64 hub_latency_us = 7;     // receipt to decision inside the hub
+}
+
+message Event {
+  int64 ts_ms = 1;
+  string kind = 2;              // order | fill | reject | halt | resume
+  string client_order_id = 3;
+  string asset_id = 4;
+  string asset_class = 5;
+  string side = 6;
+  double qty = 7;
+  double price = 8;
+  string status = 9;
+  string detail = 10;
+}
+
+message StreamRequest {}
+message HaltRequest { string reason = 1; }
+message ResumeRequest { string operator = 1; }
+message StateRequest {}
+
+message HubState {
+  bool halted = 1;
+  string halt_reason = 2;
+  int64 orders = 3;
+  int64 rejects = 4;
+  double latency_p50_us = 5;
+  double latency_p99_us = 6;
+  map<string, double> positions = 7;
+}

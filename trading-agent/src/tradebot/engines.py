@@ -84,8 +84,13 @@ class EnsembleEngine:
     name = "ensemble"
     SIGNALS = ("trend", "momentum", "meanrev", "breakout", "flow")
 
-    def __init__(self, horizon: int = 15, call_horizon: int = 30, cost: float = 0.0016, stop_atr: float = 1.5, rr: float = 2.0):
+    def __init__(self, horizon: int = 15, call_horizon: int = 30, cost: float = 0.0016, stop_atr: float = 1.5, rr: float = 2.0,
+                 extra_signals: Callable[[Snapshot], dict[str, float]] | None = None):
+        """extra_signals: optional causal source of more signals, e.g. news sentiment
+        (`lambda s: {"sentiment": store.signal(s.instrument, s.as_of)[0]}`). They are
+        weighted and scored exactly like the built-in ones."""
         self.h, self.ch, self.cost, self.stop_atr, self.rr = horizon, call_horizon, cost, stop_atr, rr
+        self.extra = extra_signals
         self.step = 0
         self.stats = {}  # (regime, signal) -> [n, hits]
         self.sig_pending = []  # (step, regime, signal, dir, mid)
@@ -144,6 +149,8 @@ class EnsembleEngine:
         self.step += 1
         self._score_pending(s.mid)
         sig, reg = self.signals(s), self.regime(s)
+        if self.extra is not None:
+            sig.update({k: max(-1.0, min(1.0, float(v))) for k, v in self.extra(s).items()})
         num = den = 0.0
         for k, v in sig.items():
             if v:

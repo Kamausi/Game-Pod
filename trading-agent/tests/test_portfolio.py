@@ -96,5 +96,25 @@ class Ensemble(unittest.TestCase):
         self.assertTrue(all(0.1 <= w <= 3.0 for w in ws))
 
 
+class WalkForwardAndExtras(unittest.TestCase):
+    def test_walk_forward_and_extra_signal(self):
+        from tradebot.experiments import DataSnapshot, Register, Spec
+        from tradebot.validation import walk_forward
+
+        tmp = Path(tempfile.mkdtemp())
+        c = synthetic_candles(1300, seed=9)
+        reg = Register(tmp / "r")
+        snap = DataSnapshot.of(c, "synthetic", "BTC_USD", "1h")
+        folds = walk_forward(reg, Spec(name="wf"), {"reward_risk": [1.5, 2.5]}, c, snap, 3, tmp / "w")
+        self.assertGreaterEqual(len(folds), 2)
+        for f in folds:
+            self.assertLessEqual(f["train"][1], f["test"][0])  # test never overlaps its training window
+        seen = []
+        eng = EnsembleEngine(extra_signals=lambda s: (seen.append(s.as_of), {"sentiment": 0.9})[1])
+        run_backtest(c[:400], EscalatingEngine(eng, None, RiskManager(RiskLimits(), tmp / "K")), tmp / "b")
+        self.assertTrue(seen and seen == sorted(seen))  # called once per decision, in time order
+        self.assertTrue(any(k == "sentiment" for (_, k) in eng.stats))  # scored like any other signal
+
+
 if __name__ == "__main__":
     unittest.main()
