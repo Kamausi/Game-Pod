@@ -218,6 +218,28 @@ Code can't stop someone who controls the whole machine. In production, run the t
 
 **Not done yet:** an independent re-implementation of the *signal logic* (reconciliation currently checks determinism and accounting; supply an external engine's results to check the signals), equity-specific data handling (total-return series, survivorship-free universes, delisting returns), and a live broker adapter. Paper trading tests the machinery (scheduling, orders, restarts), not profitability: a month of 1-hour bars is far too few independent decisions to prove an edge.
 
+## 12. Multi-asset desk and adaptive ensemble
+
+| Feature | Where | What it really does |
+|---|---|---|
+| Adaptive signal weighting | `engines.EnsembleEngine`, desk app | Six signals (trend, MACD momentum, RSI/Bollinger mean reversion, volume breakout, order-book flow, index gap). Each signal's calls are scored 15 bars later **per regime**; its weight moves from ×0.1 to ×3 with its measured hit rate. A signal that keeps failing in choppy markets fades out there by itself. |
+| Multi-timeframe analysis | `indicators.py`, `state.py` | RSI 14, MACD 12/26/9, Bollinger 20/2, 30-bar breakout with volume, EMA trend on the bar timeframe and on bars aggregated ×4 (desk: 1m plus 15m from the exchange). |
+| Scanner | desk app | Per asset: price, 24h volume, spread, gap vs Crypto.com's multi-exchange index, RSI, %B, trend on both timeframes, regime, signal, flags (illiquid, wide spread, index gap, volume spike, breakout, book imbalance). |
+| Dynamic sizing | `portfolio.py`, `policy.py`, desk | Smallest of quarter Kelly (from *measured* win rate), a daily volatility target (1% of equity per position) and the tier cap; then × drawdown scale (100% → 25% as drawdown approaches 10%, entries paused beyond) × recent-results scale (0.5× after a cold streak). |
+| Correlation / concentration | `portfolio.py`, desk | Rolling correlation matrix; same-side positions correlated above 0.7 share one 40% cap; gross exposure capped at 60%. |
+| Stress testing | `portfolio.py`, desk | Every bar: crypto crash (majors −20%, meme −40%), flash crash with gapped stops, correlations → 1, liquidity crunch. A trade that would push any scenario's loss over 12% of equity is blocked. |
+| Order types | desk | Bracket orders (stop + target), trailing stops, limit-only entries for the meme tier (must trade through the limit, expire after 3 bars, never chased), TWAP in 3 slices above 10% of equity. |
+| Meme-coin guardrails | desk | Separate tier: 5% max position, limit orders only, spread < 50 bps, $1M+ daily volume. PEPE (≈$130k/day on this venue) is blocked as illiquid. |
+
+**Deliberately not built, and why:**
+- *10–50 ms execution.* This system decides once per closed bar. Speed matters only for strategies that compete on speed, which a paper bot reading a connector every 30 s shouldn't attempt.
+- *News / social sentiment.* No news or social feed is connected. Add a news connector and it becomes one more scored signal in the ensemble, judged like the others.
+- *Cross-exchange arbitrage.* Only one venue is connected. The index-gap signal compares Crypto.com against its own multi-exchange index, which is the honest single-venue version.
+- *Stocks, forex, penny stocks.* Different data, hours, and brokers; the Crypto.com connector covers crypto only. The engine is asset-agnostic, so a stock or FX feed plugs into the same pipeline.
+- *Go/Rust/gRPC/Next.js/TimescaleDB microservices.* A rewrite with no benefit at this scale; it would add failure points, not edge.
+- *Solana DEX trading, Jito bundles, honeypot checks.* Requires a funded wallet and private keys and sends real transactions; out of scope for a paper system. The honeypot code in the source material hard-codes its safety checks to "pass", so it would give false assurance.
+- *20+ years of history.* Crypto doesn't have it. The research pipeline accepts any data you supply and fingerprints it.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
@@ -254,7 +276,7 @@ Code can't stop someone who controls the whole machine. In production, run the t
 
 ```bash
 export PYTHONPATH=src
-python3 -m unittest discover -s tests                      # 32 tests
+python3 -m unittest discover -s tests                      # 41 tests
 
 # 1. Data with provenance (or use synthetic:N:seed to practise; it has no real edge)
 python3 -m tradebot data snapshot --instrument BTC_USD --timeframe 1h --out data/btc_1h.json

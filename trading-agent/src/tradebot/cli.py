@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
 
     b = sub.add_parser("backtest", help="quick look; not recorded as evidence")
     b.add_argument("--data", default="synthetic:3000")
-    b.add_argument("--engine", default="rules", choices=["rules", "claude"])
+    b.add_argument("--engine", default="rules", choices=["rules", "ensemble", "claude"])
     b.add_argument("--run-dir", default="runs/backtest")
 
     d = sub.add_parser("data", help="snapshot market data with provenance")
@@ -58,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     sw.add_argument("--train", required=True, help="bar range, e.g. 0:2000")
     sw.add_argument("--grid", required=True, help='JSON, e.g. {"reward_risk":[1.5,2,3],"stop_atr_mult":[1,1.5,2]}')
     sw.add_argument("--base-params", default="{}")
+    sw.add_argument("--engine", default="rules", choices=["rules", "ensemble"])
     fr = rs.add_parser("freeze", help="freeze one explored configuration as a candidate")
     fr.add_argument("--run", required=True)
     fr.add_argument("--reason", required=True)
@@ -83,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("paper")
     p.add_argument("--release", default="releases/approved.json")
     p.add_argument("--dev", action="store_true", help="run without a release (journal is labelled DEV)")
-    p.add_argument("--engine", default="rules", choices=["rules", "claude"])
+    p.add_argument("--engine", default="rules", choices=["rules", "ensemble", "claude"])
     p.add_argument("--instrument", default="BTC_USD")
     p.add_argument("--timeframe", default="1h")
     p.add_argument("--run-dir", default="runs/paper")
@@ -137,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
             snap = DataSnapshot.of(candles, source, "BTC_USD", "1h")
             reg.save_data(candles, snap)
             lo, hi = _range(args.train)
-            base = Spec(name=args.family, params=json.loads(args.base_params))
+            base = Spec(name=args.family, engine=args.engine, params=json.loads(args.base_params))
             recs = sweep(reg, base, json.loads(args.grid), candles, snap, lo, hi, Path("runs/research/work"))
             ok = [x for x in recs if x["status"] == "ok"]
             ok.sort(key=lambda x: x["result"]["excess_vs_benchmark"], reverse=True)

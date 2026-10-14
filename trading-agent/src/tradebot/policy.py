@@ -9,6 +9,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .portfolio import drawdown_scale, vol_target_cap
 from .schema import Decision
 from .state import Snapshot
 
@@ -23,6 +24,8 @@ class PolicyParams:
     min_stop_pct: float = 0.004
     round_trip_cost_pct: float = 0.0016  # fees + slippage both ways, as a fraction
     allow_short: bool = False
+    vol_target_daily: float = 0.01  # cap a position's daily volatility at 1% of equity
+    bars_per_day: float = 24.0  # 1h bars
 
     def __post_init__(self):
         if not 0 < self.kelly_multiplier <= 0.25:
@@ -132,12 +135,17 @@ def decide(
     if f_star <= 0:
         return Intent("hold", reason=f"no Kelly edge at calibrated p={p:.3f}")
     # Kelly says what fraction of equity to LOSE if stopped; convert to notional.
-    size = params.kelly_multiplier * f_star / loss
+    kelly_size = params.kelly_multiplier * f_star / loss
+    vol_cap = vol_target_cap(snap.rv_24, params.bars_per_day, params.vol_target_daily)
+    dd = drawdown_scale(snap.drawdown)
+    if dd <= 0:
+        return Intent("hold", reason=f"drawdown protection: entries paused at {snap.drawdown:.1%} drawdown")
+    size = min(kelly_size, vol_cap) * dd
     return Intent(
         "enter",
         side=decision.direction,
         size_frac=size,
         stop_pct=stop_pct,
         take_pct=take_pct,
-        reason=f"p_raw={decision.p_win:.2f} p_cal={p:.3f} kelly={f_star:.3f}",
+        reason=f"p_raw={decision.p_win:.2f} p_cal={p:.3f} kelly={f_star:.3f} kelly_size={kelly_size:.3f} vol_cap={vol_cap:.3f} dd_scale={dd:.2f}",
     )

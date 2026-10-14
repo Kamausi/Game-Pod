@@ -14,6 +14,7 @@ import math
 import statistics
 from dataclasses import asdict, dataclass
 
+from . import indicators as ind
 from .types import Candle, OrderBook
 
 # Rough upper bound: ~4 chars per token. 400 tokens -> 1600 chars; keep margin.
@@ -53,6 +54,13 @@ class Snapshot:
     unrealized_pct: float
     drawdown: float  # 1 - equity / peak_equity, >= 0
     day_pnl_pct: float
+    # technical indicators (computed in code, multi-timeframe)
+    rsi_14: float = 50.0
+    macd_hist_atr: float = 0.0  # MACD histogram in ATR units
+    pct_b: float = 0.5  # Bollinger %B (20, 2)
+    breakout_30: int = 0  # +1 / -1 / 0
+    trend_fast: int = 0  # EMA 9/21 on this timeframe
+    trend_slow: int = 0  # EMA 8/21 on bars aggregated x4
 
     def to_prompt(self) -> str:
         d = asdict(self)
@@ -156,4 +164,10 @@ class StateEngine:
             unrealized_pct=unreal,
             drawdown=dd,
             day_pnl_pct=day,
+            rsi_14=ind.rsi(closes),
+            macd_hist_atr=ind.macd_hist(closes) / (atr_pct * last.close) if atr_pct > 0 else 0.0,
+            pct_b=ind.bollinger_pct_b(closes),
+            breakout_30=ind.breakout(candles),
+            trend_fast=ind.trend(closes, 9, 21),
+            trend_slow=ind.trend([c.close for c in ind.resample(candles, 4)], 8, 21),
         )

@@ -103,8 +103,9 @@ class TestPolicy(unittest.TestCase):
         cal = Calibrator()
         self.assertAlmostEqual(cal(0.9), 0.7)
         # p_win=0.6 shrinks to 0.55: still positive edge at 2:1, but much smaller size
-        a = decide(Decision.parse(GOOD), self.snap, None, PolicyParams(), cal)
-        b = decide(Decision.parse(GOOD), self.snap, None, PolicyParams(), self.fitted)
+        loose = PolicyParams(vol_target_daily=1.0)  # keep the vol cap from binding so calibration is isolated
+        a = decide(Decision.parse(GOOD), self.snap, None, loose, cal)
+        b = decide(Decision.parse(GOOD), self.snap, None, loose, self.fitted)
         self.assertLess(a.size_frac, b.size_frac)
 
     def test_failsafe_never_enters(self):

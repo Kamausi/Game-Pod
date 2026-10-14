@@ -71,6 +71,104 @@ class RuleEngine:
         )
 
 
+class EnsembleEngine:
+    """Adaptive ensemble of indicator signals; weights adapt per regime from scored outcomes.
+
+    Causal by construction: it only ever sees snapshots, in order. Each signal's
+    call is scored `horizon` snapshots later against the mid it sees then; each
+    ensemble call is scored target-before-stop on the mids it sees in between.
+    Weight x1 = coin flip; the win probability it reports comes only from its own
+    scored calls (shrunk toward no edge), never from a confidence it asserts.
+    """
+
+    name = "ensemble"
+    SIGNALS = ("trend", "momentum", "meanrev", "breakout", "flow")
+
+    def __init__(self, horizon: int = 15, call_horizon: int = 30, cost: float = 0.0016, stop_atr: float = 1.5, rr: float = 2.0):
+        self.h, self.ch, self.cost, self.stop_atr, self.rr = horizon, call_horizon, cost, stop_atr, rr
+        self.step = 0
+        self.stats = {}  # (regime, signal) -> [n, hits]
+        self.sig_pending = []  # (step, regime, signal, dir, mid)
+        self.call_pending = []  # dict(step, regime, dir, mid, stop, take)
+        self.scored = []  # (regime, y)
+
+    @staticmethod
+    def signals(s: Snapshot) -> dict:
+        return {
+            "trend": (s.trend_fast + s.trend_slow) / 2,
+            "momentum": max(-1.0, min(1.0, s.macd_hist_atr * 4)),
+            "meanrev": 1.0 if s.rsi_14 < 30 and s.pct_b < 0.05 else -1.0 if s.rsi_14 > 70 and s.pct_b > 0.95 else 0.0,
+            "breakout": float(s.breakout_30),
+            "flow": max(-1.0, min(1.0, s.imbalance * 1.5)) * 0.6,
+        }
+
+    @staticmethod
+    def regime(s: Snapshot) -> str:
+        if s.rv_ratio > 2.5 or abs(s.ret_1) > 6 * max(s.rv_24, 1e-9):
+            return "crisis"
+        if s.rv_ratio > 1.6:
+            return "high_vol"
+        if s.trend_fast != 0 and s.trend_fast == s.trend_slow and abs(s.ret_24) > 1.5 * s.rv_24 * 24 ** 0.5:
+            return "trending"
+        return "mean_reverting"
+
+    def weight(self, regime: str, sig: str) -> float:
+        n, hits = self.stats.get((regime, sig), (0, 0))
+        p = (hits + 2) / (n + 4)
+        return max(0.1, min(3.0, 1 + 6 * (p - 0.5)))
+
+    def _score_pending(self, mid: float):
+        keep = []
+        for st, reg, k, d, m in self.sig_pending:
+            if self.step - st >= self.h:
+                rec = self.stats.setdefault((reg, k), [0, 0])
+                rec[0] += 1
+                rec[1] += d * (mid / m - 1) > self.cost
+            else:
+                keep.append((st, reg, k, d, m))
+        self.sig_pending = keep
+        keep = []
+        for c in self.call_pending:
+            move = c["dir"] * (mid / c["mid"] - 1)
+            if move <= -c["stop"]:
+                self.scored.append((c["regime"], 0))
+            elif move >= c["take"]:
+                self.scored.append((c["regime"], 1))
+            elif self.step - c["step"] >= self.ch:
+                self.scored.append((c["regime"], 0))
+            else:
+                keep.append(c)
+        self.call_pending = keep
+
+    def decide(self, s: Snapshot) -> Decision:
+        self.step += 1
+        self._score_pending(s.mid)
+        sig, reg = self.signals(s), self.regime(s)
+        num = den = 0.0
+        for k, v in sig.items():
+            if v:
+                w = self.weight(reg, k)
+                num += w * v
+                den += w
+                if abs(v) >= 0.3:
+                    self.sig_pending.append((self.step, reg, k, 1 if v > 0 else -1, s.mid))
+        score = num / den if den else 0.0
+        direction = "long" if score > 0.2 else "short" if score < -0.2 else "neutral"
+        sgn = 1 if score > 0 else -1
+        quality = min(3, sum(t == sgn for t in (s.trend_fast, s.trend_slow)) + (1 if s.breakout_30 or s.vol_ratio > 1.2 else 0))
+        ys = [y for r, y in self.scored[-2000:] if r == reg][-200:]
+        p_win = (sum(ys) + 3) / (len(ys) + 8)
+        if direction != "neutral":
+            stop = max(0.004, self.stop_atr * s.atr_pct)
+            self.call_pending.append({"step": self.step, "regime": reg, "dir": sgn, "mid": s.mid, "stop": stop, "take": self.rr * stop})
+        return Decision(
+            regime=reg, direction=direction, direction_confidence=0.5 + 0.5 * abs(score), p_win=p_win,
+            toxic_flow=s.spread_bps > 15 or s.vol_ratio > 5, setup_quality=quality,
+            risk_state="safe" if s.drawdown < 0.05 and s.day_pnl_pct > -0.015 else "near_limit",
+            rationale=f"score={score:+.2f} p_win from {len(ys)} scored calls", source=self.name,
+        )
+
+
 class ClaudeEngine:
     """Claude as a typed classifier. Requires `pip install anthropic`."""
 
@@ -161,6 +259,8 @@ class EscalatingEngine:
 def build_engine(kind: str, risk: RiskManager) -> DecisionEngine:
     if kind == "rules":
         return EscalatingEngine(RuleEngine(), None, risk)
+    if kind == "ensemble":
+        return EscalatingEngine(EnsembleEngine(), None, risk)
     if kind == "claude":
         fast = ClaudeEngine("claude-haiku-5-5", effort="low", timeout_s=10)
         deep = ClaudeEngine("claude-opus-5-5", effort="high", timeout_s=120, server_fallback=True)

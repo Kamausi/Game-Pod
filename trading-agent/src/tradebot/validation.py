@@ -16,7 +16,7 @@ from dataclasses import asdict, fields, replace
 from pathlib import Path
 
 from .backtest import Result, run_backtest
-from .engines import EscalatingEngine, RuleEngine
+from .engines import EnsembleEngine, EscalatingEngine, RuleEngine
 from .experiments import DataSnapshot, Register, Spec
 from .policy import PolicyParams
 from .risk import RiskLimits, RiskManager
@@ -78,11 +78,12 @@ def build(spec: Spec) -> tuple[PolicyParams, RiskLimits]:
 
 
 def run_spec(spec: Spec, candles: list[Candle], run_dir: Path) -> Result:
-    if spec.engine != "rules":
-        raise ValueError("research runs use the deterministic rules engine; model engines are evaluated on paper")
+    if spec.engine not in ("rules", "ensemble"):
+        raise ValueError("research runs use deterministic engines (rules, ensemble); model engines are evaluated on paper")
     params, limits = build(spec)
     risk = RiskManager(limits, run_dir / "_engine_KILL")
-    return run_backtest(candles, EscalatingEngine(RuleEngine(), None, risk), run_dir, spec.instrument, params=params, limits=limits)
+    base = RuleEngine() if spec.engine == "rules" else EnsembleEngine()
+    return run_backtest(candles, EscalatingEngine(base, None, risk), run_dir, spec.instrument, params=params, limits=limits)
 
 
 def summarize(res: Result) -> dict:
