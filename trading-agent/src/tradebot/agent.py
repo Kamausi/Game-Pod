@@ -24,6 +24,7 @@ class Agent:
         calibrator: Calibrator,
         journal: Journal,
         guard=None,
+        reviewer=None,
     ):
         self.instrument = instrument
         self.engine = engine
@@ -36,6 +37,8 @@ class Agent:
         self.calibrator = calibrator
         self.journal = journal
         self.state = StateEngine()
+        self.reviewer = reviewer  # order_review.OrderReviewer: second check on every entry
+        self._last: tuple[Snapshot, Decision] | None = None
 
     def equity(self, mark: float) -> float:
         return self.broker.equity({self.instrument: mark})
@@ -63,10 +66,20 @@ class Agent:
         else:
             d = self.engine.decide(snap)
             intent = decide(d, snap, pos.side, self.params, self.calibrator)
+        trace = getattr(self.engine, "last_trace", None) if not self.risk.is_killed() else None
+        # Exactly what the model saw and said, so a bad trade can be traced to the model, the prompt or the data.
         self.journal.write(
-            "decision", as_of, snapshot=snap, decision=d, intent=intent, equity=self.equity(book.mid)
+            "decision", as_of, snapshot=snap, decision=d, intent=intent, equity=self.equity(book.mid), trace=trace
         )
+        self._last = (snap, d)
         return snap, d, intent
+
+    def order_state(self, intent: Intent) -> dict:
+        snap, d = self._last
+        return {"instrument": self.instrument, "side": intent.side, "size_frac": intent.size_frac, "stop_pct": intent.stop_pct,
+                "take_pct": intent.take_pct, "atr_pct": snap.atr_pct, "rv_ratio": snap.rv_ratio, "rv_24": snap.rv_24,
+                "spread_bps": snap.spread_bps, "direction_confidence": d.direction_confidence, "p_win": d.p_win,
+                "regime": d.regime, "drawdown": snap.drawdown, "mid": snap.mid}
 
     def act(self, intent: Intent, ts: int, bid: float, ask: float, data_ts: int, spread_bps: float):
         pos = self.broker.position(self.instrument)
@@ -75,6 +88,12 @@ class Agent:
         if intent.action == "exit" and pos.qty:
             self._close(ts, bid, ask, data_ts, spread_bps, intent.reason)
         elif intent.action == "enter" and not pos.qty:
+            if self.reviewer is not None and self._last is not None:
+                o = self.order_state(intent)
+                rv = self.reviewer.review(o)
+                self.journal.write("review", ts, order=o, verdict=rv)
+                if rv.blocked:
+                    return
             side = "buy" if intent.side == "long" else "sell"
             ref = ask if side == "buy" else bid
             qty = intent.size_frac * eq / ref

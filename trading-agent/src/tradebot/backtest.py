@@ -95,14 +95,18 @@ def run_backtest(
     params: PolicyParams | None = None,
     limits: RiskLimits | None = None,
     warmup: int = 60,
+    fee_bps: float = 6.0,
+    slip_bps: float = 2.0,
+    reviewer=None,
 ) -> Result:
     run_dir.mkdir(parents=True, exist_ok=True)
     for f in ("journal.jsonl", "risk_state.json", "KILL"):
         (run_dir / f).unlink(missing_ok=True)
     risk = RiskManager(limits or RiskLimits(), run_dir / "KILL", run_dir / "risk_state.json")
-    broker = PaperBroker(cash=start_cash)
+    broker = PaperBroker(cash=start_cash, fee_bps=fee_bps, slippage_bps=slip_bps)
     agent = Agent(
-        instrument, engine, broker, risk, params or PolicyParams(), Calibrator(), Journal(run_dir / "journal.jsonl")
+        instrument, engine, broker, risk, params or PolicyParams(), Calibrator(), Journal(run_dir / "journal.jsonl"),
+        reviewer=reviewer,
     )
     hs = spread_bps / 2e4
     peak, max_dd = start_cash, 0.0

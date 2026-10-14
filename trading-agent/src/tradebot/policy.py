@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .portfolio import drawdown_scale, vol_target_cap
+from .portfolio import drawdown_scale, vol_regime_scale, vol_target_cap
 from .schema import Decision
 from .state import Snapshot
 
@@ -26,12 +26,32 @@ class PolicyParams:
     allow_short: bool = False
     vol_target_daily: float = 0.01  # cap a position's daily volatility at 1% of equity
     bars_per_day: float = 24.0  # 1h bars
+    # Exits are code, not judgement. "fixed": a hard 2% stop and 4% target attached the
+    # moment the position opens (the rule that beat every model-chosen exit in a
+    # 3,505-agent live study). "atr": stop = stop_atr_mult x ATR, target = reward_risk x stop.
+    exit_mode: str = "fixed"
+    fixed_stop_pct: float = 0.02
+    fixed_take_pct: float = 0.04
+    model_exits: bool = False  # True lets the model close positions early (crisis / opposite signal)
+    vol_regime_floor: float = 0.25  # smallest size multiplier in a wild market
 
     def __post_init__(self):
         if not 0 < self.kelly_multiplier <= 0.25:
             raise ValueError("kelly_multiplier must be in (0, 0.25] (quarter-Kelly cap)")
         if self.min_confidence < 0.5:
             raise ValueError("min_confidence below 0.5 is not a gate")
+        if self.exit_mode not in ("fixed", "atr"):
+            raise ValueError("exit_mode must be 'fixed' or 'atr'")
+        if not 0 < self.fixed_stop_pct < self.fixed_take_pct:
+            raise ValueError("fixed stop must be positive and smaller than the fixed target")
+
+
+def bracket(params: PolicyParams, atr_pct: float) -> tuple[float, float]:
+    """(stop_pct, take_pct) set at entry. The one place exits are defined."""
+    if params.exit_mode == "fixed":
+        return params.fixed_stop_pct, params.fixed_take_pct
+    stop = max(params.min_stop_pct, params.stop_atr_mult * atr_pct)
+    return stop, params.reward_risk * stop
 
 
 @dataclass(frozen=True)
@@ -104,6 +124,8 @@ def decide(
         return Intent("hold", reason=f"failsafe: {decision.rationale}")
 
     if position_side is not None:
+        if not params.model_exits:
+            return Intent("hold", reason="in position; the fixed bracket owns the exit")
         if decision.regime == "crisis" or decision.risk_state == "reduce":
             return Intent("exit", reason=f"model flagged {decision.regime}/{decision.risk_state}")
         opposite = "short" if position_side == "long" else "long"
@@ -124,8 +146,7 @@ def decide(
         if not ok:
             return Intent("hold", reason=why)
 
-    stop_pct = max(params.min_stop_pct, params.stop_atr_mult * snap.atr_pct)
-    take_pct = params.reward_risk * stop_pct
+    stop_pct, take_pct = bracket(params, snap.atr_pct)
     cost = params.round_trip_cost_pct + snap.spread_bps / 1e4
     win, loss = take_pct - cost, stop_pct + cost
     if win <= 0:
@@ -140,12 +161,13 @@ def decide(
     dd = drawdown_scale(snap.drawdown)
     if dd <= 0:
         return Intent("hold", reason=f"drawdown protection: entries paused at {snap.drawdown:.1%} drawdown")
-    size = min(kelly_size, vol_cap) * dd
+    regime_scale = vol_regime_scale(snap.rv_ratio, params.vol_regime_floor)
+    size = min(kelly_size, vol_cap) * dd * regime_scale
     return Intent(
         "enter",
         side=decision.direction,
         size_frac=size,
         stop_pct=stop_pct,
         take_pct=take_pct,
-        reason=f"p_raw={decision.p_win:.2f} p_cal={p:.3f} kelly={f_star:.3f} kelly_size={kelly_size:.3f} vol_cap={vol_cap:.3f} dd_scale={dd:.2f}",
+        reason=f"p_raw={decision.p_win:.2f} p_cal={p:.3f} kelly={f_star:.3f} kelly_size={kelly_size:.3f} vol_cap={vol_cap:.3f} dd_scale={dd:.2f} vol_regime={regime_scale:.2f}",
     )

@@ -17,7 +17,7 @@ and expires after 7 days. Deployment and kill procedures: [LAUNCH.md](LAUNCH.md)
 | Prompt said | What this build does | Why |
 |---|---|---|
 | Build through "AgenKit" at agenkit.xyz | Not used. The six phases are run as plain Claude Code steps in this repo (section 6). | A web search on 2026-10-14 turned up only the promotional post itself: no docs, no source, no install instructions. Installing an unverified harness into your coding agent hands it your shell. |
-| "Jev" from console.typesafe.ai as the reflex model | Not used. The reflex is a pluggable `DecisionEngine`: a deterministic `RuleEngine` (default), or `ClaudeEngine` on Claude Haiku 5.5 with escalation to Claude Opus 5.5. | No public API docs could be found, so writing an adapter would mean inventing an API. If it turns out to be real, it fits behind the same interface in about 30 lines (section 4). |
+| "Jev" from console.typesafe.ai as the reflex model | Available as `--engine jev` (or `jev>opus`, escalating to Claude Opus 5.5), alongside the deterministic `RuleEngine` (default) and `ClaudeEngine`. | TypeSafe has since published API docs (docs.typesafe.ai/api), so the adapter is written against the documented shapes (section 15). It still has to earn its place: `tradebot replay` compares it with the other engines on your own saved decisions. |
 | Use the model's "calibrated probability" for Kelly sizing | Probabilities are **shrunk toward 0.5** until at least 200 scored outcomes exist, then mapped through an isotonic calibration fitted nightly. | A model saying it is calibrated doesn't make it calibrated. Calibration has to be measured. |
 | Execute automatically, live | Paper first. Live trading unlocks only through `tradebot go-live` after the launch gates pass (section 9, section 14), with canary dollar caps. | The prompt itself says to prioritise a system that survives. |
 | 5 to 10 asymmetric altcoin setups | Not delivered as picks. A sourced research prompt is in `prompts/research.md`, and the bot trades **BTC_USD only** to start. | An honest version needs live unlock schedules, fees and holder data for each token. Making up numbers is ruled out by the prompt, and the per-bar bot shouldn't trade a thesis anyway. |
@@ -281,6 +281,55 @@ Optional Python packages: `pip install -e ".[all]"` (grpcio, websockets, anthrop
 
 What has **not** been verified from the build machine: real requests to Crypto.com's private API, Alpaca live, OANDA live, Jupiter `/swap` and Jito. They are written from the public docs and tested against fakes, and the Crypto.com signature is tested against the documented algorithm. The Docker build was also not run, because no Docker daemon was available here; CI builds it. That is why the runbook starts with the read-only `tradebot live-check` and a $100 cap.
 
+## 15. Survival rules, news overlay, Jev, run memory
+
+Seven rules from a study that put 3,505 agents on real money, implemented in code:
+
+| Rule | Where | What it does here |
+|---|---|---|
+| 1. Code owns exits | `policy.py` (`exit_mode="fixed"`, default), desk | A hard 2% stop and 4% target attach at entry. The model cannot close a position early unless `model_exits=True`; the kill switch and the risk layer still can. The desk trades 1-minute bars, so each tier gets the same 1:2 bracket at a width that fits its noise (BTC 0.4%/0.8%). |
+| 2. Vol-scaled size | `portfolio.vol_regime_scale`, desk | Size × `1/rv_ratio` (short-window vol over its norm), floored at 0.25×, on top of the vol target. Twice the usual vol means half the size. |
+| 3. The list is the strategy | desk | Every asset is decided first, then acted on strongest signal first with a random tie-break, so shared caps don't go to whatever is listed first. Entries per list position are shown so you can check. |
+| 4. Turn tools off | `research ablate`, `EnsembleEngine.impact_report`, desk column | Runs the strategy with each signal removed and reports the share of decisions that changed. A signal that changes under 1% of decisions is marked "does nothing: delete". On the synthetic practice data, breakout and order flow changed 0.0%. |
+| 5. Second model before the exchange | `order_review.py`, `--reviewer code|jev|claude`, desk gate | Every entry gets a risk score (code, optionally averaged with Jev or Claude Haiku 5.5). The riskiest 10% are blocked, or logged only in shadow mode. The nightly review checks whether flagged entries actually stop out more often. Exits are never reviewed. |
+| 6. Save what the model saw | `trace` on every journal decision, desk "Exactly what this decision saw" | The exact prompt or state, the system-prompt hash, the model that served it, the raw answer, tokens and latency. |
+| 7. Replay before upgrading | `tradebot replay --engine claude:claude-haiku-5-5` | Re-runs saved inputs on another engine: direction and action agreement, Brier on resolved calls, tokens and dollars for both. |
+
+**News overlay** (`news.py`, `tradebot news ...`, `research news-ablation`, desk "News use"):
+- **Classification.** Every headline gets its asset, sentiment, materiality and regulatory risk, from a word list, Claude Haiku 5.5 or Jev.
+- **Sentiment bias.** Shifts entry confidence by ±0.10 × recent sentiment.
+- **Regulatory veto.** Blocks new longs for 24h after a material, non-positive regulatory headline about that asset.
+- **Sources.** The feeds now include Fed and SEC press releases. Fed items attach to every asset, and SEC items that mention crypto attach to every crypto asset.
+- **The test that matters.** `research news-ablation` runs no news, bias, veto and both, at several fee levels. A variant only "helps" if it wins at every fee level. Every run is recorded, so it counts against the Deflated Sharpe.
+- **Example on random synthetic headlines.** "Both" happened to win at all three fee levels and "veto" at two of three. That is exactly the kind of noise this test, and the trial count, exist to catch.
+- **History.** Import headline history from a CSV (`time,title[,source]`). Each item counts from its publish time plus 5 minutes.
+
+**Jev** (`jev.py`):
+- **Shapes.** Written against the documented `POST /v1/systemone` request and answer shapes.
+- **One call per decision.** Six atomic questions per bar:
+  - regime (choice);
+  - direction (choice);
+  - up-first and down-first for the bracket (two nouls);
+  - toxic flow (noul);
+  - setup quality (score).
+
+  Code builds the Decision; risk state is arithmetic.
+- **Failures.** A late answer misses its deadline and becomes a hold. 429/529 are retried within the deadline; 422 is never retried.
+- **Traceability.** The model version that served each call is logged. Pin `TYPESAFE_MODEL` once thresholds are calibrated.
+- **Not live-tested.** It has not been called live (no key here). `tradebot jev-check` makes one call to prove the key, version and latency.
+
+**Run memory** (`runlog.py`):
+- **What it is.** Each run directory has an append-only `run_log.md`: what was done, what was decided and why, what is open, and what was tried and rejected.
+- **Who writes it.** Paper sessions and nightly reviews append to it automatically. The nightly review prompt reads it first.
+- **Caching.** The Claude engine's system prompt goes first with `cache_control`, and the volatile snapshot goes last.
+
+**Not built, and why:**
+- **Unpaid TradingView "premium indicators".** That gets around a paywall and TradingView's terms.
+- **"Leaked" Polymarket arbitrage repos, copy-trading of wallets, referral-link bot desks.** One of the pasted posts itself describes a hijacked org shipping key-stealing bots. Claims like "98% win rate" and "$89 → $7,769" can't be checked.
+- **Avellaneda-Stoikov market making.** The posts' own numbers show naive cancel-replace loses to fees. It needs post-only maker access and a queue model before it is worth testing.
+- **GPT-6 Astra, Kimi K3, Grok Bot desks.** Engines are pluggable. `replay` is how to decide whether a pricier model earns its bill.
+- **AgenKit.** Still unverifiable.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
@@ -306,8 +355,14 @@ What has **not** been verified from the build machine: real requests to Crypto.c
 - **Survivorship and overfitting.** Each nightly "improvement" is a chance to
   fit noise. One change per night, a 7-day falsification window, and no change
   goes live the same night.
-- **I couldn't verify AgenKit or Jev.** If they're legitimate, I may be
-  underselling them. The architecture doesn't depend on them either way.
+- **I couldn't verify AgenKit.** Jev turned out to be real and documented; its adapter
+  is built from the docs but has not been called with a real key from here.
+- **The 2%/4% bracket is the study's, not yours.** It beat model-chosen exits for
+  their agents on their markets. Run `research sweep` over `fixed_stop_pct` /
+  `fixed_take_pct` on your own data (every run is counted) before trusting it.
+- **The pre-trade reviewer can block good trades.** It blocks the riskiest 10% by
+  construction. Start it in shadow mode if you doubt it; the nightly review says
+  whether flagged entries really stop out more.
 - **Live venue code has only met fakes.** A field-name or rounding mismatch
   with a real API would surface as a rejected order. The ledger, reject kill and
   reconciliation are built to fail safe on exactly that, but expect a first-day
@@ -324,7 +379,7 @@ What has **not** been verified from the build machine: real requests to Crypto.c
 
 ```bash
 export PYTHONPATH=src
-python3 -m unittest discover -s tests                      # 75 tests (4 need Go)
+python3 -m unittest discover -s tests                      # 92 tests (4 need Go)
 
 # 1. Data with provenance (or use synthetic:N:seed to practise; it has no real edge)
 python3 -m tradebot data snapshot --instrument BTC_USD --timeframe 1h --out data/btc_1h.json
@@ -350,6 +405,13 @@ python3 -m tradebot paper --dev                             # test run, labelled
 
 # Stop trading instantly (closing positions is still allowed)
 python3 -m tradebot kill --run-dir runs/paper
+
+# Survival checks: which signals do nothing, does news help after fees, is a cheaper model as good
+python3 -m tradebot research ablate --family trend_v1 --data synthetic:3000:11
+python3 -m tradebot news import headlines.csv && python3 -m tradebot news classify --by lexicon
+python3 -m tradebot research news-ablation --family news_v1 --data data/btc_4h.json --fees 1,2,3
+python3 -m tradebot replay --run-dir runs/paper --engine claude:claude-haiku-5-5
+python3 -m tradebot runlog --run-dir runs/paper
 
 # 6. After 30+ days of paper: real money under canary caps (full runbook: LAUNCH.md)
 python3 -m tradebot go-live --gates-only --operator you --venue cryptocom

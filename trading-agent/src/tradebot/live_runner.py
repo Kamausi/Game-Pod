@@ -108,7 +108,10 @@ def run_live(venue: str, instrument: str, timeframe: str, engine_kind: str, run_
            unproven=auth.record["unproven_accepted"] or "no", reconciliation="ok" if rec["ok"] and not rec_venue else "FAILED")
 
     engine = build_engine(engine_kind, risk)
-    agent = Agent(instrument, engine, broker, risk, params, Calibrator.load(run_dir / "calibration.json"), journal, guard=om)
+    from .order_review import build_reviewer
+
+    agent = Agent(instrument, engine, broker, risk, params, Calibrator.load(run_dir / "calibration.json"), journal, guard=om,
+                  reviewer=build_reviewer("code", run_dir / "reviewer_scores.json", "block"))
     last_bar, errors, tick, last_auth = 0, 0, 0, now_fn()
     flattened_for = None
     day = now_fn() // 86_400_000

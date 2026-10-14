@@ -216,6 +216,9 @@ class TestEngines(unittest.TestCase):
         d = e.decide(snap)
         self.assertEqual((d.direction, d.source), ("long", "claude:test"))
         self.assertEqual(sent["output_config"]["format"]["type"], "json_schema")
+        self.assertEqual(sent["system"][0]["cache_control"], {"type": "ephemeral"})  # stable prefix first, cached
+        self.assertEqual(e.last_trace["prompt"], snap.to_prompt())  # exactly what it saw
+        self.assertEqual(json.loads(e.last_trace["raw_output"]), GOOD)  # exactly what it said
         e.client = NS(messages=NS(create=lambda **kw: NS(stop_reason="refusal", content=[])))
         self.assertEqual(e.decide(snap).source, "failsafe")
 

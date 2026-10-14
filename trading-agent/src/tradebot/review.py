@@ -12,7 +12,7 @@ from collections import Counter
 from pathlib import Path
 
 from .journal import read_journal
-from .policy import Calibrator, PolicyParams
+from .policy import Calibrator, PolicyParams, bracket
 
 
 def brier(ps: list[float], ys: list[int]) -> float:
@@ -46,8 +46,7 @@ def label_outcomes(records: list[dict], params: PolicyParams, horizon: int = 24)
         future = decs[i + 1 : i + 1 + horizon]
         if len(future) < horizon:
             continue  # not resolved yet; scored in a later review
-        stop = max(params.min_stop_pct, params.stop_atr_mult * s["atr_pct"])
-        take = params.reward_risk * stop
+        stop, take = bracket(params, s["atr_pct"])
         sgn = 1 if d["direction"] == "long" else -1
         y = 0
         for f in future:
@@ -59,6 +58,39 @@ def label_outcomes(records: list[dict], params: PolicyParams, horizon: int = 24)
                 break
         out.append((r, y))
     return out
+
+
+def reviewer_effect(records: list[dict], horizon: int = 48) -> dict | None:
+    """Did the entries the pre-trade reviewer flagged stop out more often than the rest?
+    Each reviewed entry is scored hypothetically on later snapshot mids, flagged or not,
+    so blocked orders are judged on the same footing as the ones that were sent."""
+    reviews = [r for r in records if r["kind"] == "review"]
+    if not reviews:
+        return None
+    decs = [r for r in records if r["kind"] == "decision"]
+    out = {True: [0, 0], False: [0, 0]}  # flagged -> [resolved, stopped out]
+    for rv in reviews:
+        o, flagged = rv["order"], rv["verdict"]["flagged"]
+        future = [d for d in decs if d["ts"] > rv["ts"]][:horizon]
+        sgn = 1 if o["side"] == "long" else -1
+        res = None
+        for f in future:
+            move = sgn * (f["snapshot"]["mid"] / o["mid"] - 1)
+            if move <= -o["stop_pct"]:
+                res = 1
+                break
+            if move >= o["take_pct"]:
+                res = 0
+                break
+        if res is None:
+            continue
+        out[flagged][0] += 1
+        out[flagged][1] += res
+    rate = lambda k: out[k][1] / out[k][0] if out[k][0] else None
+    return {"reviewed": len(reviews), "flagged": sum(r["verdict"]["flagged"] for r in reviews),
+            "blocked": sum(r["verdict"]["blocked"] for r in reviews),
+            "flagged_resolved": out[True][0], "flagged_stop_rate": rate(True),
+            "passed_resolved": out[False][0], "passed_stop_rate": rate(False)}
 
 
 def run_review(run_dir: Path, params: PolicyParams | None = None) -> str:
@@ -111,6 +143,13 @@ def run_review(run_dir: Path, params: PolicyParams | None = None) -> str:
             hr = sum(ys[i] for i in idx) / len(idx)
             lines.append(f"| {lo:.1f}-{lo + 0.1:.1f} | {len(idx)} | {mp:.3f} | {hr:.3f} |")
 
+    rv = reviewer_effect(records)
+    if rv:
+        lines += ["", "## Pre-trade reviewer (second check before the exchange)",
+                  f"- entries reviewed: {rv['reviewed']}  flagged: {rv['flagged']}  blocked: {rv['blocked']}",
+                  f"- stop-out rate, flagged: {rv['flagged_stop_rate']} over {rv['flagged_resolved']} resolved",
+                  f"- stop-out rate, passed: {rv['passed_stop_rate']} over {rv['passed_resolved']} resolved",
+                  "  (the reviewer earns its place only if flagged entries stop out clearly more often)"]
     lines += ["", "## Top hold reasons", *[f"- {k}: {v}" for k, v in holds.most_common(8)], ""]
     lines += ["## Proposals (NOT applied; operator approval required)"]
     proposals = []
@@ -120,7 +159,19 @@ def run_review(run_dir: Path, params: PolicyParams | None = None) -> str:
         proposals.append(f"Only {len(ys)} resolved calls; calibrator stays in shrink mode until {new_cal.min_samples}.")
     if sum(failsafe.values()) > 0.05 * max(1, len(decisions)):
         proposals.append("Failsafe rate > 5%: fix engine reliability before anything else.")
+    if rv and rv["flagged_resolved"] >= 20 and rv["passed_stop_rate"] is not None and rv["flagged_stop_rate"] is not None \
+            and rv["flagged_stop_rate"] <= rv["passed_stop_rate"]:
+        proposals.append("Flagged entries stop out no more often than passed ones: the reviewer is blocking trades for nothing; "
+                         "switch it to shadow mode or retune it.")
     lines += [f"- {p}" for p in proposals] or ["- none"]
     report = "\n".join(lines) + "\n"
     (run_dir / "review.md").write_text(report)
+    from . import runlog
+
+    runlog.append(run_dir,
+                  done=[f"nightly review: {len(decisions)} decisions, {len(ys)} resolved calls, calibrator refit on {len(ps)} points"],
+                  decided=[f"calibrator {'still shrinking toward 0.5' if len(ys) < new_cal.min_samples else 'now active'} "
+                           f"(Brier raw {brier(ps, ys):.4f} vs base {brier([base] * len(ys), ys):.4f})" if ys else
+                           "calibrator unchanged: no resolved calls yet"],
+                  open_items=proposals or None)
     return report

@@ -38,7 +38,8 @@ def _load_broker(path: Path, start_cash: float) -> PaperBroker:
 
 
 def run_paper(instrument: str, timeframe: str, engine_kind: str, run_dir: Path, start_cash: float,
-              params: PolicyParams, limits: RiskLimits, release: dict | None, poll_s: float = 15.0, exechub: str | None = None):
+              params: PolicyParams, limits: RiskLimits, release: dict | None, poll_s: float = 15.0, exechub: str | None = None,
+              reviewer: str = "code", reviewer_mode: str = "block"):
     run_dir.mkdir(parents=True, exist_ok=True)
     risk = RiskManager(limits, run_dir / "KILL", run_dir / "risk_state.json")
     broker = _load_broker(run_dir / "broker.json", start_cash)
@@ -57,7 +58,17 @@ def run_paper(instrument: str, timeframe: str, engine_kind: str, run_dir: Path, 
 
         guard = HubGuard(HubClient(exechub), broker, risk)
         print(f"routing orders through the Go execution hub at {exechub}")
-    agent = Agent(instrument, engine, broker, risk, params, Calibrator.load(run_dir / "calibration.json"), journal, guard=guard)
+    from . import runlog
+    from .order_review import build_reviewer
+
+    rev = build_reviewer(reviewer, run_dir / "reviewer_scores.json", reviewer_mode)
+    agent = Agent(instrument, engine, broker, risk, params, Calibrator.load(run_dir / "calibration.json"), journal, guard=guard,
+                  reviewer=rev)
+    runlog.append(run_dir, done=[f"paper session started: {instrument} {timeframe} engine={engine_kind} reviewer={reviewer}/{reviewer_mode}"
+                                 f" exits={params.exit_mode} ({params.fixed_stop_pct:.1%}/{params.fixed_take_pct:.1%})"
+                                 if params.exit_mode == "fixed" else f"paper session started: {instrument} engine={engine_kind}"],
+                  decided=[f"release {release['candidate_id']}" if release else "DEV mode: not promotable"],
+                  open_items=rec["problems"] or None)
     feed = CryptoComFeed(instrument, timeframe)
     last_bar = 0
     errors = 0

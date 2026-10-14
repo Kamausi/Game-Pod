@@ -180,6 +180,7 @@ tr.click { cursor: pointer; }
     <section class="panel" aria-label="Market scanner">
       <h2><span>Market scanner</span><span class="row"><label class="field" for="mktToggle"><input type="checkbox" id="mktToggle"> Live stocks &amp; FX</label><span class="note">Click a row to chart it</span></span></h2>
       <p class="note" id="mktNote"></p>
+      <p class="note" id="biasNote"></p>
       <div class="tw" style="max-height:none">
         <table>
           <thead><tr>
@@ -228,6 +229,8 @@ tr.click { cursor: pointer; }
         </div>
         <div class="intent hold" id="intentBox">Waiting for the first bar…</div>
         <p class="note" id="sizeNote"></p>
+        <p class="note" id="revNote"></p>
+        <details><summary class="note">Exactly what this decision saw</summary><pre id="inputsPre" style="max-height:18rem;overflow:auto;font-size:.72rem;white-space:pre-wrap"></pre></details>
       </section>
     </div>
 
@@ -299,8 +302,12 @@ tr.click { cursor: pointer; }
         <label for="sDay">Max daily loss %<div class="row"><input type="number" id="sDay" step="0.5" min="0.5" max="3" value="3"><span class="lock">0.5–3</span></div></label>
         <label for="sGross">Max gross exposure %<div class="row"><input type="number" id="sGross" step="5" min="10" max="60" value="60"><span class="lock">10–60</span></div></label>
         <label for="sShort">Shorts<div class="row"><select id="sShort"><option value="0">Off (spot, long only)</option><option value="1">On</option></select></div></label>
+        <label for="sExit">Exits<div class="row"><select id="sExit"><option value="fixed">Fixed stop + target, set at entry</option><option value="atr">ATR bracket + trailing stop</option></select></div></label>
+        <label for="sMx">Model may close early<div class="row"><select id="sMx"><option value="0">No (code owns exits)</option><option value="1">Yes (crisis / opposite signal)</option></select></div></label>
+        <label for="sRev">Pre-trade reviewer<div class="row"><select id="sRev"><option value="block">Block riskiest 10%</option><option value="shadow">Shadow (log only)</option></select></div></label>
+        <label for="sNews">News use<div class="row"><select id="sNews"><option value="both">Sentiment bias + regulatory veto</option><option value="bias">Sentiment bias only</option><option value="veto">Regulatory veto only</option><option value="off">Off</option></select></div></label>
       </div>
-      <p class="note">Per-asset tiers are fixed in code. Crypto majors (BTC, ETH, SOL): up to 25% of equity, market orders, spread under 25 bps, $5M+ daily volume. Meme coins (DOGE, PEPE): up to 5%, limit orders only, spread under 50 bps, $1M+ volume. Stocks (AAPL, SPY): up to 20%, spread under 20 bps, $20M+ volume, NYSE hours only. Penny stocks under $5 (SNDL): up to 2%, limit orders only, spread under 150 bps, $500k+ volume. FX majors (EUR, GBP, AUD vs USD): up to 30%, spread under 3 bps, Sunday 17:00 to Friday 17:00 New York. Orders above 10% of equity are split into 3 TWAP slices.</p>
+      <p class="note">Per-asset tiers are fixed in code. Crypto majors (BTC, ETH, SOL): up to 25% of equity, market orders, spread under 25 bps, $5M+ daily volume. Meme coins (DOGE, PEPE): up to 5%, limit orders only, spread under 50 bps, $1M+ volume. Stocks (AAPL, SPY): up to 20%, spread under 20 bps, $20M+ volume, NYSE hours only. Penny stocks under $5 (SNDL): up to 2%, limit orders only, spread under 150 bps, $500k+ volume. FX majors (EUR, GBP, AUD vs USD): up to 30%, spread under 3 bps, Sunday 17:00 to Friday 17:00 New York. Orders above 10% of equity are split into 3 TWAP slices. Exits: a fixed stop and a target twice as far away are attached at entry (majors 0.4%/0.8%, meme 1%/2%, stocks 0.3%/0.6%, penny 1.5%/3%, FX 0.08%/0.16%) and the model cannot close early unless you allow it. Size shrinks as short-term volatility rises above its norm. Every entry passes a pre-trade reviewer that blocks the riskiest 10%.</p>
     </section>
 
     <p class="note">Live mode reads real prices through your Crypto.com connector (and, when switched on, stocks and FX from Yahoo Finance through Firecrawl) and trades paper money only; nothing is sent to an exchange from this page. Real-money trading runs from the command-line app after the launch gates in LAUNCH.md. The simulated market is a correlated random walk with regime changes and no edge to find, useful for watching the machinery at speed.</p>
@@ -329,11 +336,11 @@ const ASSETS = [
 ];
 // group: which stress scenario hits it; bpd: one-minute bars per trading day; hours: when it can trade
 const TIER = {
-  major: { label: 'crypto major', group: 'crypto', maxPos: 0.25, maxSpread: 25, minVol: 5e6, limitOnly: false, stressMove: -0.20, bpd: 1440, hours: 'always', maxAgeMs: 120000 },
-  meme: { label: 'meme coin', group: 'crypto', maxPos: 0.05, maxSpread: 50, minVol: 1e6, limitOnly: true, stressMove: -0.40, bpd: 1440, hours: 'always', maxAgeMs: 120000 },
-  stock: { label: 'stock', group: 'equity', maxPos: 0.20, maxSpread: 20, minVol: 2e7, limitOnly: false, stressMove: -0.10, bpd: 390, hours: 'nyse', maxAgeMs: 300000 },
-  penny: { label: 'penny stock', group: 'equity', maxPos: 0.02, maxSpread: 150, minVol: 5e5, limitOnly: true, stressMove: -0.35, bpd: 390, hours: 'nyse', maxAgeMs: 300000 },
-  fx: { label: 'FX major', group: 'fx', maxPos: 0.30, maxSpread: 3, minVol: 0, limitOnly: false, stressMove: -0.03, bpd: 1440, hours: 'fx', maxAgeMs: 300000 },
+  major: { label: 'crypto major', group: 'crypto', maxPos: 0.25, maxSpread: 25, minVol: 5e6, limitOnly: false, stressMove: -0.20, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.004, take: 0.008 },
+  meme: { label: 'meme coin', group: 'crypto', maxPos: 0.05, maxSpread: 50, minVol: 1e6, limitOnly: true, stressMove: -0.40, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.010, take: 0.020 },
+  stock: { label: 'stock', group: 'equity', maxPos: 0.20, maxSpread: 20, minVol: 2e7, limitOnly: false, stressMove: -0.10, bpd: 390, hours: 'nyse', maxAgeMs: 300000, stop: 0.003, take: 0.006 },
+  penny: { label: 'penny stock', group: 'equity', maxPos: 0.02, maxSpread: 150, minVol: 5e5, limitOnly: true, stressMove: -0.35, bpd: 390, hours: 'nyse', maxAgeMs: 300000, stop: 0.015, take: 0.030 },
+  fx: { label: 'FX major', group: 'fx', maxPos: 0.30, maxSpread: 3, minVol: 0, limitOnly: false, stressMove: -0.03, bpd: 1440, hours: 'fx', maxAgeMs: 300000, stop: 0.0008, take: 0.0016 },
 };
 // US Eastern offset (hours) with US daylight saving: 2nd Sunday of March 07:00 UTC to 1st Sunday of November 06:00 UTC
 function nyOffset(ts) {
@@ -354,7 +361,27 @@ const SIG_LABEL = { trend: 'Trend (MA 9/21, 1m + 15m)', momentum: 'Momentum (MAC
 const NO_BOOK = 'no order book or per-minute volume from Yahoo: flow and breakout signals stay at 0, spread is an estimate';
 const REGIMES = ['trending', 'mean_reverting', 'high_vol', 'crisis'];
 const SIG_H = 15, CALL_H = 30, CLUSTER_RHO = 0.7, CLUSTER_CAP = 0.40, STRESS_GATE = 0.12, TWAP_ABOVE = 0.10;
-const P = { minConf: 0.75, minQ: 2, kelly: 0.25, volTarget: 0.01, rr: 2, stopAtr: 2, minStop: 0.003, allowShort: false };
+const P = { minConf: 0.75, minQ: 2, kelly: 0.25, volTarget: 0.01, rr: 2, stopAtr: 2, minStop: 0.003, allowShort: false,
+  exitMode: 'fixed', modelExits: false, review: 'block', news: 'both' };
+const REVIEW_TOP = 0.10, REVIEW_WARMUP = 50, REVIEW_CEIL = 0.80, VETO_MS = 24 * 3600e3;
+// Exits are code: a fixed stop and target attached the moment a position opens (the rule that beat every
+// model-chosen exit in a 3,505-agent live study). Their 2%/4% suits hourly bars; this desk trades 1-minute
+// bars, so each tier gets the same 1:2 bracket at a width that fits its one-minute noise.
+function bracketFor(a, f) {
+  if (P.exitMode === 'fixed') return { stop: TIER[a.tier].stop, take: TIER[a.tier].take };
+  const stop = Math.max(P.minStop, P.stopAtr * f.atrPct); return { stop, take: P.rr * stop };
+}
+function reviewRisk(f, d, br) {  // same parts and weights as src/tradebot/order_review.py
+  const c = x => clamp(x, 0, 1);
+  const parts = { stop_inside_noise: c(f.atrPct / br.stop / 2), vol_shock: c((f.rvRatio - 1) / 2), spread: c(f.spreadBps / 25),
+    low_confidence: c((1 - d.direction_confidence) / 0.5), unstable_regime: d.regime === 'high_vol' || d.regime === 'crisis' ? 1 : 0, in_drawdown: c(d.dd / 0.10) };
+  const w = { stop_inside_noise: 0.30, vol_shock: 0.20, spread: 0.10, low_confidence: 0.15, unstable_regime: 0.15, in_drawdown: 0.10 };
+  return { score: Object.keys(w).reduce((s, k) => s + w[k] * parts[k], 0), parts };
+}
+function reviewThreshold() {
+  const h = S.revScores; if (h.length < REVIEW_WARMUP) return REVIEW_CEIL;
+  const xs = h.slice(-500).slice().sort((x, y) => x - y); return Math.min(xs[Math.min(xs.length - 1, Math.floor(xs.length * (1 - REVIEW_TOP)))], REVIEW_CEIL);
+}
 const L = { maxDD: 0.15, dayLoss: 0.03, gross: 0.60, maxAgeMs: 120000, maxOrders: 60 };
 
 // =====================================================================================
@@ -374,6 +401,8 @@ function freshState(mode) {
     assets: ASSETS.map(freshAsset), sel: 0, cash: START_CASH, fills: [], trips: [], journal: [], eq: [],
     peak: START_CASH, day: -1, dayStart: START_CASH, ordersToday: 0, killed: null, halted: false,
     W, sigPending: [], callPending: [], scored: [], fees: 0, now: 0, liveErr: null, polls: 0, stress: [], corr: null, pendingActs: [], bh0: null,
+    impact: Object.fromEntries(SIGNALS.map(k => [k, { a: 0, c: 0 }])), revScores: [], revPending: [], revStats: { f: [0, 0], p: [0, 0] }, revBlocked: 0,
+    entries: ASSETS.map(() => 0), pinned: null,
   };
 }
 
@@ -429,7 +458,7 @@ function signals(f) {
     breakout: f.breakoutUp && f.volSpike > 1.5 ? 1 : f.breakoutDn && f.volSpike > 1.5 ? -1 : 0,
     flow: clamp(f.imbalance * 1.5, -1, 1) * 0.6,
     basis: Math.abs(f.basisBps) > 8 ? -Math.sign(f.basisBps) * clamp(Math.abs(f.basisBps) / 30, 0, 1) : 0,
-    sentiment: f.sentN > 0 ? clamp(f.sentiment, -1, 1) : 0,
+    sentiment: (P.news === 'bias' || P.news === 'both') && f.sentN > 0 ? clamp(f.sentiment, -1, 1) : 0,
   };
 }
 function regimeOf(f) {
@@ -442,11 +471,12 @@ function weight(st) {  // Beta(2,2) prior on the hit rate; ×1 = coin flip
   const p = (st.hit + 2) / (st.n + 4);
   return clamp(1 + 6 * (p - 0.5), 0.1, 3);
 }
-function ensemble(sig, regime) {
+function ensemble(sig, regime, without) {
   let num = 0, den = 0;
-  SIGNALS.forEach(k => { if (sig[k] !== 0) { const w = weight(S.W[regime][k]); num += w * sig[k]; den += w; } });
+  SIGNALS.forEach(k => { if (k !== without && sig[k] !== 0) { const w = weight(S.W[regime][k]); num += w * sig[k]; den += w; } });
   return den > 0 ? num / den : 0;
 }
+const dirOf = sc => sc > 0.2 ? 'long' : sc < -0.2 ? 'short' : 'neutral';
 function pWinFromHistory(regime) {  // empirical and shrunk; the prior sits just below break-even for a 2:1 bracket
   const xs = S.scored.filter(s => s.regime === regime).slice(-200);
   const hits = xs.reduce((a, s) => a + s.y, 0);
@@ -489,7 +519,7 @@ function stressTests(extra) {
 }
 function sizeTrade(a, f, d) {
   const eq = equity();
-  const stop = Math.max(P.minStop, P.stopAtr * f.atrPct), take = P.rr * stop;
+  const { stop, take } = bracketFor(a, f);
   const cost = 2 * (FEE + SLIP) + f.spreadBps / 1e4;
   const win = take - cost, loss = stop + cost, b = win / loss;
   const fstar = win > 0 ? Math.max(0, d.p_win - (1 - d.p_win) / b) : 0;
@@ -500,8 +530,9 @@ function sizeTrade(a, f, d) {
   const ddScale = dd >= 0.10 ? 0 : clamp(1 - dd / 0.10, 0.25, 1);
   const recent = S.trips.slice(-10), wr = recent.length >= 5 ? recent.filter(x => x > 0).length / recent.length : 0.5;
   const perfScale = clamp(0.5 + wr, 0.5, 1);
-  const size = Math.min(kelly, volCap, TIER[a.tier].maxPos) * ddScale * perfScale;
-  return { stop, take, cost, b, fstar, kelly, volCap, ddScale, perfScale, size };
+  const regimeScale = clamp(1 / Math.max(f.rvRatio, 1e-9), 0.25, 1);  // crazier market, smaller size: computed in code, every bar
+  const size = Math.min(kelly, volCap, TIER[a.tier].maxPos) * ddScale * perfScale * regimeScale;
+  return { stop, take, cost, b, fstar, kelly, volCap, ddScale, perfScale, regimeScale, size };
 }
 
 // =====================================================================================
@@ -512,7 +543,8 @@ function decide(i) {
   a.feat = f;
   if (!f) return null;
   const sig = signals(f), regime = regimeOf(f), score = ensemble(sig, regime);
-  const direction = score > 0.2 ? 'long' : score < -0.2 ? 'short' : 'neutral';
+  const direction = dirOf(score);
+  SIGNALS.forEach(k => { if (sig[k] !== 0) { const im = S.impact[k]; im.a++; if (dirOf(ensemble(sig, regime, k)) !== direction) im.c++; } });
   const agree = [f.trend1, f.trend15].filter(t => t !== 0 && t === Math.sign(score)).length;
   const quality = Math.min(3, agree + (f.volSpike > 1.2 || f.breakoutUp || f.breakoutDn ? 1 : 0));
   const pw = pWinFromHistory(regime);
@@ -522,15 +554,21 @@ function decide(i) {
   const d = {
     regime, direction, direction_confidence: 0.5 + 0.5 * Math.abs(score), p_win: pw.p, p_n: pw.n, toxic_flow: !!toxic,
     setup_quality: quality, risk_state: dd >= 0.10 ? 'reduce' : dd < 0.05 && eq / S.dayStart - 1 > -0.015 ? 'safe' : 'near_limit',
-    score, sig,
+    score, sig, dd, veto: direction === 'long' && (P.news === 'veto' || P.news === 'both') ? vetoFor(a.sym, S.mode === 'live' ? Date.now() : S.now) : [],
   };
   const bar = a.bars.length - 1;
   SIGNALS.forEach(k => { if (Math.abs(sig[k]) >= 0.3) S.sigPending.push({ i, k, regime, dir: Math.sign(sig[k]), px: f.close, bar }); });
   if (direction !== 'neutral') {
-    const stop = Math.max(P.minStop, P.stopAtr * f.atrPct);
-    S.callPending.push({ i, regime, dir: direction === 'long' ? 1 : -1, px: f.close, p: d.p_win, stop, take: P.rr * stop, bar });
+    const br = bracketFor(a, f);
+    S.callPending.push({ i, regime, dir: direction === 'long' ? 1 : -1, px: f.close, p: d.p_win, stop: br.stop, take: br.take, bar });
   }
-  return { f, d, intent: policy(i, a, f, d) };
+  const intent = policy(i, a, f, d);
+  // exactly what the decision saw: features, signals, weights, gates and the reviewer's reading
+  const inputs = { ts: S.now, asset: a.sym, regime, score: +score.toFixed(4), features: Object.fromEntries(Object.entries(f).map(([k, v]) => [k, typeof v === 'number' ? +v.toPrecision(6) : v])),
+    signals: Object.fromEntries(SIGNALS.map(k => [k, +sig[k].toFixed(3)])), weights: Object.fromEntries(SIGNALS.map(k => [k, +weight(S.W[regime][k]).toFixed(3)])),
+    p_win: d.p_win, gates: intent.gates.map(g => ({ gate: g[0], pass: g[1], detail: g[2] })), action: intent.action, reason: intent.reason, review: intent.review || null,
+    exits: P.exitMode, news: P.news, veto: d.veto.slice(0, 2) };
+  return { f, d, intent, inputs };
 }
 function policy(i, a, f, d) {
   const side = a.pos.qty > 0 ? 'long' : a.pos.qty < 0 ? 'short' : null;
@@ -544,9 +582,11 @@ function policy(i, a, f, d) {
   g('Regime not crisis', d.regime !== 'crisis', d.regime.replace('_', ' '));
   g('Portfolio risk state safe', d.risk_state === 'safe', d.risk_state.replace('_', ' '));
   g('Side allowed', d.direction !== 'short' || P.allowShort, P.allowShort ? 'shorts on' : 'long only');
+  g('No regulatory veto (24h)', !d.veto.length, d.veto.length ? 'blocked: ' + d.veto[0].slice(0, 48) : P.news === 'veto' || P.news === 'both' ? 'clear' : 'veto off');
   g('Market open', isOpen(a, S.now), tier.hours === 'always' ? '24/7' : isOpen(a, S.now) ? 'open' : tier.hours === 'fx' ? 'closed for the weekend' : 'closed (NYSE 09:30–16:00 New York)');
   if (S.killed) return { action: side ? 'exit' : 'hold', reason: 'kill switch: ' + S.killed, gates };
   if (side) {
+    if (!P.modelExits) return { action: 'hold', reason: 'in position; the fixed stop and target own the exit', gates };
     if (d.regime === 'crisis') return { action: 'exit', reason: 'crisis regime while in position', gates };
     const opp = side === 'long' ? 'short' : 'long';
     if (d.direction === opp && d.direction_confidence > P.minConf) return { action: 'exit', reason: 'confident opposite signal', gates };
@@ -568,7 +608,14 @@ function policy(i, a, f, d) {
   g('Worst stress loss ≤ ' + (STRESS_GATE * 100) + '%', worst <= STRESS_GATE, (worst * 100).toFixed(1) + '% after');
   const failed2 = gates.find(x => !x[1]);
   if (failed2) return { action: 'hold', reason: 'portfolio gate failed: ' + failed2[0].toLowerCase(), gates, sz };
-  return { action: 'enter', side: d.direction, size: sz.size, stop: sz.stop, take: sz.take, sz, reason: 'all gates passed', gates };
+  // second check between the decision and the exchange: the riskiest 10% of entries are flagged
+  const rv = reviewRisk(f, d, sz), thr = reviewThreshold(), flagged = rv.score >= thr;
+  S.revScores.push(rv.score); if (S.revScores.length > 2000) S.revScores.splice(0, 500);
+  S.revPending.push({ i, dir: d.direction === 'long' ? 1 : -1, px: f.close, stop: sz.stop, take: sz.take, bar: a.bars.length - 1, flagged });
+  const review = { score: +rv.score.toFixed(3), threshold: +thr.toFixed(3), flagged, mode: P.review, parts: rv.parts };
+  g('Pre-trade review: not in riskiest ' + Math.round(REVIEW_TOP * 100) + '%', !(flagged && P.review === 'block'), 'risk ' + rv.score.toFixed(2) + ' vs ' + thr.toFixed(2) + (P.review === 'shadow' && flagged ? ' (shadow: logged only)' : ''));
+  if (flagged && P.review === 'block') { S.revBlocked++; return { action: 'hold', reason: 'pre-trade reviewer flagged this entry (risk ' + rv.score.toFixed(2) + ')', gates, sz, review }; }
+  return { action: 'enter', side: d.direction, size: sz.size, stop: sz.stop, take: sz.take, sz, reason: 'all gates passed', gates, review };
 }
 
 // =====================================================================================
@@ -605,6 +652,7 @@ function fill(a, ts, side, qty, price, reason, kind) {
   p.qty += signed; if (Math.abs(p.qty * price) < 1e-6) p.qty = 0;
   S.fills.push({ ts, sym: a.sym, side, qty, price, fee, reason });
   a.trip += -signed * price - fee;
+  if (opening && p.qty === signed) S.entries[S.assets.indexOf(a)]++;
   if (opening) {
     log(ts, a.sym, kind || 'entry', (side === 'buy' ? 'Bought ' : 'Sold ') + fmtQty(qty) + ' at ' + fmtPx(price) + ' (' + reason + ')', 'info');
     a.markers.push({ ts, price, kind: 'entry' });
@@ -667,8 +715,10 @@ function workLimit(a, ts, lo, hi, dataTs) {
 }
 function checkExits(a, ts, o, h, l, hs, dataTs) {
   const p = a.pos; if (!p.qty) return;
-  if (p.qty > 0) { p.best = Math.max(p.best, h); if (p.best >= p.avg * (1 + p.stopDist)) p.stop = Math.max(p.stop, p.best * (1 - p.stopDist)); }
-  else { p.best = Math.min(p.best || l, l); if (p.best <= p.avg * (1 - p.stopDist)) p.stop = Math.min(p.stop, p.best * (1 + p.stopDist)); }
+  if (P.exitMode === 'atr') {  // trailing stop only in ATR mode; the fixed bracket never moves once set
+    if (p.qty > 0) { p.best = Math.max(p.best, h); if (p.best >= p.avg * (1 + p.stopDist)) p.stop = Math.max(p.stop, p.best * (1 - p.stopDist)); }
+    else { p.best = Math.min(p.best || l, l); if (p.best <= p.avg * (1 - p.stopDist)) p.stop = Math.min(p.stop, p.best * (1 + p.stopDist)); }
+  }
   let px = null, reason = '';
   if (p.qty > 0) { if (l <= p.stop) { px = Math.min(o, p.stop); reason = p.stop > p.avg ? 'trailing stop' : 'stop'; } else if (h >= p.take) { px = Math.max(o, p.take); reason = 'target'; } }
   else { if (h >= p.stop) { px = Math.max(o, p.stop); reason = p.stop < p.avg ? 'trailing stop' : 'stop'; } else if (l <= p.take) { px = Math.min(o, p.take); reason = 'target'; } }
@@ -698,9 +748,22 @@ function scoreAll() {
     return false;
   });
 }
+function scoreReviews() {  // flagged or not, every reviewed entry is judged on the same footing: stop first or target first
+  S.revPending = S.revPending.filter(c => {
+    const a = S.assets[c.i]; let res = null;
+    for (let k = c.bar + 1; k < a.bars.length; k++) {
+      const b = a.bars[k], adverse = c.dir > 0 ? b.l / c.px - 1 : 1 - b.h / c.px, favour = c.dir > 0 ? b.h / c.px - 1 : 1 - b.l / c.px;
+      if (adverse <= -c.stop) { res = 1; break; }
+      if (favour >= c.take) { res = 0; break; }
+    }
+    if (res === null && a.bars.length - 1 - c.bar < 120) return true;
+    if (res !== null) { const st = S.revStats[c.flagged ? 'f' : 'p']; st[0]++; st[1] += res; }
+    return false;
+  });
+}
 function shiftIndex(i, k) {
-  [S.sigPending, S.callPending].forEach(arr => arr.forEach(c => { if (c.i === i) c.bar -= k; }));
-  S.sigPending = S.sigPending.filter(c => c.bar >= 0); S.callPending = S.callPending.filter(c => c.bar >= 0);
+  [S.sigPending, S.callPending, S.revPending].forEach(arr => arr.forEach(c => { if (c.i === i) c.bar -= k; }));
+  S.sigPending = S.sigPending.filter(c => c.bar >= 0); S.callPending = S.callPending.filter(c => c.bar >= 0); S.revPending = S.revPending.filter(c => c.bar >= 0);
 }
 
 // =====================================================================================
@@ -739,11 +802,14 @@ function simStep() {
   const pending = S.pendingActs; S.pendingActs = [];
   const t = S.now;
   simBar(t); S.now = t + BAR;
+  pending.forEach(pa => {  // decided at the last close, filled at this open, strongest signal first
+    const a = S.assets[pa.i]; if (!isOpen(a, t) || !a.bars.length) return;
+    const b = a.bars[a.bars.length - 1], hs = (a.tick.ask - a.tick.bid) / 2;
+    act(pa.i, pa.intent, b.t, b.o - hs, b.o + hs, pa.dataTs);
+  });
   S.assets.forEach((a, i) => {
     if (!isOpen(a, t) || !a.bars.length) return;  // nothing trades while its market is closed; the decision waits for a fresh bar
     const b = a.bars[a.bars.length - 1], hs = (a.tick.ask - a.tick.bid) / 2;
-    const pa = pending.find(x => x.i === i);
-    if (pa) act(i, pa.intent, b.t, b.o - hs, b.o + hs, pa.dataTs);   // decided at the last close, filled at this open
     if (a.twap) workTwap(a, b.t, b.o - hs, b.o + hs, b.t);
     workLimit(a, b.ct, b.l, b.h, b.ct);
     checkExits(a, b.ct, b.o, b.h, b.l, hs, b.ct);
@@ -756,6 +822,10 @@ function simStep() {
 function afterBar(ts, sim) {
   S.corr = correlation();
   riskUpdate(ts);
+  // The order assets are acted on is part of the strategy: shared caps (gross, cluster, stress) go to whoever
+  // asks first. So every asset is decided first, then acted on strongest signal first with a random
+  // tie-break, never in list order. Entries per list position are counted to check it.
+  const batch = [];
   S.assets.forEach((a, i) => {
     if (a.bars.length < 49 || a.err) return;
     const lastCt = a.bars[a.bars.length - 1].ct;
@@ -763,11 +833,15 @@ function afterBar(ts, sim) {
     a.decidedCt = lastCt;
     const r = decide(i); if (!r) return;
     a.last = { ...r, ts };
-    if (r.intent.action !== 'hold') log(ts, a.sym, 'decision', r.d.regime.replace('_', ' ') + ' / ' + r.d.direction + ' (' + r.d.direction_confidence.toFixed(2) + ') → ' + r.intent.action + ': ' + r.intent.reason, 'muted');
+    if (r.intent.action !== 'hold') log(ts, a.sym, 'decision', r.d.regime.replace('_', ' ') + ' / ' + r.d.direction + ' (' + r.d.direction_confidence.toFixed(2) + ') → ' + r.intent.action + ': ' + r.intent.reason, 'muted', r.inputs);
+    batch.push({ i, a, r, key: Math.abs(r.d.score), tie: (sim ? S.rand : Math.random)() });
+  });
+  batch.sort((x, y) => y.key - x.key || x.tie - y.tie);
+  batch.forEach(({ i, a, r }) => {
     if (sim) S.pendingActs.push({ i, intent: r.intent, dataTs: ts });
     else if (S.running) act(i, r.intent, ts, a.tick.bid, a.tick.ask, a.tick.ts);
   });
-  scoreAll();
+  scoreAll(); scoreReviews();
   S.stress = stressTests();
   const eq = equity(); S.eq.push({ ts, eq, peak: Math.max(S.peak, eq) });
   if (S.eq.length > 3000) S.eq.splice(0, 1000);
@@ -954,6 +1028,18 @@ function lexScore(title) {
   toks.forEach((t, i) => { let v = POSW.has(t) ? 1 : NEGW.has(t) ? -1 : 0; if (v && toks.slice(Math.max(0, i - 3), i).some(w => NEGATORS.has(w))) v = -v; sc += v; });
   return Math.tanh(sc / 2);
 }
+const REGW = new Set('sec cftc doj regulator regulators regulatory lawsuit lawsuits sue sues sued ban bans banned enforcement sanction sanctions fine fined probe investigation subpoena charges charged court ruling settlement crackdown illegal delist delisted indictment seized'.split(' '));
+const ACTW = new Set('approve approves approved reject rejects rejected launch launches launched hack hacked ban bans banned sue sues sued file files filed list lists listed delist delisted halt halts halted cut cuts raise raises hike hikes charge charges charged fine fined seize seized freeze froze exploit exploited drain drained settle settled suspend suspended pause paused'.split(' '));
+const OPIN = new Set('could might may why what how should opinion analysis prediction predicts forecast explained guide recap weekly'.split(' '));
+function newsClass(title) {  // same rules as src/tradebot/news.py: a named asset within eight words of an action verb, not opinion
+  const toks = title.toLowerCase().match(/[a-z]+/g) || [], names = new Set(Object.values(KW).flat().concat(['sec', 'fed', 'crypto', 'regulator']));
+  const near = toks.some((t, i) => ACTW.has(t) && toks.slice(Math.max(0, i - 8), i + 9).some(w => names.has(w)));
+  const opinion = toks.some(t => OPIN.has(t)) || /\?\s*$/.test(title), reg = toks.filter(t => REGW.has(t)).length;
+  return { mat: near && !opinion ? 0.8 : near ? 0.3 : 0.1, reg: reg ? Math.min(1, 0.45 * reg) : 0 };
+}
+function vetoFor(sym, now) {  // material, non-positive regulatory headlines about this asset seen in the last 24h
+  return (SENT ? SENT.items : []).filter(h => h.assets.includes(sym) && h.reg >= 0.6 && h.mat >= 0.6 && h.score <= 0 && h.seen <= now && now - h.seen <= VETO_MS).map(h => h.title);
+}
 function assetsIn(title) { const w = new Set(title.toLowerCase().match(/[a-z]+/g) || []); return Object.keys(KW).filter(k => KW[k].some(x => w.has(x))); }
 function sentimentFor(sym, now) {  // decayed mean of headlines SEEN in the last 6h (never their claimed publish time)
   let num = 0, den = 0, n = 0;
@@ -963,12 +1049,12 @@ function sentimentFor(sym, now) {  // decayed mean of headlines SEEN in the last
 function addHeadlines(list, now) {
   let added = 0;
   list.forEach(x => { if (!x.title || SENT.items.some(h => h.id === x.id)) return; const assets = assetsIn(x.title); if (!assets.length) return;
-    SENT.items.unshift({ id: x.id, title: x.title, src: x.src, seen: now, assets, score: lexScore(x.title), scorer: 'word list' }); added++; });
+    SENT.items.unshift({ id: x.id, title: x.title, src: x.src, seen: now, assets, score: lexScore(x.title), scorer: 'word list', ...newsClass(x.title) }); added++; });
   if (SENT.items.length > 120) SENT.items.length = 120;
   return added;
 }
 const SIM_HEAD = ['{a} edges higher as traders eye macro data', '{a} slides after hot inflation print', 'Analysts split on {a} outlook', '{a} rally stalls near resistance',
-  'Exchange outflows of {a} jump', '{a} network upgrade approved', 'Regulator probe weighs on {a}', '{a} funding rates turn negative'];
+  'Exchange outflows of {a} jump', '{a} network upgrade approved', 'Regulator sues {a} developers in fraud probe', '{a} funding rates turn negative'];
 async function fetchNews() {
   if (!FEEDS.news) return;
   const now = S.now || Date.now();
@@ -995,10 +1081,11 @@ async function scoreWithClaude() {
   $('claudeBtn').disabled = true; SENT.claudeNote = 'Thinking…'; render();
   try {
     const prompt = 'Rate each crypto news headline for its likely short-term price impact on the assets it mentions. ' +
-      'Return JSON only: {"scores":[{"i":<index>,"score":<number from -1 (clearly negative) to 1 (clearly positive), 0 if neutral or unclear>,"relevant":<false for opinion pieces, recaps of moves that already happened, prediction-market listings and ads>}]}.\n\n' +
-      items.map((h, i) => i + '. ' + h.title).join('\n');
+      'Return JSON only: {"scores":[{"i":<index>,"score":<number from -1 (clearly negative) to 1 (clearly positive), 0 if neutral or unclear>,"relevant":<false for opinion pieces, recaps of moves that already happened, prediction-market listings and ads>,"regulatory":<number 0 to 1: probability it concerns regulatory or legal action such as enforcement, lawsuits, bans, sanctions or a regulator decision>}]}.\n' +
+      'Each line gives the source and when the headline was first seen.\n\n' +
+      items.map((h, i) => i + '. [' + h.src + ' | seen ' + new Date(h.seen).toISOString().slice(0, 16) + 'Z] ' + h.title).join('\n');
     const out = await SAMPLE.json(prompt, { modelTier: 'quick' });
-    (out.scores || []).forEach(x => { const h = items[x.i]; if (!h) return; h.score = x.relevant ? clamp(+x.score || 0, -1, 1) : 0; h.scorer = 'Claude'; });
+    (out.scores || []).forEach(x => { const h = items[x.i]; if (!h) return; h.score = x.relevant ? clamp(+x.score || 0, -1, 1) : 0; h.mat = x.relevant ? 0.9 : 0.2; h.reg = clamp(+x.regulatory || 0, 0, 1); h.scorer = 'Claude'; });
     SENT.claudeNote = 'Scored ' + items.length + ' headlines with Claude.';
   } catch (e) {
     SENT.claudeNote = e && e.code === 'not_granted' ? 'Claude access wasn\'t allowed for this page; word-list scores stay in use.' : e && e.code === 'rate_limited' ? 'Claude is busy; try again in a minute.' : 'Claude scoring failed (' + ((e && e.code) || 'error') + '); word-list scores stay in use.';
@@ -1060,7 +1147,7 @@ function renderFeeds() {
   $('claudeBtn').hidden = !SAMPLE || !FEEDS.news; $('claudeNote').textContent = SENT.claudeNote || '';
   const sNow = S.mode === 'live' ? Date.now() : S.now;
   $('sentBody').innerHTML = S.assets.map(a => { const r = sentimentFor(a.sym, sNow); return '<tr><td class="sym">' + short(a.sym) + '</td><td class="n">' + (r.n ? (r.s >= 0 ? '+' : '') + r.s.toFixed(2) : '—') + '</td><td class="n">' + r.n + '</td></tr>'; }).join('');
-  $('newsBody').innerHTML = SENT.items.slice(0, 30).map(h => '<tr><td class="t">' + tfmt(h.seen).slice(6) + '</td><td style="white-space:normal">' + esc(h.title) + ' <span class="note">' + esc(h.src) + '</span></td><td>' + h.assets.map(short).join(', ') + '</td><td class="n">' + (h.score >= 0 ? '+' : '') + h.score.toFixed(2) + ' <span class="note">' + h.scorer + '</span></td></tr>').join('')
+  $('newsBody').innerHTML = SENT.items.slice(0, 30).map(h => '<tr><td class="t">' + tfmt(h.seen).slice(6) + '</td><td style="white-space:normal">' + esc(h.title) + ' <span class="note">' + esc(h.src) + '</span></td><td>' + h.assets.map(short).join(', ') + (h.reg >= 0.6 && h.mat >= 0.6 && h.score <= 0 ? ' <span class="tag p-risk">regulatory</span>' : '') + '</td><td class="n">' + (h.score >= 0 ? '+' : '') + h.score.toFixed(2) + ' <span class="note">' + h.scorer + '</span></td></tr>').join('')
     || '<tr><td colspan="4" class="note">No headlines yet.</td></tr>';
   $('arbNote').textContent = !FEEDS.arb ? 'Off. Turn on to read Kraken\'s public prices through your Firecrawl connector every 2 minutes (1 credit each time) and compare them with Crypto.com.'
     : !live ? 'Simulated Kraken quotes around the simulated price, every 2 bars.'
@@ -1073,7 +1160,7 @@ function renderFeeds() {
 // =====================================================================================
 // Journal + formatting
 // =====================================================================================
-function log(ts, sym, kind, text, tone) { S.journal.unshift({ ts, sym, kind, text, tone }); if (S.journal.length > 400) S.journal.length = 400; }
+function log(ts, sym, kind, text, tone, inputs) { S.jid = (S.jid || 0) + 1; S.journal.unshift({ ts, sym, kind, text, tone, inputs, id: S.jid }); if (S.journal.length > 400) S.journal.length = 400; }
 function kill(reason, ts) { S.killed = reason; log(ts || S.now, '—', 'kill', 'Kill switch on: ' + reason + '. New trades blocked; open positions closed on the next bar.', 'risk'); }
 const usd = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const signedUsd = v => (v >= 0 ? '+' : '−') + usd(Math.abs(v));
@@ -1254,7 +1341,8 @@ function render() {
     const it = L0.intent, ib = $('intentBox'); ib.className = 'intent ' + it.action;
     ib.textContent = it.action === 'enter' ? 'ENTER ' + it.side.toUpperCase() + ': ' + it.reason : it.action.toUpperCase() + ': ' + it.reason;
     const z = it.sz;
-    $('sizeNote').textContent = z ? 'Sizing: stop ' + (z.stop * 100).toFixed(2) + '%, target ' + (z.take * 100).toFixed(2) + '%, payoff ' + z.b.toFixed(2) + ':1 after costs. Smallest of quarter Kelly ' + (z.kelly * 100).toFixed(1) + '%, vol target ' + (z.volCap * 100).toFixed(1) + '% and tier cap ' + (TIER[a.tier].maxPos * 100) + '%, × drawdown ' + z.ddScale.toFixed(2) + ' × recent results ' + z.perfScale.toFixed(2) + ' = ' + (z.size * 100).toFixed(1) + '% of equity.' : '';
+    $('sizeNote').textContent = z ? 'Sizing: ' + (P.exitMode === 'fixed' ? 'fixed ' : 'ATR ') + 'stop ' + (z.stop * 100).toFixed(2) + '%, target ' + (z.take * 100).toFixed(2) + '%, payoff ' + z.b.toFixed(2) + ':1 after costs. Smallest of quarter Kelly ' + (z.kelly * 100).toFixed(1) + '%, vol target ' + (z.volCap * 100).toFixed(1) + '% and tier cap ' + (TIER[a.tier].maxPos * 100) + '%, × drawdown ' + z.ddScale.toFixed(2) + ' × recent results ' + z.perfScale.toFixed(2) + ' × volatility regime ' + z.regimeScale.toFixed(2) + ' = ' + (z.size * 100).toFixed(1) + '% of equity.' : '';
+    if (!S.pinned || S.pinned.asset !== a.sym) $('inputsPre').textContent = JSON.stringify(L0.inputs, null, 1);
   } else {
     $('sigBody').innerHTML = '<tr><td colspan="3" class="note">Signals appear once this asset has 49 one-minute bars.</td></tr>';
     $('decList').innerHTML = ''; $('gateList').innerHTML = ''; $('intentBox').className = 'intent hold'; $('intentBox').textContent = 'Waiting for enough history…'; $('sizeNote').textContent = '';
@@ -1270,8 +1358,15 @@ function render() {
   $('stressBody').innerHTML = S.stress.length ? S.stress.map(s => '<tr><td>' + esc(s.name) + '</td><td class="n">' + (s.pct * 100).toFixed(1) + '%</td><td><div class="hbar"><i style="width:' + clamp(s.pct / L.maxDD * 100, 0, 100) + '%;background:' + (s.pct > STRESS_GATE ? 'var(--risk)' : 'var(--accent)') + '"></i></div></td></tr>').join('') : '<tr><td colspan="3" class="note">Runs once prices arrive.</td></tr>';
 
   const curReg = L0 ? L0.d.regime : null;
-  $('wHead').innerHTML = '<tr><th>Signal</th>' + REGIMES.map(r => '<th class="n"' + (r === curReg ? ' style="color:var(--accent)"' : '') + '>' + r.replace('_', ' ') + '</th>').join('') + '</tr>';
-  $('wBody').innerHTML = SIGNALS.map(k => '<tr><td>' + k + '</td>' + REGIMES.map(r => { const st = S.W[r][k]; return '<td class="n">×' + weight(st).toFixed(2) + ' <span class="note">(' + st.n + ')</span></td>'; }).join('') + '</tr>').join('');
+  $('wHead').innerHTML = '<tr><th>Signal</th>' + REGIMES.map(r => '<th class="n"' + (r === curReg ? ' style="color:var(--accent)"' : '') + '>' + r.replace('_', ' ') + '</th>').join('') + '<th class="n">Changes decisions</th></tr>';
+  $('wBody').innerHTML = SIGNALS.map(k => { const im = S.impact[k], pc = im.a ? im.c / im.a : 0;
+    const tag = im.a >= 200 && pc < 0.01 ? ' <span class="tag p-warn">no effect · delete</span>' : '';
+    return '<tr><td>' + k + '</td>' + REGIMES.map(r => { const st = S.W[r][k]; return '<td class="n">×' + weight(st).toFixed(2) + ' <span class="note">(' + st.n + ')</span></td>'; }).join('') +
+      '<td class="n">' + (im.a ? (pc * 100).toFixed(1) + '%' : '—') + ' <span class="note">of ' + im.a + '</span>' + tag + '</td></tr>'; }).join('');
+  const rs = S.revStats, rate = st => st[0] ? (st[1] / st[0] * 100).toFixed(0) + '% of ' + st[0] : '—';
+  $('revNote').textContent = 'Pre-trade reviewer (' + P.review + '): ' + S.revScores.length + ' entries reviewed, ' + S.revBlocked + ' blocked. Stop-out rate: flagged ' + rate(rs.f) + ', passed ' + rate(rs.p) + ' (judged the same way, flagged or not). It earns its place only if the flagged rate is clearly higher.';
+  const counts = S.entries, tot = counts.reduce((x, y) => x + y, 0);
+  $('biasNote').textContent = tot ? 'Entries by list position: ' + S.assets.map((x, i) => (i + 1) + '. ' + short(x.sym) + ' ' + counts[i]).join(' · ') + '. Decisions are acted on strongest signal first with a random tie-break, so list position should not predict entries.' : 'Entries by list position appear after the first trades.';
 
   const sc = S.scored, N = sc.length; $('rN').textContent = N;
   if (N) {
@@ -1286,7 +1381,7 @@ function render() {
   renderFeeds();
   $('jCount').textContent = S.journal.length + ' events';
   $('jBody').innerHTML = S.journal.slice(0, 150).map(j => { const tone = { good: 'p-good', risk: 'p-risk', warn: 'p-warn', info: 'p-info', muted: 'p-mute' }[j.tone] || '';
-    return '<tr><td class="t">' + tfmt(j.ts) + '</td><td class="sym">' + esc(short(j.sym)) + '</td><td><span class="tag ' + tone + '">' + esc(j.kind) + '</span></td><td>' + esc(j.text) + '</td></tr>'; }).join('') || '<tr><td colspan="4" class="note">Events appear here as the agent trades.</td></tr>';
+    return '<tr' + (j.inputs ? ' class="click" data-j="' + j.id + '" title="Show exactly what this decision saw"' : '') + '><td class="t">' + tfmt(j.ts) + '</td><td class="sym">' + esc(short(j.sym)) + '</td><td><span class="tag ' + tone + '">' + esc(j.kind) + '</span></td><td>' + esc(j.text) + (j.inputs ? ' <span class="note">· inputs</span>' : '') + '</td></tr>'; }).join('') || '<tr><td colspan="4" class="note">Events appear here as the agent trades.</td></tr>';
   drawCharts();
 }
 
@@ -1322,8 +1417,8 @@ $('resetBtn').addEventListener('click', () => start(S.mode));
 $('killBtn').addEventListener('click', () => { if (S.killed) { $('unkillConfirm').hidden = false; return; } kill('manual kill by operator', S.now); render(); });
 $('unkillYes').addEventListener('click', () => { S.killed = null; S.peak = equity(); $('unkillConfirm').hidden = true; log(S.now, '—', 'risk', 'Kill switch cleared by operator. Drawdown peak reset to ' + usd(S.peak) + '.', 'warn'); render(); });
 $('unkillNo').addEventListener('click', () => { $('unkillConfirm').hidden = true; });
-$('scanBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-i]'); if (tr) { S.sel = +tr.dataset.i; render(); } });
-$('assetTabs').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) { S.sel = +b.dataset.i; render(); } });
+$('scanBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-i]'); if (tr) { S.sel = +tr.dataset.i; S.pinned = null; render(); } });
+$('assetTabs').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) { S.sel = +b.dataset.i; S.pinned = null; render(); } });
 function bindSetting(id, lo, hi, apply) {
   const el = $(id);
   el.addEventListener('change', () => { let v = +el.value; if (!isFinite(v) || v < lo || v > hi) { v = clamp(isFinite(v) ? v : hi, lo, hi); el.value = v; el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 900); }
@@ -1340,6 +1435,13 @@ $('newsToggle').addEventListener('change', e => { FEEDS.news = e.target.checked;
 $('arbToggle').addEventListener('change', e => { FEEDS.arb = e.target.checked; log(S.now, '—', 'setting', 'Cross-exchange scan ' + (FEEDS.arb ? 'on' : 'off'), 'muted'); scheduleFeeds(); if (S.mode === 'sim' && FEEDS.arb) fetchArb(); render(); });
 $('mktToggle').addEventListener('change', e => { FEEDS.mkt = e.target.checked; log(S.now, '—', 'setting', 'Stocks & FX feed ' + (FEEDS.mkt ? 'on' : 'off'), 'muted'); scheduleFeeds(); render(); });
 $('claudeBtn').addEventListener('click', scoreWithClaude);
+const sel = (id, apply, label) => $(id).addEventListener('change', e => { apply(e.target.value); log(S.now, '—', 'setting', label + ': ' + e.target.selectedOptions[0].textContent, 'muted'); render(); });
+sel('sExit', v => P.exitMode = v, 'Exits');
+sel('sMx', v => P.modelExits = v === '1', 'Model may close early');
+sel('sRev', v => P.review = v, 'Pre-trade reviewer');
+sel('sNews', v => P.news = v, 'News use');
+$('jBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-j]'); if (!tr) return; const j = S.journal.find(x => x.id === +tr.dataset.j);
+  if (j && j.inputs) { S.pinned = j.inputs; $('inputsPre').textContent = JSON.stringify(j.inputs, null, 1); $('inputsPre').closest('details').open = true; $('inputsPre').scrollIntoView({ block: 'nearest' }); } });
 $('sShort').addEventListener('change', e => { P.allowShort = e.target.value === '1'; log(S.now, '—', 'setting', 'Shorts ' + (P.allowShort ? 'on' : 'off'), 'muted'); render(); });
 bindHover($('cPrice'), $('tipPrice'), 'price', i => { const p = pricePts[i].c; return tfmt(p.ct) + '<br>O ' + fmtPx(p.o) + '  H ' + fmtPx(p.h) + '<br>L ' + fmtPx(p.l) + '  C ' + fmtPx(p.c); });
 bindHover($('cEq'), $('tipEq'), 'eq', i => { const p = eqPts[i]; return tfmt(p.ts) + '<br>equity ' + usd(p.y) + '<br>kill line ' + usd(p.peak * (1 - L.maxDD)); });

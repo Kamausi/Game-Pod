@@ -76,6 +76,47 @@ def main(argv: list[str] | None = None) -> int:
     wf.add_argument("--grid", required=True)
     wf.add_argument("--engine", default="rules", choices=["rules", "ensemble"])
 
+    ab = rs.add_parser("ablate", help="turn each ensemble signal off in turn; a signal that changes no trades does nothing")
+    ab.add_argument("--family", required=True)
+    ab.add_argument("--data", required=True)
+    ab.add_argument("--range", default=None, help="bar range, e.g. 0:2000 (default: all)")
+    ab.add_argument("--base-params", default="{}")
+    na = rs.add_parser("news-ablation", help="strategy without news, + sentiment bias, + regulatory veto, both; at several fee levels")
+    na.add_argument("--family", required=True)
+    na.add_argument("--data", required=True)
+    na.add_argument("--news-db", default="runs/sentiment.sqlite")
+    na.add_argument("--engine", default="ensemble", choices=["rules", "ensemble"])
+    na.add_argument("--fees", default="1,2,3", help="fee multipliers, e.g. 1,2,3")
+    na.add_argument("--instrument", default="BTC_USD")
+    na.add_argument("--timeframe", default="4h")
+    na.add_argument("--base-params", default="{}")
+
+    nw = sub.add_parser("news", help="headline history for the news overlay: import a CSV, classify")
+    nws = nw.add_subparsers(dest="ncmd", required=True)
+    ni = nws.add_parser("import", help="CSV with columns time,title[,source]")
+    ni.add_argument("csv")
+    ni.add_argument("--db", default="runs/sentiment.sqlite")
+    ni.add_argument("--seen-delay-min", type=float, default=5.0)
+    nc = nws.add_parser("classify", help="asset, sentiment, materiality, regulatory risk for every unclassified headline")
+    nc.add_argument("--db", default="runs/sentiment.sqlite")
+    nc.add_argument("--by", default="lexicon", choices=["lexicon", "claude", "jev"])
+
+    rp = sub.add_parser("replay", help="re-run saved decisions on another engine: agreement, Brier, cost")
+    rp.add_argument("--run-dir", default="runs/paper")
+    rp.add_argument("--engine", required=True, help="rules | ensemble | jev | claude:<model id>, e.g. claude:claude-haiku-5-5")
+    rp.add_argument("--limit", type=int, default=None)
+
+    rl = sub.add_parser("runlog", help="show or append to the run log the next run reads first")
+    rl.add_argument("--run-dir", default="runs/paper")
+    rl.add_argument("--add", action="store_true")
+    rl.add_argument("--done", action="append", default=[])
+    rl.add_argument("--decided", action="append", default=[])
+    rl.add_argument("--open", dest="open_items", action="append", default=[])
+    rl.add_argument("--rejected", action="append", default=[])
+    rl.add_argument("-n", type=int, default=5)
+
+    sub.add_parser("jev-check", help="one Jev call to prove the key, model version and latency")
+
     imp = sub.add_parser("import-csv", help="import a long OHLCV history (e.g. 20+ years of daily bars) with validation")
     imp.add_argument("path")
     imp.add_argument("--out", required=True, help="where to write the candle JSON for research --data")
@@ -119,7 +160,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("paper")
     p.add_argument("--release", default="releases/approved.json")
     p.add_argument("--dev", action="store_true", help="run without a release (journal is labelled DEV)")
-    p.add_argument("--engine", default="rules", choices=["rules", "ensemble", "claude"])
+    p.add_argument("--engine", default="rules", choices=["rules", "ensemble", "claude", "jev", "jev>opus"])
+    p.add_argument("--reviewer", default="code", choices=["off", "code", "jev", "claude"],
+                   help="second check on every entry before it is sent (default: deterministic code)")
+    p.add_argument("--reviewer-mode", default="block", choices=["block", "shadow"])
     p.add_argument("--instrument", default="BTC_USD")
     p.add_argument("--timeframe", default="1h")
     p.add_argument("--run-dir", default="runs/paper")
@@ -325,6 +369,37 @@ def main(argv: list[str] | None = None) -> int:
             if oos:
                 print(f"out-of-sample excess vs benchmark: mean {sum(oos) / len(oos):+.2%}, positive in {sum(x > 0 for x in oos)}/{len(oos)} folds")
             return 0
+        if args.rcmd == "ablate":
+            from .validation import ablate
+
+            candles, source = _load_data(args.data)
+            snap = DataSnapshot.of(candles, source, "BTC_USD", "1h")
+            reg.save_data(candles, snap)
+            lo, hi = _range(args.range) if args.range else (0, len(candles))
+            out = ablate(reg, Spec(name=args.family, engine="ensemble", params=json.loads(args.base_params)), candles, snap, lo, hi,
+                         Path("runs/research/work"))
+            print(f"all signals on: {out['baseline']['trades']} trades, return {out['baseline']['total_return']:+.2%}")
+            for k, v in out["signals"].items():
+                print(f"  without {k:<9} decisions changed {v['decisions_changed']:6.1%}  trades {v['trades']:4d}  "
+                      f"return {v['return_without']:+.2%} ({v['return_delta_vs_all']:+.2%})  -> {v['verdict']}")
+            return 0
+        if args.rcmd == "news-ablation":
+            from .news import news_ablation
+
+            candles, source = _load_data(args.data)
+            snap = DataSnapshot.of(candles, source, args.instrument, args.timeframe)
+            reg.save_data(candles, snap)
+            base = Spec(name=args.family, engine=args.engine, instrument=args.instrument, timeframe=args.timeframe,
+                        params=json.loads(args.base_params))
+            out = news_ablation(reg, base, candles, snap, Path(args.news_db), Path("runs/research/work"),
+                                fee_mults=tuple(float(x) for x in args.fees.split(",")))
+            print(f"{out['headlines_used']} classified headlines (db sha {out['news_sha']}); every run recorded")
+            for k, v in out["table"].items():
+                print(f"  {k:<22} " + (f"return {v['total_return']:+.2%}  trades {v['trades']:4d}  max DD {v['max_drawdown']:.1%}" if v else "FAILED"))
+            for mode, v in out["verdict"].items():
+                diffs = ", ".join(f"{d:+.2%}" for d in v["improvement_by_fee"])
+                print(f"  {mode:<5} vs no news, by fee level: {diffs}  -> {'helps at every fee level' if v['helps_at_every_fee'] else 'NO consistent improvement'}")
+            return 0
         if args.rcmd == "freeze":
             rec = reg.find(args.run)
             out = reg.freeze(Spec(**rec["spec"]), args.reason)
@@ -391,7 +466,8 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.dev:
             run_paper(args.instrument, args.timeframe, args.engine, Path(args.run_dir), args.cash,
-                      PolicyParams(), RiskLimits(), None, exechub=args.exechub)
+                      PolicyParams(), RiskLimits(), None, exechub=args.exechub, reviewer=args.reviewer,
+                      reviewer_mode=args.reviewer_mode)
             return 0
         try:
             spec, limits, rel = verify_release(Path(args.release))
@@ -399,7 +475,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"refusing to start: {err}\n(use --dev for an unpromotable test run)")
             return 2
         params = PolicyParams(**{**asdict(PolicyParams()), **spec.params})
-        run_paper(spec.instrument, spec.timeframe, spec.engine, Path(args.run_dir), args.cash, params, limits, rel, exechub=args.exechub)
+        run_paper(spec.instrument, spec.timeframe, spec.engine, Path(args.run_dir), args.cash, params, limits, rel, exechub=args.exechub,
+                  reviewer=args.reviewer, reviewer_mode=args.reviewer_mode)
         return 0
 
     if args.cmd == "go-live":
@@ -472,6 +549,46 @@ def main(argv: list[str] | None = None) -> int:
         ok = Alerts()(args.level, args.message)
         print("sent" if ok else "not sent (TRADEBOT_ALERT_WEBHOOK unset or unreachable)")
         return 0 if ok else 1
+
+    if args.cmd == "news":
+        from .news import classify, import_csv
+        from .sentiment import SentimentStore
+
+        store = SentimentStore(args.db)
+        if args.ncmd == "import":
+            print(import_csv(store, args.csv, int(args.seen_delay_min * 60_000)))
+        else:
+            print(classify(store, args.by))
+        return 0
+
+    if args.cmd == "replay":
+        from .replay import build_replay_engine, replay
+
+        out = replay(Path(args.run_dir), build_replay_engine(args.engine), limit=args.limit)
+        print(json.dumps(out, indent=2))
+        return 0
+
+    if args.cmd == "runlog":
+        from . import runlog
+
+        if args.add:
+            if not args.done:
+                raise ValueError("--add needs at least one --done")
+            print(runlog.append(Path(args.run_dir), args.done, args.decided, args.open_items, args.rejected))
+        print(runlog.recent(Path(args.run_dir), args.n) or "(empty)")
+        return 0
+
+    if args.cmd == "jev-check":
+        import time as _t
+
+        from .jev import JevClient, noul
+
+        c = JevClient(deadline_s=10)
+        t0 = _t.perf_counter()
+        r = c.ask("Payouts have been failing for three days.", {"urgent": noul("This conveys urgency")})
+        print(f"ok: model {r['model']}, urgent={r['answers']['urgent']['noul']:.2f}, {(_t.perf_counter() - t0) * 1000:.0f} ms, "
+              f"usage {r.get('usage')}")
+        return 0
 
     if args.cmd == "review":
         print(run_review(Path(args.run_dir)))

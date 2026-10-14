@@ -26,6 +26,13 @@ def vol_target_cap(rv_per_bar: float, bars_per_day: float, target_daily: float) 
     return target_daily / daily
 
 
+def vol_regime_scale(rv_ratio: float, floor: float = 0.25) -> float:
+    """Crazier market, smaller size. rv_ratio is short-window vol over its 24-bar norm:
+    at or below 1 this is 1x; at 2x the usual vol it halves; never below `floor`.
+    Computed in code every bar, never left to the model."""
+    return max(floor, min(1.0, 1.0 / max(rv_ratio, 1e-9)))
+
+
 def drawdown_scale(drawdown: float, pause_at: float = 0.10, floor: float = 0.25) -> float:
     """Linear de-risking: full size at 0 drawdown, `floor` near `pause_at`, zero beyond."""
     if drawdown >= pause_at:

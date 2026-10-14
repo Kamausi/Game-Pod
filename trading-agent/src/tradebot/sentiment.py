@@ -28,7 +28,12 @@ DEFAULT_FEEDS = (
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "https://cointelegraph.com/rss",
     "https://decrypt.co/feed",
+    "https://www.federalreserve.gov/feeds/press_all.xml",  # macro: applies to every tracked asset
+    "https://www.sec.gov/news/pressreleases.rss",  # regulator: crypto-related items apply to every crypto asset
 )
+# Headlines from these sources move everything, so they are attached to every tracked asset.
+MACRO_SOURCES = ("federalreserve.gov",)
+CRYPTO_WIDE = ("crypto", "cryptocurrency", "cryptocurrencies", "stablecoin", "stablecoins", "digital")
 ASSET_KEYWORDS = {
     "BTC_USD": ("bitcoin", "btc"),
     "ETH_USD": ("ethereum", "ether", "eth"),
@@ -77,8 +82,12 @@ def fetch_rss(url: str, timeout: float = 10) -> str:
         return r.read().decode("utf-8", errors="replace")
 
 
-def assets_mentioned(title: str) -> list[str]:
+def assets_mentioned(title: str, source: str = "") -> list[str]:
+    if any(m in source for m in MACRO_SOURCES):
+        return list(ASSET_KEYWORDS)
     words = set(re.findall(r"[a-z]+", title.lower()))
+    if words & set(CRYPTO_WIDE):
+        return list(ASSET_KEYWORDS)
     return [a for a, kws in ASSET_KEYWORDS.items() if words & set(kws)]
 
 
@@ -86,7 +95,7 @@ def assets_mentioned(title: str) -> list[str]:
 POS = {"surge", "surges", "rally", "rallies", "soar", "soars", "gain", "gains", "jump", "jumps", "record", "high", "approve",
        "approved", "approval", "inflow", "inflows", "bullish", "upgrade", "adopt", "adoption", "partnership", "launch", "beat", "rebound"}
 NEG = {"crash", "crashes", "plunge", "plunges", "drop", "drops", "fall", "falls", "hack", "hacked", "exploit", "lawsuit", "sue",
-       "sued", "ban", "bans", "outflow", "outflows", "bearish", "liquidation", "liquidations", "fraud", "selloff", "dump", "reject",
+       "sues", "sued", "ban", "bans", "outflow", "outflows", "bearish", "liquidation", "liquidations", "fraud", "selloff", "dump", "reject",
        "rejected", "delay", "delays", "probe", "fine", "fined", "low", "slump"}
 NEGATORS = {"not", "no", "never", "denies", "deny", "without"}
 
@@ -148,12 +157,16 @@ class SentimentStore:
         self.db.execute("""CREATE TABLE IF NOT EXISTS headlines (
             id TEXT PRIMARY KEY, title TEXT, url TEXT, source TEXT, published_ms INTEGER,
             seen_ms INTEGER NOT NULL, assets TEXT, score REAL, scorer TEXT)""")
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(headlines)")}
+        for c in ("material", "regulatory"):  # added for the news overlay; older stores are migrated in place
+            if c not in cols:
+                self.db.execute(f"ALTER TABLE headlines ADD COLUMN {c} REAL")
 
     def add(self, items: Iterable[Headline]) -> list[Headline]:
         new = []
         for h in items:
             cur = self.db.execute("INSERT OR IGNORE INTO headlines (id,title,url,source,published_ms,seen_ms,assets) VALUES (?,?,?,?,?,?,?)",
-                                  (h.id, h.title, h.url, h.source, h.published_ms, h.seen_ms, json.dumps(assets_mentioned(h.title))))
+                                  (h.id, h.title, h.url, h.source, h.published_ms, h.seen_ms, json.dumps(assets_mentioned(h.title, h.source))))
             if cur.rowcount:
                 new.append(h)
         self.db.commit()
@@ -165,6 +178,40 @@ class SentimentStore:
     def set_scores(self, rows: list[tuple[str, float | None]], scorer: str):
         self.db.executemany("UPDATE headlines SET score=?, scorer=? WHERE id=?", [(s if s is not None else 0.0, scorer, i) for i, s in rows])
         self.db.commit()
+
+    def set_classes(self, rows: list[tuple[str, dict]], scorer: str):
+        """rows: (id, {"sentiment", "material", "regulatory"[, "asset"]}). A classifier that names a
+        single asset narrows the keyword match; "none" from the classifier drops the headline."""
+        for i, c in rows:
+            if "asset" in c:
+                assets = [] if c["asset"] is None else [c["asset"]]
+                old = self.db.execute("SELECT assets FROM headlines WHERE id=?", (i,)).fetchone()
+                if old and len(json.loads(old[0])) > 1 and c["asset"] is not None:
+                    assets = json.loads(old[0])  # macro / sector-wide item: keep the wide attachment
+                self.db.execute("UPDATE headlines SET assets=? WHERE id=?", (json.dumps(assets), i))
+            self.db.execute("UPDATE headlines SET score=?, material=?, regulatory=?, scorer=? WHERE id=?",
+                            (c["sentiment"], c["material"], c["regulatory"], scorer, i))
+        self.db.commit()
+
+    def unclassified(self, limit: int = 200) -> list[tuple[str, str, str, int]]:
+        return self.db.execute("SELECT id, title, source, seen_ms FROM headlines WHERE regulatory IS NULL AND assets != '[]' "
+                               "ORDER BY seen_ms LIMIT ?", (limit,)).fetchall()
+
+    def regulatory_hits(self, asset: str, as_of_ms: int, window_ms: int = 24 * 3_600_000, min_reg: float = 0.6,
+                        min_material: float = 0.6, max_sentiment: float = 0.0) -> list[str]:
+        """Material, non-positive regulatory headlines SEEN in (as_of - window, as_of] for this asset."""
+        rows = self.db.execute("SELECT title, assets FROM headlines WHERE seen_ms <= ? AND seen_ms > ? AND regulatory >= ? "
+                               "AND material >= ? AND score <= ?", (as_of_ms, as_of_ms - window_ms, min_reg, min_material,
+                                                                     max_sentiment)).fetchall()
+        return [t for t, a in rows if asset in json.loads(a)]
+
+    def sha256(self) -> str:
+        import hashlib
+
+        h = hashlib.sha256()
+        for row in self.db.execute("SELECT id, title, seen_ms, assets, score, material, regulatory FROM headlines ORDER BY id"):
+            h.update(json.dumps(row).encode())
+        return h.hexdigest()
 
     def signal(self, asset: str, as_of_ms: int, window_ms: int = 6 * 3_600_000, half_life_ms: int = 2 * 3_600_000) -> tuple[float, int]:
         """Time-decayed mean score of headlines SEEN in (as_of - window, as_of]."""

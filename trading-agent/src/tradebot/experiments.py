@@ -60,10 +60,17 @@ class Spec:
     timeframe: str = "1h"
     params: dict = field(default_factory=dict)  # PolicyParams overrides
     limits: dict = field(default_factory=dict)  # RiskLimits overrides (may only tighten)
+    # engine options: {"disable": [signals]}, {"news": mode, "news_db": path, "news_sha": sha},
+    # {"fee_mult": x}, {"reviewer": "code"}. Empty for specs written before these existed,
+    # and left out of the hash then, so old candidate ids are unchanged.
+    engine_opts: dict = field(default_factory=dict)
 
     @property
     def id(self) -> str:
-        return "cand_" + _h(asdict(self))[:12]
+        d = asdict(self)
+        if not d["engine_opts"]:
+            del d["engine_opts"]
+        return "cand_" + _h(d)[:12]
 
 
 @dataclass(frozen=True)

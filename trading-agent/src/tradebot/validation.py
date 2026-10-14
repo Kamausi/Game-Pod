@@ -81,9 +81,71 @@ def run_spec(spec: Spec, candles: list[Candle], run_dir: Path) -> Result:
     if spec.engine not in ("rules", "ensemble"):
         raise ValueError("research runs use deterministic engines (rules, ensemble); model engines are evaluated on paper")
     params, limits = build(spec)
+    opts = spec.engine_opts or {}
+    fee_mult = float(opts.get("fee_mult", 1.0))
+    if fee_mult != 1.0:
+        params = replace(params, round_trip_cost_pct=params.round_trip_cost_pct * fee_mult)
     risk = RiskManager(limits, run_dir / "_engine_KILL")
-    base = RuleEngine() if spec.engine == "rules" else EnsembleEngine()
-    return run_backtest(candles, EscalatingEngine(base, None, risk), run_dir, spec.instrument, params=params, limits=limits)
+    bracket_ = (params.fixed_stop_pct, params.fixed_take_pct) if params.exit_mode == "fixed" else None
+    if spec.engine == "rules":
+        if opts.get("disable"):
+            raise ValueError("signal ablation needs the ensemble engine")
+        base = RuleEngine()
+    else:
+        base = EnsembleEngine(stop_atr=params.stop_atr_mult, rr=params.reward_risk, fixed_bracket=bracket_,
+                              disabled=tuple(opts.get("disable", ())))
+    if opts.get("news", "none") != "none":
+        from .news import NewsOverlay
+        from .sentiment import SentimentStore
+
+        store = SentimentStore(opts["news_db"])
+        if opts.get("news_sha") and store.sha256()[:16] != opts["news_sha"]:
+            raise ValueError("news database changed since this spec was written")
+        base = NewsOverlay(base, store, opts["news"])
+    reviewer = None
+    if opts.get("reviewer"):
+        from .order_review import OrderReviewer
+
+        if opts["reviewer"] not in ("code", "code-shadow"):
+            raise ValueError("research runs use the deterministic reviewer only")
+        reviewer = OrderReviewer(mode="shadow" if opts["reviewer"] == "code-shadow" else "block")
+    return run_backtest(candles, EscalatingEngine(base, None, risk), run_dir, spec.instrument, params=params, limits=limits,
+                        fee_bps=6.0 * fee_mult, slip_bps=2.0 * fee_mult, reviewer=reviewer)
+
+
+def decisions_changed(base_dir: Path, other_dir: Path) -> float:
+    """Share of bars where the intended action (enter long / enter short / exit / hold) differs."""
+    from .journal import read_journal
+
+    key = lambda r: (r["ts"], r["intent"]["action"], r["intent"].get("side"))
+    a = [key(r) for r in read_journal(base_dir / "journal.jsonl") if r["kind"] == "decision"]
+    b = {r[0]: r for r in (key(x) for x in read_journal(other_dir / "journal.jsonl") if x["kind"] == "decision")}
+    if not a:
+        return 0.0
+    return sum(b.get(ts) != (ts, act, side) for ts, act, side in a) / len(a)
+
+
+def ablate(reg: Register, base: Spec, candles: list[Candle], snap: DataSnapshot, lo: int, hi: int, work: Path,
+           signals: tuple[str, ...] | None = None) -> dict:
+    """Turn each signal (tool) off in turn. If the trades don't change, it is doing nothing:
+    delete it. Every run is recorded as an exploration of the family."""
+    if base.engine != "ensemble":
+        raise ValueError("ablation runs on the ensemble engine")
+    window = candles[lo:hi]
+    signals = signals or EnsembleEngine.SIGNALS
+    base_res = summarize(run_spec(base, window, work / base.id))
+    reg.record_run("explore", base, snap, snap.slice_note(lo, hi), base_res)
+    rows = {}
+    for sig in signals:
+        spec = replace(base, engine_opts={**base.engine_opts, "disable": sorted(set(base.engine_opts.get("disable", [])) | {sig})})
+        r = summarize(run_spec(spec, window, work / spec.id))
+        reg.record_run("explore", spec, snap, snap.slice_note(lo, hi), r)
+        changed = decisions_changed(work / base.id, work / spec.id)
+        rows[sig] = {"decisions_changed": changed, "trades": r["trades"], "return_without": r["total_return"],
+                     "return_delta_vs_all": r["total_return"] - base_res["total_return"],
+                     "verdict": "does nothing: delete" if changed < 0.01 else
+                                "hurts: removing it improved return" if r["total_return"] > base_res["total_return"] else "keep"}
+    return {"baseline": {"trades": base_res["trades"], "total_return": base_res["total_return"]}, "signals": rows}
 
 
 def summarize(res: Result) -> dict:
