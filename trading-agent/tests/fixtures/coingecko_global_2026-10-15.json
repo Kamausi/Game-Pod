@@ -1,0 +1,27 @@
+{
+ "data": {
+  "active_cryptocurrencies": 22293,
+  "markets": 1507,
+  "total_market_cap": {
+   "usd": 2711370430935.533
+  },
+  "total_volume": {
+   "usd": 52155489831927.695
+  },
+  "market_cap_percentage": {
+   "btc": 60.032588813936684,
+   "eth": 10.650946447097905,
+   "usdt": 6.774455162021008,
+   "bnb": 3.5401995588677106,
+   "xrp": 3.0497443942243034,
+   "usdc": 2.676142355645507,
+   "sol": 2.2247224620042574,
+   "trx": 1.158875885975072,
+   "steth": 0.8437186983379887,
+   "zec": 0.6857602196355634
+  },
+  "market_cap_change_percentage_24h_usd": -5.783515386638133,
+  "volume_change_percentage_24h_usd": 12.18222373275385,
+  "updated_at": 1792064373
+ }
+}

@@ -1,0 +1,289 @@
+{
+"coins": [
+{
+"item": {
+"id": "zerebro",
+"coin_id": 51289,
+"name": "Zerebro",
+"symbol": "ZEREBRO",
+"market_cap_rank": 469,
+"slug": "zerebro",
+"score": 0,
+"data": {
+"price": 0.04722580455872432,
+"price_change_percentage_24h": {
+"usd": 49.35036501964658
+},
+"market_cap": "$47,448,272",
+"total_volume": "$45,229,111"
+}
+}
+},
+{
+"item": {
+"id": "bitcoin",
+"coin_id": 1,
+"name": "Bitcoin",
+"symbol": "BTC",
+"market_cap_rank": 1,
+"slug": "bitcoin",
+"score": 1,
+"data": {
+"price": 80957.71535141363,
+"price_change_percentage_24h": {
+"usd": -2.81387011766142
+},
+"market_cap": "$1,626,275,920,085",
+"total_volume": "$40,637,241,651"
+}
+}
+},
+{
+"item": {
+"id": "near",
+"coin_id": 10365,
+"name": "NEAR Protocol",
+"symbol": "NEAR",
+"market_cap_rank": 20,
+"slug": "near",
+"score": 2,
+"data": {
+"price": 4.566187496222938,
+"price_change_percentage_24h": {
+"usd": -9.991981935069234
+},
+"market_cap": "$5,973,785,785",
+"total_volume": "$1,138,138,838"
+}
+}
+},
+{
+"item": {
+"id": "quantus",
+"coin_id": 102171910,
+"name": "Quantus",
+"symbol": "QTC",
+"market_cap_rank": 635,
+"slug": "quantus",
+"score": 3,
+"data": {
+"price": 111.47543500433744,
+"price_change_percentage_24h": {
+"usd": -8.819514951584134
+},
+"market_cap": "$31,725,682",
+"total_volume": "$7,424,677"
+}
+}
+},
+{
+"item": {
+"id": "zksync",
+"coin_id": 38043,
+"name": "ZKsync",
+"symbol": "ZK",
+"market_cap_rank": 194,
+"slug": "zksync",
+"score": 4,
+"data": {
+"price": 0.016761804600048842,
+"price_change_percentage_24h": {
+"usd": 7.262112579252983
+},
+"market_cap": "$181,194,898",
+"total_volume": "$117,241,717"
+}
+}
+},
+{
+"item": {
+"id": "aerodrome-finance",
+"coin_id": 31745,
+"name": "Aerodrome Finance",
+"symbol": "AERO",
+"market_cap_rank": 84,
+"slug": "aerodrome-finance",
+"score": 5,
+"data": {
+"price": 0.8354257506286655,
+"price_change_percentage_24h": {
+"usd": -7.141379370872141
+},
+"market_cap": "$838,399,403",
+"total_volume": "$71,960,426"
+}
+}
+},
+{
+"item": {
+"id": "backpack",
+"coin_id": 102171961,
+"name": "Backpack",
+"symbol": "BP",
+"market_cap_rank": 167,
+"slug": "backpack",
+"score": 6,
+"data": {
+"price": 0.920031918724482,
+"price_change_percentage_24h": {
+"usd": -10.790585185000392
+},
+"market_cap": "$229,999,606",
+"total_volume": "$6,911,686"
+}
+}
+},
+{
+"item": {
+"id": "pudgy-penguins",
+"coin_id": 52622,
+"name": "Pudgy Penguins",
+"symbol": "PENGU",
+"market_cap_rank": 119,
+"slug": "pudgy-penguins",
+"score": 7,
+"data": {
+"price": 0.007389906315879357,
+"price_change_percentage_24h": {
+"usd": -4.8765627217191625
+},
+"market_cap": "$464,062,242",
+"total_volume": "$143,608,331"
+}
+}
+},
+{
+"item": {
+"id": "starknet",
+"coin_id": 26433,
+"name": "Starknet",
+"symbol": "STRK",
+"market_cap_rank": 106,
+"slug": "starknet",
+"score": 8,
+"data": {
+"price": 0.07644584737553083,
+"price_change_percentage_24h": {
+"usd": -1.7073762694975188
+},
+"market_cap": "$566,844,007",
+"total_volume": "$236,383,601"
+}
+}
+},
+{
+"item": {
+"id": "ethereum",
+"coin_id": 279,
+"name": "Ethereum",
+"symbol": "ETH",
+"market_cap_rank": 2,
+"slug": "ethereum",
+"score": 9,
+"data": {
+"price": 2361.7578838441596,
+"price_change_percentage_24h": {
+"usd": -5.504067726953946
+},
+"market_cap": "$288,221,304,344",
+"total_volume": "$19,229,297,710"
+}
+}
+},
+{
+"item": {
+"id": "pearl-2",
+"coin_id": 102173580,
+"name": "Pearl",
+"symbol": "PRL",
+"market_cap_rank": 103,
+"slug": "pearl-research",
+"score": 10,
+"data": {
+"price": 1.6954624075933515,
+"price_change_percentage_24h": {
+"usd": -17.24961076718649
+},
+"market_cap": "$587,860,636",
+"total_volume": "$9,642,367"
+}
+}
+},
+{
+"item": {
+"id": "cosmos",
+"coin_id": 1481,
+"name": "Cosmos Hub",
+"symbol": "ATOM",
+"market_cap_rank": 81,
+"slug": "cosmos-hub",
+"score": 11,
+"data": {
+"price": 1.693959780338572,
+"price_change_percentage_24h": {
+"usd": -5.777596208803012
+},
+"market_cap": "$908,033,808",
+"total_volume": "$60,582,847"
+}
+}
+},
+{
+"item": {
+"id": "pendle",
+"coin_id": 15069,
+"name": "Pendle",
+"symbol": "PENDLE",
+"market_cap_rank": 132,
+"slug": "pendle",
+"score": 12,
+"data": {
+"price": 1.9300345040257632,
+"price_change_percentage_24h": {
+"usd": -11.676845160121324
+},
+"market_cap": "$335,327,408",
+"total_volume": "$65,653,807"
+}
+}
+},
+{
+"item": {
+"id": "bitway",
+"coin_id": 71205,
+"name": "Bitway",
+"symbol": "BTW",
+"market_cap_rank": 39,
+"slug": "bitway",
+"score": 13,
+"data": {
+"price": 1.8695500787885293,
+"price_change_percentage_24h": {
+"usd": -28.420513761472122
+},
+"market_cap": "$2,808,682,980",
+"total_volume": "$41,920,082"
+}
+}
+},
+{
+"item": {
+"id": "zama",
+"coin_id": 70921,
+"name": "Zama",
+"symbol": "ZAMA",
+"market_cap_rank": 195,
+"slug": "zama",
+"score": 14,
+"data": {
+"price": 0.07145301685750458,
+"price_change_percentage_24h": {
+"usd": -7.460741698584347
+},
+"market_cap": "$180,859,832",
+"total_volume": "$25,712,114"
+}
+}
+}
+]
+}

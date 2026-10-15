@@ -289,6 +289,21 @@ def main(argv: list[str] | None = None) -> int:
     uv.add_argument("--perps", action="store_true", help="include perpetuals (their fee schedule differs: check it)")
     uv.add_argument("--top", type=int, default=25)
 
+    scn = sub.add_parser("scan", help="market-wide scanner: gainers, losers, most searched, most traded, market cap, turnover, dominance... -> one watchlist")
+    scn.add_argument("--markets", help="saved CoinGecko /coins/markets JSON (default: fetch live)")
+    scn.add_argument("--trending", help="saved CoinGecko /search/trending JSON")
+    scn.add_argument("--global", dest="glob", help="saved CoinGecko /global JSON")
+    scn.add_argument("--tickers", help="saved Crypto.com get-tickers JSON")
+    scn.add_argument("--n", type=int, default=12, help="watchlist size")
+    scn.add_argument("--top", type=int, default=15, help="length of each criterion list")
+    scn.add_argument("--venue", default="cryptocom", choices=["cryptocom", "cryptocom_cro"])
+    scn.add_argument("--taker", action="store_true")
+    scn.add_argument("--order", type=float, default=500)
+    scn.add_argument("--min-volume", type=float, default=100_000, help="the venue's own 24 h USD volume floor for a pick")
+    scn.add_argument("--max-majors", type=int, default=1, help="how many of BTC/ETH/SOL may take watchlist slots")
+    scn.add_argument("--criteria", default="", help="comma list to use, in priority order (default: all)")
+    scn.add_argument("--out", help="write the full result as JSON")
+
     wh = sub.add_parser("whales", help="score Solana wallets from their own on-chain trades; paper-copy only the ones that pass")
     whs = wh.add_subparsers(dest="what", required=True)
     w1 = whs.add_parser("score")
@@ -829,7 +844,7 @@ def main(argv: list[str] | None = None) -> int:
               f"usage {r.get('usage')}")
         return 0
 
-    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck", "export", "ccxt", "universe", "whales", "playbook"):
+    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck", "export", "ccxt", "universe", "whales", "playbook", "scan"):
         from .cli_desk import run as run_desk_cli
         return run_desk_cli(args)
     if args.cmd == "review":

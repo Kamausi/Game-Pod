@@ -55,7 +55,28 @@ def run(args) -> int:
         return _whales(args)
     if args.cmd == "playbook":
         return _playbook(args)
+    if args.cmd == "scan":
+        return _scan(args)
     return 2
+
+
+def _scan(a) -> int:
+    from . import scanner as sc
+    load = lambda f: json.loads(Path(f).read_text()) if f else None
+    if a.markets or a.trending or a.glob or a.tickers:
+        src = {"markets": load(a.markets), "trending": load(a.trending), "glob": load(a.glob), "tickers": load(a.tickers)}
+        if isinstance(src["tickers"], dict):
+            src["tickers"] = (src["tickers"].get("result") or src["tickers"]).get("data")
+    else:
+        src = sc.fetch_all()
+    kw = dict(n=a.n, venue=a.venue, maker=not a.taker, order_usd=a.order, min_volume_usd=a.min_volume, max_majors=a.max_majors)
+    if a.criteria:
+        kw["order"] = tuple(c.strip() for c in a.criteria.split(",") if c.strip())
+    res = sc.scan(src["markets"], src["trending"], src["glob"], src["tickers"], top=a.top, **kw)
+    print(sc.report(res))
+    if a.out:
+        Path(a.out).write_text(json.dumps(res, indent=1))
+    return 0
 
 
 def _desk(a) -> int:
