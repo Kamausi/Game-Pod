@@ -210,6 +210,7 @@ canvas.spark { height: 34px; }
 .lgd .v { font: 500 .78rem var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
 .lgd .pb { grid-column: 2 / -1; height: 5px; border-radius: 3px; background: var(--grid); overflow: hidden; }
 .lgd .pb i { display: block; height: 100%; border-radius: 3px; }
+.sub3 { font: 600 .78rem/1.3 var(--font-mono); letter-spacing: .02em; color: var(--muted); margin: .9rem 0 .4rem; }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 8px; background: var(--sunken); border: 1px solid var(--line); }
 .seg button { border: 0; background: none; padding: .35rem .6rem; font: 600 .74rem/1 var(--font-mono); color: var(--muted); border-radius: 6px; }
 .seg button[aria-pressed="true"], .seg button[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
@@ -868,7 +869,10 @@ td canvas.spark { width: 110px; height: 28px; }
     <section class="panel" aria-label="Fees">
       <h2><span>Fee schedule</span><span class="note" id="feeNote"></span></h2>
       <div class="controls"><label class="field wide" for="feeVenue">Charge paper trades like <select id="feeVenue"></select></label></div>
-      <p class="note" style="max-width:72ch">Fees are a percentage of each trade, so the price of one coin does not matter: $100 of BTC and $100 of DOGE pay the same fee. The paper engine fills like a market order, so crypto pays the taker rate. US stocks at Alpaca have no commission (an SEC fee of about 0.003% applies to sells). An agent only enters when its target beats the round-trip cost, so at a 0.50% taker fee the one-minute crypto agents mostly sit out. That is the fee doing its job, not a bug.</p>
+      <h3 class="sub3">Your closed trades, repriced under each fee schedule</h3>
+      <div class="tw" style="max-height:none"><table><thead><tr><th>Schedule</th><th class="n">Fees</th><th class="n">Per round trip</th><th class="n">Net</th><th class="n">vs now</th><th></th></tr></thead><tbody id="feeCmpBody"></tbody></table></div>
+      <p class="note" id="feeCmpNote" style="max-width:76ch"></p>
+      <p class="note" style="max-width:72ch">Fees are a percentage of each trade, so the price of one coin does not matter: $100 of BTC and $100 of DOGE pay the same fee. Market orders and stops pay the taker rate; crypto limit entries (where the maker rate is cheaper), take-profit targets and soft exits pay the maker rate. US stocks at Alpaca have no commission (an SEC fee of about 0.003% applies to sells). An agent only enters when its target beats the round-trip cost, so at a 0.50% taker fee the one-minute crypto agents mostly sit out. That is the fee doing its job, not a bug.</p>
     </section>
     <section class="panel" aria-label="Settings">
       <h2><span>Account-wide limits</span></h2>
@@ -884,6 +888,8 @@ td canvas.spark { width: 110px; height: 28px; }
         <label for="sShort">Shorts<div class="row"><select id="sShort"><option value="0">Off (spot, long only)</option><option value="1">On</option></select></div></label>
         <label for="sExit">Exits<div class="row"><select id="sExit"><option value="fixed">Fixed stop + target, set at entry</option><option value="atr">ATR bracket + trailing stop</option></select></div></label>
         <label for="sMx">Model may close early<div class="row"><select id="sMx"><option value="0">No (code owns exits)</option><option value="1">Yes (crisis / opposite signal)</option></select></div></label>
+        <label for="sCm">Target at least × round-trip cost<div class="row"><select id="sCm"><option value="4">4× (fees ≤ 25% of a win)</option><option value="6">6× (fees ≤ 17%)</option><option value="8">8× (fees ≤ 12.5%)</option></select></div></label>
+        <label for="sSoft">Soft exits<div class="row"><select id="sSoft"><option value="0">Off (stop or target only)</option><option value="1">On (limit exit when the signal turns)</option></select></div></label>
         <label for="sRev">Pre-trade reviewer<div class="row"><select id="sRev"><option value="block">Block riskiest 10%</option><option value="shadow">Shadow (log only)</option></select></div></label>
         <label for="sNews">News use<div class="row"><select id="sNews"><option value="both">Sentiment bias + regulatory veto</option><option value="bias">Sentiment bias only</option><option value="veto">Regulatory veto only</option><option value="off">Off</option></select></div></label>
       </div>
@@ -992,21 +998,22 @@ function tradeCost(a, f) {
   const lim = limitEntry(a);
   return feeRate(a, 'buy', lim ? 'maker' : 'taker') + feeRate(a, 'sell', 'taker') + SLIP * (lim ? 1 : 2) + (lim ? 0 : (f && isFinite(f.spreadBps) ? f.spreadBps : a.spreadBps) / 1e4);
 }
-// Fees may take at most a quarter of a winning trade: the target is at least COST_MULT x the round-trip cost, the stop half that.
-const COST_MULT = 4, COOLDOWN_BARS = 60;
+// Fees may take at most 1/P.costMult of a winning trade: the target is at least P.costMult x the round-trip cost.
+const COOLDOWN_BARS = 60, SOFT_CONF = 0.6;  // the cost multiple lives in P.costMult (Settings)
 const SIGNALS = ['trend', 'momentum', 'meanrev', 'breakout', 'flow', 'basis', 'sentiment'];
 const SIG_LABEL = { trend: 'Trend (MA 9/21, 1m + 15m)', momentum: 'Momentum (MACD 12/26/9)', meanrev: 'Mean reversion (RSI + Bollinger)', breakout: 'Breakout (30-bar range + volume)', flow: 'Order flow (top-of-book imbalance)', basis: 'Index gap (price vs multi-exchange index)', sentiment: 'News sentiment (last 6h)' };
 const NO_BOOK = 'no order book or per-minute volume from Yahoo: flow and breakout signals stay at 0, spread is an estimate';
 const REGIMES = ['trending', 'mean_reverting', 'high_vol', 'crisis'];
 const SIG_H = 15, CALL_H = 30, CLUSTER_RHO = 0.7, CLUSTER_CAP = 0.40, STRESS_GATE = 0.12, TWAP_ABOVE = 0.10;
 const P = { minConf: 0.75, minQ: 2, kelly: 0.25, volTarget: 0.01, riskPct: 0.01, rr: 2, stopAtr: 2, minStop: 0.003, allowShort: false,
-  exitMode: 'fixed', modelExits: false, review: 'block', news: 'both' };
+  exitMode: 'fixed', modelExits: false, review: 'block', news: 'both',
+  costMult: [4, 6, 8].includes(PREF('costMult')) ? PREF('costMult') : 4, softExit: PREF('softExit') === true };
 const REVIEW_TOP = 0.10, REVIEW_WARMUP = 50, REVIEW_CEIL = 0.80, VETO_MS = 24 * 3600e3;
 // Exits are code: a fixed stop and target attached the moment a position opens (the rule that beat every
 // model-chosen exit in a 3,505-agent live study). Their 2%/4% suits hourly bars; this desk trades 1-minute
 // bars, so each tier gets the same 1:2 bracket at a width that fits its one-minute noise.
 function bracketFor(a, f) {
-  const floor = COST_MULT * tradeCost(a, f);  // a target narrower than this pays most of its win to the exchange
+  const floor = P.costMult * tradeCost(a, f);  // a target narrower than this pays most of its win to the exchange
   if (P.exitMode === 'fixed') { const t = TIER[a.tier], take = Math.max(t.take, floor); return { stop: Math.max(t.stop, take * t.stop / t.take), take, floor }; }
   const stop = Math.max(P.minStop, P.stopAtr * f.atrPct, floor / P.rr); return { stop, take: P.rr * stop, floor };
 }
@@ -1238,9 +1245,12 @@ function policy(i, a, f, d) {
   g('Market open', isOpen(a, S.now), tier.hours === 'always' ? '24/7' : isOpen(a, S.now) ? 'open' : tier.hours === 'fx' ? 'closed for the weekend' : 'closed (NYSE 09:30–16:00 New York)');
   if (S.killed) return { action: side ? 'exit' : 'hold', reason: 'kill switch: ' + S.killed, gates };
   if (side) {
-    if (!P.modelExits) return { action: 'hold', reason: 'in position; the fixed stop and target own the exit', gates };
-    if (d.regime === 'crisis') return { action: 'exit', reason: 'crisis regime while in position', gates };
     const opp = side === 'long' ? 'short' : 'long';
+    // Soft exit: when the signal turns, leave with a resting limit (maker fee) instead of waiting for the stop (taker fee). The stop stays.
+    if (P.softExit && d.direction === opp && d.direction_confidence > SOFT_CONF && !a.pendingLimit && limitEntry(a))
+      return { action: 'soft_exit', reason: 'signal turned (' + d.direction_confidence.toFixed(2) + '): leaving with a limit order at the maker fee; the stop still stands', gates };
+    if (!P.modelExits) return { action: 'hold', reason: a.pendingLimit && a.pendingLimit.exit ? 'limit exit working' : 'in position; the fixed stop and target own the exit', gates };
+    if (d.regime === 'crisis') return { action: 'exit', reason: 'crisis regime while in position', gates };
     if (d.direction === opp && d.direction_confidence > P.minConf) return { action: 'exit', reason: 'confident opposite signal', gates };
     return { action: 'hold', reason: 'in position; bracket and trailing stop manage the exit', gates };
   }
@@ -1298,6 +1308,7 @@ function checkOrder(a, side, qty, price, ts, dataTs) {
   return { ok: true, qty: q, clamped: q < qty };
 }
 function fill(a, ts, side, qty, price, reason, kind, liq) {
+  liq = liq || 'taker';
   const fee = qty * price * feeRate(a, side, liq), signed = side === 'buy' ? qty : -qty, p = a.pos;
   const opening = p.qty === 0 || p.qty * signed > 0;
   if (opening) p.avg = (p.avg * Math.abs(p.qty) + price * qty) / Math.abs(p.qty + signed);
@@ -1306,7 +1317,7 @@ function fill(a, ts, side, qty, price, reason, kind, liq) {
   S.fills.push({ ts, sym: a.sym, side, qty, price, fee, reason });
   a.trip += -signed * price - fee;
   if (opening && p.qty === signed && kind !== 'manual') S.entries[S.assets.indexOf(a)]++;
-  if (opening && p.qty === signed) p.open = { ts, side: side === 'buy' ? 'long' : 'short', qty, regime: a.last ? a.last.d.regime : 'none yet', conf: a.last ? a.last.d.direction_confidence : null, manual: kind === 'manual', mfe: 0, mae: 0 };
+  if (opening && p.qty === signed) p.open = { ts, liq, side: side === 'buy' ? 'long' : 'short', qty, regime: a.last ? a.last.d.regime : 'none yet', conf: a.last ? a.last.d.direction_confidence : null, manual: kind === 'manual', mfe: 0, mae: 0 };
   else if (opening && p.open) p.open.qty = Math.abs(p.qty);
   if (opening) {
     log(ts, a.sym, kind || 'entry', (side === 'buy' ? 'Bought ' : 'Sold ') + fmtQty(qty) + ' at ' + fmtPx(price) + ' (' + reason + ')', 'info');
@@ -1315,7 +1326,8 @@ function fill(a, ts, side, qty, price, reason, kind, liq) {
     const pnl = a.trip; a.trip = 0; S.trips.push(pnl); a.coolUntil = ts + COOLDOWN_BARS * BAR;
     const o = p.open || {}, sd = p.stopDist || TIER[a.tier].stop, risk = sd * p.avg * (o.qty || qty);
     S.tripLog.push({ sym: a.sym, side: o.side || (side === 'sell' ? 'long' : 'short'), open: o.ts || ts, ts, entry: p.avg, exit: price, pnl, R: risk ? pnl / risk : 0, reason,
-      regime: o.regime || 'none yet', manual: !!o.manual, heat: (o.mae || 0) / sd, mfe: o.mfe || 0, notional: p.avg * (o.qty || qty) });
+      regime: o.regime || 'none yet', manual: !!o.manual, heat: (o.mae || 0) / sd, mfe: o.mfe || 0, notional: p.avg * (o.qty || qty),
+      exitNotional: price * (o.qty || qty), tier: a.tier, entryLiq: o.liq || 'taker', exitLiq: liq, fees: S.fills.filter(x => x.sym === a.sym && x.ts >= (o.ts || ts)).reduce((t, x) => t + x.fee, 0) });
     if (S.tripLog.length > 2000) S.tripLog.splice(0, 500);
     p.open = null; p.stop = p.take = p.avg = p.best = 0;
     log(ts, a.sym, reason, 'Closed at ' + fmtPx(price) + ', P&L after fees ' + signedUsd(pnl), pnl >= 0 ? 'good' : 'risk');
@@ -1343,6 +1355,12 @@ function setBracket(a, intent) {
 function act(i, intent, ts, bid, ask, dataTs) {
   const a = S.assets[i], eq = equity();
   if (intent.action === 'exit' && a.pos.qty) { closeAll(a, ts, bid, ask, dataTs, 'exit'); return; }
+  if (intent.action === 'soft_exit' && a.pos.qty && !a.pendingLimit) {
+    const side = a.pos.qty > 0 ? 'sell' : 'buy', limit = side === 'sell' ? ask : bid;
+    a.pendingLimit = { side, qty: Math.abs(a.pos.qty), limit, ttl: 3, exit: true };
+    log(ts, a.sym, 'limit', 'Soft exit: limit ' + side + ' ' + fmtQty(Math.abs(a.pos.qty)) + ' at ' + fmtPx(limit) + ' (maker fee; the stop still stands; expires in 3 bars)', 'info');
+    return;
+  }
   if (intent.action !== 'enter' || a.pos.qty || a.pendingLimit || a.pendingStop || a.twap) return;
   const side = intent.side === 'long' ? 'buy' : 'sell', mid = (bid + ask) / 2;
   const qty = intent.size * eq / mid;
@@ -1379,6 +1397,7 @@ function workLimit(a, ts, lo, hi, dataTs) {
     a.pendingLimit = null;
     const v = checkOrder(a, o.side, o.qty, o.limit, ts, dataTs);
     if (!v.ok) { log(ts, a.sym, 'blocked', 'Limit fill blocked by risk layer: ' + v.why, 'risk'); return; }
+    if (o.exit) { if (a.pos.qty) { S.ordersToday++; fill(a, ts, o.side, Math.min(v.qty, Math.abs(a.pos.qty)), o.limit, 'soft exit', undefined, 'maker'); } return; }
     S.ordersToday++; fill(a, ts, o.side, v.qty, o.limit, o.manual ? 'manual limit filled' : 'limit filled', o.manual ? 'manual' : undefined, 'maker'); setBracket(a, o.intent);
   } else if (--o.ttl <= 0) { a.pendingLimit = null; log(ts, a.sym, 'cancel', 'Limit order expired unfilled; not chased', 'muted'); }
 }
@@ -2040,7 +2059,7 @@ function render() {
     const it = L0.intent, ib = $('intentBox'); ib.className = 'intent ' + it.action;
     ib.textContent = it.action === 'enter' ? 'ENTER ' + it.side.toUpperCase() + ': ' + it.reason : it.action.toUpperCase() + ': ' + it.reason;
     const z = it.sz;
-    $('sizeNote').textContent = z ? 'Sizing: ' + (P.exitMode === 'fixed' ? 'fixed ' : 'ATR ') + 'stop ' + (z.stop * 100).toFixed(2) + '%, target ' + (z.take * 100).toFixed(2) + '% (round trip costs ' + (z.cost * 100).toFixed(2) + '% in fees and slippage, so no target under ' + (COST_MULT * z.cost * 100).toFixed(2) + '%), payoff ' + z.b.toFixed(2) + ':1 after costs. Smallest of quarter Kelly ' + (z.kelly * 100).toFixed(1) + '%, vol target ' + (z.volCap * 100).toFixed(1) + '% and tier cap ' + (TIER[a.tier].maxPos * 100) + '%, × drawdown ' + z.ddScale.toFixed(2) + ' × recent results ' + z.perfScale.toFixed(2) + ' × volatility regime ' + z.regimeScale.toFixed(2) + ' = ' + (z.size * 100).toFixed(1) + '% of equity.' : '';
+    $('sizeNote').textContent = z ? 'Sizing: ' + (P.exitMode === 'fixed' ? 'fixed ' : 'ATR ') + 'stop ' + (z.stop * 100).toFixed(2) + '%, target ' + (z.take * 100).toFixed(2) + '% (round trip costs ' + (z.cost * 100).toFixed(2) + '% in fees and slippage, so no target under ' + (P.costMult * z.cost * 100).toFixed(2) + '%), payoff ' + z.b.toFixed(2) + ':1 after costs. Smallest of quarter Kelly ' + (z.kelly * 100).toFixed(1) + '%, vol target ' + (z.volCap * 100).toFixed(1) + '% and tier cap ' + (TIER[a.tier].maxPos * 100) + '%, × drawdown ' + z.ddScale.toFixed(2) + ' × recent results ' + z.perfScale.toFixed(2) + ' × volatility regime ' + z.regimeScale.toFixed(2) + ' = ' + (z.size * 100).toFixed(1) + '% of equity.' : '';
     if (!S.pinned || S.pinned.asset !== a.sym) $('inputsPre').textContent = JSON.stringify(L0.inputs, null, 1);
   } else {
     $('sigBody').innerHTML = '<tr><td colspan="3" class="note">Signals appear once this asset has 49 one-minute bars.</td></tr>';
@@ -3197,7 +3216,34 @@ $('uvStocks').value = (PREF('stockPicks') || []).join(', ');
 function renderFees() {
   const fp = FEE_PRESETS[FEE_VENUE], c = fp.crypto * 2e4, st = fp.stock != null ? fp.stock * 2e4 : SEC_SELL_FEE * 1e4;
   $('feeNote').textContent = 'Round trip: crypto ' + c.toFixed(1) + ' bp · stocks ' + st.toFixed(2) + ' bp · FX ' + ((fp.fx || 0) * 2e4).toFixed(1) + ' bp + spreads';
+  const T = S.tripLog.filter(t => t.notional > 0), cmp = feeReprice(T);
+  if (!T.length) { $('feeCmpBody').innerHTML = '<tr><td colspan="6" class="note">No closed trades yet.</td></tr>'; $('feeCmpNote').textContent = ''; return; }
+  const cur = cmp.find(r => r.key === FEE_VENUE);
+  $('feeCmpBody').innerHTML = cmp.map(r => '<tr><td>' + esc(r.label) + (r.key === FEE_VENUE ? ' <span class="tag p-good">now</span>' : '') + '</td><td class="n">' + usd(r.fees) + '</td><td class="n">' + usd(r.fees / T.length) + '</td><td class="n ' + sgnCls(r.net) + '">' + signedUsd(r.net) + '</td><td class="n ' + sgnCls(cur.fees - r.fees) + '">' + (r.key === FEE_VENUE ? '—' : signedUsd(cur.fees - r.fees)) + '</td><td>' + (r.key === FEE_VENUE ? '' : '<button type="button" data-fee="' + r.key + '">Use</button>') + '</td></tr>').join('');
+  const recorded = T.reduce((x, t) => x + (t.fees || 0), 0), gross = cmp[0].gross, mk = T.filter(t => t.exitLiq === 'maker').length;
+  $('feeCmpNote').textContent = T.length + ' closed round trips, ' + signedUsd(gross) + ' before fees; ' + mk + ' exited at the maker rate (target or soft exit), ' + (T.length - mk) + ' at the taker rate (stop or market). Fees actually charged: ' + usd(recorded)
+    + '. Each schedule reprices the same trades: crypto entries at the maker rate only where it is cheaper than the taker rate, targets and soft exits at maker, stops at taker. It assumes the same fills, which another venue would not give exactly.';
 }
+// Same trades, other fee schedule. Equity: the schedule's stock rate, or the SEC fee on the sell leg; FX: the schedule's fx rate or zero.
+function feeReprice(T) {
+  return Object.entries(FEE_PRESETS).filter(([k]) => k !== 'legacy').map(([key, fp]) => {
+    let fees = 0, gross = 0;
+    T.forEach(t => {
+      const g = (TIER[t.tier] || TIER.alt).group, exitN = t.exitNotional || t.notional;
+      gross += t.pnl + (t.fees || 0);
+      if (g === 'crypto') {
+        const ent = TIER[t.tier] && TIER[t.tier].limitOnly || fp.maker < fp.crypto ? fp.maker : fp.crypto;
+        fees += t.notional * ent + exitN * (t.exitLiq === 'maker' ? fp.maker : fp.crypto);
+      } else if (g === 'equity') fees += fp.stock != null ? (t.notional + exitN) * fp.stock : (t.side === 'long' ? exitN : t.notional) * SEC_SELL_FEE;
+      else fees += (t.notional + exitN) * (fp.fx || 0);
+    });
+    return { key, label: fp.label, fees, gross, net: gross - fees };
+  }).sort((a, b) => a.fees - b.fees);
+}
+$('feeCmpBody').addEventListener('click', e => { const b = e.target.closest('button[data-fee]'); if (!b) return; const v = $('feeVenue'); v.value = b.dataset.fee; v.dispatchEvent(new Event('change')); });
+$('sCm').value = String(P.costMult); $('sSoft').value = P.softExit ? '1' : '0';
+$('sCm').addEventListener('change', e => { P.costMult = +e.target.value; store.set('costMult', P.costMult); log(S.now, '—', 'setting', 'Targets at least ' + P.costMult + '× the round-trip cost', 'muted'); render(); });
+$('sSoft').addEventListener('change', e => { P.softExit = e.target.value === '1'; store.set('softExit', P.softExit); log(S.now, '—', 'setting', 'Soft exits ' + (P.softExit ? 'on' : 'off'), 'muted'); render(); });
 $('feeVenue').addEventListener('change', e => { FEE_VENUE = e.target.value; store.set('feeVenue', FEE_VENUE); $('uvVenue').value = FEE_VENUE; log(S.now, '—', 'info', 'Fee schedule set to ' + FEE_PRESETS[FEE_VENUE].label + '.', 'info'); rerender(); });
 ['uvVenue', 'uvMaker', 'uvEx', 'uvOrder', 'uvMin', 'uvStocks'].forEach(id => $(id).addEventListener(id === 'uvOrder' || id === 'uvMin' || id === 'uvStocks' ? 'input' : 'change', () => rerender()));
 $('uvGo').addEventListener('click', universeScan);
