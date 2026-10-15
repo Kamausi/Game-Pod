@@ -18,7 +18,9 @@ RUN useradd --create-home --uid 10001 trader
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --only-binary=:all: grpcio==1.66.2 && pip install ".[all]"
+# EXTRAS=all,openbb adds OpenBB (large) for --prices openbb
+ARG EXTRAS=all
+RUN pip install --only-binary=:all: grpcio==1.66.2 && pip install ".[${EXTRAS}]"
 COPY prompts ./prompts
 # All state (runs/, config/, releases/, KILL files) lives in the mounted volume.
 WORKDIR /state

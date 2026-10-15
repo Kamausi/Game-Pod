@@ -14,9 +14,13 @@ def _print(x) -> None:
 
 def _prices(spec: str, years: int = 4):
     from . import insider as ins
+    end = date.today()
+    start = (end - timedelta(days=365 * years)).isoformat()
     if spec == "alpaca":
-        end = date.today()
-        return ins.AlpacaBars((end - timedelta(days=365 * years)).isoformat(), end.isoformat())
+        return ins.AlpacaBars(start, end.isoformat())
+    if spec == "openbb" or spec.startswith("openbb:"):
+        from .platforms import OpenBBPrices
+        return OpenBBPrices(start, end.isoformat(), provider=spec.partition(":")[2] or "yfinance")
     return ins.CsvPrices(spec)
 
 
@@ -41,6 +45,10 @@ def run(args) -> int:
         return _audit(args)
     if args.cmd == "tokencheck":
         return _tokencheck(args)
+    if args.cmd == "export":
+        return _export(args)
+    if args.cmd == "ccxt":
+        return _ccxt(args)
     return 2
 
 
@@ -84,6 +92,13 @@ def _desk(a) -> int:
     if a.seat == "weekly":
         _print(dk.weekly(d, day))
         return 0
+    if a.seat == "schedule":
+        from . import schedule as sc
+        if a.once:
+            seat, at = sc.next_run(sc.datetime.now(sc.NY))
+            print(f"next: {seat} at {at.isoformat()}")
+            return 0
+        return sc.loop(str(d.root), a.prices, a.llm, a.llm_effort, alert=_alert)
     prices = _prices(a.prices)
     if a.seat in ("scout", "morning"):
         out = dk.scout(d, day, prices=prices)
@@ -91,7 +106,11 @@ def _desk(a) -> int:
         if a.seat == "scout":
             return 0
     if a.seat in ("analyst", "morning"):
-        out = dk.analyst(d, day, prices=prices)
+        seat = None
+        if a.llm:
+            from .llm_analyst import ClaudeSeat
+            seat = ClaudeSeat(effort=a.llm_effort)
+        out = dk.analyst(d, day, prices=prices, seat=seat)
         print("analyst:", ", ".join(f"{c['symbol']} {c['verdict']}" for c in out["cards"]) or "nothing to price")
         if a.seat == "analyst":
             return 0
@@ -127,6 +146,24 @@ def _desk(a) -> int:
 def _insider(a) -> int:
     from . import desk as dk
     from . import insider as ins
+    if a.what == "fetch":
+        rows = ins.fetch_datasets(ins.quarter_list(a.quarters), a.out)
+        _print(rows)
+        return 1 if any(r["status"] == "FAILED" for r in rows) else 0
+    if a.what == "prices":
+        syms = set()
+        for src in a.data:
+            syms |= {s.symbol for s in ins.load_form345(src, a.min_usd)[0]}
+        if a.source == "alpaca":
+            src_ = ins.AlpacaBars(a.start, date.today().isoformat())
+        else:
+            from .platforms import OpenBBPrices
+            src_ = OpenBBPrices(a.start, provider=a.source.partition(":")[2] or "yfinance")
+        rows = ins.fetch_prices(sorted(syms), src_, a.out)
+        missing = [r["symbol"] for r in rows if not r["bars"]]
+        _print({"symbols": len(rows), "with_bars": len(rows) - len(missing), "missing": missing,
+                "note": "missing names are mostly delisted: the survivorship hole the backtest reports as 'unpriced'", "out": a.out})
+        return 0
     sigs, stats = [], []
     for src in a.data:
         s, st = ins.load_form345(src, 0 if a.study_filters else a.min_usd, any_insider=a.study_filters)
@@ -248,3 +285,38 @@ def _tokencheck(a) -> int:
     rep = bc.check(a.mint, SolanaRPC(a.rpc), early_slots=a.early_slots, max_pages=a.max_pages)
     _print(asdict(rep))
     return 0 if rep.verdict == "NO BUNDLE FOUND" else 1
+
+
+def _export(a) -> int:
+    import csv
+    from .platforms import export_freqtrade
+    sig = None
+    if a.kind == "signals":
+        if not a.signals:
+            raise SystemExit("--kind signals needs --signals pair,date CSV")
+        sig = [(r[0], r[1]) for r in csv.reader(open(a.signals)) if len(r) >= 2 and r[1][:1].isdigit()]
+    src = export_freqtrade(a.kind, sig, a.stop_pct, a.hold_days, a.timeframe, a.name)
+    compile(src, a.out, "exec")
+    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(a.out).write_text(src)
+    print(f"wrote {a.out}: freqtrade backtesting --strategy {a.name} --timeframe {a.timeframe}")
+    return 0
+
+
+def _ccxt(a) -> int:
+    from .platforms import CcxtVenue
+    if a.what == "exchanges":
+        from .platforms import _optional
+        ccxt = _optional("ccxt", "ccxt")
+        print(len(ccxt.exchanges), "exchanges:", " ".join(ccxt.exchanges))
+        return 0
+    v = CcxtVenue(a.exchange, sandbox=a.what == "balance")
+    if a.what == "ticker":
+        _print(v.ticker(a.symbol))
+    elif a.what == "book":
+        _print(v.book(a.symbol, a.limit))
+    elif a.what == "bars":
+        _print([asdict(b) for b in v.bars(a.symbol, a.timeframe, limit=a.limit)])
+    else:
+        _print(v.balance())
+    return 0

@@ -76,7 +76,13 @@ tradebot desk morning                    # brief + tickets; nothing is placed
 tradebot desk approve 1                  # your tap, same day only
 ```
 
-Enable the timers with `systemctl enable --now tradebot-desk-{morning,chain-check,exit-due,journal,weekly,audit}.timer`. Then, in order:
+Real history first, where sec.gov is reachable: `tradebot insider fetch 2016q1-2026q3`, then `tradebot insider prices --data data/sec/*.zip` (README §19).
+
+Run it on a schedule, either:
+- **systemd:** `systemctl enable --now tradebot-desk-{morning,chain-check,exit-due,journal,weekly,audit}.timer`
+- **Docker:** `docker compose --profile desk up -d desk` (same times, `tradebot desk schedule`).
+
+Add `TRADEBOT_DESK_LLM=1` and `ANTHROPIC_API_KEY` to `.env` for the Claude bull/bear/judge seat. It can only kill names. Then, in order:
 
 1. **Paper until 25–50 trades,** at 1% risk.
 2. **Compare with the backtest.** Read the weekly file in `desk/journal/`. If it says DECAYING, stop.
@@ -114,4 +120,4 @@ While the legs rest, the loop does not run its own stop; it mirrors the exchange
 
 ## What is not verified from the build environment
 
-The venue request formats (Crypto.com private API and its signature, Alpaca live, OANDA live, Jupiter `/swap`, Jito `sendBundle`) are implemented from the public docs and tested against fakes. They have not been sent to the real services from here. That is why step 3 starts with `live-check` (read-only) and a $100 cap.
+The venue request formats (Crypto.com private API and its signature, Alpaca live, OANDA live, Jupiter `/swap`, Jito `sendBundle`) are implemented from the public docs and tested against fakes. They have not been sent to the real services from here. That is why step 3 starts with `live-check` (read-only) and a $100 cap. Also not sent from here: ccxt sandbox orders, OpenBB downloads, the SEC zip download and the Claude seat (no API key). Each is tested against fakes, and against the real library's interfaces where one could be installed.

@@ -6,7 +6,8 @@
            price-to-earnings (25th / median / 75th percentile x trailing EPS from SEC XBRL).
            Every number carries its source. No positive earnings or no history = NO RANGE.
   SKEPTIC  never proposes, only kills: unsourced key number, batch, 10b5-1 plan, EXPENSIVE,
-           NO RANGE, earnings likely within 5 trading days, already moved. Unsure = KILL.
+           NO RANGE, earnings likely within 5 trading days, already moved, the Claude judge
+           disagrees or cites a number not in its fact table (--llm). Unsure = KILL.
   RISK     turns PASS names into tickets: DAY limit buy 0.5% above the last close, stop
            2 x ATR(14) below entry, shares = equity x 1% / (entry - stop), checked by
            risk_check() against limits.json. KILL or PAUSE file = no tickets.
@@ -230,7 +231,8 @@ def fair_value(concept: dict, bars: list[ins.DayBar], url: str) -> dict:
             "wrong_if": "earnings fall, or the market re-rates the stock below its own history (a lower P/E for a reason)"}
 
 
-def analyst(desk: Desk, d: str, get=ins.sec_get, prices=None) -> dict:
+def analyst(desk: Desk, d: str, get=ins.sec_get, prices=None, seat=None) -> dict:
+    """seat: an llm_analyst.ClaudeSeat for the bull / bear / judge second opinion (RANGE names only)."""
     sc = desk.read(d, "scout") or {"names": []}
     cards, lines = [], [f"# Analyst {d}", "", "Lessons read first: " + ("yes" if desk.lessons().strip() else "none yet"), ""]
     for n in sc["names"]:
@@ -261,6 +263,11 @@ def analyst(desk: Desk, d: str, get=ins.sec_get, prices=None) -> dict:
         lines.append(f"- memory: {mem['same_pattern_n']} past '{mem['pattern']}' theses with an outcome"
                      + (f", average {mem['same_pattern_avg_r']:+.2f}R" if mem['same_pattern_n'] else "")
                      + "".join(f"; {n['symbol']} on {t['date']}: {t['decision']} ({t['why']}), {t['outcome_r']:+.2f}R" for t in mem["same_symbol"]))
+        if seat is not None and card["verdict"] == "RANGE":
+            from . import llm_analyst as llm
+            op = card["llm"] = llm.debate(n, card, seat)
+            lines.append(f"- Claude seat ({op['model']}): {op['status']}" + (f", judge says {op['judge']['verdict']}: {op['judge']['summary']}" if "judge" in op else "")
+                         + "".join(f"\n  - problem: {x}" for x in op.get("problems", [])))
         lines.append("")
     out = {"date": d, "cards": cards}
     desk.write(d, "analyst", out, "\n".join(lines))
@@ -299,6 +306,9 @@ def skeptic(desk: Desk, d: str, prices=None, max_move: float = 0.05) -> dict:
                     why = f"already moved {bars[-1].c / at - 1:+.1%} since the filing: in the price"
             else:
                 why = "move since filing UNVERIFIED"
+        if not why and c is not None:
+            from .llm_analyst import skeptic_reason
+            why = skeptic_reason(c)
         mem = (c or {}).get("memory") or {}
         if not why and mem.get("same_pattern_n", 0) >= 3 and (mem.get("same_pattern_avg_r") or 0) < 0:
             why = f"memory: {mem['same_pattern_n']} similar theses ({mem['pattern']}) averaged {mem['same_pattern_avg_r']:+.2f}R"

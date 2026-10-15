@@ -539,6 +539,84 @@ Coatue's frame: external + internal context in; what, how much and when out.
 
 A local `import os` inside `cli.main` shadowed the module-level import, so the previous commit's `tradebot` command line failed on start. It's fixed, and a test now runs the command line end to end.
 
+## 19. Claude analyst seat, open-source platforms, real-data tooling, the desk in Docker (2026-10-15)
+
+### The Claude seat (`llm_analyst.py`; `tradebot desk --llm morning`)
+
+A TradingAgents-style debate beside the code analyst, run only on names the code priced RANGE:
+1. **Bull** makes the case for buying.
+2. **Bear** makes the case against and answers the bull.
+3. **Judge** gives its own verdict (RANGE / EXPENSIVE / NO VIEW) and says whether it agrees with the code.
+
+**It may use only numbers it is handed.** The model fetches nothing. It gets a numbered fact table:
+- the Form 4 role, size and date;
+- SEC diluted EPS by quarter;
+- the last close;
+- the code's own-history P/E range;
+- the desk's memory of similar theses.
+
+Every point must cite fact ids. Then `verify()` checks the output **in code**: every point must cite a real fact, and every number written in a point must match a cited fact (rounding, %, $K/$M forms allowed). One invented number fails the whole opinion.
+
+**It can only kill.** The skeptic kills the name if:
+- the judge disagrees with the code;
+- verification fails (UNVERIFIED);
+- the call errors or the model refuses (ERROR).
+
+Unsure = KILL. The seat never adds a trade.
+
+**Request settings** (from the current Claude API docs):
+- `claude-opus-5-5` with adaptive thinking (the default on this model, so it is omitted) and `effort` set explicitly (`--llm-effort`, default high);
+- JSON output via `output_config.format`, with the system prompt cached;
+- `stop_reason` "refusal" and "max_tokens" are handled before the content is read;
+- **server-side refusal fallback is on** (`betas=["server-side-fallback-2026-07-01"]`, `fallbacks="default"`), and the model that actually answered is recorded in the card's traces.
+
+**Cost:** 3 calls per RANGE name (at most 5 names a day).
+
+Turn it on with `--llm` or `TRADEBOT_DESK_LLM=1`; it needs `ANTHROPIC_API_KEY`.
+
+### Open-source platforms (`platforms.py`)
+
+All three were checked against the installed libraries on 2026-10-15, not from memory:
+
+| Platform | What it does here | Verified against |
+|---|---|---|
+| **ccxt** | `tradebot ccxt ticker\|book\|bars\|balance --exchange X`: market data from any of ccxt's 103 exchanges. Orders run **only on an exchange's sandbox/testnet**; with `sandbox=False` every order method refuses | ccxt 4.5.88. Kraken and Coinbase have `urls["test"] = None`, and ccxt's own `set_sandbox_mode` then crashes with a TypeError, so the adapter checks first and refuses by name |
+| **OpenBB** | `--prices openbb[:provider]` for the desk, the backtest and `insider prices`. Same `.bars()` interface as the CSV and Alpaca sources | openbb-core 4: `obb.equity.price.historical(symbol, start_date, end_date, provider)`; result rows carry date, open, high, low, close, volume. An empty result (`EmptyDataError`) is treated as no bars |
+| **freqtrade** | `tradebot export freqtrade --kind trend200\|signals --out ...` writes an `IStrategy` (INTERFACE_VERSION 3) with the same stop, a `custom_exit` time exit, and no ROI ladder | freqtrade 2026.9: both kinds loaded by freqtrade's `StrategyResolver` and produced entries and exits on a test frame. freqtrade trades crypto only, so the insider desk's stock signals don't port; trend200 and any crypto `pair,date` list do |
+
+### The real insider backtest (run where sec.gov is reachable)
+
+```
+export SEC_USER_AGENT="your-name you@example.com"
+tradebot insider fetch 2016q1-2026q3 --out data/sec          # quarterly form345.zips; skips ones already there
+tradebot insider prices --data data/sec/*.zip --source alpaca --out data/bars   # or --source openbb
+tradebot insider backtest --data data/sec/2016q1_form345.zip ... --prices data/bars
+tradebot insider holdout  --data ... --prices data/bars      # once, ever
+```
+
+- **Downloads.** `fetch` tries both SEC paths (the newest quarters moved to `/files/datastandardsinnovation/` in 2026, so that path goes first from 2026q2 on). It refuses anything that isn't a valid zip and writes atomically.
+- **Prices.** `prices` writes one CSV per symbol that had a qualifying buy, plus SPY. It lists the symbols with no bars: mostly delisted names, i.e. the survivorship hole the backtest reports as "unpriced".
+- **Check your feed's history.** Free Alpaca IEX data may not reach back as far as the zips, so look at the `first` date per symbol.
+
+**Not run.** None of this has run on real data yet: sec.gov is blocked from this build environment.
+
+### The desk in Docker (`tradebot desk schedule`)
+
+```
+cp .env.example .env     # APCA paper keys, SEC_USER_AGENT; optional ANTHROPIC_API_KEY + TRADEBOT_DESK_LLM=1
+docker compose run --rm desk desk --dir desk init
+docker compose --profile desk up -d desk
+docker compose run --rm desk desk --dir desk approve 1 2    # you, the same day
+```
+
+- **Schedule.** `schedule` runs the same New York table as the systemd timers: morning 05:30, chain-check 08:30, exit-due 15:45, journal 16:30 (Mon–Fri), weekly Fri 17:00, audit Sun 18:00.
+- **Isolation and alerts.** Each routine runs as its own subprocess, logged to `desk/schedule.log`. A non-zero exit sends an alert.
+- **Missed runs.** A routine missed while the container was down is not run late; chain-check reports the gap.
+- **Holidays.** Market holidays aren't skipped; the scout just finds nothing.
+- **Choosing a setup.** systemd hosts keep using `deploy/systemd/`; Docker hosts use this.
+
+**Verification.** `docker compose config` validates, and the image's install step (`pip install ".[all]"`, now including ccxt and anthropic ≥ 1.0) was run in a clean Python 3.12 venv. `docker build` itself was not run, because there is no Docker daemon in the build environment.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers

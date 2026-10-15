@@ -531,3 +531,79 @@ def verdict(build: dict, holdout: dict | None) -> str:
     if (holdout["avg_r"] or 0) < 0.5 * (build["avg_r"] or 0):
         return "WEAK: the holdout kept the sign but lost more than half the build period's average R."
     return "EDGE (best case): positive in the build period and the holdout, after costs. Survivorship bias still flatters it."
+
+
+# ------------------------------------------------------------------ downloads (run where sec.gov is reachable)
+
+DATASET_URLS = ("https://www.sec.gov/files/structureddata/data/insider-transactions-data-sets/{q}_form345.zip",
+                "https://www.sec.gov/files/datastandardsinnovation/data/insider-transactions-data-sets/{q}_form345.zip")
+
+
+def quarter_list(specs: list[str]) -> list[str]:
+    """'2016q1', '2016q1-2017q2' -> ['2016q1', ...]."""
+    out = []
+    for s in specs:
+        a, _, b = s.lower().partition("-")
+        b = b or a
+        (y, q), (y2, q2) = (map(int, a.split("q")), map(int, b.split("q")))
+        if not (1 <= q <= 4 and 1 <= q2 <= 4) or (y, q) > (y2, q2):
+            raise ValueError(f"bad quarter range {s}")
+        while (y, q) <= (y2, q2):
+            out.append(f"{y}q{q}")
+            y, q = (y + 1, 1) if q == 4 else (y, q + 1)
+    return list(dict.fromkeys(out))
+
+
+def fetch_datasets(quarters: list[str], out: str | Path, get=sec_get) -> list[dict]:
+    """Download each quarter's form345.zip once (skips files already there and valid). The SEC
+    moved the newest quarters to a second path in 2026, so both are tried; the newer path first
+    from 2026q2 on."""
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for q in quarters:
+        dest = out / f"{q}_form345.zip"
+        if dest.exists() and zipfile.is_zipfile(dest):
+            rows.append({"quarter": q, "file": str(dest), "status": "already there"})
+            continue
+        urls = DATASET_URLS[::-1] if q >= "2026q2" else DATASET_URLS
+        err = None
+        for u in urls:
+            try:
+                body = get(u.format(q=q), timeout=120)
+            except Exception as e:
+                err = f"{type(e).__name__}: {e}"[:160]
+                continue
+            if body[:2] != b"PK":
+                err = f"{u.format(q=q)} did not return a zip"
+                continue
+            tmp = dest.with_suffix(".part")
+            tmp.write_bytes(body)
+            if not zipfile.is_zipfile(tmp):
+                tmp.unlink()
+                err = "corrupt zip"
+                continue
+            tmp.replace(dest)
+            rows.append({"quarter": q, "file": str(dest), "status": "downloaded", "bytes": len(body), "url": u.format(q=q)})
+            err = None
+            break
+        if err:
+            rows.append({"quarter": q, "status": "FAILED", "error": err})
+    return rows
+
+
+def fetch_prices(symbols: list[str], prices, out: str | Path) -> list[dict]:
+    """Write <SYMBOL>.csv for each symbol from any .bars() source (AlpacaBars, OpenBBPrices).
+    Symbols with no bars are reported: that count is the survivorship hole (delisted names)."""
+    from .platforms import write_bars_csv
+    rows = []
+    for s in sorted(set(symbols) | {"SPY"}):
+        try:
+            bars = prices.bars(s)
+        except Exception as e:
+            rows.append({"symbol": s, "bars": 0, "error": f"{type(e).__name__}: {e}"[:120]})
+            continue
+        if bars:
+            write_bars_csv(bars, Path(out) / f"{s}.csv")
+        rows.append({"symbol": s, "bars": len(bars), "first": bars[0].d if bars else None, "last": bars[-1].d if bars else None})
+    return rows

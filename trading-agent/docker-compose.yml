@@ -3,6 +3,7 @@
 #   docker compose run --rm -it trader go-live --operator you --venue cryptocom
 #   docker compose --profile live up -d
 # Optional TimescaleDB: docker compose --profile db up -d timescaledb
+# Insider desk:        docker compose run --rm desk desk --dir desk init && docker compose --profile desk up -d desk
 services:
   exechub:
     build: { context: ., target: exechub }
@@ -18,6 +19,20 @@ services:
     volumes: ["./state:/state"]
     depends_on: [exechub]
     command: ["paper", "--run-dir", "runs/paper", "--exechub", "exechub:50051"]
+
+  # The insider desk (Alpaca PAPER only): scout -> analyst -> skeptic -> risk at 05:30 New York,
+  # then chain-check, exit-due, journal, weekly, audit, the same table as the systemd timers.
+  # You approve tickets yourself:  docker compose run --rm desk desk --dir desk approve 1 2
+  # Needs in .env: APCA_API_KEY_ID, APCA_API_SECRET_KEY (paper), SEC_USER_AGENT; optional
+  # ANTHROPIC_API_KEY + TRADEBOT_DESK_LLM=1 for the Claude seat, TRADEBOT_ALERT_WEBHOOK.
+  desk:
+    profiles: ["desk"]
+    build: { context: ., target: tradebot }
+    restart: unless-stopped
+    env_file: .env
+    environment: { TZ: America/New_York }
+    volumes: ["./state:/state"]
+    command: ["desk", "--dir", "desk", "--prices", "alpaca", "schedule"]
 
   live:
     profiles: ["live"]

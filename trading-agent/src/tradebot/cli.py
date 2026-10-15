@@ -220,7 +220,9 @@ def main(argv: list[str] | None = None) -> int:
     dsk = sub.add_parser("desk", help="the six-seat desk: scout, analyst, skeptic, risk, you, journal (Alpaca PAPER only)")
     dsk.add_argument("--dir", default="desk")
     dsk.add_argument("--date", help="YYYY-MM-DD, default today in New York")
-    dsk.add_argument("--prices", default="alpaca", help="'alpaca' (needs APCA_API_KEY_ID/SECRET) or a folder of <SYMBOL>.csv daily bars")
+    dsk.add_argument("--prices", default="alpaca", help="'alpaca' (needs APCA_API_KEY_ID/SECRET), 'openbb[:provider]', or a folder of <SYMBOL>.csv daily bars")
+    dsk.add_argument("--llm", action="store_true", default=os.environ.get("TRADEBOT_DESK_LLM") == "1", help="add the Claude bull/bear/judge seat to the analyst (needs ANTHROPIC_API_KEY); it can only kill")
+    dsk.add_argument("--llm-effort", default="high", choices=["low", "medium", "high", "xhigh", "max"])
     dsub = dsk.add_subparsers(dest="seat", required=True)
     for name, h in (("init", "create folders, limits.json and lessons.md"), ("scout", "C-suite Form 4 buys since the last close"),
                     ("analyst", "fair value cards from SEC EPS and own-history P/E"), ("skeptic", "PASS or KILL every name"),
@@ -236,6 +238,8 @@ def main(argv: list[str] | None = None) -> int:
             x.add_argument("symbol", nargs="?")
         if name == "audit":
             x.add_argument("--repo", default=os.environ.get("TRADEBOT_REPO", "."), help="git checkout holding the tests (env TRADEBOT_REPO)")
+    sch = dsub.add_parser("schedule", help="run the routines on New York time in one long-lived process (Docker); systemd users use the timers")
+    sch.add_argument("--once", action="store_true", help="print the next routine and when, then exit")
     ap_ = dsub.add_parser("approve", help="YOU: place today's tickets by number on the paper account")
     ap_.add_argument("numbers", type=int, nargs="+")
 
@@ -253,6 +257,34 @@ def main(argv: list[str] | None = None) -> int:
         x.add_argument("--hold", type=int, default=5)
         x.add_argument("--cost", type=float, default=0.001, help="per side")
         x.add_argument("--study-filters", action="store_true", help="any insider, any size, no stop, no liquidity filter: replicate a published study first")
+
+    fx = isub.add_parser("fetch", help="download SEC Insider Transactions quarterly zips (run it where sec.gov is reachable; needs SEC_USER_AGENT)")
+    fx.add_argument("quarters", nargs="+", help="e.g. 2016q1 or a range 2016q1-2026q2")
+    fx.add_argument("--out", default="data/sec")
+    fp = isub.add_parser("prices", help="daily bars as <SYMBOL>.csv for every symbol with a qualifying buy in the zips, plus SPY")
+    fp.add_argument("--data", nargs="+", required=True)
+    fp.add_argument("--source", default="alpaca", help="'alpaca' or 'openbb[:provider]'")
+    fp.add_argument("--out", default="data/bars")
+    fp.add_argument("--start", default="2016-01-01")
+    fp.add_argument("--min-usd", type=float, default=100_000)
+
+    exp = sub.add_parser("export", help="write a strategy for another platform")
+    esub = exp.add_subparsers(dest="what", required=True)
+    ef = esub.add_parser("freqtrade", help="a freqtrade IStrategy (INTERFACE_VERSION 3) with the same stop and hold")
+    ef.add_argument("--kind", choices=["trend200", "signals"], default="trend200")
+    ef.add_argument("--signals", help="CSV pair,date of entry days (for --kind signals)")
+    ef.add_argument("--stop-pct", type=float, default=0.08)
+    ef.add_argument("--hold-days", type=int, default=5)
+    ef.add_argument("--timeframe", default="1d")
+    ef.add_argument("--name", default="TradebotExport")
+    ef.add_argument("--out", required=True, help="e.g. user_data/strategies/TradebotExport.py")
+
+    cx = sub.add_parser("ccxt", help="any of ccxt's exchanges: market data, and sandbox (testnet) orders only")
+    cx.add_argument("what", choices=["exchanges", "ticker", "book", "bars", "balance"])
+    cx.add_argument("--exchange", default="binance")
+    cx.add_argument("--symbol", default="BTC/USDT")
+    cx.add_argument("--timeframe", default="1d")
+    cx.add_argument("--limit", type=int, default=20)
 
     wth = sub.add_parser("weather", help="read-only Polymarket daily temperature scan against the NWS forecast")
     wsub = wth.add_subparsers(dest="what", required=True)
@@ -721,7 +753,7 @@ def main(argv: list[str] | None = None) -> int:
               f"usage {r.get('usage')}")
         return 0
 
-    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck"):
+    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck", "export", "ccxt"):
         from .cli_desk import run as run_desk_cli
         return run_desk_cli(args)
     if args.cmd == "review":

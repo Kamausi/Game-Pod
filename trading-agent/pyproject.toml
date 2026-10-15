@@ -6,11 +6,13 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-claude = ["anthropic>=0.70"]
+claude = ["anthropic>=1.0"]  # fallbacks="default" + output_config need a current SDK
 services = ["grpcio>=1.66", "protobuf>=5.27"]
 stream = ["websockets>=12"]
 solana = ["solders>=0.21", "base58>=2.1"]
-all = ["anthropic>=0.70", "grpcio>=1.66", "protobuf>=5.27", "websockets>=12", "solders>=0.21", "base58>=2.1"]
+ccxt = ["ccxt>=4.5"]
+openbb = ["openbb>=4.4"]  # heavy; not in "all"
+all = ["anthropic>=1.0", "grpcio>=1.66", "protobuf>=5.27", "websockets>=12", "solders>=0.21", "base58>=2.1", "ccxt>=4.5"]
 
 [project.scripts]
 tradebot = "tradebot.cli:entry"

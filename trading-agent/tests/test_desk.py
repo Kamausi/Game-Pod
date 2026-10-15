@@ -241,7 +241,7 @@ def positive_concept(eps_q=1.0, years=(2023, 2024, 2025, 2026)):
     return {"units": {"USD/shares": facts}}
 
 
-def run_chain(tmp_path, xml, price=50.0, moved=0.0, concept=None):
+def run_chain(tmp_path, xml, price=50.0, moved=0.0, concept=None, seat=None):
     d = dk.Desk(tmp_path / "desk")
     d.init()
     folder = "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/"
@@ -259,7 +259,7 @@ def run_chain(tmp_path, xml, price=50.0, moved=0.0, concept=None):
     prices = ins.CsvPrices(tmp_path / "px")
     day = "2026-10-15"
     sc = dk.scout(d, day, get, prices, pages=1)
-    an = dk.analyst(d, day, get, prices)
+    an = dk.analyst(d, day, get, prices, seat=seat)
     sk = dk.skeptic(d, day, prices)
     return d, day, prices, sc, an, sk
 
