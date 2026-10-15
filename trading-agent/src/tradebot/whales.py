@@ -84,7 +84,37 @@ def swap_of(tx: dict, wallet: str, sig: str = "") -> Swap | None:
     return Swap(sig, int(tx.get("blockTime") or 0), mint, "buy" if qty > 0 else "sell", abs(qty), quote, abs(q), abs(q) / abs(qty))
 
 
-def history(rpc, wallet: str, max_tx: int = 300) -> list[Swap]:
+@dataclass
+class Transfer:
+    sig: str
+    time: int
+    mint: str  # token mint, or "SOL"
+    direction: str  # in / out
+    qty: float
+    counterparty: str | None
+
+
+def transfer_of(tx: dict, wallet: str, sig: str = "") -> Transfer | None:
+    """A token moving in or out with nothing paid back: vesting, airdrops, exchange deposits."""
+    if not tx or (tx.get("meta") or {}).get("err") or swap_of(tx, wallet, sig):
+        return None
+    d = owner_mint_deltas(tx, wallet)
+    d.pop(WSOL, None)
+    if len(d) != 1:
+        return None
+    mint, qty = next(iter(d.items()))
+    meta, other = tx["meta"], None
+    for side in ("postTokenBalances", "preTokenBalances"):
+        for b in meta.get(side) or []:
+            if b.get("mint") == mint and b.get("owner") not in (None, wallet):
+                other = b["owner"]
+                break
+        if other:
+            break
+    return Transfer(sig, int(tx.get("blockTime") or 0), mint, "in" if qty > 0 else "out", abs(qty), other)
+
+
+def history(rpc, wallet: str, max_tx: int = 300, transfers: list | None = None) -> list[Swap]:
     sigs, before = [], None
     while len(sigs) < max_tx:
         batch = rpc.call("getSignaturesForAddress", [wallet, {"limit": min(1000, max_tx - len(sigs)), **({"before": before} if before else {})}])
@@ -96,10 +126,20 @@ def history(rpc, wallet: str, max_tx: int = 300) -> list[Swap]:
     for s in sigs:
         if s.get("err"):
             continue
-        sw = swap_of(rpc.call("getTransaction", [s["signature"], TX_OPTS]), wallet, s["signature"])
+        tx = rpc.call("getTransaction", [s["signature"], TX_OPTS])
+        sw = swap_of(tx, wallet, s["signature"])
         if sw:
             out.append(sw)
+        elif transfers is not None and (t := transfer_of(tx, wallet, s["signature"])):
+            transfers.append(t)
     return sorted(out, key=lambda x: x.time)
+
+
+def first_seen(rpc, wallet: str, max_pages: int = 3) -> tuple[int | None, bool]:
+    """Time of the oldest transaction reachable, and whether that is really the first one."""
+    from .bundlecheck import oldest_signatures
+    sigs, reached = oldest_signatures(rpc, wallet, max_pages=max_pages)
+    return (sigs[0].get("blockTime") if sigs else None), reached
 
 
 @dataclass
@@ -119,7 +159,9 @@ class Score:
     flags: list[str] = field(default_factory=list)
 
 
-def score(wallet: str, swaps: list[Swap], lag_s: float = 30) -> Score:
+def score(wallet: str, swaps: list[Swap], lag_s: float = 30, transfers: list[Transfer] | None = None, labels: dict[str, str] | None = None,
+          born: int | None = None, now: float | None = None) -> Score:
+    """labels: address -> name (e.g. exchange deposit wallets from Solscan or Arkham), supplied by you."""
     from . import quant
     lots: dict[tuple[str, str], list[list[float]]] = {}  # (mint, quote) -> [[qty, price, time]]
     rets, holds = [], []
@@ -151,6 +193,29 @@ def score(wallet: str, swaps: list[Swap], lag_s: float = 30) -> Score:
         sc.flags.append(f"{sc.swaps_per_day:.0f} swaps a day: a bot or market maker, not a conviction trader")
     if sc.open_positions > 2 * max(1, sc.closed):
         sc.flags.append("mostly open bags: its wins may be unrealised and unsellable")
+    # wash trading: many quick round trips in one token that go nowhere
+    churn = 0
+    last_buy: dict[str, Swap] = {}
+    for s_ in swaps:
+        if s_.side == "buy":
+            last_buy[s_.mint] = s_
+        elif s_.mint in last_buy and s_.time - last_buy[s_.mint].time <= 3600 and abs(s_.price / last_buy[s_.mint].price - 1) < 0.01:
+            churn += 1
+    if churn >= 5:
+        sc.flags.append(f"{churn} round trips within an hour at the same price: looks like wash trading (fake volume)")
+    tr = transfers or []
+    tin = [t for t in tr if t.direction == "in"]
+    sells = sum(1 for s_ in swaps if s_.side == "sell")
+    if len(tin) >= 3 and sells > sum(1 for s_ in swaps if s_.side == "buy"):
+        sc.flags.append(f"receives tokens without paying ({len(tin)} times) and mostly sells: a VC, team or vesting distributor, not smart money")
+    for t in tr:
+        lab = (labels or {}).get(t.counterparty or "")
+        if t.direction == "out" and lab:
+            sc.flags.append(f"moved {t.qty:,.4g} of {t.mint[:6]}… to {lab}: exchange inflow, often a sale coming")
+    if born is not None:
+        age = ((now or time.time()) - born) / 86400
+        if age < 30:
+            sc.flags.append(f"wallet is {age:.0f} days old: too new to trust (fresh wallets are cheap to fake)")
     return sc
 
 
@@ -181,8 +246,12 @@ def gate(scores: list[Score], screened: int | None = None, lag_s: float = 30, co
 # ------------------------------------------------------------------ paper copying
 
 
-def watch(rpc, trader, wallets: list[str], state_path: str | Path, usdc_per_copy: float = 50.0, max_tx: int = 50, now=time.time) -> list[dict]:
-    """One pass: new swaps of each gated wallet since the last pass become paper copies."""
+def watch(rpc, trader, wallets: list[str], state_path: str | Path, usdc_per_copy: float = 50.0, max_tx: int = 50, now=time.time,
+          sleeve_usd: float | None = None, max_chase: float = 0.03, sol_usd=None) -> list[dict]:
+    """One pass: new swaps of each gated wallet since the last pass become paper copies.
+    sleeve_usd caps what copying may have deployed at once (keep it to 1-5% of your capital);
+    max_chase skips a copy when our quoted price is already that much worse than the whale's fill
+    (you would be the exit liquidity). sol_usd() prices SOL for SOL-quoted whale fills."""
     p = Path(state_path)
     st = json.loads(p.read_text()) if p.exists() else {"seen": {}, "copies": {}}
     if "paper" in st:  # the paper account carries over between passes
@@ -209,6 +278,15 @@ def watch(rpc, trader, wallets: list[str], state_path: str | Path, usdc_per_copy
             delay = now() - sw.time if sw.time else None
             key = f"{w}:{sw.mint}"
             if sw.side == "buy" and key not in st["copies"]:
+                deployed = sum(c["usdc"] for c in st["copies"].values())
+                if sleeve_usd is not None and deployed + usdc_per_copy > sleeve_usd:
+                    events.append({"wallet": w, "mint": sw.mint, "whale": "buy", "copy": {"action": "skipped", "why": f"copy sleeve full (${deployed:,.0f} of ${sleeve_usd:,.0f})"}})
+                    continue
+                whale_usd = sw.price if sw.quote == "USD" else (sw.price * sol_usd() if sol_usd else None)
+                ours = trader.price_usd(sw.mint, usdc_per_copy) if hasattr(trader, "price_usd") else None
+                if whale_usd and ours and ours / whale_usd - 1 > max_chase:
+                    events.append({"wallet": w, "mint": sw.mint, "whale": "buy", "copy": {"action": "skipped", "why": f"price already {ours / whale_usd - 1:+.1%} above the whale's fill: you'd be its exit liquidity"}})
+                    continue
                 res = trader.buy(sw.mint, usdc_per_copy)
                 if res.get("action") == "paper_buy":
                     st["copies"][key] = {"since": sw.time, "usdc": usdc_per_copy}

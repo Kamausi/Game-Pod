@@ -53,6 +53,8 @@ def run(args) -> int:
         return _universe(args)
     if args.cmd == "whales":
         return _whales(args)
+    if args.cmd == "playbook":
+        return _playbook(args)
     return 2
 
 
@@ -410,8 +412,23 @@ def _whales(a) -> int:
     from .onchain import SolanaRPC
     rpc = SolanaRPC(a.rpc)
     if a.what == "score":
-        scores = [wh.score(w, wh.history(rpc, w, a.max_tx), a.lag) for w in a.wallets]
-        gates = wh.gate(scores, a.screened, a.lag, a.cost_bps)
+        import csv
+        wallets = list(a.wallets)
+        screened = a.screened
+        if a.wallets_file:
+            rows = [r for r in csv.DictReader(open(a.wallets_file)) if (r.get("wallet") or "").strip()]
+            wallets += [r["wallet"].strip() for r in rows]
+            screened = screened or len(rows)
+        if not wallets:
+            raise SystemExit("give wallets or --wallets-file")
+        labels = {r[0].strip(): r[1].strip() for r in csv.reader(open(a.labels)) if len(r) >= 2} if a.labels else None
+        scores = []
+        for w in wallets:
+            trs: list = []
+            sw = wh.history(rpc, w, a.max_tx, transfers=trs)
+            born = None if a.no_age else wh.first_seen(rpc, w)[0]
+            scores.append(wh.score(w, sw, a.lag, trs, labels, born))
+        gates = wh.gate(scores, screened, a.lag, a.cost_bps)
         rows = wh.scorecard_rows(scores, gates)
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         Path(a.out).write_text(json.dumps({"lag_s": a.lag, "cost_bps": a.cost_bps, "screened": a.screened or len(a.wallets), "wallets": rows}, indent=1, default=str))
@@ -425,6 +442,49 @@ def _whales(a) -> int:
     if not ok:
         print("no wallet passed the gate: nothing to copy (that is the gate working)")
         return 0
-    trader = DexPaperTrader(RugGuard(rpc), Jupiter())
-    _print(wh.watch(rpc, trader, ok, a.state, a.usdc))
+    jup = Jupiter()
+    trader = DexPaperTrader(RugGuard(rpc), jup)
+
+    def sol_usd():
+        return int(jup.quote(wh.WSOL, wh.USDC, 10**9)["outAmount"]) / 1e6
+    _print(wh.watch(rpc, trader, ok, a.state, a.usdc, sleeve_usd=a.sleeve, max_chase=a.max_chase, sol_usd=sol_usd))
+    return 0
+
+
+def _playbook(a) -> int:
+    from . import insider as ins
+    from . import playbook as pb
+    if a.what == "tokenomics":
+        _print(pb.tokenomics(pb.coingecko(a.coin_id)))
+        return 0
+    if a.what == "tax":
+        import csv
+        out = pb.tax_lots(list(csv.DictReader(open(a.fills))))
+        if a.out:
+            Path(a.out).write_text(pb.tax_csv(out["rows"]))
+        _print({k: v for k, v in out.items() if k != "rows"} | {"rows": len(out["rows"]), "file": a.out,
+                                                                 "note": "a record for your tax software or accountant, not tax advice"})
+        return 0
+    if a.bars:
+        bars = ins.CsvPrices(str(Path(a.bars).parent)).bars(Path(a.bars).stem)
+    else:
+        bars = pb.yahoo_daily(a.symbol, a.range)
+    alt = not a.symbol.upper().startswith("BTC")
+    load = lambda f: ins.CsvPrices(str(Path(f).parent)).bars(Path(f).stem)
+    btc = bars if not alt else load(a.btc_bars) if a.btc_bars else pb.yahoo_daily("BTC-USD", a.range)
+    if a.what == "regime":
+        _print(pb.regime([b.c for b in btc]))
+    elif a.what == "levels":
+        _print({"close": bars[-1].c, "levels": pb.levels(bars), "fomo": pb.fomo(bars)})
+    elif a.what == "setup":
+        r = pb.regime([b.c for b in btc])["regime"]
+        st = pb.swing_setup(bars, r, alt, a.fee)
+        if st.get("setup"):
+            st["size_at_1pct_of_10k"] = pb.size(10_000, st["entry_ref"], st["stop"])
+        _print({"regime": r, **st})
+    elif a.what == "backtest":
+        out = pb.backtest(bars, pb.regime_series(btc) if alt else None, alt, a.fee)
+        _print({k: v for k, v in out.items() if k != "trades_list"})
+    else:
+        _print(pb.dca(bars, a.amount, a.every, a.fee))
     return 0

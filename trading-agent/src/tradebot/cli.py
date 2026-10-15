@@ -292,18 +292,43 @@ def main(argv: list[str] | None = None) -> int:
     wh = sub.add_parser("whales", help="score Solana wallets from their own on-chain trades; paper-copy only the ones that pass")
     whs = wh.add_subparsers(dest="what", required=True)
     w1 = whs.add_parser("score")
-    w1.add_argument("wallets", nargs="+")
+    w1.add_argument("wallets", nargs="*")
     w1.add_argument("--screened", type=int, help="how many wallets you looked at to pick these (default: this many)")
     w1.add_argument("--lag", type=float, default=30, help="seconds between their trade and your copy")
     w1.add_argument("--cost-bps", type=float, default=100, help="your round-trip cost: fees + slippage")
     w1.add_argument("--max-tx", type=int, default=300)
     w1.add_argument("--out", default="runs/whales_gate.json")
+    w1.add_argument("--wallets-file", help="CSV with a 'wallet' column (e.g. addresses you exported from a leaderboard); its row count is the screening penalty")
+    w1.add_argument("--labels", help="CSV address,label of exchange deposit wallets etc. (from Solscan / Arkham), to spot exchange inflows")
+    w1.add_argument("--no-age", action="store_true", help="skip the wallet-age lookup (saves RPC calls)")
     w2 = whs.add_parser("watch", help="one pass: paper-copy new trades of wallets the last score passed")
     w2.add_argument("--gate", default="runs/whales_gate.json")
     w2.add_argument("--state", default="runs/whales_state.json")
     w2.add_argument("--usdc", type=float, default=50)
+    w2.add_argument("--sleeve", type=float, default=500, help="max USD deployed in copies at once (keep it to 1-5%% of your capital)")
+    w2.add_argument("--max-chase", type=float, default=0.03, help="skip a copy if our price is this much above the whale's fill")
     for x in (w1, w2):
         x.add_argument("--rpc", default=os.environ.get("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com"))
+
+    pbk = sub.add_parser("playbook", help="risk-first crypto playbook: market regime, support/resistance, FOMO guard, swing setup, DCA, tokenomics, tax lots")
+    pbs = pbk.add_subparsers(dest="what", required=True)
+    for name, h in (("regime", "BTC 50/200-day trend: are altcoin buys allowed?"), ("levels", "support and resistance for a coin"),
+                    ("setup", "is there a swing entry today (with stop and take-profit fixed first)?"), ("backtest", "walk-forward swing backtest"),
+                    ("dca", "dollar-cost averaging vs lump sum")):
+        x = pbs.add_parser(name, help=h)
+        x.add_argument("symbol", nargs="?", default="BTC-USD", help="Yahoo symbol, e.g. SOL-USD")
+        x.add_argument("--bars", help="CSV date,open,high,low,close instead of downloading")
+        x.add_argument("--btc-bars", help="BTC daily CSV for the market-regime filter instead of downloading")
+        x.add_argument("--range", default="5y")
+        x.add_argument("--fee", type=float, default=0.0025, help="per side")
+        if name == "dca":
+            x.add_argument("--amount", type=float, default=100)
+            x.add_argument("--every", type=int, default=7)
+    tk = pbs.add_parser("tokenomics", help="circulating vs max supply and FDV / market cap (CoinGecko id, e.g. arbitrum)")
+    tk.add_argument("coin_id")
+    tx = pbs.add_parser("tax", help="FIFO capital gains from a fills CSV: time,asset,side,qty,price,fee (USD)")
+    tx.add_argument("fills")
+    tx.add_argument("--out", help="write Form-8949-style rows to this CSV")
 
     cx = sub.add_parser("ccxt", help="any of ccxt's exchanges: market data, and sandbox (testnet) orders only")
     cx.add_argument("what", choices=["exchanges", "ticker", "book", "bars", "balance"])
@@ -800,7 +825,7 @@ def main(argv: list[str] | None = None) -> int:
               f"usage {r.get('usage')}")
         return 0
 
-    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck", "export", "ccxt", "universe", "whales"):
+    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck", "export", "ccxt", "universe", "whales", "playbook"):
         from .cli_desk import run as run_desk_cli
         return run_desk_cli(args)
     if args.cmd == "review":

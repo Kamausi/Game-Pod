@@ -497,6 +497,7 @@ td canvas.spark { width: 110px; height: 28px; }
   <section class="view" data-view="markets" aria-label="Markets" hidden>
     <div class="vhead"><h1>Markets</h1><p id="mkHead">—</p></div>
     <section class="panel" aria-label="Low-cost universe">
+      <p id="regLine" class="note" style="margin:0"></p>
       <h2><span>Low-cost universe · move per unit of trading cost</span><span class="note" id="uvNote">Not scanned yet.</span></h2>
       <div class="controls">
         <label class="field" for="uvVenue">Fees <select id="uvVenue"></select></label>
@@ -608,6 +609,12 @@ td canvas.spark { width: 110px; height: 28px; }
   <!-- ============================== JOURNAL ============================== -->
   <section class="view" data-view="journal" aria-label="Journal" hidden>
     <div class="vhead"><h1>Trading journal</h1><p id="jHead">—</p></div>
+    <section class="panel" aria-label="Tax lots">
+      <h2><span>Tax lots · first in, first out</span><button type="button" id="taxCsv">Download CSV</button></h2>
+      <p class="note" id="taxSum"></p>
+      <div class="tw" style="max-height:16rem"><table><thead><tr><th>Asset</th><th>Bought</th><th>Sold</th><th class="n">Proceeds</th><th class="n">Cost basis</th><th class="n">Gain</th><th>Term</th></tr></thead><tbody id="taxBody"></tbody></table></div>
+      <p class="note" style="max-width:72ch">Every sell is a disposal, including the sell leg of a crypto-to-crypto swap. Lots close oldest first; fees are added to the cost and taken off the proceeds; over 365 days held is long term. Paper trades here; the same ledger runs on real fills with <code>tradebot playbook tax fills.csv</code>. A record for your tax software or accountant, not tax advice.</p>
+    </section>
     <div class="statrow" id="jStats"></div>
     <div class="grid3">
       <section class="panel" aria-label="Win and loss"><h2><span>Wins vs losses</span></h2><div class="donutrow"><canvas id="cWL" height="140"></canvas><ul class="lgd" id="wlLgd"></ul></div></section>
@@ -711,6 +718,15 @@ td canvas.spark { width: 110px; height: 28px; }
         <span class="note" id="inCost"></span>
       </div>
       <div class="tw"><table><thead><tr><th>Filed</th><th>Symbol</th><th>Insider</th><th>Role</th><th class="n">Bought</th><th>Flags</th><th>Skeptic</th><th>Filing</th></tr></thead><tbody id="inBody"></tbody></table></div>
+    </section>
+    <section class="panel" aria-label="Tokenomics">
+      <h2><span>Tokenomics · supply still to come</span><span class="note" id="tkNote">Not run yet.</span></h2>
+      <div class="controls">
+        <label class="field" for="tkId">CoinGecko id <input type="text" id="tkId" value="arbitrum" spellcheck="false" placeholder="e.g. sui, arbitrum, solana"></label>
+        <button type="button" class="primary" id="tkGo">Check · 1 credit</button>
+      </div>
+      <dl class="tk-facts" id="tkFacts" style="max-width:40rem"></dl>
+      <p class="note" style="max-width:70ch">A large share of supply not yet circulating is tokens still to be unlocked or issued, and someone will sell them. Fully diluted value far above the market cap says the same thing in dollars. CoinGecko has no unlock calendar: read the project's vesting schedule before buying.</p>
     </section>
     <section class="panel" aria-label="Weather market">
       <h2><span>Weather market vs NWS forecast</span><span class="note" id="wxNote">Not run yet.</span></h2>
@@ -832,6 +848,7 @@ td canvas.spark { width: 110px; height: 28px; }
       <div class="settings">
         <label for="sConf">Min. direction confidence<div class="row"><input type="number" id="sConf" step="0.01" min="0.70" max="0.99" value="0.75"><span class="lock">0.70–0.99</span></div></label>
         <label for="sQual">Min. setup quality<div class="row"><input type="number" id="sQual" step="1" min="2" max="3" value="2"><span class="lock">2–3</span></div></label>
+        <label for="sRisk">Max. risk per trade, % of equity<div class="row"><input type="number" id="sRisk" step="0.1" min="0.5" max="2" value="1"><span class="lock">0.5–2 (the 1% rule)</span></div></label>
         <label for="sKelly">Kelly multiplier<div class="row"><input type="number" id="sKelly" step="0.01" min="0.05" max="0.25" value="0.25"><span class="lock">0.05–0.25</span></div></label>
         <label for="sVol">Daily vol target per position %<div class="row"><input type="number" id="sVol" step="0.1" min="0.2" max="1.5" value="1"><span class="lock">0.2–1.5</span></div></label>
         <label for="sDD">Max drawdown %<div class="row"><input type="number" id="sDD" step="0.5" min="5" max="15" value="15"><span class="lock">5–15</span></div></label>
@@ -924,6 +941,12 @@ const FEE_PRESETS = {
   legacy: { label: 'Old flat 0.06% on everything (unrealistic)', maker: 6e-4, crypto: 6e-4, stock: 6e-4, fx: 6e-4 },
 };
 const SEC_SELL_FEE = 27.8e-6;
+// BTC daily trend from Yahoo (via Firecrawl, 1 credit every 6 hours in live mode): only buy alts when it is UP.
+const REG = { state: null, close: null, s50: null, s200: null, ts: 0, busy: false, note: '' };
+function runUp(a) {
+  if (a.tick && isFinite(a.tick.chg)) return a.tick.chg;
+  const n = a.bars.length; return n > 1440 ? a.bars[n - 1].c / a.bars[n - 1441].c - 1 : null;
+}
 let FEE_VENUE = (k => FEE_PRESETS[k] ? k : 'alpaca')(PREF('feeVenue'));
 function feeRate(a, side) {
   const fp = FEE_PRESETS[FEE_VENUE], g = TIER[a.tier].group;
@@ -937,7 +960,7 @@ const SIG_LABEL = { trend: 'Trend (MA 9/21, 1m + 15m)', momentum: 'Momentum (MAC
 const NO_BOOK = 'no order book or per-minute volume from Yahoo: flow and breakout signals stay at 0, spread is an estimate';
 const REGIMES = ['trending', 'mean_reverting', 'high_vol', 'crisis'];
 const SIG_H = 15, CALL_H = 30, CLUSTER_RHO = 0.7, CLUSTER_CAP = 0.40, STRESS_GATE = 0.12, TWAP_ABOVE = 0.10;
-const P = { minConf: 0.75, minQ: 2, kelly: 0.25, volTarget: 0.01, rr: 2, stopAtr: 2, minStop: 0.003, allowShort: false,
+const P = { minConf: 0.75, minQ: 2, kelly: 0.25, volTarget: 0.01, riskPct: 0.01, rr: 2, stopAtr: 2, minStop: 0.003, allowShort: false,
   exitMode: 'fixed', modelExits: false, review: 'block', news: 'both' };
 const REVIEW_TOP = 0.10, REVIEW_WARMUP = 50, REVIEW_CEIL = 0.80, VETO_MS = 24 * 3600e3;
 // Exits are code: a fixed stop and target attached the moment a position opens (the rule that beat every
@@ -1107,8 +1130,9 @@ function sizeTrade(a, f, d) {
   const recent = S.trips.slice(-10), wr = recent.length >= 5 ? recent.filter(x => x > 0).length / recent.length : 0.5;
   const perfScale = clamp(0.5 + wr, 0.5, 1);
   const regimeScale = clamp(1 / Math.max(f.rvRatio, 1e-9), 0.25, 1);  // crazier market, smaller size: computed in code, every bar
-  const size = Math.min(kelly, volCap, TIER[a.tier].maxPos) * ddScale * perfScale * regimeScale;
-  return { stop, take, cost, b, fstar, kelly, volCap, ddScale, perfScale, regimeScale, size };
+  const riskCap = P.riskPct / loss;  // the 1% rule: a stop-out may cost at most P.riskPct of equity
+  const size = Math.min(kelly, volCap, TIER[a.tier].maxPos, riskCap) * ddScale * perfScale * regimeScale;
+  return { stop, take, cost, b, fstar, kelly, volCap, riskCap, ddScale, perfScale, regimeScale, size };
 }
 
 // =====================================================================================
@@ -1159,6 +1183,10 @@ function policy(i, a, f, d) {
   g('Portfolio risk state safe', d.risk_state === 'safe', d.risk_state.replace('_', ' '));
   g('Side allowed', d.direction !== 'short' || P.allowShort, P.allowShort ? 'shorts on' : 'long only');
   g('No regulatory veto (24h)', !d.veto.length, d.veto.length ? 'blocked: ' + d.veto[0].slice(0, 48) : P.news === 'veto' || P.news === 'both' ? 'clear' : 'veto off');
+  const altBuy = TIER[a.tier].group === 'crypto' && a.sym !== 'BTC_USD' && d.direction === 'long';
+  g('Market regime allows alt buys (BTC daily)', !altBuy || S.mode !== 'live' || REG.state === null || REG.state === 'UP', !altBuy ? 'not an alt buy' : S.mode !== 'live' ? 'not applied to the simulated market' : REG.state === null ? 'not read yet' : 'BTC ' + REG.state + (REG.state === 'UP' ? '' : ': alts wait'));
+  const run = runUp(a);
+  g('No chase (under +15% in 24h)', d.direction !== 'long' || run === null || run < 0.15, run === null ? 'n/a' : (run >= 0 ? '+' : '') + (run * 100).toFixed(1) + '% 24h' + (run >= 0.15 ? ': wait for a pullback' : ''));
   g('Market open', isOpen(a, S.now), tier.hours === 'always' ? '24/7' : isOpen(a, S.now) ? 'open' : tier.hours === 'fx' ? 'closed for the weekend' : 'closed (NYSE 09:30–16:00 New York)');
   if (S.killed) return { action: side ? 'exit' : 'hold', reason: 'kill switch: ' + S.killed, gates };
   if (side) {
@@ -1475,7 +1503,7 @@ const parseTs = x => typeof x === 'number' ? x : /^\d+$/.test(String(x)) ? +x : 
 const toBars = x => ((x && x.data) || []).map(b => ({ t: parseTs(b.timestamp ?? b.t), o: +(b.open ?? b.o), h: +(b.high ?? b.h), l: +(b.low ?? b.l), c: +(b.close ?? b.c), v: +(b.volume ?? b.v) }));
 function toTick(t) {
   const tk = t && t.data ? t.data[0] : t;
-  return { bid: +(tk.best_bid ?? tk.b), ask: +(tk.best_ask ?? tk.k), bidSize: +(tk.best_bid_size ?? tk.bs ?? 1), askSize: +(tk.best_ask_size ?? tk.ks ?? 1), vol24: +(tk.volume_value ?? tk.vv ?? 0), ts: parseTs(tk.timestamp ?? tk.t) };
+  return { chg: +(tk.change ?? tk.c ?? NaN), bid: +(tk.best_bid ?? tk.b), ask: +(tk.best_ask ?? tk.k), bidSize: +(tk.best_bid_size ?? tk.bs ?? 1), askSize: +(tk.best_ask_size ?? tk.ks ?? 1), vol24: +(tk.volume_value ?? tk.vv ?? 0), ts: parseTs(tk.timestamp ?? tk.t) };
 }
 async function fetchAsset(a, with15) {
   if (MCP) {
@@ -1495,7 +1523,21 @@ async function fetchAsset(a, with15) {
   ]);
   return { bars: toBars(c), bars15: c15 ? toBars(c15) : null, tick: toTick(t), index: null };
 }
+async function fetchRegime(force) {
+  if (REG.busy || !MCP || (!force && Date.now() - REG.ts < 6 * 3600e3)) return;
+  REG.busy = true; REG.note = 'reading BTC daily…';
+  try {
+    const js = await fcJSON('https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?range=1y&interval=1d', 'BTC 50/200-day trend to decide whether altcoin buys are allowed (paper trading).');
+    const c = js.chart.result[0].indicators.quote[0].close.filter(x => x != null);
+    if (c.length < 200) throw { code: 'short', message: c.length + ' daily closes' };
+    const avg = n => c.slice(-n).reduce((s, x) => s + x, 0) / n, px = c[c.length - 1], s50 = avg(50), s200 = avg(200);
+    Object.assign(REG, { state: px > s200 && s50 > s200 ? 'UP' : px < s200 && s50 < s200 ? 'DOWN' : 'MIXED', close: px, s50, s200, ts: Date.now(), note: '' });
+    log(S.now, 'BTC', 'info', 'Market regime ' + REG.state + ': BTC ' + usd(px) + ', 50-day ' + usd(s50) + ', 200-day ' + usd(s200) + (REG.state === 'UP' ? '. Alt buys allowed.' : '. Alt buys paused.'), 'info');
+  } catch (e) { REG.note = 'regime read failed: ' + ((e && e.code) || 'error'); }
+  finally { REG.busy = false; rerender(); }
+}
 async function liveTick() {
+  fetchRegime(false);
   if (liveBusy || S.mode !== 'live' || mcpState === 'pending') return;
   liveBusy = true; const mine = S;
   try {
@@ -2025,6 +2067,7 @@ function bindSetting(id, lo, hi, apply) {
 }
 bindSetting('sConf', 0.70, 0.99, v => P.minConf = v);
 bindSetting('sQual', 2, 3, v => P.minQ = Math.round(v));
+bindSetting('sRisk', 0.5, 2, v => P.riskPct = v / 100);
 bindSetting('sKelly', 0.05, 0.25, v => P.kelly = v);
 bindSetting('sVol', 0.2, 1.5, v => P.volTarget = v / 100);
 bindSetting('sDD', 5, 15, v => L.maxDD = v / 100);
@@ -2343,10 +2386,10 @@ function renderExtra() {
   if (VIEW === 'markets') { renderMarkets(now); renderUniverse(); }
   if (VIEW === 'portfolio') renderPortfolio(eq);
   if (VIEW === 'agents') renderAgents(now);
-  if (VIEW === 'journal') renderJournal();
+  if (VIEW === 'journal') { renderJournal(); renderTax(); }
   if (VIEW === 'bots') renderBots(now);
   if (VIEW === 'wallet') renderWallet(eq, now);
-  if (VIEW === 'research') renderResearch();
+  if (VIEW === 'research') { renderResearch(); renderTokenomics(); }
   if (VIEW === 'lab') renderLab();
   if (VIEW === 'settings') renderFees();
 }
@@ -3079,6 +3122,9 @@ async function universeScan() {
   finally { UV.busy = false; rerender(); }
 }
 function renderUniverse() {
+  $('regLine').innerHTML = REG.state ? '<b>Market regime (BTC daily): ' + REG.state + '</b> · close ' + usd(REG.close) + ' · 50-day ' + usd(REG.s50) + ' · 200-day ' + usd(REG.s200) + ' · ' + (REG.state === 'UP' ? 'alt-coin buys allowed' : 'alt-coin buys paused: agents wait') + ' <button type="button" id="regGo">Refresh · 1 credit</button>'
+    + (S.mode === 'sim' ? ' <span class="note">(real-world reading; the simulated market is not gated by it)</span>' : '')
+    : (S.mode === 'sim' ? 'Market regime: not read in the simulated market (alt buys are not gated).' : 'Market regime: ' + (REG.note || 'not read yet') + ' <button type="button" id="regGo">Read BTC daily · 1 credit</button>');
   $('uvNote').textContent = UV.note; $('uvGo').disabled = UV.busy; $('uvGo').textContent = UV.busy ? 'Scanning…' : 'Scan Crypto.com';
   const rows = uvRows();
   $('uvBody').innerHTML = UV.raw ? (rows.map(r => '<tr><td><input type="checkbox" data-uv="' + esc(r.sym) + '"' + (UV.picked.has(r.sym) ? ' checked' : '') + ' aria-label="Pick ' + esc(r.base) + '"></td><td class="sym">' + esc(r.base) + (r.move > 3000 ? ' <span class="tag p-risk">pump-size range</span>' : r.vv < 1e6 ? ' <span class="tag p-warn">thin</span>' : '') + '</td><td class="n">' + (r.move / 100).toFixed(1) + '%</td><td class="n">' + r.spread.toFixed(2) + ' bp</td><td class="n">' + r.feeRt.toFixed(0) + ' bp</td><td class="n">' + r.impact.toFixed(1) + ' bp</td><td class="n"><b>' + r.cost.toFixed(0) + ' bp</b></td><td class="n">' + r.score.toFixed(1) + '</td><td class="n">$' + (r.vv / 1e6).toFixed(1) + 'M</td></tr>').join('')
@@ -3096,6 +3142,7 @@ function renderFees() {
 $('feeVenue').addEventListener('change', e => { FEE_VENUE = e.target.value; store.set('feeVenue', FEE_VENUE); $('uvVenue').value = FEE_VENUE; log(S.now, '—', 'info', 'Fee schedule set to ' + FEE_PRESETS[FEE_VENUE].label + '.', 'info'); rerender(); });
 ['uvVenue', 'uvMaker', 'uvEx', 'uvOrder', 'uvMin', 'uvStocks'].forEach(id => $(id).addEventListener(id === 'uvOrder' || id === 'uvMin' || id === 'uvStocks' ? 'input' : 'change', () => rerender()));
 $('uvGo').addEventListener('click', universeScan);
+$('regLine').addEventListener('click', e => { if (e.target.id === 'regGo') fetchRegime(true); });
 $('uvBody').addEventListener('change', e => { const c = e.target.closest('input[data-uv]'); if (!c) return; c.checked ? UV.picked.add(c.dataset.uv) : UV.picked.delete(c.dataset.uv); rerender(); });
 $('uvUse').addEventListener('click', () => {
   const rows = uvRows(), byS = Object.fromEntries((UV.raw ? rows : []).map(r => [r.sym, r])), old = Object.fromEntries((PREF('altPicks') || []).map(p => [p.sym, p]));
@@ -3105,6 +3152,63 @@ $('uvUse').addEventListener('click', () => {
   location.reload();
 });
 $('uvReset').addEventListener('click', () => { store.set('altPicks', []); store.set('stockPicks', []); store.set('dropMajors', false); location.reload(); });
+
+
+// ---------- tokenomics (CoinGecko via Firecrawl) and FIFO tax lots ----------
+const TKN = { out: null, busy: false, note: 'Not run yet.' };
+async function tokenomicsCheck() {
+  const id = ($('tkId').value || '').trim().toLowerCase();
+  if (!/^[a-z0-9-]{2,60}$/.test(id)) { TKN.note = 'Enter a CoinGecko id like "arbitrum".'; rerender(); return; }
+  if (!MCP) { TKN.note = 'Needs the Firecrawl connector.'; rerender(); return; }
+  TKN.busy = true; TKN.note = 'Reading CoinGecko…'; rerender();
+  try {
+    const cg = await fcJSON('https://api.coingecko.com/api/v3/coins/' + id + '?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false', 'Token supply and dilution check before a paper trade.');
+    const md = cg.market_data || {}, circ = md.circulating_supply, mx = md.max_supply, tot = md.total_supply, cap = mx || tot;
+    const mcap = (md.market_cap || {}).usd, fdv = (md.fully_diluted_valuation || {}).usd, share = circ && cap ? circ / cap : null, ratio = fdv && mcap ? fdv / mcap : null, flags = [];
+    if (mx == null) flags.push('no max supply: issuance can continue indefinitely');
+    if (share !== null && share < 0.7) flags.push(Math.round((1 - share) * 100) + '% of supply still to unlock or be issued');
+    if (ratio !== null && ratio > 2) flags.push('fully diluted value ' + ratio.toFixed(1) + '× the market cap');
+    TKN.out = { name: (cg.name || id) + ' (' + String(cg.symbol || '').toUpperCase() + ')', circ, mx, tot, share, mcap, fdv, ratio, flags };
+    TKN.note = 'Read ' + new Date().toISOString().slice(11, 16) + ' UTC';
+  } catch (e) { TKN.note = 'Check failed: ' + ((e && e.code) || 'error') + (e && e.message ? ' · ' + e.message : ''); }
+  finally { TKN.busy = false; rerender(); }
+}
+function renderTokenomics() {
+  $('tkNote').textContent = TKN.note; $('tkGo').disabled = TKN.busy;
+  const o = TKN.out, big = v => v == null ? '—' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : (+v).toLocaleString('en-US');
+  $('tkFacts').innerHTML = o ? [['Token', o.name], ['Circulating', big(o.circ)], ['Max supply', o.mx == null ? 'none (uncapped)' : big(o.mx)], ['Total supply', big(o.tot)],
+    ['Circulating share', o.share == null ? '—' : (o.share * 100).toFixed(1) + '%'], ['Market cap · fully diluted', '$' + big(o.mcap) + ' · $' + big(o.fdv) + (o.ratio ? ' (' + o.ratio.toFixed(2) + '×)' : '')],
+    ['Verdict', o.flags.length ? 'DILUTION RISK: ' + o.flags.join('; ') : 'OK on supply']].map(f => '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>').join('') : '';
+}
+function taxLots() {
+  const lots = {}, rows = [];
+  S.fills.slice().sort((a, b) => a.ts - b.ts).forEach(f => {
+    const q = Math.abs(f.qty); if (!(q > 0)) return;
+    if (f.side === 'buy') { (lots[f.sym] = lots[f.sym] || []).push({ q, per: (q * f.price + f.fee) / q, ts: f.ts }); return; }
+    let left = q; const feePer = f.fee / q;
+    while (left > 1e-12 && lots[f.sym] && lots[f.sym].length) {
+      const l = lots[f.sym][0], take = Math.min(left, l.q), held = (f.ts - l.ts) / 864e5;
+      const proceeds = take * (f.price - feePer), basis = take * l.per;
+      rows.push({ sym: f.sym, qty: take, bought: l.ts, sold: f.ts, proceeds, basis, gain: proceeds - basis, term: held > 365 ? 'long' : 'short' });
+      l.q -= take; left -= take; if (l.q <= 1e-12) lots[f.sym].shift();
+    }
+    if (left > 1e-9) rows.push({ sym: f.sym, qty: left, bought: null, sold: f.ts, proceeds: left * (f.price - feePer), basis: null, gain: null, term: 'short sale (no lot)' });
+  });
+  return rows;
+}
+function renderTax() {
+  const rows = taxLots(), sum = t => rows.filter(r => r.term === t && r.gain != null).reduce((s, r) => s + r.gain, 0);
+  $('taxSum').textContent = rows.length + ' disposals · short-term ' + signedUsd(sum('short')) + ' · long-term ' + signedUsd(sum('long')) + ' · fees paid ' + usd(S.fees);
+  $('taxBody').innerHTML = rows.slice(-60).reverse().map(r => '<tr><td>' + esc(fmtQty(r.qty) + ' ' + short(r.sym)) + '</td><td class="t">' + (r.bought ? tfmt(r.bought) : '—') + '</td><td class="t">' + tfmt(r.sold) + '</td><td class="n">' + usd(r.proceeds) + '</td><td class="n">' + (r.basis == null ? '—' : usd(r.basis)) + '</td><td class="n ' + (r.gain > 0 ? 'up' : r.gain < 0 ? 'down' : '') + '">' + (r.gain == null ? '—' : signedUsd(r.gain)) + '</td><td>' + esc(r.term) + '</td></tr>').join('')
+    || '<tr><td colspan="7" class="note">No sells yet. Each closed position adds a row here.</td></tr>';
+}
+$('tkGo').addEventListener('click', tokenomicsCheck);
+$('taxCsv').addEventListener('click', () => {
+  const iso = t => t ? new Date(t).toISOString().slice(0, 10) : 'UNKNOWN';
+  const csv = 'description,date_acquired,date_sold,proceeds,cost_basis,gain,term\n' + taxLots().map(r => [fmtQty(r.qty) + ' ' + short(r.sym), iso(r.bought), iso(r.sold), r.proceeds.toFixed(2), r.basis == null ? '' : r.basis.toFixed(2), r.gain == null ? '' : r.gain.toFixed(2), r.term].join(',')).join('\n') + '\n';
+  try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'tax-lots-paper.csv'; document.body.appendChild(a); a.click(); a.remove(); }
+  catch (e) { $('taxSum').textContent = 'Download blocked in this view.'; }
+});
 
 // ---------- ask Claude ----------
 function deskState() {

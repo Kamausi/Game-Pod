@@ -734,6 +734,47 @@ So "low fees" means a cheaper venue, limit (maker) orders, and commission-free s
 
 `onchain.USDC_MINT` was `EPjFWdd5AufqSSqeM2qhRF9o8GZ8VZfdGqDKLUvqU5G1`, an address with no trace anywhere. The real one (circle.com, solana.com docs) is `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`. Every paper DEX quote was asking Jupiter for a token that doesn't exist.
 
+## 22. The crypto playbook as rules, tested on five years of real prices (2026-10-15)
+
+### Rules in code (`playbook.py`, `tradebot playbook …`)
+
+| Playbook rule | What the code does |
+|---|---|
+| Risk capital, 1–2% per trade | `size()` caps risk at 2%. The page now has a hard **max risk per trade** (default 1%, adjustable 0.5–2%) inside position sizing: a stop-out can't cost more |
+| Trend is your friend; buy alts only in an up market | `regime()`: BTC above its 200-day **and** 50-day above 200-day = UP. Alt buys are allowed only in UP. On the page, agents check it every decision (BTC daily from Yahoo, 1 credit every 6 h) |
+| Support and resistance | `levels()`: swing pivots clustered within half an ATR, ranked by touches, using only past bars |
+| Avoid FOMO | `fomo()` and a page gate: no entry after +15% in 24 h or +50% in a week. Wait for a pullback |
+| Hard take-profits, plan the exit first | `swing_setup()` fixes stop (1 ATR under support) and target (next resistance) before entry, and refuses a trade without 2R after fees or without a resistance to aim at |
+| Swing vs DCA | `backtest()` walks forward day by day with no look-ahead. `dca()` compares weekly buying with a lump sum |
+| Tokenomics | `tokenomics()` and a Research panel: circulating share of max supply and FDV / market cap from CoinGecko. CoinGecko has no unlock calendar, so check the project's |
+| Hidden costs | Real fee schedules (§21). Limit orders in the cost ranking. A network fee per swap in the DEX paper trader (`network_fee_usd`, an estimate to set) |
+| Taxes: every swap is a sale | `tax_lots()` / `playbook tax fills.csv --out 8949.csv`, plus a Journal panel with CSV download: FIFO lots, fees in basis and proceeds, short vs long term |
+
+### What the real data says (Yahoo daily, Oct 2021 – Oct 2026, 0.25% fee per side)
+
+- **The textbook swing rule lost money.** SOL: 10 trades, 1 winner, −0.74R average, −7.2% at 1% risk per trade. BTC: 8 trades, +2.0%, against +116% buy-and-hold.
+- **The regime filter helped.** It cut the SOL loss from −11.2% (16 trades) to −7.2%. That's the one rule that earned its keep here.
+- **Weekly $100 DCA:**
+  - BTC +90% (lump sum +32%, worst point −53% against money put in);
+  - SOL +95% (lump sum −36%, worst point −78%).
+  - This window starts near a top, which flatters DCA.
+- **Today:** BTC regime UP (close $81.6k, 50-day $81.2k, 200-day $72.2k). SOL has no setup: it's below its own 50-day average.
+
+These results are pinned in `tests/test_playbook.py`. Changing the rule until the backtest looks good would be fitting noise: use `audit dsr` / `audit pbo` first.
+
+### Whale copying: the safeguards from the playbook (`whales.py`)
+
+- **New flags:**
+  - wallet younger than 30 days;
+  - **wash trading** (5+ round trips within an hour at the same price);
+  - **VC / team / vesting distributor** (receives tokens without paying, mostly sells);
+  - **exchange inflow**: moves tokens to an address you labelled as an exchange (`--labels address,label` from Solscan or Arkham; no labels are guessed).
+- **Copy sleeve cap** (`watch --sleeve`, default $500): what copying may have deployed at once. Keep it to 1–5% of capital.
+- **Exit-liquidity guard** (`--max-chase`, default 3%): no copy when our quoted price is already that far above the whale's fill.
+- **Leaderboard exports** (fomo and the like): `whales score --wallets-file wallets.csv`. Every row counts toward the screening penalty, so a 30-day leaderboard star needs a real record to pass.
+
+**Not built:** pulling data out of fomo's app by capturing its network traffic (the ".har" method), or paid third-party scrapers of it. Those take data the app chose not to publish. Use addresses the trader shows publicly or that you've confirmed on Solscan.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers

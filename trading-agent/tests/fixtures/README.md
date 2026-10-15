@@ -15,3 +15,7 @@ Real responses captured 2026-10-14 through the Firecrawl connector (the build ho
 ## cryptocom_tickers_2026-10-15.json (captured 2026-10-15 10:40 UTC)
 
 Crypto.com connector `get_tickers` (all instruments), **trimmed** to 11 of 1,038 instruments; values unchanged. Note the spot naming (`BTCUSD`, not `BTC_USD`) and perpetuals (`SOLUSDPERP`) in this listing, while `get_ticker` / `get_candlestick` accept `XRP_USD`.
+
+## yahoo_BTC_USD_daily.csv, yahoo_SOL_USD_daily.csv (captured 2026-10-15)
+
+`GET https://query1.finance.yahoo.com/v8/finance/chart/{BTC-USD,SOL-USD}?range=5y&interval=1d` through the Firecrawl connector, converted to CSV (UTC dates; values rounded to 6 significant figures; days with a missing price dropped). The last row is the day in progress.

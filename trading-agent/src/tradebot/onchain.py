@@ -151,6 +151,7 @@ class DexPaperTrader:
     max_price_impact: float = 0.01
     extra_slip_bps: float = 50.0
     usdc: float = 10_000.0
+    network_fee_usd: float = 0.02  # per swap: base fee + priority fee, an estimate; set your own
     holdings: dict[str, int] = field(default_factory=dict)  # mint -> raw token amount
     log: list[dict] = field(default_factory=list)
 
@@ -169,11 +170,20 @@ class DexPaperTrader:
             self.log.append(out)
             return out
         got = int(int(q["outAmount"]) * (1 - self.extra_slip_bps / 1e4))
-        self.usdc -= usdc_amount
+        self.usdc -= usdc_amount + self.network_fee_usd
         self.holdings[mint] = self.holdings.get(mint, 0) + got
         out = {"action": "paper_buy", "mint": mint, "usdc": usdc_amount, "tokens_raw": got, "price_impact": impact}
         self.log.append(out)
         return out
+
+    def price_usd(self, mint: str, usdc_amount: float) -> float | None:
+        """What buying usdc_amount would pay per whole token now (Jupiter quote, token decimals from chain)."""
+        try:
+            dec = int(self.guard.rpc.mint_info(mint)["decimals"])
+            q = self.jupiter.quote(USDC_MINT, mint, int(usdc_amount * 1e6))
+            return usdc_amount / (int(q["outAmount"]) / 10 ** dec)
+        except Exception:
+            return None
 
     def sell_all(self, mint: str) -> dict:
         amt = self.holdings.get(mint, 0)
@@ -182,7 +192,7 @@ class DexPaperTrader:
         q = self.jupiter.quote(mint, USDC_MINT, amt)
         got = int(q["outAmount"]) * (1 - self.extra_slip_bps / 1e4) / 1e6
         self.holdings[mint] = 0
-        self.usdc += got
+        self.usdc += got - self.network_fee_usd
         out = {"action": "paper_sell", "mint": mint, "usdc": got, "price_impact": float(q.get("priceImpactPct", 0))}
         self.log.append(out)
         return out
