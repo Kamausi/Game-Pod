@@ -1,0 +1,10 @@
+[Unit]
+Description=tradebot desk: exit-due (close positions on their 5th trading day)
+
+[Timer]
+OnCalendar=Mon..Fri 15:45 America/New_York
+Persistent=false
+Unit=tradebot-desk@exit-due.service
+
+[Install]
+WantedBy=timers.target

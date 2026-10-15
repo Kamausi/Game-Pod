@@ -364,6 +364,128 @@ Everything that was marked "not verified" has been checked against primary sourc
 - **Prediction-market gap scanner (read-only).** `predmarkets --pairs pairs.json` compares Polymarket and Kalshi on pairs you confirmed resolve identically, net of each venue's taker fee, plus Polymarket complete sets. It never matches pairs automatically and never orders.
 - **Still declined.** Free TradingView "premium" access, and the "leaked" bot repos and copy-trading desks. The pasted FrondEnt repo could not even be found.
 
+## 17. The desk, weather markets, the quote loop, and claim audits (2026-10-15)
+
+The pasted posts boil down to one setup: research seats that argue, a fast yes/no before the order, code that places it, and a human tap. This round builds that around a strategy that can be tested on free public data: C-suite insider buying.
+
+### The six-seat desk (`desk.py`, `insider.py`; `tradebot desk ...`)
+
+Each Jane Street rule is a seat. Each seat writes a file the next one reads, so you can open any step and check it.
+
+| Seat | What it does | Rule |
+|---|---|---|
+| Scout | Reads the live EDGAR Form 4 feed. Keeps open-market purchases (code P) of $100K+ by a CEO, CFO, COO, President or Chair, filed since the last close. Liquid names only, at most 5. "NO TRADE TODAY" is a good result | Ignore 99% of the data |
+| Analyst | Fair value from SEC XBRL diluted EPS times the stock's **own** history of P/E (25th / median / 75th percentile). Every number is sourced to an accession number. No positive trailing EPS: NO RANGE | Every trade is "what is it worth?" |
+| Skeptic | Never proposes, only kills: batch filings, 10b5-1 plan buys, EXPENSIVE, NO RANGE, an unverified key number, earnings likely within 5 trading days, already moved 5%+ since the filing. Unsure = KILL | Most ideas are bad; your AI will cheat |
+| Risk | Tickets for PASS names: DAY limit 0.5% above the last close, stop 2×ATR(14) below, shares = equity × 1% / (entry − stop), capped at 10% of equity. `risk_check()` reads `limits.json`; a KILL or PAUSE file means no tickets | Code guards the money |
+| You | `tradebot desk approve 1 3` places today's tickets on the **Alpaca paper** account as OTO orders (the stop goes live with the fill). The broker class refuses any other host | Humans run the weird days |
+| Journal | One row per ticket and per killed name, with what each kill **would** have made. A weekly review, lessons appended to `lessons.md`, and DECAYING after 20+ trades below half the backtest's average R | Every model decays |
+
+Routines are systemd timers in New York time (`deploy/systemd/tradebot-desk-*.timer`). Each is a different seat command:
+
+| Time (New York) | Seat |
+|---|---|
+| Weekdays 05:30 | morning |
+| Weekdays 08:30 | chain-check (alerts CHAIN BROKEN) |
+| Weekdays 15:45 | exit-due (cancels the stop, sells on trading day 5) |
+| Weekdays 16:30 | journal |
+| Friday 17:00 | weekly |
+| Sunday 18:00 | audit |
+
+**What the build caught**
+- **Chair as "other".** A chair is often filed as `isOther` + "Chairman of the Board", not as an officer, so titles are matched from both fields.
+- **10b5-1 plans.** Form 4 has an `aff10b5One` flag for trades under a 10b5-1 plan. Those are scheduled, not conviction, so the Skeptic kills them.
+- **No Q4 in XBRL.** XBRL has no Q4 frame: Q4 EPS only exists inside the full year. Taking "the last four quarter frames" silently skips a quarter. Q4 is now derived as FY − Q1 − Q2 − Q3, and four consecutive quarters are required.
+
+**The Quant seat**
+- `tradebot insider backtest --data 2024q1_form345.zip ... --prices <bars>` runs the build window and logs the run in `quant/changes.md` with the commit and what changed.
+- `tradebot insider holdout` runs the last 12 months **once**. A second run is refused.
+- Costs are 0.1% per side.
+- A gap through the stop fills at the open.
+- Entry is the first open **after** the filing date.
+- Signals that can't be priced are counted as "unpriced" and reported as the survivorship hole, never dropped.
+- `--study-filters` replicates a published study's looser filters first, to check the data.
+- `tradebot desk audit` is the Skeptic auditing the Quant. It runs the tests and reads git history for deleted or skipped tests. The test suite plants a deleted test and checks that the audit catches it.
+
+**Not run here.** sec.gov is blocked from this build host, so no real backtest was run here. Every request shape below was checked live through the Firecrawl connector, and the tests use those real responses.
+
+### Weather markets, read-only (`weather.py`; `tradebot weather scan <slug>`)
+
+This is the open-source weather-bot setup with the missing parts made explicit:
+- **Forecast:** the NWS hourly forecast at the **resolution station**.
+- **Buckets:** Gaussian probabilities on whole-degree readings.
+- **Edge:** after Polymarket's taker fee (0.05 × p × (1 − p)).
+- **Size:** quarter Kelly, capped at 5%.
+
+**Learning.** `weather settle` records observed highs, and after 30 settled days per station the forecast bias and spread are learned from that station's own errors. Until then the error model is a labelled PRIOR.
+
+**What the market actually resolves on.** The NYC market settles on **LaGuardia (KLGA)**, not Central Park. The scanner reads the station from the market's resolution source and refuses a market without one.
+
+**First real run** (2026-10-15, October 16 market):
+
+| Bucket | Model | Market ask | What it means |
+|---|---|---|---|
+| 74–75°F | 22% | 39¢ | Market is far more confident than the PRIOR |
+| 80–81°F | 4.2% | 0.4¢ | "Edge" only because the PRIOR spread is wide |
+
+NWS forecast 74°F, lead 40 h. The model's "edges" sit in the tails because its PRIOR spread (3.5°F) is wider than the market's. That is not an edge until the learned spread says so.
+
+### The jev-trader loop as a dry run (`jevquote.py`; `tradebot jevquote --record BTC_USD --tick 0.01`)
+
+This is the loop from the post, with no order path in the code:
+1. Read the book and ask buy or sell (Jev, or the momentum stand-in).
+2. Post one post-only quote one tick inside the touch.
+3. Replace it on the next step.
+
+A fill is counted only when the other side comes to the quote's price. The summary reports:
+- spread captured;
+- 1- and 10-step markouts;
+- decision hit rate;
+- latency p50 / p95;
+- the same "does it earn after adverse selection" verdict as `research mm`.
+
+Run it on 1,000 recorded steps before believing "earn the spread instead of paying it".
+
+### Auditing a claim (`audit.py`; `tradebot audit ...`)
+
+The evidence half of the "reverse engineer any system" roadmap, in code we own:
+- **`headline`:** every start date, calendar years, worst fall, and after your costs and tax.
+- **`finding`:** DATA VALIDATED / TRADE-OFF / NO EDGE, split by time. Validated means it beats the benchmark on both CAGR and Sharpe in both windows.
+- **Plateau or lone peak:** for parameter sweeps.
+- **`trend200`:** the boring rival.
+- **`secrets`:** hard-coded keys, reported as file and line only, never the value.
+- **`spec`:** the claim with every undisclosed field UNKNOWN.
+
+On a synthetic 26-year series, the 200-day rule gave a lower CAGR than buy-and-hold (7.4% vs 9.7%) for a smaller worst fall (36.5% vs 42.1%). That is the trade-off it is known for, not an edge.
+
+### Verified this round
+
+| Item | How | Result |
+|---|---|---|
+| EDGAR current Form 4 feed | Live, via Firecrawl | Atom. Each filing appears twice (Reporting and Issuer), one accession number. Deduplicated |
+| Form 4 XML | Live filing (Procore, 2026-10-14) | `reportingOwnerRelationship`, `officerTitle` / `otherText`, `aff10b5One`, `transactionCode` P/S/M, shares, price. Saved as a fixture |
+| Insider Transactions Data Sets | sec.gov page + readme PDF | Quarterly `form345.zip`, 2006 onward. SUBMISSION / REPORTINGOWNER / NONDERIV_TRANS. Dates DD-MON-YYYY. The PDF did not render two REPORTINGOWNER column names, so the loader checks columns by name and refuses with the list it found |
+| SEC XBRL companyconcept | Live | `units["USD/shares"]` with `frame`, `accn`, `form`, `filed`. No Q4 frame (derived) |
+| Alpaca OTO | Official docs | `order_class: "oto"` with `stop_loss` only; day/gtc; stop at least $0.01 below a limit entry |
+| Alpaca daily bars | Official OpenAPI | `GET data.alpaca.markets/v2/stocks/{symbol}/bars?timeframe=1Day`, paginated. Free accounts need `feed=iex` |
+| Polymarket weather event | Live | One market per bucket. `groupItemTitle` "63°F or below" / "64-65°F" / "82°F or higher"; taker fee 0.05. Resolution source names the station |
+| NWS | Live | `/stations/KLGA/observations/latest` (°C), `/points/{lat},{lon}` → `forecastHourly` + `timeZone`, hourly periods in °F |
+
+### Declined or left out, and why
+
+| Item | Why |
+|---|---|
+| Grok Bot "0.18 Reconstructed" / "Original" bundles | Rebuilt or unminified copies of a company's shipped app. Not using them |
+| REA on other people's apps | Our system is our own source, so there's nothing to reverse. `audit` covers the evidence half |
+| CrawlScan, CrawlHive and their tokens | Token promotions with self-reported track records |
+| tradingview-mcp | Drives TradingView Desktop through unofficial interfaces; the author flags the ToS himself |
+| Pump.fun snipers | Not part of this desk |
+| QuantGPT, AgenKit | Paid services; nothing here depends on them |
+| OpenBB, freqtrade, NautilusTrader, ccxt, TradingAgents, QuantDinger | Not added as dependencies. This repo already has data adapters, a backtest that shares code with the live loop, venue adapters, and argue-then-kill seats |
+| Polymarket/agents | Archived (last commit Nov 2024), as the post says |
+
+Most of the 23 memecoin repos are wallet hygiene (revoke.cash, Rabby, phishing lists): worth using, nothing to build. On "fake repos": an old account with thousands of stars and a Telegram link is the drainer pattern. `audit secrets` won't catch that; reading the code will.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers

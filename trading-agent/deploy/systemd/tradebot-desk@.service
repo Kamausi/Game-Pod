@@ -1,0 +1,17 @@
+[Unit]
+Description=tradebot desk seat: %i
+After=network-online.target
+Wants=network-online.target
+OnFailure=tradebot-alert@%n.service
+
+[Service]
+Type=oneshot
+User=trader
+WorkingDirectory=/srv/tradebot/state
+EnvironmentFile=/srv/tradebot/.env
+# %i is the seat: morning, chain-check, exit-due, journal, weekly, audit
+ExecStart=/srv/tradebot/venv/bin/tradebot desk --dir desk %i
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/tradebot/state
+PrivateTmp=true

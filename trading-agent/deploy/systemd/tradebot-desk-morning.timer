@@ -1,0 +1,10 @@
+[Unit]
+Description=tradebot desk: morning (scout, analyst, skeptic, risk; brief before the open)
+
+[Timer]
+OnCalendar=Mon..Fri 05:30 America/New_York
+Persistent=false
+Unit=tradebot-desk@morning.service
+
+[Install]
+WantedBy=timers.target

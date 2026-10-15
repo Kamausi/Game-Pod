@@ -1,0 +1,10 @@
+[Unit]
+Description=tradebot desk: chain-check (CHAIN BROKEN alert if a morning file is missing)
+
+[Timer]
+OnCalendar=Mon..Fri 08:30 America/New_York
+Persistent=false
+Unit=tradebot-desk@chain-check.service
+
+[Install]
+WantedBy=timers.target

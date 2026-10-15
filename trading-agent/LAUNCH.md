@@ -63,6 +63,25 @@ Start: `docker compose --profile live up -d` or `systemctl enable --now tradebot
 
 Raise caps only after **two weeks of live** with live results within the paper results' range (fill slippage within 2× the modelled 2 bps, no reconciliation alerts). Raise at most 2× per step, then `go-live` again (the edit voids the authorization by design).
 
+## The insider desk (paper only)
+
+A separate track from the crypto loop: Form 4 insider buys, Jane Street-style seats, Alpaca **paper** account only.
+
+```
+tradebot desk init                       # desk/limits.json (paper_only: true), lessons.md
+export SEC_USER_AGENT="you you@example.com" APCA_API_KEY_ID=... APCA_API_SECRET_KEY=...   # paper keys
+tradebot insider backtest --data <zips> --prices <bars>   # prove it first; one change at a time
+tradebot insider holdout  --data <zips> --prices <bars>   # once
+tradebot desk morning                    # brief + tickets; nothing is placed
+tradebot desk approve 1                  # your tap, same day only
+```
+
+Enable the timers with `systemctl enable --now tradebot-desk-{morning,chain-check,exit-due,journal,weekly,audit}.timer`. Then, in order:
+
+1. **Paper until 25–50 trades,** at 1% risk.
+2. **Compare with the backtest.** Read the weekly file in `desk/journal/`. If it says DECAYING, stop.
+3. **Moving to live is your code change:** swap the broker class and keys yourself. No command does it, by design.
+
 ## Kill procedures
 
 | Situation | Do this |

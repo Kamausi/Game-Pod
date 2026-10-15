@@ -1,0 +1,10 @@
+[Unit]
+Description=tradebot desk: audit (skeptic audits the quant's tests and holdout)
+
+[Timer]
+OnCalendar=Sun 18:00 America/New_York
+Persistent=false
+Unit=tradebot-desk@audit.service
+
+[Install]
+WantedBy=timers.target

@@ -8,11 +8,15 @@ Real money (only after launch gates, see LAUNCH.md):
   go-live | live | sol-buy | sol-sell | live-check
 Quick look:
   backtest
+The desk (Alpaca PAPER only) and research tools:
+  desk init|scout|analyst|skeptic|risk|morning|approve|exit-due|kill|pause|resume|journal|weekly|chain-check|health|audit
+  insider backtest|holdout | weather scan|settle | jevquote | audit headline|finding|trend200|secrets|spec
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -212,6 +216,78 @@ def main(argv: list[str] | None = None) -> int:
     al = sub.add_parser("alert", help="send one alert to TRADEBOT_ALERT_WEBHOOK (used by systemd OnFailure)")
     al.add_argument("message")
     al.add_argument("--level", default="critical", choices=["info", "warn", "critical"])
+
+    dsk = sub.add_parser("desk", help="the six-seat desk: scout, analyst, skeptic, risk, you, journal (Alpaca PAPER only)")
+    dsk.add_argument("--dir", default="desk")
+    dsk.add_argument("--date", help="YYYY-MM-DD, default today in New York")
+    dsk.add_argument("--prices", default="alpaca", help="'alpaca' (needs APCA_API_KEY_ID/SECRET) or a folder of <SYMBOL>.csv daily bars")
+    dsub = dsk.add_subparsers(dest="seat", required=True)
+    for name, h in (("init", "create folders, limits.json and lessons.md"), ("scout", "C-suite Form 4 buys since the last close"),
+                    ("analyst", "fair value cards from SEC EPS and own-history P/E"), ("skeptic", "PASS or KILL every name"),
+                    ("risk", "tickets for PASS names, checked against limits.json"), ("morning", "scout -> analyst -> skeptic -> risk, print the brief"),
+                    ("exit-due", "close positions on their 5th trading day"), ("kill", "KILL file, cancel all orders, list positions"),
+                    ("pause", "no new tickets"), ("resume", "remove PAUSE"), ("journal", "log today's tickets and kills (with what kills would have made)"),
+                    ("weekly", "weekly review, lessons, decay check"), ("chain-check", "alert CHAIN BROKEN if a morning file is missing"),
+                    ("health", "routines' files for today and what is missing"), ("audit", "fresh-eyes audit of the Quant's tests and holdout")):
+        x = dsub.add_parser(name, help=h)
+        if name == "audit":
+            x.add_argument("--repo", default=os.environ.get("TRADEBOT_REPO", "."), help="git checkout holding the tests (env TRADEBOT_REPO)")
+    ap_ = dsub.add_parser("approve", help="YOU: place today's tickets by number on the paper account")
+    ap_.add_argument("numbers", type=int, nargs="+")
+
+    isd = sub.add_parser("insider", help="Form 4 insider-buy strategy: build backtest (logged change) and the one-time holdout")
+    isub = isd.add_subparsers(dest="what", required=True)
+    for name in ("backtest", "holdout"):
+        x = isub.add_parser(name)
+        x.add_argument("--data", nargs="+", required=True, help="SEC Insider Transactions quarterly zips or unpacked folders")
+        x.add_argument("--prices", required=True, help="folder of <SYMBOL>.csv daily bars (include SPY) or 'alpaca'")
+        x.add_argument("--desk", default="desk")
+        x.add_argument("--holdout-months", type=int, default=12)
+        x.add_argument("--min-usd", type=float, default=100_000)
+        x.add_argument("--min-adv", type=float, default=20e6)
+        x.add_argument("--atr-mult", type=float, default=2.0)
+        x.add_argument("--hold", type=int, default=5)
+        x.add_argument("--cost", type=float, default=0.001, help="per side")
+        x.add_argument("--study-filters", action="store_true", help="any insider, any size, no stop, no liquidity filter: replicate a published study first")
+
+    wth = sub.add_parser("weather", help="read-only Polymarket daily temperature scan against the NWS forecast")
+    wsub = wth.add_subparsers(dest="what", required=True)
+    ws = wsub.add_parser("scan")
+    ws.add_argument("slug", help="e.g. highest-temperature-in-nyc-on-october-16-2026")
+    ws.add_argument("--bankroll", type=float, default=1000.0)
+    ws.add_argument("--log", default="runs/weather_errors.jsonl")
+    wst = wsub.add_parser("settle", help="record observed highs for past scans so the station bias is learned")
+    wst.add_argument("--log", default="runs/weather_errors.jsonl")
+
+    jvq = sub.add_parser("jevquote", help="jev-trader loop as a dry run: decide each step, quote inside the touch, count taker fills")
+    jvq.add_argument("--replay", help="JSONL of book snapshots")
+    jvq.add_argument("--record", help="instrument to record from Crypto.com's public book first, e.g. BTC_USD")
+    jvq.add_argument("--steps", type=int, default=1000)
+    jvq.add_argument("--interval", type=float, default=0.3)
+    jvq.add_argument("--model", choices=["momentum", "jev"], default="momentum")
+    jvq.add_argument("--tick", type=float, required=True)
+    jvq.add_argument("--size", type=float, default=0.001)
+    jvq.add_argument("--max-inventory", type=float, default=0.005)
+    jvq.add_argument("--maker-fee-bps", type=float, default=0.0)
+    jvq.add_argument("--log", default="runs/jevquote.jsonl")
+
+    aud = sub.add_parser("audit", help="judge a trading claim: headline check, finding, trend200 rival, secrets scan, spec")
+    asub = aud.add_subparsers(dest="what", required=True)
+    ah = asub.add_parser("headline")
+    ah.add_argument("series", help="CSV: date + return (or value/close)")
+    ah.add_argument("--annual-cost-pct", type=float, default=0.0)
+    ah.add_argument("--tax-pct", type=float, default=0.0)
+    ah.add_argument("--slippage-pct", type=float, default=0.0, help="per period")
+    af = asub.add_parser("finding")
+    af.add_argument("strategy")
+    af.add_argument("benchmark")
+    af.add_argument("--split", default="2015-01-01")
+    at = asub.add_parser("trend200")
+    at.add_argument("prices", help="CSV: date + close")
+    at.add_argument("--benchmark", action="store_true", help="also report buy and hold")
+    asc = asub.add_parser("secrets")
+    asc.add_argument("path")
+    asub.add_parser("spec", help="print the claim template; every field you can't fill stays UNKNOWN")
 
     rv = sub.add_parser("review")
     rv.add_argument("--run-dir", default="runs/paper")
@@ -634,6 +710,9 @@ def main(argv: list[str] | None = None) -> int:
               f"usage {r.get('usage')}")
         return 0
 
+    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit"):
+        from .cli_desk import run as run_desk_cli
+        return run_desk_cli(args)
     if args.cmd == "review":
         print(run_review(Path(args.run_dir)))
         return 0

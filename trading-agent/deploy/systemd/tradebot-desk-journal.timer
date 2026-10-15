@@ -1,0 +1,10 @@
+[Unit]
+Description=tradebot desk: journal (log tickets, fills and kills)
+
+[Timer]
+OnCalendar=Mon..Fri 16:30 America/New_York
+Persistent=false
+Unit=tradebot-desk@journal.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=tradebot desk: weekly (weekly review, lessons, decay check)
+
+[Timer]
+OnCalendar=Fri 17:00 America/New_York
+Persistent=false
+Unit=tradebot-desk@weekly.service
+
+[Install]
+WantedBy=timers.target
