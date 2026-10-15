@@ -927,12 +927,12 @@ const ASSETS = [
 ];
 // group: which stress scenario hits it; bpd: one-minute bars per trading day; hours: when it can trade
 const TIER = {
-  major: { label: 'crypto major', group: 'crypto', maxPos: 0.25, maxSpread: 25, minVol: 5e6, limitOnly: false, stressMove: -0.20, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.004, take: 0.008 },
+  major: { label: 'crypto major', group: 'crypto', maxPos: 0.25, maxSpread: 25, minVol: 5e6, limitOnly: true, stressMove: -0.20, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.004, take: 0.008 },
   meme: { label: 'meme coin', group: 'crypto', maxPos: 0.05, maxSpread: 50, minVol: 1e6, limitOnly: true, stressMove: -0.40, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.010, take: 0.020 },
   stock: { label: 'stock', group: 'equity', maxPos: 0.20, maxSpread: 20, minVol: 2e7, limitOnly: false, stressMove: -0.10, bpd: 390, hours: 'nyse', maxAgeMs: 300000, stop: 0.003, take: 0.006 },
   penny: { label: 'penny stock', group: 'equity', maxPos: 0.02, maxSpread: 150, minVol: 5e5, limitOnly: true, stressMove: -0.35, bpd: 390, hours: 'nyse', maxAgeMs: 300000, stop: 0.015, take: 0.030 },
   fx: { label: 'FX major', group: 'fx', maxPos: 0.30, maxSpread: 3, minVol: 0, limitOnly: false, stressMove: -0.03, bpd: 1440, hours: 'fx', maxAgeMs: 300000, stop: 0.0008, take: 0.0016 },
-  alt: { label: 'alt coin', group: 'crypto', maxPos: 0.10, maxSpread: 30, minVol: 1e6, limitOnly: false, stressMove: -0.30, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.008, take: 0.016 },
+  alt: { label: 'alt coin', group: 'crypto', maxPos: 0.10, maxSpread: 30, minVol: 1e6, limitOnly: true, stressMove: -0.30, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.008, take: 0.016 },
 };
 // The tradable universe: picks from the low-cost ranking (Markets) and stocks you add replace or join the defaults at load.
 const PREF = k => { try { const v = localStorage.getItem('tb.' + k); return v == null ? null : JSON.parse(v); } catch (e) { return null; } };
@@ -958,7 +958,8 @@ function isOpen(a, ts) {
 }
 const FEE = 6e-4, SLIP = 2e-4, BAR = 60000, START_CASH = 10000;
 // Fee schedules, per side (verified 2026-10-15: crypto.com/exchange/document/fees-limits, alpaca.markets/support/crypto-maker-taker-gmt-faq,
-// alpaca.markets/support/commission-clearing-fees). The paper engine fills like a market order, so crypto pays the TAKER rate.
+// alpaca.markets/support/commission-clearing-fees). Market orders and stops pay the TAKER rate; resting limit orders (crypto entries
+// and take-profit targets) pay the MAKER rate.
 // US stocks at Alpaca: no commission; SEC fee on the sell leg only (rate set by the SEC; check alpaca.markets/support/regulatory-fees).
 const FEE_PRESETS = {
   alpaca: { label: 'Alpaca: crypto 0.25% taker, stocks $0 commission', maker: 0.0015, crypto: 0.0025 },
@@ -975,13 +976,21 @@ function runUp(a) {
   const n = a.bars.length; return n > 1440 ? a.bars[n - 1].c / a.bars[n - 1441].c - 1 : null;
 }
 let FEE_VENUE = (k => FEE_PRESETS[k] ? k : 'alpaca')(PREF('feeVenue'));
-function feeRate(a, side) {
+function feeRate(a, side, liq) {
   const fp = FEE_PRESETS[FEE_VENUE], g = TIER[a.tier].group;
-  if (g === 'crypto') return fp.crypto;
+  if (g === 'crypto') return liq === 'maker' ? fp.maker : fp.crypto;
   if (g === 'equity') return fp.stock ?? (side === 'sell' ? SEC_SELL_FEE : 0);
   return fp.fx ?? 0;
 }
 const rtFee = a => feeRate(a, 'buy') + feeRate(a, 'sell');
+// What one round trip really costs this desk: entry (maker when the tier enters with limits), the exit priced as a taker stop
+// (the worst case), slippage on that stop, and the spread when the entry crosses it.
+function tradeCost(a, f) {
+  const lim = TIER[a.tier].limitOnly;
+  return feeRate(a, 'buy', lim ? 'maker' : 'taker') + feeRate(a, 'sell', 'taker') + SLIP * (lim ? 1 : 2) + (lim ? 0 : (f && isFinite(f.spreadBps) ? f.spreadBps : a.spreadBps) / 1e4);
+}
+// Fees may take at most a quarter of a winning trade: the target is at least COST_MULT x the round-trip cost, the stop half that.
+const COST_MULT = 4, COOLDOWN_BARS = 60;
 const SIGNALS = ['trend', 'momentum', 'meanrev', 'breakout', 'flow', 'basis', 'sentiment'];
 const SIG_LABEL = { trend: 'Trend (MA 9/21, 1m + 15m)', momentum: 'Momentum (MACD 12/26/9)', meanrev: 'Mean reversion (RSI + Bollinger)', breakout: 'Breakout (30-bar range + volume)', flow: 'Order flow (top-of-book imbalance)', basis: 'Index gap (price vs multi-exchange index)', sentiment: 'News sentiment (last 6h)' };
 const NO_BOOK = 'no order book or per-minute volume from Yahoo: flow and breakout signals stay at 0, spread is an estimate';
@@ -994,8 +1003,9 @@ const REVIEW_TOP = 0.10, REVIEW_WARMUP = 50, REVIEW_CEIL = 0.80, VETO_MS = 24 * 
 // model-chosen exit in a 3,505-agent live study). Their 2%/4% suits hourly bars; this desk trades 1-minute
 // bars, so each tier gets the same 1:2 bracket at a width that fits its one-minute noise.
 function bracketFor(a, f) {
-  if (P.exitMode === 'fixed') return { stop: TIER[a.tier].stop, take: TIER[a.tier].take };
-  const stop = Math.max(P.minStop, P.stopAtr * f.atrPct); return { stop, take: P.rr * stop };
+  const floor = COST_MULT * tradeCost(a, f);  // a target narrower than this pays most of its win to the exchange
+  if (P.exitMode === 'fixed') { const t = TIER[a.tier], take = Math.max(t.take, floor); return { stop: Math.max(t.stop, take * t.stop / t.take), take, floor }; }
+  const stop = Math.max(P.minStop, P.stopAtr * f.atrPct, floor / P.rr); return { stop, take: P.rr * stop, floor };
 }
 function reviewRisk(f, d, br) {  // same parts and weights as src/tradebot/order_review.py
   const c = x => clamp(x, 0, 1);
@@ -1151,7 +1161,7 @@ function stressTests(extra) {
 function sizeTrade(a, f, d) {
   const eq = equity();
   const { stop, take } = bracketFor(a, f);
-  const cost = rtFee(a) + 2 * SLIP + f.spreadBps / 1e4;
+  const cost = tradeCost(a, f);
   const win = take - cost, loss = stop + cost, b = win / loss;
   const fstar = win > 0 ? Math.max(0, d.p_win - (1 - d.p_win) / b) : 0;
   const kelly = P.kelly * fstar / loss;
@@ -1217,6 +1227,8 @@ function policy(i, a, f, d) {
   g('No regulatory veto (24h)', !d.veto.length, d.veto.length ? 'blocked: ' + d.veto[0].slice(0, 48) : P.news === 'veto' || P.news === 'both' ? 'clear' : 'veto off');
   const altBuy = TIER[a.tier].group === 'crypto' && a.sym !== 'BTC_USD' && d.direction === 'long';
   g('Market regime allows alt buys (BTC daily)', !altBuy || S.mode !== 'live' || REG.state === null || REG.state === 'UP', !altBuy ? 'not an alt buy' : S.mode !== 'live' ? 'not applied to the simulated market' : REG.state === null ? 'not read yet' : 'BTC ' + REG.state + (REG.state === 'UP' ? '' : ': alts wait'));
+  const cool = a.coolUntil && S.now < a.coolUntil;
+  g('Not re-entering straight after an exit (' + COOLDOWN_BARS + ' min)', !cool || !!side, cool ? 'cooling down: ' + Math.ceil((a.coolUntil - S.now) / 60000) + ' min left' : 'clear');
   if (a.rotOut) g('On the scanner watchlist', false, 'parked: dropped off the latest market scan (exits only)');
   const run = runUp(a);
   g('No chase (under +15% in 24h)', d.direction !== 'long' || run === null || run < 0.15, run === null ? 'n/a' : (run >= 0 ? '+' : '') + (run * 100).toFixed(1) + '% 24h' + (run >= 0.15 ? ': wait for a pullback' : ''));
@@ -1282,8 +1294,8 @@ function checkOrder(a, side, qty, price, ts, dataTs) {
   if (side === 'buy' && a.pos.qty >= 0) { q = Math.min(q, Math.max(0, S.cash) / (price * (1 + feeRate(a, 'buy')))); if (q <= 0) return { ok: false, why: 'not enough cash' }; }  // spot: no borrowing
   return { ok: true, qty: q, clamped: q < qty };
 }
-function fill(a, ts, side, qty, price, reason, kind) {
-  const fee = qty * price * feeRate(a, side), signed = side === 'buy' ? qty : -qty, p = a.pos;
+function fill(a, ts, side, qty, price, reason, kind, liq) {
+  const fee = qty * price * feeRate(a, side, liq), signed = side === 'buy' ? qty : -qty, p = a.pos;
   const opening = p.qty === 0 || p.qty * signed > 0;
   if (opening) p.avg = (p.avg * Math.abs(p.qty) + price * qty) / Math.abs(p.qty + signed);
   S.cash -= signed * price + fee; S.fees += fee;
@@ -1297,7 +1309,7 @@ function fill(a, ts, side, qty, price, reason, kind) {
     log(ts, a.sym, kind || 'entry', (side === 'buy' ? 'Bought ' : 'Sold ') + fmtQty(qty) + ' at ' + fmtPx(price) + ' (' + reason + ')', 'info');
     a.markers.push({ ts, price, kind: 'entry' });
   } else if (p.qty === 0) {
-    const pnl = a.trip; a.trip = 0; S.trips.push(pnl);
+    const pnl = a.trip; a.trip = 0; S.trips.push(pnl); a.coolUntil = ts + COOLDOWN_BARS * BAR;
     const o = p.open || {}, sd = p.stopDist || TIER[a.tier].stop, risk = sd * p.avg * (o.qty || qty);
     S.tripLog.push({ sym: a.sym, side: o.side || (side === 'sell' ? 'long' : 'short'), open: o.ts || ts, ts, entry: p.avg, exit: price, pnl, R: risk ? pnl / risk : 0, reason,
       regime: o.regime || 'none yet', manual: !!o.manual, heat: (o.mae || 0) / sd, mfe: o.mfe || 0, notional: p.avg * (o.qty || qty) });
@@ -1364,7 +1376,7 @@ function workLimit(a, ts, lo, hi, dataTs) {
     a.pendingLimit = null;
     const v = checkOrder(a, o.side, o.qty, o.limit, ts, dataTs);
     if (!v.ok) { log(ts, a.sym, 'blocked', 'Limit fill blocked by risk layer: ' + v.why, 'risk'); return; }
-    S.ordersToday++; fill(a, ts, o.side, v.qty, o.limit, o.manual ? 'manual limit filled' : 'limit filled', o.manual ? 'manual' : undefined); setBracket(a, o.intent);
+    S.ordersToday++; fill(a, ts, o.side, v.qty, o.limit, o.manual ? 'manual limit filled' : 'limit filled', o.manual ? 'manual' : undefined, 'maker'); setBracket(a, o.intent);
   } else if (--o.ttl <= 0) { a.pendingLimit = null; log(ts, a.sym, 'cancel', 'Limit order expired unfilled; not chased', 'muted'); }
 }
 function checkExits(a, ts, o, h, l, hs, dataTs) {
@@ -1377,7 +1389,16 @@ function checkExits(a, ts, o, h, l, hs, dataTs) {
   let px = null, reason = '';
   if (p.qty > 0) { if (l <= p.stop) { px = Math.min(o, p.stop); reason = p.stop > p.avg ? 'trailing stop' : 'stop'; } else if (h >= p.take) { px = Math.max(o, p.take); reason = 'target'; } }
   else { if (h >= p.stop) { px = Math.max(o, p.stop); reason = p.stop < p.avg ? 'trailing stop' : 'stop'; } else if (l <= p.take) { px = Math.min(o, p.take); reason = 'target'; } }
-  if (px !== null) closeAll(a, ts, px - hs, px + hs, dataTs, reason);
+  if (px === null) return;
+  if (reason === 'target') closeAtLimit(a, ts, px, dataTs, reason);  // the target is a resting limit order: maker fee, no spread crossed
+  else closeAll(a, ts, px - hs, px + hs, dataTs, reason);
+}
+function closeAtLimit(a, ts, px, dataTs, reason) {
+  if (!a.pos.qty) return;
+  const side = a.pos.qty > 0 ? 'sell' : 'buy', v = checkOrder(a, side, Math.abs(a.pos.qty), px, ts, dataTs);
+  if (!v.ok) { log(ts, a.sym, 'blocked', 'Target order blocked by risk layer: ' + v.why, 'risk'); return; }
+  a.pendingLimit = null; a.twap = null; S.ordersToday++;
+  fill(a, ts, side, v.qty, px, reason, undefined, 'maker');
 }
 
 // =====================================================================================
@@ -1966,7 +1987,7 @@ function render() {
   $('kStress').textContent = (worst.pct * 100).toFixed(1) + '%'; setMeter($('mStress'), worst.pct / STRESS_GATE, 0.5, 0.85);
   $('kStressSub').textContent = worst.pct > 0 ? worst.name.split(':')[0] : 'no positions';
   const n = S.trips.length, wins = S.trips.filter(x => x > 0).length;
-  $('kTrades').textContent = n; $('kTradesSub').textContent = n ? (wins / n * 100).toFixed(0) + '% winners · net ' + signedUsd(S.trips.reduce((x, y) => x + y, 0)) + ' · fees ' + usd(S.fees) : 'none yet';
+  $('kTrades').textContent = n; $('kTradesSub').textContent = n ? (wins / n * 100).toFixed(0) + '% winners · net ' + signedUsd(S.trips.reduce((x, y) => x + y, 0)) + ' · fees ' + usd(S.fees) + ' · before fees ' + signedUsd(S.trips.reduce((x, y) => x + y, 0) + S.fees) : 'none yet';
 
   $('scanBody').innerHTML = S.assets.map((a, i) => {
     const f = a.feat, d = a.last && a.last.d, tier = TIER[a.tier], flags = [];
@@ -2016,7 +2037,7 @@ function render() {
     const it = L0.intent, ib = $('intentBox'); ib.className = 'intent ' + it.action;
     ib.textContent = it.action === 'enter' ? 'ENTER ' + it.side.toUpperCase() + ': ' + it.reason : it.action.toUpperCase() + ': ' + it.reason;
     const z = it.sz;
-    $('sizeNote').textContent = z ? 'Sizing: ' + (P.exitMode === 'fixed' ? 'fixed ' : 'ATR ') + 'stop ' + (z.stop * 100).toFixed(2) + '%, target ' + (z.take * 100).toFixed(2) + '%, payoff ' + z.b.toFixed(2) + ':1 after costs. Smallest of quarter Kelly ' + (z.kelly * 100).toFixed(1) + '%, vol target ' + (z.volCap * 100).toFixed(1) + '% and tier cap ' + (TIER[a.tier].maxPos * 100) + '%, × drawdown ' + z.ddScale.toFixed(2) + ' × recent results ' + z.perfScale.toFixed(2) + ' × volatility regime ' + z.regimeScale.toFixed(2) + ' = ' + (z.size * 100).toFixed(1) + '% of equity.' : '';
+    $('sizeNote').textContent = z ? 'Sizing: ' + (P.exitMode === 'fixed' ? 'fixed ' : 'ATR ') + 'stop ' + (z.stop * 100).toFixed(2) + '%, target ' + (z.take * 100).toFixed(2) + '% (round trip costs ' + (z.cost * 100).toFixed(2) + '% in fees and slippage, so no target under ' + (COST_MULT * z.cost * 100).toFixed(2) + '%), payoff ' + z.b.toFixed(2) + ':1 after costs. Smallest of quarter Kelly ' + (z.kelly * 100).toFixed(1) + '%, vol target ' + (z.volCap * 100).toFixed(1) + '% and tier cap ' + (TIER[a.tier].maxPos * 100) + '%, × drawdown ' + z.ddScale.toFixed(2) + ' × recent results ' + z.perfScale.toFixed(2) + ' × volatility regime ' + z.regimeScale.toFixed(2) + ' = ' + (z.size * 100).toFixed(1) + '% of equity.' : '';
     if (!S.pinned || S.pinned.asset !== a.sym) $('inputsPre').textContent = JSON.stringify(L0.inputs, null, 1);
   } else {
     $('sigBody').innerHTML = '<tr><td colspan="3" class="note">Signals appear once this asset has 49 one-minute bars.</td></tr>';
