@@ -245,6 +245,14 @@ canvas.spark { height: 34px; }
 .stepper button { padding: .4rem .65rem; font: 600 .95rem/1 var(--font-mono); }
 .chips { display: flex; flex-wrap: wrap; gap: .3rem; }
 .chips button { padding: .3rem .5rem; font: 600 .72rem/1 var(--font-mono); }
+section[data-view="lab"] .field { flex-wrap: wrap; max-width: 100%; min-width: 0; }
+section[data-view="lab"] .field select, section[data-view="lab"] .field input { max-width: 100%; min-width: 0; }
+section[data-view="lab"] .panel > h2 { flex-wrap: wrap; gap: .3rem .6rem; }
+section[data-view="lab"] .tk-facts dd { min-width: 0; overflow-wrap: anywhere; }
+section[data-view="lab"] .panel > * { min-width: 0; }
+.labgrid { grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); }
+section[data-view="lab"] textarea { box-sizing: border-box; max-width: 100%; display: block; }
+section[data-view="lab"] .field.wide { display: grid; width: 100%; }
 .tk-facts { display: grid; grid-template-columns: auto 1fr; gap: .2rem .8rem; margin: 0; font-size: .78rem; }
 .tk-facts dt { color: var(--muted); }
 .tk-facts dd { margin: 0; text-align: right; font: 500 .78rem var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -304,6 +312,7 @@ td canvas.spark { width: 110px; height: 28px; }
       <button type="button" data-view="journal"><svg viewBox="0 0 24 24"><path d="M6 3h11a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1z"/><path d="M9 8h7M9 12h7"/></svg>Journal</button>
       <button type="button" data-view="news"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h6M7 13h10M7 16h6"/></svg>News</button>
       <button type="button" data-view="research"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg>Research</button>
+      <button type="button" data-view="lab"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.5 9.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7.5 15h9"/></svg>Quant lab</button>
     </div>
     <div class="nav-group"><h3>Account</h3>
       <button type="button" data-view="wallet"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14.5h2"/></svg>Wallet</button>
@@ -686,13 +695,74 @@ td canvas.spark { width: 110px; height: 28px; }
       <h2><span>Weather market vs NWS forecast</span><span class="note" id="wxNote">Not run yet.</span></h2>
       <div class="controls">
         <label class="field wide" for="wxSlug">Polymarket event <input type="text" id="wxSlug" spellcheck="false"></label>
-        <label class="field" for="wxSigma">Forecast error σ °F <input type="number" id="wxSigma" min="1" max="8" step="0.5" value="3.5"></label>
-        <button type="button" class="primary" id="wxGo">Scan · 4 credits</button>
+        <label class="field" for="wxSigma">NWS error σ °F <input type="number" id="wxSigma" min="1" max="8" step="0.5" value="3.5"></label>
+        <label class="field" for="wxSrc">Use <select id="wxSrc"><option value="blend">Blend (NWS + ensemble)</option><option value="ensemble">Ensemble only</option><option value="nws">NWS only</option></select></label>
+        <button type="button" class="primary" id="wxGo">Scan · 5 credits</button>
       </div>
       <dl class="tk-facts" id="wxFacts" style="max-width:34rem"></dl>
-      <div class="tw" style="max-height:none"><table><thead><tr><th>Bucket</th><th class="n">Model</th><th class="n">Bid</th><th class="n">Ask</th><th class="n">Fee</th><th class="n">Edge</th><th class="n">¼ Kelly of $1,000</th></tr></thead><tbody id="wxBody"></tbody></table></div>
-      <p class="note" style="max-width:70ch">The forecast is the NWS hourly forecast at the market's own resolution station (NYC settles on LaGuardia, not Central Park), maximum over the station's local day. Buckets are whole degrees. Edge = model probability − ask − taker fee (0.05 × p × (1 − p)). σ = 3.5°F is a starting assumption: when the model's "edges" sit in the tails, that says σ is wider than the market's, not that money is on the table. The command-line scanner learns each station's own forecast bias and σ after 30 settled days (<code>tradebot weather scan</code> / <code>settle</code>).</p>
+      <figure id="wxStrip" style="margin:0" hidden><svg id="wxSvg" viewBox="0 0 640 86" width="100%" role="img" aria-label="Each ensemble run's forecast high, against the market's buckets"></svg><figcaption class="note">Each dot is one ensemble run's forecast high (GFS blue, ECMWF teal); the black tick is the NWS forecast. Shaded bands are the market's buckets.</figcaption></figure>
+      <div class="tw" style="max-height:none"><table><thead><tr><th>Bucket</th><th class="n">NWS</th><th class="n">Ensemble</th><th class="n">Used</th><th class="n">Bid</th><th class="n">Ask</th><th class="n">Fee</th><th class="n">Edge</th><th class="n">¼ Kelly of $1,000</th></tr></thead><tbody id="wxBody"></tbody></table></div>
+      <p class="note" style="max-width:70ch">Ensemble: the 82 runs of GFS (31) and ECMWF (51) from Open-Meteo's free API, each run's daily high dressed with a 1.5°F normal kernel (Roulston &amp; Smith 2003); the spread of the runs is the forecast's real uncertainty, where σ below is only an assumption. The command-line scanner learns each station's bias and kernel, and scores every settled bucket (<code>tradebot weather calibration</code>). The forecast is the NWS hourly forecast at the market's own resolution station (NYC settles on LaGuardia, not Central Park), maximum over the station's local day. Buckets are whole degrees. Edge = model probability − ask − taker fee (0.05 × p × (1 − p)). σ = 3.5°F is a starting assumption: when the model's "edges" sit in the tails, that says σ is wider than the market's, not that money is on the table. The command-line scanner learns each station's own forecast bias and σ after 30 settled days (<code>tradebot weather scan</code> / <code>settle</code>).</p>
     </section>
+  </section>
+
+  <section class="view" data-view="lab" aria-label="Quant lab" hidden>
+    <div class="vhead"><h1>Quant lab</h1><p>The checks the command-line desk now runs, on this page's own data. Same formulas as <code>quant.py</code>, each tested there against arch, statsmodels, scikit-learn or the original paper.</p></div>
+    <div class="grid2 labgrid">
+      <section class="panel" aria-label="Volatility">
+        <h2><span>Volatility · range estimators</span><span class="note" id="labAsset"></span></h2>
+        <div class="tw" style="max-height:none"><table><thead><tr><th>Estimator</th><th class="n">Per bar</th><th class="n">Annualised</th><th>Note</th></tr></thead><tbody id="labVol"></tbody></table></div>
+        <p class="note">Range estimators use the high and low, so they need far fewer bars than close-to-close for the same accuracy. Yang–Zhang is unbiased with gaps and drift; the desk sizes stops and estimates impact with it.</p>
+        <h3 class="note" style="margin:0">Trend or noise? · Lo–MacKinlay variance ratio</h3>
+        <div class="tw" style="max-height:none"><table><thead><tr><th>Horizon</th><th class="n">VR</th><th class="n">z (robust)</th><th>Reading</th></tr></thead><tbody id="labVR"></tbody></table></div>
+        <p class="note">VR above 1 = moves persist (trend rules have something to work with); below 1 = moves reverse. Only a p under 0.05 counts.</p>
+      </section>
+      <section class="panel" aria-label="Deflated Sharpe">
+        <h2><span>Is the edge real? · deflated Sharpe</span><span id="labDsrTag"></span></h2>
+        <div class="controls">
+          <label class="field" for="labSrc">Returns <select id="labSrc"><option value="session">Session trades (R)</option><option value="paste">Paste my own</option></select></label>
+          <label class="field" for="labTrials">Configurations tried <input type="number" id="labTrials" min="1" step="1" value="1"></label>
+          <label class="field" for="labTVar">Variance of their Sharpes <input type="text" id="labTVar" inputmode="decimal" placeholder="unknown"></label>
+        </div>
+        <label class="field wide" id="labPaste" for="labPasteTxt" hidden>Returns, one per line or comma separated <textarea id="labPasteTxt" rows="3" spellcheck="false" style="width:100%;font:inherit;font-family:var(--font-mono)"></textarea></label>
+        <dl class="tk-facts" id="labDsr"></dl>
+        <p class="note">Try 100 random strategies and the best one will show a Sharpe near 2.5 by luck alone (Bailey &amp; López de Prado). The deflated Sharpe asks whether this one beats that benchmark after skew and fat tails. The insider backtest counts its own configurations and refuses to call an edge under 95%.</p>
+      </section>
+      <section class="panel" aria-label="Calibration">
+        <h2><span>Are the p_win calls honest? · calibration</span></h2>
+        <p class="note" id="labCalSum"></p>
+        <div class="tw" style="max-height:none"><table><thead><tr><th>Stated p_win</th><th class="n">Calls</th><th class="n">Average stated</th><th class="n">Actually won</th></tr></thead><tbody id="labCal"></tbody></table></div>
+        <p class="note">An honest forecaster's "60%" wins about 60% of the time. Rows more than 10 points off are marked. Brier below the "always say the base rate" score means the calls carry information.</p>
+      </section>
+      <section class="panel" aria-label="Market impact">
+        <h2><span>What will the order cost? · square-root impact</span></h2>
+        <div class="controls">
+          <label class="field" for="impSh">Shares <input type="number" id="impSh" min="0" step="10" value="200"></label>
+          <label class="field" for="impPx">Price $ <input type="number" id="impPx" min="0" step="0.01" value="50"></label>
+          <label class="field" for="impAdv">Daily volume $M <input type="number" id="impAdv" min="0" step="1" value="20"></label>
+          <label class="field" for="impSig">Daily vol % <input type="number" id="impSig" min="0" step="0.1" value="2"></label>
+        </div>
+        <p id="impOut"></p>
+        <p class="note">Cost ≈ half the spread + σ × √(order ÷ daily volume) (Almgren et al. 2005; Tóth et al. 2011). Every desk ticket now carries this number, and the risk check refuses tickets above 25 bps.</p>
+      </section>
+      <section class="panel" aria-label="Desk schedule">
+        <h2><span>Desk schedule · New York time</span></h2>
+        <div class="tw" style="max-height:none"><table><thead><tr><th>Routine</th><th>When</th><th>Next run</th><th>What</th></tr></thead><tbody id="labSched"></tbody></table></div>
+        <p class="note">Run by systemd timers or, in Docker, by <code>tradebot desk schedule</code>. With <code>TRADEBOT_DESK_LLM=1</code> the morning analyst adds the Claude bull / bear / judge seat; it may only cite numbers it was handed and can only kill names.</p>
+      </section>
+      <section class="panel" aria-label="Export to freqtrade">
+        <h2><span>Export to freqtrade</span><button type="button" id="ftCopy">Copy</button></h2>
+        <div class="controls">
+          <label class="field" for="ftKind">Rule <select id="ftKind"><option value="trend200">trend200 (above 200-day avg)</option><option value="signals">My signal days</option></select></label>
+          <label class="field" for="ftStop">Stop % <input type="number" id="ftStop" min="0.5" max="50" step="0.5" value="8"></label>
+          <label class="field" for="ftHold">Hold days <input type="number" id="ftHold" min="0" step="1" value="5"></label>
+          <label class="field" for="ftName">Class <input type="text" id="ftName" value="TradebotExport" spellcheck="false"></label>
+        </div>
+        <label class="field wide" id="ftSigWrap" for="ftSig" hidden>pair,date per line <textarea id="ftSig" rows="3" spellcheck="false" style="width:100%;font-family:var(--font-mono)">BTC/USDT,2025-03-03</textarea></label>
+        <textarea id="ftOut" rows="10" readonly spellcheck="false" style="width:100%;font:.72rem/1.4 var(--font-mono);background:var(--sunken);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.5rem"></textarea>
+        <p class="note">Same file as <code>tradebot export freqtrade</code>; it loads in freqtrade 2026.9. Save it in <code>user_data/strategies/</code> and run <code>freqtrade backtesting --strategy TradebotExport</code>. freqtrade trades crypto only.</p>
+      </section>
+    </div>
   </section>
 
   <!-- ============================== WALLET ============================== -->
@@ -1928,7 +1998,7 @@ if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').m
 // Views: overview, terminal, markets, portfolio, agents, journal. Everything below reads the
 // engine's own state (S, SENT, ARB); nothing here invents prices, trades or results.
 // =====================================================================================
-const VIEWS = ['overview', 'trade', 'markets', 'bots', 'portfolio', 'agents', 'journal', 'news', 'research', 'wallet', 'settings'];
+const VIEWS = ['overview', 'trade', 'markets', 'bots', 'portfolio', 'agents', 'journal', 'news', 'research', 'lab', 'wallet', 'settings'];
 const store = {
   get(k, d) { try { const v = localStorage.getItem('tb.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('tb.' + k, JSON.stringify(v)); } catch (e) { /* per-viewer convenience only */ } },
@@ -2222,6 +2292,7 @@ function renderExtra() {
   if (VIEW === 'bots') renderBots(now);
   if (VIEW === 'wallet') renderWallet(eq, now);
   if (VIEW === 'research') renderResearch();
+  if (VIEW === 'lab') renderLab();
 }
 function renderOverview(eq, now) {
   const start0 = S.journal.length ? S.journal[S.journal.length - 1].ts : now, openN = S.assets.filter(x => isOpen(x, now)).length;
@@ -2719,7 +2790,16 @@ async function weatherScan() {
     const buckets = (ev.markets || []).map(mk => { const r = bucketRange(mk.groupItemTitle || mk.question); const fs = mk.feeSchedule || {};
       return r && { title: mk.groupItemTitle, lo: r[0], hi: r[1], bid: +mk.bestBid || 0, ask: +mk.bestAsk || 0, rate: mk.feesEnabled ? +(fs.rate || 0) : 0, open: mk.acceptingOrders && !mk.closed }; })
       .filter(Boolean).sort((a, b) => a.lo - b.lo);
-    RS.wx.out = { title: ev.title, station, day, max: Math.max(...temps), hours: temps.length, issued: fc.updateTime || fc.generatedAt, buckets, slug };
+    let ens = null, ensErr = null;
+    try {
+      RS.wx.note = 'Reading the GFS + ECMWF ensemble…'; rerender();
+      const js = await fcJSON('https://ensemble-api.open-meteo.com/v1/ensemble?latitude=' + lat.toFixed(4) + '&longitude=' + lon.toFixed(4) + '&hourly=temperature_2m&models=gfs025,ecmwf_ifs025&temperature_unit=fahrenheit&timezone=' + encodeURIComponent(pt.timeZone) + '&forecast_days=7', obj);
+      const idx = js.hourly.time.map((t, i) => t.slice(0, 10) === day ? i : -1).filter(i => i >= 0), runs = [];
+      Object.keys(js.hourly).forEach(k => { const m = k.match(/^temperature_2m(?:_member\d+)?(?:_(.+))?$/); if (!m) return;
+        const vs = idx.map(i => js.hourly[k][i]).filter(v => v !== null && v !== undefined); if (vs.length >= 20) runs.push({ model: /gefs|gfs/.test(m[1] || '') ? 'gfs' : 'ecmwf', max: Math.max(...vs) }); });
+      if (runs.length >= 10) ens = { runs, grid: [js.latitude, js.longitude] }; else ensErr = runs.length + ' complete runs for ' + day;
+    } catch (e) { ensErr = (e && e.message) || 'unavailable'; }
+    RS.wx.out = { title: ev.title, station, day, max: Math.max(...temps), hours: temps.length, issued: fc.updateTime || fc.generatedAt, buckets, slug, ens, ensErr };
     RS.wx.note = 'Read ' + new Date().toISOString().slice(11, 16) + ' UTC';
   } catch (e) { RS.wx.note = 'Scan failed: ' + ((e && e.code) || 'error') + (e && e.message ? ' · ' + e.message : ''); }
   finally { RS.wx.busy = false; rerender(); }
@@ -2733,23 +2813,184 @@ function renderResearch() {
     || '<tr><td colspan="8" class="note">NO TRADE TODAY: no C-suite open-market buy of $100K+ in the filings read. That is a good result.</td></tr>')
     : '<tr><td colspan="8" class="note">Run the scan to read the latest filings.</td></tr>';
   if (!$('wxSlug').value) $('wxSlug').value = defaultSlug();
-  $('wxNote').textContent = RS.wx.note; $('wxGo').disabled = RS.wx.busy || !live; $('wxGo').textContent = RS.wx.busy ? 'Scanning…' : 'Scan · 4 credits';
+  $('wxNote').textContent = RS.wx.note; $('wxGo').disabled = RS.wx.busy || !live; $('wxGo').textContent = RS.wx.busy ? 'Scanning…' : 'Scan · 5 credits';
   const o = RS.wx.out, sig = clamp(+$('wxSigma').value || 3.5, 1, 8);
-  if (!o) { $('wxFacts').innerHTML = ''; $('wxBody').innerHTML = '<tr><td colspan="7" class="note">' + (live ? 'Scan to compare the market with the forecast.' : 'Needs the Firecrawl connector (open on claude.ai with it added).') + '</td></tr>'; return; }
-  $('wxFacts').innerHTML = [['Market', o.title], ['Resolves on station', o.station], ['Day', o.day], ['NWS forecast high', o.max + '°F from ' + o.hours + ' hourly periods'], ['Forecast issued', (o.issued || '').slice(0, 16).replace('T', ' ') + ' UTC'], ['Error model', 'Normal, bias 0, σ ' + sig + '°F (starting assumption)']]
+  if (!o) { $('wxStrip').hidden = true; $('wxFacts').innerHTML = ''; $('wxBody').innerHTML = '<tr><td colspan="9" class="note">' + (live ? 'Scan to compare the market with the forecast.' : 'Needs the Firecrawl connector (open on claude.ai with it added).') + '</td></tr>'; return; }
+  const src = o.ens ? $('wxSrc').value : 'nws', KS = 1.5, hs = o.ens ? o.ens.runs.map(r => r.max) : [];
+  const pN = (b, mu, sd) => (b.hi === Infinity ? 1 : phiN((b.hi + 0.5 - mu) / sd)) - (b.lo === -Infinity ? 0 : phiN((b.lo - 0.5 - mu) / sd));
+  const ensLine = o.ens ? hs.length + ' runs (' + o.ens.runs.filter(r => r.model === 'gfs').length + ' GFS, ' + o.ens.runs.filter(r => r.model === 'ecmwf').length + ' ECMWF): ' + Math.min(...hs).toFixed(1) + '–' + Math.max(...hs).toFixed(1) + '°F, mean ' + qmean(hs).toFixed(1) + ', spread σ ' + Math.sqrt(qvar(hs)).toFixed(1) : 'unavailable (' + (o.ensErr || '') + '): NWS only';
+  $('wxFacts').innerHTML = [['Market', o.title], ['Resolves on station', o.station], ['Day', o.day], ['NWS forecast high', o.max + '°F from ' + o.hours + ' hourly periods'], ['Forecast issued', (o.issued || '').slice(0, 16).replace('T', ' ') + ' UTC'], ['Ensemble', ensLine], ['NWS error model', 'Normal, bias 0, σ ' + sig + '°F (starting assumption)'], ['Using', src === 'blend' ? 'average of NWS and ensemble' : src]]
     .map(f => '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>').join('');
+  $('wxStrip').hidden = !o.ens;
+  if (o.ens) {
+    const fin = o.buckets.flatMap(b => [b.lo, b.hi]).filter(isFinite), lo = Math.min(Math.min(...hs), o.max, ...fin) - 2, hi = Math.max(Math.max(...hs), o.max, ...fin) + 2, X = v => 20 + (v - lo) / (hi - lo) * 600;
+    const band = o.buckets.map((b, i) => { const a = X(Math.max(lo, b.lo === -Infinity ? lo : b.lo - 0.5)), z = X(Math.min(hi, b.hi === Infinity ? hi : b.hi + 0.5));
+      return '<rect x="' + a.toFixed(1) + '" y="6" width="' + Math.max(0, z - a).toFixed(1) + '" height="52" fill="' + (i % 2 ? 'var(--sunken)' : 'var(--mid)') + '"/>'; }).join('');
+    const ticks = []; for (let t = Math.ceil(lo / 2) * 2; t <= hi; t += 2) ticks.push('<text x="' + X(t).toFixed(1) + '" y="78" font-size="10" text-anchor="middle" fill="var(--muted)" font-family="var(--font-mono)">' + t + '°</text>');
+    const sorted = o.ens.runs.slice().sort((a, b) => a.max - b.max), seen = {};
+    const dots = sorted.map(r => { const k = Math.round(r.max * 2); seen[k] = (seen[k] || 0) + 1; return '<circle cx="' + X(r.max).toFixed(1) + '" cy="' + (54 - seen[k] * 4.2).toFixed(1) + '" r="2" fill="' + (r.model === 'gfs' ? 'var(--c1)' : 'var(--c2)') + '"/>'; }).join('');
+    $('wxSvg').innerHTML = band + dots + '<line x1="' + X(o.max).toFixed(1) + '" x2="' + X(o.max).toFixed(1) + '" y1="2" y2="62" stroke="var(--fg)" stroke-width="2"/>' + ticks.join('');
+  }
   let tot = 0;
   $('wxBody').innerHTML = o.buckets.map(b => {
-    const p = (b.hi === Infinity ? 1 : phiN((b.hi + 0.5 - o.max) / sig)) - (b.lo === -Infinity ? 0 : phiN((b.lo - 0.5 - o.max) / sig)); tot += p;
+    const pn = pN(b, o.max, sig), pe = o.ens ? qmean(hs.map(h => pN(b, h, KS))) : null;
+    const p = src === 'nws' || pe === null ? pn : src === 'ensemble' ? pe : 0.5 * (pn + pe); tot += p;
     const fee = b.rate * b.ask * (1 - b.ask), edge = b.open && b.ask > 0 && b.ask < 1 ? p - b.ask - fee : null, cost = b.ask + fee;
     const k = edge !== null && edge >= 0.02 ? Math.min(0.05, 0.25 * Math.max(0, (p - cost) / (1 - cost))) * 1000 : 0;
-    return '<tr><td>' + esc(b.title) + '</td><td class="n">' + (p * 100).toFixed(1) + '%</td><td class="n">' + b.bid.toFixed(3) + '</td><td class="n">' + b.ask.toFixed(3) + '</td><td class="n">' + fee.toFixed(4) + '</td><td class="n ' + (edge > 0 ? 'up' : edge < 0 ? 'down' : '') + '">' + (edge === null ? '—' : (edge >= 0 ? '+' : '') + (edge * 100).toFixed(1) + '¢') + '</td><td class="n">' + (k ? usd(k) : '—') + '</td></tr>'; }).join('')
-    + '<tr><td class="note">Probabilities sum to</td><td class="n">' + (tot * 100).toFixed(1) + '%</td><td colspan="5"></td></tr>';
+    return '<tr><td>' + esc(b.title) + '</td><td class="n">' + (pn * 100).toFixed(1) + '%</td><td class="n">' + (pe === null ? '—' : (pe * 100).toFixed(1) + '%') + '</td><td class="n"><b>' + (p * 100).toFixed(1) + '%</b></td><td class="n">' + b.bid.toFixed(3) + '</td><td class="n">' + b.ask.toFixed(3) + '</td><td class="n">' + fee.toFixed(4) + '</td><td class="n ' + (edge > 0 ? 'up' : edge < 0 ? 'down' : '') + '">' + (edge === null ? '—' : (edge >= 0 ? '+' : '') + (edge * 100).toFixed(1) + '¢') + '</td><td class="n">' + (k ? usd(k) : '—') + '</td></tr>'; }).join('')
+    + '<tr><td class="note">Probabilities sum to</td><td></td><td></td><td class="n">' + (tot * 100).toFixed(1) + '%</td><td colspan="5"></td></tr>';
 }
 $('inGo').addEventListener('click', insiderScan);
 $('inN').addEventListener('input', () => rerender());
 $('wxGo').addEventListener('click', weatherScan);
 $('wxSigma').addEventListener('input', () => rerender());
+$('wxSrc').addEventListener('change', () => rerender());
+
+// ---------- quant lab: the same formulas as src/tradebot/quant.py (checked there against arch, statsmodels, sklearn) ----------
+const QL = { trials: 1, trialsVar: '', paste: '', src: 'session', ens: null };
+const qmean = x => x.reduce((s, v) => s + v, 0) / x.length;
+const qvar = (x, d = 1) => { const m = qmean(x); return x.reduce((s, v) => s + (v - m) ** 2, 0) / (x.length - d); };
+function qmoments(x) {
+  const n = x.length, m = qmean(x), m2 = x.reduce((s, v) => s + (v - m) ** 2, 0) / n;
+  if (!m2) return [m, 0, 0, 3];
+  const m3 = x.reduce((s, v) => s + (v - m) ** 3, 0) / n, m4 = x.reduce((s, v) => s + (v - m) ** 4, 0) / n;
+  return [m, Math.sqrt(m2), m3 / m2 ** 1.5, m4 / m2 ** 2];
+}
+function invN(p) {  // Acklam's rational approximation, |error| < 1.2e-9
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239],
+    b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572],
+    c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783],
+    d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  if (p < 0.02425) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p > 1 - 0.02425) return -invN(1 - p);
+  const q = p - 0.5, r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+const EG = 0.5772156649015329;
+const emaxSR = (n, v) => n <= 1 ? 0 : Math.sqrt(v) * ((1 - EG) * invN(1 - 1 / n) + EG * invN(1 - 1 / (n * Math.E)));
+const srVar = (sr, n, g3, g4) => (1 - g3 * sr + (g4 - 1) / 4 * sr * sr) / (n - 1);
+function qdsr(x, trials, vTrials) {
+  const n = x.length, [m, s, g3, g4] = qmoments(x), sr = s ? m / s : 0, v = srVar(sr, n, g3, g4);
+  const sr0 = emaxSR(Math.max(1, trials), vTrials > 0 ? vTrials : v);
+  const ps = k => v > 0 ? phiN((sr - k) / Math.sqrt(v)) : NaN;
+  const mtr = sr > 0 ? 1 + (1 - g3 * sr + (g4 - 1) / 4 * sr * sr) * (invN(0.95) / sr) ** 2 : Infinity;
+  return { n, mean: m, sr, g3, g4, psr: ps(0), sr0, dsr: ps(sr0), mtr };
+}
+function qboot(x, reps = 1000, seed = 7) {  // Politis-Romano stationary bootstrap, mean block n^(1/3)
+  let st = seed >>> 0; const rnd = () => (st = (st * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const n = x.length, p = 1 / Math.max(1, Math.cbrt(n)), out = [];
+  for (let r = 0; r < reps; r++) { let i = Math.floor(rnd() * n), s = 0;
+    for (let k = 0; k < n; k++) { s += x[i]; i = rnd() < p ? Math.floor(rnd() * n) : (i + 1) % n; } out.push(s / n); }
+  out.sort((a, b) => a - b); return [out[Math.floor(0.025 * reps)], out[Math.ceil(0.975 * reps) - 1]];
+}
+function qvol(bars) {  // per-bar volatility estimators; bars oldest first with o,h,l,c
+  const x = bars.filter(b => b.o > 0 && b.h > 0 && b.l > 0 && b.c > 0), n = x.length - 1;
+  if (n < 10) return null;
+  const L = Math.log, cur = x.slice(1);
+  const cc = Math.sqrt(qvar(cur.map((b, i) => L(b.c / x[i].c))));
+  const pk = Math.sqrt(cur.reduce((s, b) => s + L(b.h / b.l) ** 2, 0) / (4 * Math.LN2 * n));
+  const gk = Math.sqrt(Math.max(0, cur.reduce((s, b) => s + 0.5 * L(b.h / b.l) ** 2 - (2 * Math.LN2 - 1) * L(b.c / b.o) ** 2, 0) / n));
+  const rs2 = Math.max(0, cur.reduce((s, b) => s + L(b.h / b.c) * L(b.h / b.o) + L(b.l / b.c) * L(b.l / b.o), 0) / n);
+  const k = 0.34 / (1.34 + (n + 1) / (n - 1));
+  const yz = Math.sqrt(qvar(cur.map((b, i) => L(b.o / x[i].c))) + k * qvar(cur.map(b => L(b.c / b.o))) + (1 - k) * rs2);
+  let ew = L(cur[0].c / x[0].c) ** 2; cur.forEach((b, i) => { if (i) ew = 0.94 * ew + 0.06 * L(b.c / x[i].c) ** 2; });
+  return { n, cc, pk, gk, rs: Math.sqrt(rs2), yz, ewma: Math.sqrt(ew) };
+}
+function qvr(prices, q) {  // Lo-MacKinlay VR(q), overlapping, robust z (matches arch.unitroot.VarianceRatio)
+  const lp = prices.map(Math.log), r = lp.slice(1).map((v, i) => v - lp[i]), n = r.length;
+  if (n < 4 * q) return null;
+  const mu = qmean(r), s1 = r.reduce((s, v) => s + (v - mu) ** 2, 0) / (n - 1), m = q * (n - q + 1) * (1 - q / n);
+  let sq = 0; for (let t = 0; t <= n - q; t++) sq += (lp[t + q] - lp[t] - q * mu) ** 2;
+  const vr = sq / m / s1, d2 = r.map(v => (v - mu) ** 2), den = d2.reduce((s, v) => s + v, 0) ** 2;
+  let th = 0; for (let j = 1; j < q; j++) { let s = 0; for (let t = j; t < n; t++) s += d2[t] * d2[t - j]; th += (2 * (q - j) / q) ** 2 * n * s / den; }
+  const z = th > 0 ? (vr - 1) * Math.sqrt(n) / Math.sqrt(th) : NaN;
+  return { vr, z, p: 2 * (1 - phiN(Math.abs(z))) };
+}
+function qrel(p, y, bins = 5) {
+  const rows = []; let ece = 0;
+  for (let k = 0; k < bins; k++) { const lo = k / bins, hi = (k + 1) / bins, idx = p.map((v, i) => i).filter(i => p[i] >= lo && (p[i] < hi || (k === bins - 1 && p[i] <= 1)));
+    if (!idx.length) continue; const st = qmean(idx.map(i => p[i])), ob = qmean(idx.map(i => y[i])); rows.push({ lo, hi, n: idx.length, st, ob }); ece += idx.length / p.length * Math.abs(st - ob); }
+  return { rows, ece, brier: qmean(p.map((v, i) => (v - y[i]) ** 2)), base: qmean(y) };
+}
+const sqrtImpact = (sh, px, adv, sig, spread = 2) => adv > 0 ? spread / 2 + sig * Math.sqrt(sh * px / adv) * 1e4 : Infinity;
+const DESK_JOBS = [['morning', [1, 2, 3, 4, 5], '05:30', 'scout → analyst → skeptic → risk; the brief'], ['chain-check', [1, 2, 3, 4, 5], '08:30', 'alert if a morning file is missing'],
+  ['exit-due', [1, 2, 3, 4, 5], '15:45', 'close positions on their 5th trading day'], ['journal', [1, 2, 3, 4, 5], '16:30', 'log tickets and kills'],
+  ['weekly', [5], '17:00', 'review, lessons, CUSUM decay check'], ['audit', [0], '18:00', 'fresh-eyes audit of the tests']];
+function nyNext(days, hm) {  // next New York wall-clock time on one of these weekdays (0 = Sunday)
+  const [H, M] = hm.split(':').map(Number), now = Date.now();
+  const parts = t => Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23', weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(t)).map(p => [p.type, p.value]));
+  const WD = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  for (let k = 0; k < 8; k++) {
+    const p = parts(now + k * 86400e3); if (!days.includes(WD[p.weekday])) continue;
+    const guess = Date.UTC(+p.year, +p.month - 1, +p.day, H, M), q = parts(guess), off = Date.UTC(+q.year, +q.month - 1, +q.day, +q.hour, +q.minute) - guess, t = guess - off;
+    if (t > now) return t;
+  }
+  return null;
+}
+function ftExport(kind, stop, hold, name, signals) {
+  const today = new Date().toISOString().slice(0, 10), t200 = kind === 'trend200';
+  const sig = {}; (signals || []).forEach(([p, d]) => (sig[p] = sig[p] || []).push(d));
+  const block = t200 ? '' : 'SIGNALS = {\n' + Object.keys(sig).sort().map(p => '    ' + JSON.stringify(p) + ': ' + JSON.stringify([...new Set(sig[p])].sort()) + ',\n').join('') + '}\n';
+  return '"""Exported by the tradebot desk on ' + today + '. ' + (t200 ? 'trend200: long while the close is above its 200-candle average.' : 'Entry on the candle of each listed signal day.') + '\nStop ' + (stop * 100).toFixed(1) + '% below entry, time exit after ' + hold + ' days (custom_exit), no ROI ladder.\n"""\n'
+    + 'from datetime import datetime, timedelta\n\nfrom pandas import DataFrame\n\nfrom freqtrade.strategy import IStrategy\n\n' + block + '\n\nclass ' + name + '(IStrategy):\n'
+    + '    INTERFACE_VERSION = 3\n    timeframe = "1d"\n    can_short = False\n    stoploss = -' + stop + '\n    minimal_roi = {"0": 100.0}\n    use_exit_signal = ' + (t200 ? 'True' : 'False') + '\n    process_only_new_candles = True\n    startup_candle_count = ' + (t200 ? 200 : 1) + '\n\n'
+    + '    def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:\n' + (t200 ? '        dataframe["sma200"] = dataframe["close"].rolling(200).mean()\n' : '        days = set(SIGNALS.get(metadata["pair"], []))\n        dataframe["signal"] = dataframe["date"].dt.strftime("%Y-%m-%d").isin(days).astype(int)\n') + '        return dataframe\n\n'
+    + '    def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:\n' + (t200 ? '        dataframe.loc[dataframe["close"] > dataframe["sma200"], "enter_long"] = 1\n' : '        dataframe.loc[dataframe["signal"] == 1, "enter_long"] = 1\n') + '        return dataframe\n\n'
+    + '    def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:\n' + (t200 ? '        dataframe.loc[dataframe["close"] < dataframe["sma200"], "exit_long"] = 1\n' : '        dataframe["exit_long"] = 0\n') + '        return dataframe\n\n'
+    + '    def custom_exit(self, pair: str, trade, current_time: datetime, current_rate: float, current_profit: float, **kwargs):\n        if current_time - trade.open_date_utc >= timedelta(days=' + (t200 && hold <= 0 ? 10000 : hold) + '):\n            return "time_exit_' + hold + 'd"\n        return None\n';
+}
+const f3 = (v, d = 3) => v === null || v === undefined || !isFinite(v) ? '—' : (+v).toFixed(d);
+const pc = (v, d = 1) => v === null || v === undefined || !isFinite(v) ? '—' : (v * 100).toFixed(d) + '%';
+function renderLab() {
+  const a = S.assets[S.sel], bars = a.bars.slice(-300);
+  $('labAsset').textContent = short(a.sym) + ' · last ' + bars.length + ' one-minute bars';
+  const tr = TIER[a.tier] || { bpd: 1440, group: 'crypto' }, v = qvol(bars), ann = Math.sqrt(tr.bpd * (tr.group === 'crypto' ? 365 : 252));
+  $('labVol').innerHTML = v ? [['Close to close', v.cc, 'the usual; noisiest'], ['Parkinson (1980)', v.pk, 'high/low range; no drift, no gaps'], ['Garman–Klass (1980)', v.gk, 'range + open/close'],
+    ['Rogers–Satchell (1991)', v.rs, 'drift-free; ignores gaps'], ['Yang–Zhang (2000)', v.yz, 'gaps + drift; the one the desk uses for tickets'], ['EWMA λ = 0.94', v.ewma, 'RiskMetrics; reacts to the latest bars']]
+    .map(r => '<tr><td>' + r[0] + '</td><td class="n">' + pc(r[1], 3) + '</td><td class="n">' + pc(r[1] * ann, 0) + '</td><td class="note">' + r[2] + '</td></tr>').join('')
+    : '<tr><td colspan="4" class="note">Needs at least 11 bars of this asset.</td></tr>';
+  const px = bars.map(b => b.c);
+  $('labVR').innerHTML = [2, 5, 10].map(q => { const r = qvr(px, q); if (!r) return '<tr><td>VR(' + q + ')</td><td colspan="3" class="note">not enough bars</td></tr>';
+    const read = r.p < 0.05 ? (r.vr > 1 ? '<span class="tag p-info">trending</span>' : '<span class="tag p-warn">mean reverting</span>') : '<span class="tag">random walk</span>';
+    return '<tr><td>VR(' + q + ')</td><td class="n">' + f3(r.vr) + '</td><td class="n">' + f3(r.z, 2) + '</td><td>' + read + ' <span class="note">p ' + f3(r.p, 3) + '</span></td></tr>'; }).join('');
+
+  const srcR = QL.src === 'paste' ? QL.paste.split(/[\s,;]+/).map(Number).filter(x => isFinite(x)) : S.tripLog.map(t => t.R);
+  $('labPaste').hidden = QL.src !== 'paste';
+  const vt = parseFloat(QL.trialsVar);
+  if (srcR.length < 5) { $('labDsr').innerHTML = '<dt>Trades</dt><dd>' + srcR.length + ' — needs 5 or more ' + (QL.src === 'paste' ? 'numbers.' : 'closed trades this session (or paste your own returns).') + '</dd>'; $('labDsrTag').textContent = ''; }
+  else {
+    const d = qdsr(srcR, QL.trials, vt), ci = qboot(srcR);
+    const verdict = d.dsr >= 0.95 ? ['p-good', 'Real at 95%'] : d.psr >= 0.95 ? ['p-warn', 'Real alone, not after ' + QL.trials + ' tries'] : ['p-risk', 'Not distinguishable from luck'];
+    $('labDsrTag').innerHTML = '<span class="tag ' + verdict[0] + '">' + verdict[1] + '</span>';
+    $('labDsr').innerHTML = [['Trades', d.n], ['Average', f3(d.mean, 3) + (QL.src === 'paste' ? '' : 'R')], ['95% interval (block bootstrap)', f3(ci[0], 3) + ' to ' + f3(ci[1], 3)], ['Sharpe per trade', f3(d.sr)],
+      ['Skew · kurtosis', f3(d.g3, 2) + ' · ' + f3(d.g4, 2)], ['P(Sharpe > 0) · PSR', pc(d.psr)], ['Best-of-' + QL.trials + ' luck benchmark', f3(d.sr0)], ['Deflated Sharpe · DSR', pc(d.dsr)],
+      ['Trades needed for 95%', isFinite(d.mtr) ? Math.ceil(d.mtr) : 'never at this Sharpe']].map(r => '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>').join('');
+  }
+
+  const sc = S.scored.slice(-1000);
+  if (sc.length < 20) { $('labCal').innerHTML = '<tr><td colspan="4" class="note">' + sc.length + ' scored calls so far; the table fills in after 20.</td></tr>'; $('labCalSum').textContent = ''; }
+  else { const r = qrel(sc.map(s => s.p), sc.map(s => s.y));
+    $('labCalSum').textContent = sc.length + ' calls · Brier ' + f3(r.brier) + ' (always saying ' + pc(r.base, 0) + ' would score ' + f3(r.base * (1 - r.base)) + ') · ECE ' + pc(r.ece);
+    $('labCal').innerHTML = r.rows.map(b => '<tr><td>' + pc(b.lo, 0) + '–' + pc(b.hi, 0) + '</td><td class="n">' + b.n + '</td><td class="n">' + pc(b.st) + '</td><td class="n ' + (Math.abs(b.ob - b.st) > 0.1 ? 'down' : '') + '">' + pc(b.ob) + '</td></tr>').join(''); }
+
+  const sh = +$('impSh').value || 0, ip = +$('impPx').value || 0, adv = (+$('impAdv').value || 0) * 1e6, sg = (+$('impSig').value || 0) / 100;
+  const bps = sqrtImpact(sh, ip, adv, sg);
+  $('impOut').innerHTML = isFinite(bps) ? '<b>' + bps.toFixed(1) + ' bps</b> expected one-way cost (' + usd(bps / 1e4 * sh * ip) + ') · ' + (bps > 25 ? '<span class="tag p-risk">over the desk\'s 25 bps limit: refused</span>' : '<span class="tag p-good">within the 25 bps limit</span>') : '<span class="note">Enter a positive daily dollar volume.</span>';
+
+  $('labSched').innerHTML = DESK_JOBS.map(([n, days, hm, what]) => { const t = nyNext(days, hm);
+    return '<tr><td><code>' + n + '</code></td><td>' + (days.length === 5 ? 'Mon–Fri' : days[0] === 5 ? 'Fri' : 'Sun') + ' ' + hm + '</td><td>' + (t ? new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(t)) + ' NY · in ' + Math.round((t - Date.now()) / 36e5) + ' h' : '—') + '</td><td class="note">' + what + '</td></tr>'; }).join('');
+
+  const kind = $('ftKind').value, sigs = $('ftSig').value.split('\n').map(l => l.split(',').map(s => s.trim())).filter(r => r.length >= 2 && /^\d{4}-\d\d-\d\d/.test(r[1]));
+  $('ftSigWrap').hidden = kind !== 'signals';
+  const nm = /^[A-Za-z_]\w*$/.test($('ftName').value) ? $('ftName').value : 'TradebotExport';
+  $('ftOut').value = kind === 'signals' && !sigs.length ? '# add pair,date lines (e.g. BTC/USDT,2025-03-03)' : ftExport(kind, clamp(+$('ftStop').value || 8, 0.5, 50) / 100, clamp(Math.round(+$('ftHold').value || 5), 0, 365), nm, sigs);
+}
+$('labSrc').addEventListener('change', e => { QL.src = e.target.value; rerender(); });
+$('labTrials').addEventListener('input', e => { QL.trials = Math.max(1, Math.round(+e.target.value || 1)); rerender(); });
+$('labTVar').addEventListener('input', e => { QL.trialsVar = e.target.value; rerender(); });
+$('labPasteTxt').addEventListener('input', e => { QL.paste = e.target.value; rerender(); });
+['impSh', 'impPx', 'impAdv', 'impSig', 'ftKind', 'ftStop', 'ftHold', 'ftName', 'ftSig'].forEach(id => $(id).addEventListener('input', () => rerender()));
+$('ftCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('ftOut').value); $('ftCopy').textContent = 'Copied'; } catch (e) { $('ftOut').select(); $('ftCopy').textContent = 'Select all + copy'; } setTimeout(() => { $('ftCopy').textContent = 'Copy'; }, 1500); });
 
 // ---------- ask Claude ----------
 function deskState() {
