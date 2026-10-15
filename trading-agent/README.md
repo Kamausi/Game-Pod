@@ -876,6 +876,28 @@ Forcing limit entries at a maker = taker venue only added adverse selection. Tha
 
 At Binance-class fees the final rules still do worse than before on this one price path, so the change is not a free win everywhere. The simulator is a random walk with one seed: it shows the cost structure, not live performance. The live check is the before-fees figure on the Round trips card. If fees stay close to it, the signals have no edge worth trading.
 
+## 25. Lowering fees further: what helped and what did not (2026-10-15)
+
+**New on the page (Settings):**
+- **Repricing panel.** It reprices your own closed round trips under every fee schedule, holding the trades fixed. Each trade now records its entry and exit liquidity (maker or taker) and the fees charged. On the current schedule the repriced total equals the fees actually charged.
+- **Cost multiple.** The target must be at least 4×, 6× or 8× the round-trip cost.
+- **Soft exits.** When the signal turns against a position, the desk leaves with a resting limit order at the maker fee. The stop stays in place as a backstop.
+
+**Simulator, 15,000 one-minute bars, one seed.** Each setting changes which trades happen, so the trades differ between rows:
+
+| Setting | Round trips | Fees | Before fees | Net |
+|---|---|---|---|---|
+| Alpaca, 4× (default) | 59 | $191.11 | +$371.00 | **+$179.89** |
+| Alpaca, 6× | 27 | $70.97 | +$66.19 | −$4.79 |
+| Alpaca, soft exits | 59 | $171.84 | +$248.53 | +$76.68 |
+| Alpaca, 6× + soft exits | 27 | $56.85 | +$39.55 | −$17.30 |
+| Crypto.com with CRO | 41 | $83.41 | +$10.82 | −$72.59 |
+| Crypto.com with CRO, soft exits | 41 | $33.95 | −$38.03 | −$71.98 |
+
+Every variant cut fees, but none raised net profit. The 6× floor and soft exits gave up more profit than they saved in fees, so the defaults stay at 4× with soft exits off.
+
+The CRO row is a different set of trades, and on one random price path that difference swamps the fee difference. The fair venue comparison is the repricing panel: the same trades, priced at different fees. On a 3,000-bar run, repricing showed CRO cutting fees from $47.32 to $19.17.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
