@@ -250,6 +250,9 @@ section[data-view="lab"] .field select, section[data-view="lab"] .field input { 
 section[data-view="lab"] .panel > h2 { flex-wrap: wrap; gap: .3rem .6rem; }
 section[data-view="lab"] .tk-facts dd { min-width: 0; overflow-wrap: anywhere; }
 section[data-view="lab"] .panel > * { min-width: 0; }
+section[aria-label="Low-cost universe"] > *, section[aria-label="Fees"] > * { min-width: 0; }
+section[aria-label="Low-cost universe"] .field, section[aria-label="Fees"] .field { flex-wrap: wrap; max-width: 100%; min-width: 0; }
+section[aria-label="Low-cost universe"] select, section[aria-label="Fees"] select, section[aria-label="Low-cost universe"] input[type=text] { max-width: 100%; min-width: 0; }
 .labgrid { grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); }
 section[data-view="lab"] textarea { box-sizing: border-box; max-width: 100%; display: block; }
 section[data-view="lab"] .field.wide { display: grid; width: 100%; }
@@ -493,6 +496,24 @@ td canvas.spark { width: 110px; height: 28px; }
   <!-- ============================== MARKETS ============================== -->
   <section class="view" data-view="markets" aria-label="Markets" hidden>
     <div class="vhead"><h1>Markets</h1><p id="mkHead">—</p></div>
+    <section class="panel" aria-label="Low-cost universe">
+      <h2><span>Low-cost universe · move per unit of trading cost</span><span class="note" id="uvNote">Not scanned yet.</span></h2>
+      <div class="controls">
+        <label class="field" for="uvVenue">Fees <select id="uvVenue"></select></label>
+        <label class="field" for="uvMaker"><input type="checkbox" id="uvMaker" checked> limit orders (maker)</label>
+        <label class="field" for="uvEx"><input type="checkbox" id="uvEx" checked> leave out BTC &amp; ETH</label>
+        <label class="field" for="uvOrder">Order $ <input type="number" id="uvOrder" min="10" step="50" value="500"></label>
+        <label class="field" for="uvMin">Min 24h volume $M <input type="number" id="uvMin" min="0" step="0.5" value="0.5"></label>
+        <button type="button" class="primary" id="uvGo">Scan Crypto.com</button>
+      </div>
+      <div class="tw" style="max-height:24rem"><table><thead><tr><th>Pick</th><th>Coin</th><th class="n">24h move</th><th class="n">Spread</th><th class="n">Fees (round trip)</th><th class="n">Impact</th><th class="n">Cost</th><th class="n">Move ÷ cost</th><th class="n">24h volume</th></tr></thead><tbody id="uvBody"></tbody></table></div>
+      <div class="controls">
+        <label class="field wide" for="uvStocks">Stocks to add (commission-free at Alpaca) <input type="text" id="uvStocks" placeholder="e.g. SOFI, F, PLTR" spellcheck="false"></label>
+        <button type="button" class="primary" id="uvUse">Trade the picks on the desk</button>
+        <button type="button" id="uvReset">Back to the default list</button>
+      </div>
+      <p class="note" style="max-width:76ch">Cost = fees both ways + the spread (zero with limit orders) + market impact (σ × √(order ÷ daily volume), both ways). Move = the 24-hour high–low range. BTC and ETH have the tightest spreads on the exchange, so leaving them out is a choice about crowding, not cost. Coins under about $1M a day are thin: a big move there is also a big risk, and a 30%+ daily range usually means a meme pump. Applying picks restarts the paper account with the new list.</p>
+    </section>
     <section class="panel" aria-label="Assets">
       <h2><span>Assets</span><span class="seg" role="tablist" id="mkTabs"><button type="button" role="tab" data-t="all">All</button><button type="button" role="tab" data-t="open">Tradable now</button><button type="button" role="tab" data-t="gain">Gainers</button><button type="button" role="tab" data-t="lose">Losers</button></span></h2>
       <div class="tw" style="max-height:none"><table><thead><tr><th>Asset</th><th>Class</th><th class="n">Last</th><th class="n">1h</th><th class="n">Session</th><th class="n">24h volume</th><th class="n">Spread</th><th>2h trend</th><th>Hours</th><th></th></tr></thead><tbody id="mkBody"></tbody></table></div>
@@ -801,6 +822,11 @@ td canvas.spark { width: 110px; height: 28px; }
   <!-- ============================== SETTINGS ============================== -->
   <section class="view" data-view="settings" aria-label="Rules and limits" hidden>
     <div class="vhead"><h1>Rules &amp; limits</h1><p>Stricter only. Values outside the locked range snap back.</p></div>
+    <section class="panel" aria-label="Fees">
+      <h2><span>Fee schedule</span><span class="note" id="feeNote"></span></h2>
+      <div class="controls"><label class="field wide" for="feeVenue">Charge paper trades like <select id="feeVenue"></select></label></div>
+      <p class="note" style="max-width:72ch">Fees are a percentage of each trade, so the price of one coin does not matter: $100 of BTC and $100 of DOGE pay the same fee. The paper engine fills like a market order, so crypto pays the taker rate. US stocks at Alpaca have no commission (an SEC fee of about 0.003% applies to sells). An agent only enters when its target beats the round-trip cost, so at a 0.50% taker fee the one-minute crypto agents mostly sit out. That is the fee doing its job, not a bug.</p>
+    </section>
     <section class="panel" aria-label="Settings">
       <h2><span>Account-wide limits</span></h2>
       <div class="settings">
@@ -862,7 +888,17 @@ const TIER = {
   stock: { label: 'stock', group: 'equity', maxPos: 0.20, maxSpread: 20, minVol: 2e7, limitOnly: false, stressMove: -0.10, bpd: 390, hours: 'nyse', maxAgeMs: 300000, stop: 0.003, take: 0.006 },
   penny: { label: 'penny stock', group: 'equity', maxPos: 0.02, maxSpread: 150, minVol: 5e5, limitOnly: true, stressMove: -0.35, bpd: 390, hours: 'nyse', maxAgeMs: 300000, stop: 0.015, take: 0.030 },
   fx: { label: 'FX major', group: 'fx', maxPos: 0.30, maxSpread: 3, minVol: 0, limitOnly: false, stressMove: -0.03, bpd: 1440, hours: 'fx', maxAgeMs: 300000, stop: 0.0008, take: 0.0016 },
+  alt: { label: 'alt coin', group: 'crypto', maxPos: 0.10, maxSpread: 30, minVol: 1e6, limitOnly: false, stressMove: -0.30, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.008, take: 0.016 },
 };
+// The tradable universe: picks from the low-cost ranking (Markets) and stocks you add replace or join the defaults at load.
+const PREF = k => { try { const v = localStorage.getItem('tb.' + k); return v == null ? null : JSON.parse(v); } catch (e) { return null; } };
+(function applyUniverse() {
+  if (PREF('dropMajors')) for (let i = ASSETS.length - 1; i >= 0; i--) if (/^(BTC|ETH)_USD$/.test(ASSETS[i].sym)) ASSETS.splice(i, 1);
+  (PREF('altPicks') || []).forEach(p => { if (p && /^[A-Z0-9]{1,12}_USD$/.test(p.sym) && !ASSETS.some(a => a.sym === p.sym))
+    ASSETS.splice(ASSETS.filter(a => a.src === 'cc').length, 0, { sym: p.sym, idx: null, tier: 'alt', src: 'cc', p0: +p.p0 || 1, beta: 1.3, ivol: Math.min(0.01, Math.max(0.0004, +p.ivol || 0.0015)), spreadBps: Math.max(0.5, +p.spreadBps || 3), simVol: +p.vol || 2e6 }); });
+  (PREF('stockPicks') || []).forEach(t => { if (/^[A-Z.]{1,6}$/.test(t) && !ASSETS.some(a => a.sym === t))
+    ASSETS.splice(ASSETS.filter(a => a.src === 'cc' || a.tier === 'stock' || a.tier === 'penny').length, 0, { sym: t, ysym: t, tier: 'stock', src: 'yahoo', p0: 50, beta: 0.5, ivol: 0.0008, spreadBps: 2, simVol: 5e8 }); });
+})();
 // US Eastern offset (hours) with US daylight saving: 2nd Sunday of March 07:00 UTC to 1st Sunday of November 06:00 UTC
 function nyOffset(ts) {
   const y = new Date(ts).getUTCFullYear();
@@ -877,6 +913,25 @@ function isOpen(a, ts) {
   return !(dow === 6 || (dow === 5 && mins >= 1020) || (dow === 0 && mins < 1020));  // FX: Sunday 17:00 to Friday 17:00 New York
 }
 const FEE = 6e-4, SLIP = 2e-4, BAR = 60000, START_CASH = 10000;
+// Fee schedules, per side (verified 2026-10-15: crypto.com/exchange/document/fees-limits, alpaca.markets/support/crypto-maker-taker-gmt-faq,
+// alpaca.markets/support/commission-clearing-fees). The paper engine fills like a market order, so crypto pays the TAKER rate.
+// US stocks at Alpaca: no commission; SEC fee on the sell leg only (rate set by the SEC; check alpaca.markets/support/regulatory-fees).
+const FEE_PRESETS = {
+  alpaca: { label: 'Alpaca: crypto 0.25% taker, stocks $0 commission', maker: 0.0015, crypto: 0.0025 },
+  cryptocom: { label: 'Crypto.com Exchange level 1: 0.50% taker', maker: 0.0025, crypto: 0.005 },
+  cryptocom_cro: { label: 'Crypto.com with CRO balance: 0.44% taker', maker: 0, crypto: 0.0044 },
+  binance: { label: 'Binance-class: 0.10%', maker: 0.001, crypto: 0.001 },
+  legacy: { label: 'Old flat 0.06% on everything (unrealistic)', maker: 6e-4, crypto: 6e-4, stock: 6e-4, fx: 6e-4 },
+};
+const SEC_SELL_FEE = 27.8e-6;
+let FEE_VENUE = (k => FEE_PRESETS[k] ? k : 'alpaca')(PREF('feeVenue'));
+function feeRate(a, side) {
+  const fp = FEE_PRESETS[FEE_VENUE], g = TIER[a.tier].group;
+  if (g === 'crypto') return fp.crypto;
+  if (g === 'equity') return fp.stock ?? (side === 'sell' ? SEC_SELL_FEE : 0);
+  return fp.fx ?? 0;
+}
+const rtFee = a => feeRate(a, 'buy') + feeRate(a, 'sell');
 const SIGNALS = ['trend', 'momentum', 'meanrev', 'breakout', 'flow', 'basis', 'sentiment'];
 const SIG_LABEL = { trend: 'Trend (MA 9/21, 1m + 15m)', momentum: 'Momentum (MACD 12/26/9)', meanrev: 'Mean reversion (RSI + Bollinger)', breakout: 'Breakout (30-bar range + volume)', flow: 'Order flow (top-of-book imbalance)', basis: 'Index gap (price vs multi-exchange index)', sentiment: 'News sentiment (last 6h)' };
 const NO_BOOK = 'no order book or per-minute volume from Yahoo: flow and breakout signals stay at 0, spread is an estimate';
@@ -1041,7 +1096,7 @@ function stressTests(extra) {
 function sizeTrade(a, f, d) {
   const eq = equity();
   const { stop, take } = bracketFor(a, f);
-  const cost = 2 * (FEE + SLIP) + f.spreadBps / 1e4;
+  const cost = rtFee(a) + 2 * SLIP + f.spreadBps / 1e4;
   const win = take - cost, loss = stop + cost, b = win / loss;
   const fstar = win > 0 ? Math.max(0, d.p_win - (1 - d.p_win) / b) : 0;
   const kelly = P.kelly * fstar / loss;
@@ -1163,11 +1218,11 @@ function checkOrder(a, side, qty, price, ts, dataTs) {
   const eq = equity(), cap = TIER[a.tier].maxPos * eq / price;
   let q = Math.min(qty, Math.max(0, cap - Math.abs(a.pos.qty) - botQty(S.assets.indexOf(a))));
   if (q <= 0) return { ok: false, why: 'position limit' };
-  if (side === 'buy' && a.pos.qty >= 0) { q = Math.min(q, Math.max(0, S.cash) / (price * (1 + FEE))); if (q <= 0) return { ok: false, why: 'not enough cash' }; }  // spot: no borrowing
+  if (side === 'buy' && a.pos.qty >= 0) { q = Math.min(q, Math.max(0, S.cash) / (price * (1 + feeRate(a, 'buy')))); if (q <= 0) return { ok: false, why: 'not enough cash' }; }  // spot: no borrowing
   return { ok: true, qty: q, clamped: q < qty };
 }
 function fill(a, ts, side, qty, price, reason, kind) {
-  const fee = qty * price * FEE, signed = side === 'buy' ? qty : -qty, p = a.pos;
+  const fee = qty * price * feeRate(a, side), signed = side === 'buy' ? qty : -qty, p = a.pos;
   const opening = p.qty === 0 || p.qty * signed > 0;
   if (opening) p.avg = (p.avg * Math.abs(p.qty) + price * qty) / Math.abs(p.qty + signed);
   S.cash -= signed * price + fee; S.fees += fee;
@@ -1271,7 +1326,7 @@ function scoreAll() {
   S.sigPending = S.sigPending.filter(c => {
     const a = S.assets[c.i]; if (a.bars.length - 1 - c.bar < SIG_H) return true;
     const ret = c.dir * (a.bars[c.bar + SIG_H].c / c.px - 1);
-    const st = S.W[c.regime][c.k]; st.n++; if (ret > 2 * (FEE + SLIP)) st.hit++;
+    const st = S.W[c.regime][c.k]; st.n++; if (ret > rtFee(a) + 2 * SLIP) st.hit++;
     return false;
   });
   S.callPending = S.callPending.filter(c => {
@@ -1945,11 +2000,11 @@ function start(mode) {
     S.now = Date.UTC(2026, 9, 1, 2, 0);  // opens at 15:00 UTC on a Thursday: crypto, FX and the NYSE session all trading
     for (let k = 0; k < 420; k++) { simBar(S.now); S.now += BAR; }
     benchmarkAnchor();
-    log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + ' on a simulated ' + S.assets.length + '-asset market: 5 crypto, 3 stocks, 3 FX pairs, each with its real trading hours.', 'info');
+    log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + ' on a simulated ' + S.assets.length + '-asset market: ' + S.assets.filter(a => TIER[a.tier].group === 'crypto').length + ' crypto, ' + S.assets.filter(a => TIER[a.tier].group === 'equity').length + ' stocks, ' + S.assets.filter(a => a.tier === 'fx').length + ' FX pairs, each with its real trading hours. Fees: ' + FEE_PRESETS[FEE_VENUE].label + '.', 'info');
     for (let k = 0; k < 360; k++) simStep();  // open in a working state: six simulated hours already traded
   } else {
     S.now = Date.now();
-    log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + '. Reading live prices for BTC, ETH, SOL, DOGE and PEPE every 30 s' + (FEEDS.mkt ? ', and stocks and FX every 2 minutes' : '') + '; deciding once per closed 1-minute bar.', 'info');
+    log(S.now, '—', 'start', 'Paper account opened with ' + usd(START_CASH) + '. Reading live prices for ' + S.assets.filter(a => a.src === 'cc').map(a => short(a.sym)).join(', ') + ' every 30 s' + (FEEDS.mkt ? ', and stocks and FX every 2 minutes' : '') + '; deciding once per closed 1-minute bar.', 'info');
   }
   render(); schedule(); scheduleFeeds();
 }
@@ -2191,9 +2246,9 @@ function tkRender() {
   const amt = +$('tkAmt').value || 0, ref = kind === 'market' ? (q ? (side === 'buy' ? q.ask : q.bid) : NaN) : +$('tkPx').value;
   const br = bracketFor(a, a.feat || { atrPct: 0 }), units = ref > 0 ? amt / ref : 0, sg = side === 'buy' ? 1 : -1;
   const opp = a.pos.qty && (side === 'buy') !== (a.pos.qty > 0);
-  const facts = [['Units', units ? fmtQty(units) : '—'], ['Cost (spot, no leverage)', usd(amt)], ['Fee estimate', usd(amt * FEE)]];
+  const facts = [['Units', units ? fmtQty(units) : '—'], ['Cost (spot, no leverage)', usd(amt)], ['Fee estimate', usd(amt * feeRate(a, side))]];
   if (a.tier === 'fx') facts.push(['Pip value (0.0001)', units ? usd(units * 0.0001) : '—']); else facts.push(['1% move', usd(amt * 0.01)]);
-  if (!opp && ref > 0) facts.push(['Stop · target', fmtPx(ref * (1 - sg * br.stop)) + ' · ' + fmtPx(ref * (1 + sg * br.take))], ['Risk to stop', usd(amt * br.stop + 2 * amt * FEE)]);
+  if (!opp && ref > 0) facts.push(['Stop · target', fmtPx(ref * (1 - sg * br.stop)) + ' · ' + fmtPx(ref * (1 + sg * br.take))], ['Risk to stop', usd(amt * br.stop + amt * rtFee(a))]);
   facts.push(['Tier cap (' + tier.label + ')', usd(tier.maxPos * eq) + ' · ' + (tier.maxPos * 100) + '%'], ['Market', isOpen(a, nowTs()) ? 'open' : 'closed']);
   if (opp) facts.push(['This order', 'reduces your ' + (a.pos.qty > 0 ? 'long' : 'short')]);
   $('tkFacts').innerHTML = facts.map(f => '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>').join('');
@@ -2285,7 +2340,7 @@ function renderExtra() {
 
   if (VIEW === 'overview') renderOverview(eq, now);
   if (VIEW === 'trade') renderTerminal(eq, now, a);
-  if (VIEW === 'markets') renderMarkets(now);
+  if (VIEW === 'markets') { renderMarkets(now); renderUniverse(); }
   if (VIEW === 'portfolio') renderPortfolio(eq);
   if (VIEW === 'agents') renderAgents(now);
   if (VIEW === 'journal') renderJournal();
@@ -2293,6 +2348,7 @@ function renderExtra() {
   if (VIEW === 'wallet') renderWallet(eq, now);
   if (VIEW === 'research') renderResearch();
   if (VIEW === 'lab') renderLab();
+  if (VIEW === 'settings') renderFees();
 }
 function renderOverview(eq, now) {
   const start0 = S.journal.length ? S.journal[S.journal.length - 1].ts : now, openN = S.assets.filter(x => isOpen(x, now)).length;
@@ -2494,7 +2550,7 @@ function botQty(i) { return S.bots.reduce((s, b) => s + (b.i === i ? b.qty : 0),
 function botValue(b) { return b.cash + b.qty * markOf(S.assets[b.i]); }
 function botUnreal(b) { return b.qty ? b.qty * markOf(S.assets[b.i]) - b.cost : 0; }
 function botFill(b, side, qty, px, ts, reason) {
-  const a = S.assets[b.i], fee = qty * px * FEE;
+  const a = S.assets[b.i], fee = qty * px * feeRate(a, side);
   if (side === 'buy') { b.cost += qty * px + fee; b.qty += qty; b.cash -= qty * px + fee; }
   else {
     const avg = b.cost / b.qty, pnl = (px - avg) * qty - fee;
@@ -2525,8 +2581,8 @@ function runBots(ts) {
     const bar = a.bars[a.bars.length - 1]; if (b.lastCt === bar.ct) return; b.lastCt = bar.ct;
     if (!isOpen(a, ts)) return;
     const buy = (usdAmt, px, reason) => {
-      usdAmt = Math.min(usdAmt, b.cash / (1 + FEE)); if (usdAmt < 1) { usdAmt = 0; }
-      const why = usdAmt ? botBlock(b, usdAmt * (1 + FEE), ts) : 'bot out of money';
+      usdAmt = Math.min(usdAmt, b.cash / (1 + feeRate(a, 'buy'))); if (usdAmt < 1) { usdAmt = 0; }
+      const why = usdAmt ? botBlock(b, usdAmt * (1 + feeRate(a, 'buy')), ts) : 'bot out of money';
       if (why) { if (b.block !== why) log(ts, a.sym, 'bot', b.name + ': buy skipped (' + why + ')', 'warn'); b.block = why; return 0; }
       b.block = null; const qty = usdAmt / px; botFill(b, 'buy', qty, px, ts, reason); return qty;
     };
@@ -2568,7 +2624,7 @@ function bkRender() {
   let note = '';
   if (k === 'dca') { const amt = +$('bkAmt').value || 0, ev = +$('bkEvery').value || 1, mx = +$('bkMax').value || 1;
     note = 'Spends up to ' + usd(Math.min(alloc, amt * mx)) + ' over ' + (ev * (mx - 1) / 60).toFixed(1) + ' hours per cycle' + (amt * mx > alloc ? ', but only ' + usd(alloc) + ' is set aside, so it stops early' : '') + '. Round-trip fees are about 0.12%; a take profit below that loses money.'; }
-  if (k === 'grid') { const g = gridSpec(a); note = g.err || ('Slice ' + usd(g.slice) + ' per level, ' + (g.step * 100).toFixed(2) + '% apart. Each completed buy-sell earns about ' + ((g.step - 2 * FEE) * 100).toFixed(2) + '% after fees' + (g.step < 2 * FEE + 0.0003 ? '. That is below fees: widen the range or use fewer levels.' : '. Price outside the range does nothing; below it, the bot just holds.')); }
+  if (k === 'grid') { const g = gridSpec(a); note = g.err || ('Slice ' + usd(g.slice) + ' per level, ' + (g.step * 100).toFixed(2) + '% apart. Each completed buy-sell earns about ' + ((g.step - rtFee(a)) * 100).toFixed(2) + '% after fees' + (g.step < rtFee(a) + 0.0003 ? '. That is below fees: widen the range or use fewer levels.' : '. Price outside the range does nothing; below it, the bot just holds.')); }
   if (k === 'copy') { const sc = +$('bkScale').value || 0; note = 'This agent can hold up to ' + (TIER[a.tier].maxPos * 100) + '% of equity (' + usd(TIER[a.tier].maxPos * eq) + '). At ' + sc + '× the bot buys up to ' + usd(Math.min(alloc, sc * TIER[a.tier].maxPos * eq)) + ' per copied entry. It copies longs only.'; }
   $('bkNote').textContent = note + ' Money available: ' + usd(Math.max(0, S.cash)) + '.';
 }
@@ -2579,7 +2635,7 @@ function launchBot() {
   let p;
   if (k === 'dca') { p = { amount: +$('bkAmt').value, every: Math.max(1, Math.round(+$('bkEvery').value)), tp: (+$('bkTp').value || 0) / 100, maxBuys: Math.max(1, Math.round(+$('bkMax').value)) };
     if (!(p.amount >= 10)) return bkMsg('Set a buy amount of at least $10.', 'risk'); }
-  if (k === 'grid') { const g = gridSpec(a); if (g.err) return bkMsg(g.err, 'risk'); if (g.step < 2 * FEE + 0.0003) return bkMsg('Levels are ' + (g.step * 100).toFixed(2) + '% apart, less than fees and slippage. Every round would lose money.', 'risk'); p = { levels: g.levels, slice: g.slice, lo: g.lo, hi: g.hi }; }
+  if (k === 'grid') { const g = gridSpec(a); if (g.err) return bkMsg(g.err, 'risk'); if (g.step < rtFee(a) + 0.0003) return bkMsg('Levels are ' + (g.step * 100).toFixed(2) + '% apart, less than fees and slippage. Every round would lose money.', 'risk'); p = { levels: g.levels, slice: g.slice, lo: g.lo, hi: g.hi }; }
   if (k === 'copy') { p = { scale: +$('bkScale').value }; if (!(p.scale > 0 && p.scale <= 2)) return bkMsg('Pick a size between 0.05× and 2×.', 'risk'); }
   S.cash -= alloc;
   const b = { id: ++S.botId, kind: k, i, alloc, cash: alloc, qty: 0, cost: 0, realized: 0, trades: 0, sells: 0, wins: 0, buys: 0, cycles: 0, status: 'running', created: now, p,
@@ -2633,9 +2689,9 @@ function swapPlan() {
   const fa = from === 'USD' ? null : S.assets[+from], ta = to === 'USD' ? null : S.assets[+to];
   const fq = fa && quoteOf(fa), tq = ta && quoteOf(ta);
   let sellQty = 0, proceeds = amt;
-  if (fa) { if (!fq) return { err: 'No price for ' + short(fa.sym) + ' yet.' }; sellQty = Math.min(amt / fq.bid, Math.max(0, fa.pos.qty)); proceeds = sellQty * fq.bid * (1 - SLIP) * (1 - FEE); }
+  if (fa) { if (!fq) return { err: 'No price for ' + short(fa.sym) + ' yet.' }; sellQty = Math.min(amt / fq.bid, Math.max(0, fa.pos.qty)); proceeds = sellQty * fq.bid * (1 - SLIP) * (1 - feeRate(fa, 'sell')); }
   if (ta && !tq) return { err: 'No price for ' + short(ta.sym) + ' yet.' };
-  const buyQty = ta ? proceeds / (tq.ask * (1 + SLIP) * (1 + FEE)) : 0;
+  const buyQty = ta ? proceeds / (tq.ask * (1 + SLIP) * (1 + feeRate(ta, 'buy'))) : 0;
   return { fa, ta, fq, tq, sellQty, proceeds, buyQty, amt, err: from === to ? 'Pick two different things.' : fa && !(fa.pos.qty > 0) ? 'You hold no ' + short(fa.sym) + ' in the agent book.' : null };
 }
 function renderWallet(eq, now) {
@@ -2652,7 +2708,7 @@ function renderWallet(eq, now) {
     ['You give', sp.fa ? fmtQty(sp.sellQty) + ' ' + short(sp.fa.sym) + ' (' + usd(sp.sellQty * sp.fq.bid) + ')' : usd(sp.amt) + ' cash'],
     ['You get', sp.ta ? '≈ ' + fmtQty(sp.buyQty) + ' ' + short(sp.ta.sym) : '≈ ' + usd(sp.proceeds) + ' cash'],
     ['Rate', sp.fa && sp.ta ? '1 ' + short(sp.fa.sym) + ' ≈ ' + fmtQty(sp.fq.bid / sp.tq.ask) + ' ' + short(sp.ta.sym) : sp.ta ? '1 ' + short(sp.ta.sym) + ' = ' + usd(sp.tq.ask) : '1 ' + short(sp.fa.sym) + ' = ' + usd(sp.fq.bid)],
-    ['Fees and slippage', usd(sp.amt * ((sp.fa ? FEE + SLIP : 0) + (sp.ta ? FEE + SLIP : 0)))],
+    ['Fees and slippage', usd(sp.amt * ((sp.fa ? feeRate(sp.fa, 'sell') + SLIP : 0) + (sp.ta ? feeRate(sp.ta, 'buy') + SLIP : 0)))],
   ].map(f => '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>').join('');
   $('swGo').disabled = !!sp.err;
   $('wxBody').innerHTML = S.transfers.map(t => '<tr><td class="t">' + tfmt(t.ts) + '</td><td>' + t.kind + '</td><td class="n ' + sgnCls(t.amt) + '">' + signedUsd(t.amt) + '</td><td class="n">' + usd(t.cash) + '</td></tr>').join('')
@@ -2669,7 +2725,7 @@ function doSwap() {
   if (!sp.ta) { wxMsg('swMsg', sold || 'Nothing to do.', 'good'); return rerender(); }
   const ta = sp.ta, tq = sp.tq;
   if (ta.pos.qty < 0 || ta.pendingLimit || ta.pendingStop || ta.twap) { wxMsg('swMsg', sold + 'Buy skipped: ' + short(ta.sym) + ' has a short or a working order. The money stays as cash.', 'warn'); return rerender(); }
-  const ok = marketOrder(ta, now, 'buy', cash / (tq.ask * (1 + SLIP) * (1 + FEE)), tq.bid, tq.ask, tq.ts, 'swap', 'manual');
+  const ok = marketOrder(ta, now, 'buy', cash / (tq.ask * (1 + SLIP) * (1 + feeRate(ta, 'buy'))), tq.bid, tq.ask, tq.ts, 'swap', 'manual');
   if (ok) setBracket(ta, bracketFor(ta, ta.feat || { atrPct: 0 }));
   wxMsg('swMsg', ok ? sold + 'Bought ' + short(ta.sym) + '; stop ' + fmtPx(ta.pos.stop) + ', target ' + fmtPx(ta.pos.take) + '.' : sold + 'Buy blocked: ' + S.journal[0].text.replace('Order blocked by risk layer: ', '') + '. The money stays as cash.', ok ? 'good' : 'warn'); rerender();
 }
@@ -2991,6 +3047,64 @@ $('labTVar').addEventListener('input', e => { QL.trialsVar = e.target.value; rer
 $('labPasteTxt').addEventListener('input', e => { QL.paste = e.target.value; rerender(); });
 ['impSh', 'impPx', 'impAdv', 'impSig', 'ftKind', 'ftStop', 'ftHold', 'ftName', 'ftSig'].forEach(id => $(id).addEventListener('input', () => rerender()));
 $('ftCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('ftOut').value); $('ftCopy').textContent = 'Copied'; } catch (e) { $('ftOut').select(); $('ftCopy').textContent = 'Select all + copy'; } setTimeout(() => { $('ftCopy').textContent = 'Copy'; }, 1500); });
+
+
+// ---------- low-cost universe (live Crypto.com tickers) and the fee schedule ----------
+const UV = { raw: null, busy: false, note: 'Not scanned yet.', picked: new Set((PREF('altPicks') || []).map(p => p.sym)) };
+function uvRows() {
+  if (!UV.raw) return [];
+  const fp = FEE_PRESETS[$('uvVenue').value] || FEE_PRESETS.alpaca, maker = $('uvMaker').checked, order = Math.max(10, +$('uvOrder').value || 500), minV = (+$('uvMin').value || 0) * 1e6;
+  const feeRt = 2 * (maker ? fp.maker : fp.crypto) * 1e4, ex = $('uvEx').checked;
+  return UV.raw.map(r => {
+    const n = r.instrument_name || r.i || '', m = n.match(/^([A-Z0-9]{1,12})_?USD$/); if (!m || /PERP/.test(n)) return null;
+    const base = m[1], b = +(r.best_bid ?? r.b), k = +(r.best_ask ?? r.k), l = +(r.last ?? r.a), h = +(r.high ?? r.h), lo = +(r.low ?? r.l), vv = +(r.volume_value ?? r.vv);
+    if (!(b > 0 && k > 0 && l > 0 && h > 0 && lo > 0 && vv > 0) || /^(USDT|USDC|DAI|PYUSD|FDUSD|USD1|RLUSD)$/.test(base)) return null;
+    if (ex && /^(BTC|ETH)$/.test(base)) return null;
+    const spread = (k - b) / ((k + b) / 2) * 1e4, move = (h - lo) / l * 1e4, impact = 2 * (move / 2e4) * Math.sqrt(order / vv) * 1e4;
+    const cost = feeRt + (maker ? 0 : spread) + impact;
+    if (vv < minV || order > 0.01 * vv || move < 20) return null;
+    return { sym: base + '_USD', base, last: l, spread, move, impact, feeRt, cost, score: move / cost, vv };
+  }).filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 25);
+}
+async function universeScan() {
+  if (UV.busy) return;
+  if (!MCP) { UV.note = 'Needs the Crypto.com connector (open the page on claude.ai with it added).'; rerender(); return; }
+  UV.busy = true; UV.note = 'Reading every Crypto.com ticker…'; rerender();
+  try {
+    const r = unwrap(await MCP.callTool(SERVER, 'get_tickers', {}, { cache: false }));
+    const data = Array.isArray(r) ? r : (r && (r.data || (r.result && r.result.data))) || [];
+    if (!data.length) throw { code: 'empty', message: 'no tickers came back' };
+    UV.raw = data; UV.note = 'Read ' + new Date().toISOString().slice(11, 16) + ' UTC · ' + data.length + ' instruments';
+  } catch (e) { UV.note = 'Scan failed: ' + ((e && e.code) || 'error') + (e && e.message ? ' · ' + e.message : ''); }
+  finally { UV.busy = false; rerender(); }
+}
+function renderUniverse() {
+  $('uvNote').textContent = UV.note; $('uvGo').disabled = UV.busy; $('uvGo').textContent = UV.busy ? 'Scanning…' : 'Scan Crypto.com';
+  const rows = uvRows();
+  $('uvBody').innerHTML = UV.raw ? (rows.map(r => '<tr><td><input type="checkbox" data-uv="' + esc(r.sym) + '"' + (UV.picked.has(r.sym) ? ' checked' : '') + ' aria-label="Pick ' + esc(r.base) + '"></td><td class="sym">' + esc(r.base) + (r.move > 3000 ? ' <span class="tag p-risk">pump-size range</span>' : r.vv < 1e6 ? ' <span class="tag p-warn">thin</span>' : '') + '</td><td class="n">' + (r.move / 100).toFixed(1) + '%</td><td class="n">' + r.spread.toFixed(2) + ' bp</td><td class="n">' + r.feeRt.toFixed(0) + ' bp</td><td class="n">' + r.impact.toFixed(1) + ' bp</td><td class="n"><b>' + r.cost.toFixed(0) + ' bp</b></td><td class="n">' + r.score.toFixed(1) + '</td><td class="n">$' + (r.vv / 1e6).toFixed(1) + 'M</td></tr>').join('')
+    || '<tr><td colspan="9" class="note">Nothing passes the volume floor at this order size. Lower the minimum volume or the order size.</td></tr>')
+    : '<tr><td colspan="9" class="note">Scan to rank every Crypto.com USD pair by how far it moves for what a round trip costs.</td></tr>';
+  $('uvUse').disabled = !UV.picked.size && !$('uvStocks').value.trim() && !$('uvEx').checked;
+}
+function fillFeeSelect(id, val) { const el = $(id); if (el.options.length) return; el.innerHTML = Object.entries(FEE_PRESETS).map(([k, v]) => '<option value="' + k + '">' + esc(v.label) + '</option>').join(''); el.value = val; }
+fillFeeSelect('feeVenue', FEE_VENUE); fillFeeSelect('uvVenue', FEE_VENUE);
+$('uvStocks').value = (PREF('stockPicks') || []).join(', ');
+function renderFees() {
+  const fp = FEE_PRESETS[FEE_VENUE], c = fp.crypto * 2e4, st = fp.stock != null ? fp.stock * 2e4 : SEC_SELL_FEE * 1e4;
+  $('feeNote').textContent = 'Round trip: crypto ' + c.toFixed(1) + ' bp · stocks ' + st.toFixed(2) + ' bp · FX ' + ((fp.fx || 0) * 2e4).toFixed(1) + ' bp + spreads';
+}
+$('feeVenue').addEventListener('change', e => { FEE_VENUE = e.target.value; store.set('feeVenue', FEE_VENUE); $('uvVenue').value = FEE_VENUE; log(S.now, '—', 'info', 'Fee schedule set to ' + FEE_PRESETS[FEE_VENUE].label + '.', 'info'); rerender(); });
+['uvVenue', 'uvMaker', 'uvEx', 'uvOrder', 'uvMin', 'uvStocks'].forEach(id => $(id).addEventListener(id === 'uvOrder' || id === 'uvMin' || id === 'uvStocks' ? 'input' : 'change', () => rerender()));
+$('uvGo').addEventListener('click', universeScan);
+$('uvBody').addEventListener('change', e => { const c = e.target.closest('input[data-uv]'); if (!c) return; c.checked ? UV.picked.add(c.dataset.uv) : UV.picked.delete(c.dataset.uv); rerender(); });
+$('uvUse').addEventListener('click', () => {
+  const rows = uvRows(), byS = Object.fromEntries((UV.raw ? rows : []).map(r => [r.sym, r])), old = Object.fromEntries((PREF('altPicks') || []).map(p => [p.sym, p]));
+  const picks = [...UV.picked].map(sym => { const r = byS[sym]; return r ? { sym, p0: r.last, spreadBps: +r.spread.toFixed(2), ivol: r.move / 2e4 / Math.sqrt(1440), vol: r.vv } : old[sym]; }).filter(Boolean);
+  const stocks = $('uvStocks').value.toUpperCase().split(/[\s,;]+/).filter(t => /^[A-Z.]{1,6}$/.test(t)).slice(0, 8);
+  store.set('altPicks', picks); store.set('stockPicks', stocks); store.set('dropMajors', $('uvEx').checked);
+  location.reload();
+});
+$('uvReset').addEventListener('click', () => { store.set('altPicks', []); store.set('stockPicks', []); store.set('dropMajors', false); location.reload(); });
 
 // ---------- ask Claude ----------
 function deskState() {

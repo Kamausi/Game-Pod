@@ -279,6 +279,32 @@ def main(argv: list[str] | None = None) -> int:
     ef.add_argument("--name", default="TradebotExport")
     ef.add_argument("--out", required=True, help="e.g. user_data/strategies/TradebotExport.py")
 
+    uv = sub.add_parser("universe", help="rank coins or stocks by how much they move for what a round trip costs (fees + spread + impact)")
+    uv.add_argument("what", choices=["crypto", "stocks"])
+    uv.add_argument("--venue", default="cryptocom", choices=["cryptocom", "cryptocom_cro", "alpaca_crypto", "binance", "kraken"], help="fee schedule for crypto")
+    uv.add_argument("--taker", action="store_true", help="market orders (default: limit orders, maker fee, no spread paid)")
+    uv.add_argument("--order", type=float, default=500, help="order size in USD")
+    uv.add_argument("--min-volume", type=float, default=1e6, help="24 h USD volume floor")
+    uv.add_argument("--exclude", default="", help="comma list, e.g. BTC,ETH")
+    uv.add_argument("--perps", action="store_true", help="include perpetuals (their fee schedule differs: check it)")
+    uv.add_argument("--top", type=int, default=25)
+
+    wh = sub.add_parser("whales", help="score Solana wallets from their own on-chain trades; paper-copy only the ones that pass")
+    whs = wh.add_subparsers(dest="what", required=True)
+    w1 = whs.add_parser("score")
+    w1.add_argument("wallets", nargs="+")
+    w1.add_argument("--screened", type=int, help="how many wallets you looked at to pick these (default: this many)")
+    w1.add_argument("--lag", type=float, default=30, help="seconds between their trade and your copy")
+    w1.add_argument("--cost-bps", type=float, default=100, help="your round-trip cost: fees + slippage")
+    w1.add_argument("--max-tx", type=int, default=300)
+    w1.add_argument("--out", default="runs/whales_gate.json")
+    w2 = whs.add_parser("watch", help="one pass: paper-copy new trades of wallets the last score passed")
+    w2.add_argument("--gate", default="runs/whales_gate.json")
+    w2.add_argument("--state", default="runs/whales_state.json")
+    w2.add_argument("--usdc", type=float, default=50)
+    for x in (w1, w2):
+        x.add_argument("--rpc", default=os.environ.get("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com"))
+
     cx = sub.add_parser("ccxt", help="any of ccxt's exchanges: market data, and sandbox (testnet) orders only")
     cx.add_argument("what", choices=["exchanges", "ticker", "book", "bars", "balance"])
     cx.add_argument("--exchange", default="binance")
@@ -774,7 +800,7 @@ def main(argv: list[str] | None = None) -> int:
               f"usage {r.get('usage')}")
         return 0
 
-    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck", "export", "ccxt"):
+    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck", "export", "ccxt", "universe", "whales"):
         from .cli_desk import run as run_desk_cli
         return run_desk_cli(args)
     if args.cmd == "review":

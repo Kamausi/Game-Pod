@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 BURN_OWNERS = {"1nc1nerator11111111111111111111111111111111", "11111111111111111111111111111111"}
-USDC_MINT = "EPjFWdd5AufqSSqeM2qhRF9o8GZ8VZfdGqDKLUvqU5G1"
+USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 DEFAULT_RPC = "https://api.mainnet-beta.solana.com"
 DEFAULT_JUPITER = "https://lite-api.jup.ag/swap/v1"
 

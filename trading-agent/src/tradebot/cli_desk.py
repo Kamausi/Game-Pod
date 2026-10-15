@@ -49,6 +49,10 @@ def run(args) -> int:
         return _export(args)
     if args.cmd == "ccxt":
         return _ccxt(args)
+    if args.cmd == "universe":
+        return _universe(args)
+    if args.cmd == "whales":
+        return _whales(args)
     return 2
 
 
@@ -383,4 +387,44 @@ def _audit_quant(a) -> int:
     _print({"window": len(rets), "daily": {"close_to_close": cc, "parkinson": quant.parkinson(bars[1:]), "garman_klass": quant.garman_klass(bars[1:]),
                                           "rogers_satchell": quant.rogers_satchell(bars[1:]), "yang_zhang": quant.yang_zhang(bars), "ewma_0.94": quant.ewma_vol(rets)},
             "garch11": g, "annualize": "x sqrt(252)"})
+    return 0
+
+
+def _universe(a) -> int:
+    from . import universe as u
+    ex = tuple(x.strip() for x in a.exclude.split(",") if x.strip())
+    kw = dict(min_volume_usd=a.min_volume, order_usd=a.order, exclude=ex, top=a.top)
+    if a.what == "crypto":
+        rows = u.crypto_universe(u.fetch_cryptocom_tickers(), a.venue, not a.taker, kinds=("spot", "perp") if a.perps else ("spot",), **kw)
+        head = f"Crypto.com tickers, fees {a.venue} {'taker' if a.taker else 'maker'}"
+    else:
+        rows = u.stock_universe(u.fetch_alpaca_snapshots(), not a.taker, **kw)
+        head = "Alpaca most-active stocks (commission-free; SEC/FINRA fees on sells)"
+    print(f"{head}, ${a.order:,.0f} orders, >= ${a.min_volume / 1e6:.1f}M/24h" + (f", excluding {','.join(ex)}" if ex else ""))
+    print(u.table(rows))
+    return 0
+
+
+def _whales(a) -> int:
+    from . import whales as wh
+    from .onchain import SolanaRPC
+    rpc = SolanaRPC(a.rpc)
+    if a.what == "score":
+        scores = [wh.score(w, wh.history(rpc, w, a.max_tx), a.lag) for w in a.wallets]
+        gates = wh.gate(scores, a.screened, a.lag, a.cost_bps)
+        rows = wh.scorecard_rows(scores, gates)
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.out).write_text(json.dumps({"lag_s": a.lag, "cost_bps": a.cost_bps, "screened": a.screened or len(a.wallets), "wallets": rows}, indent=1, default=str))
+        _print(rows)
+        return 0
+    from .onchain import DexPaperTrader, Jupiter, RugGuard
+    g = json.loads(Path(a.gate).read_text()) if Path(a.gate).exists() else None
+    if not g:
+        raise SystemExit("run `tradebot whales score <wallets>` first: only wallets that pass are copied")
+    ok = [w["wallet"] for w in g["wallets"] if w.get("copy")]
+    if not ok:
+        print("no wallet passed the gate: nothing to copy (that is the gate working)")
+        return 0
+    trader = DexPaperTrader(RugGuard(rpc), Jupiter())
+    _print(wh.watch(rpc, trader, ok, a.state, a.usdc))
     return 0

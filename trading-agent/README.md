@@ -682,6 +682,58 @@ Open-Meteo is free for non-commercial use (open-meteo.com terms), and the server
 | PyPortfolioOpt / arch / statsmodels / scikit-learn at run time | Used as test references only (`pip install '.[reference]'`); the bot keeps zero required dependencies. PyPortfolioOpt 1.6's `HRPOpt.optimize()` is broken on scipy 1.18 (it calls the removed `sch._LINKAGE_METHODS`), so the test runs its own steps |
 | FRED, Quandl | They need keys, and no current strategy uses macro data |
 
+## 21. Trade where costs are low, and copy wallets only when their record earns it (2026-10-15)
+
+### What a trade costs (measured, not assumed)
+
+The price of one coin doesn't matter: fees are a percentage and you buy fractions. On Crypto.com's live tickers (2026-10-15), **BTC's spread was 0.00 bp and ETH's 0.04 bp, the cheapest on the exchange**. Smaller coins cost more to cross, and only 7 spot USD pairs traded over $2M a day. What dominates is the fee schedule (verified):
+
+| Venue | Maker | Taker | Round trip with market orders |
+|---|---|---|---|
+| Crypto.com Exchange, level 1 | 0.25% | 0.50% | **100 bp** |
+| Crypto.com with CRO balance | 0% | 0.44% | 88 bp |
+| Alpaca crypto | 0.15% | 0.25% | 50 bp |
+| Binance-class | 0.10% | 0.10% | 20 bp |
+| Alpaca US stocks | $0 commission | | ~0.3 bp (SEC/FINRA fees on sells) |
+
+So "low fees" means a cheaper venue, limit (maker) orders, and commission-free stocks, not avoiding BTC. "BTC and ETH are saturated" is a fair, separate point: deep markets are the most competed. The new tools let you leave them out on purpose.
+
+### `tradebot universe crypto|stocks` and the page's Markets panel
+
+- **Ranking:** every pair by **24 h move ÷ round-trip cost**. Cost = fees both ways + spread (zero with maker orders) + square-root impact at your order size.
+- **Liquidity floor:** a minimum 24 h volume, and the order must be under 1% of a day's volume.
+- **Flags:** coins under $1M/day are marked thin, and a 30%+ daily range is marked pump-size.
+- **Sample run** (real data, Alpaca maker fees, $500 orders, BTC and ETH left out): XRP, NEAR, DOGE, SOL, ARB and ADA lead at about 21–22× move per unit of cost.
+- **Try it on the page:** tick coins, add stocks (e.g. SOFI, F), press **Trade the picks on the desk**. The paper account restarts with that list (new coins get an "alt coin" tier: 10% max position, wider stop and target).
+
+### The page charged the wrong fees, now fixed
+
+- **Before:** the page charged a flat 0.06% per side on everything. That's 8× too cheap for entry-level Crypto.com crypto, and it wrongly charged commission-free stocks.
+- **Now:** Rules & limits has a **Fee schedule** (default Alpaca: crypto 0.25% taker, stocks $0 + SEC fee on sells). Every fill, cost gate, grid check, swap and bot uses it.
+- **Expect fewer crypto trades:** at a 0.50% taker fee the one-minute crypto agents mostly sit out, because their 0.8% targets don't clear a 1%+ round trip. That's correct behaviour.
+
+### Whale wallets: `tradebot whales score` → `tradebot whales watch` (Solana, read-only)
+
+- **History:** each wallet's swaps are rebuilt from the chain. Its token balance change is matched against what it paid in SOL (native + wrapped, fee added back) or USDC/USDT. Transfers and airdrops aren't trades.
+- **Score:** buys and sells are matched first-in, first-out into closed trades (return, holding time). Open bags are not counted as wins. Flags:
+  - too few closed trades;
+  - flips faster than you can follow;
+  - 200+ swaps a day (a bot or market maker);
+  - mostly unsold bags.
+- **Gate:** copy only with **all** of:
+  - 20+ closed trades;
+  - deflated Sharpe ≥ 95%, where N = how many wallets you screened (`--screened`). Leaderboard wallets are winners by selection: in the tests, a marginal wallet scores 88% picked from 2 and 4% picked from 2,000;
+  - median hold ≥ 10× your follow delay;
+  - average trade > your round-trip cost.
+- **Watch:** paper-copies only gated wallets. Their next buys go through the existing DexPaperTrader (RugGuard checks, Jupiter quote, price-impact cap), and their sells close the copy. The paper account persists between passes. Nothing is signed or sent.
+- **Not covered:**
+  - Ethereum wallets: reading their swap history needs an indexer key or an archive RPC.
+  - Whale tracking on the page: the browser can't post JSON-RPC through the connectors.
+
+### Bug fixed
+
+`onchain.USDC_MINT` was `EPjFWdd5AufqSSqeM2qhRF9o8GZ8VZfdGqDKLUvqU5G1`, an address with no trace anywhere. The real one (circle.com, solana.com docs) is `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`. Every paper DEX quote was asking Jupiter for a token that doesn't exist.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
