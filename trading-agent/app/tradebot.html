@@ -927,12 +927,12 @@ const ASSETS = [
 ];
 // group: which stress scenario hits it; bpd: one-minute bars per trading day; hours: when it can trade
 const TIER = {
-  major: { label: 'crypto major', group: 'crypto', maxPos: 0.25, maxSpread: 25, minVol: 5e6, limitOnly: true, stressMove: -0.20, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.004, take: 0.008 },
+  major: { label: 'crypto major', group: 'crypto', maxPos: 0.25, maxSpread: 25, minVol: 5e6, limitOnly: false, stressMove: -0.20, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.004, take: 0.008 },
   meme: { label: 'meme coin', group: 'crypto', maxPos: 0.05, maxSpread: 50, minVol: 1e6, limitOnly: true, stressMove: -0.40, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.010, take: 0.020 },
   stock: { label: 'stock', group: 'equity', maxPos: 0.20, maxSpread: 20, minVol: 2e7, limitOnly: false, stressMove: -0.10, bpd: 390, hours: 'nyse', maxAgeMs: 300000, stop: 0.003, take: 0.006 },
   penny: { label: 'penny stock', group: 'equity', maxPos: 0.02, maxSpread: 150, minVol: 5e5, limitOnly: true, stressMove: -0.35, bpd: 390, hours: 'nyse', maxAgeMs: 300000, stop: 0.015, take: 0.030 },
   fx: { label: 'FX major', group: 'fx', maxPos: 0.30, maxSpread: 3, minVol: 0, limitOnly: false, stressMove: -0.03, bpd: 1440, hours: 'fx', maxAgeMs: 300000, stop: 0.0008, take: 0.0016 },
-  alt: { label: 'alt coin', group: 'crypto', maxPos: 0.10, maxSpread: 30, minVol: 1e6, limitOnly: true, stressMove: -0.30, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.008, take: 0.016 },
+  alt: { label: 'alt coin', group: 'crypto', maxPos: 0.10, maxSpread: 30, minVol: 1e6, limitOnly: false, stressMove: -0.30, bpd: 1440, hours: 'always', maxAgeMs: 120000, stop: 0.008, take: 0.016 },
 };
 // The tradable universe: picks from the low-cost ranking (Markets) and stocks you add replace or join the defaults at load.
 const PREF = k => { try { const v = localStorage.getItem('tb.' + k); return v == null ? null : JSON.parse(v); } catch (e) { return null; } };
@@ -985,8 +985,11 @@ function feeRate(a, side, liq) {
 const rtFee = a => feeRate(a, 'buy') + feeRate(a, 'sell');
 // What one round trip really costs this desk: entry (maker when the tier enters with limits), the exit priced as a taker stop
 // (the worst case), slippage on that stop, and the spread when the entry crosses it.
+// Crypto enters with a resting limit only where the maker rate is cheaper: a limit fills only when price trades through it
+// (against you), so at a venue where maker = taker it costs edge and saves nothing.
+function limitEntry(a) { const fp = FEE_PRESETS[FEE_VENUE]; return TIER[a.tier].limitOnly || (TIER[a.tier].group === 'crypto' && fp.maker < fp.crypto); }
 function tradeCost(a, f) {
-  const lim = TIER[a.tier].limitOnly;
+  const lim = limitEntry(a);
   return feeRate(a, 'buy', lim ? 'maker' : 'taker') + feeRate(a, 'sell', 'taker') + SLIP * (lim ? 1 : 2) + (lim ? 0 : (f && isFinite(f.spreadBps) ? f.spreadBps : a.spreadBps) / 1e4);
 }
 // Fees may take at most a quarter of a winning trade: the target is at least COST_MULT x the round-trip cost, the stop half that.
@@ -1343,10 +1346,10 @@ function act(i, intent, ts, bid, ask, dataTs) {
   if (intent.action !== 'enter' || a.pos.qty || a.pendingLimit || a.pendingStop || a.twap) return;
   const side = intent.side === 'long' ? 'buy' : 'sell', mid = (bid + ask) / 2;
   const qty = intent.size * eq / mid;
-  if (TIER[a.tier].limitOnly) {
+  if (limitEntry(a)) {
     const limit = side === 'buy' ? bid : ask;
     a.pendingLimit = { side, qty, limit, ttl: 3, intent };
-    log(ts, a.sym, 'limit', 'Limit ' + side + ' ' + fmtQty(qty) + ' at ' + fmtPx(limit) + ' (' + TIER[a.tier].label + ' tier: limit orders only, expires in 3 bars)', 'info');
+    log(ts, a.sym, 'limit', 'Limit ' + side + ' ' + fmtQty(qty) + ' at ' + fmtPx(limit) + ' (' + (TIER[a.tier].limitOnly ? TIER[a.tier].label + ' tier: limit orders only' : 'maker fee is cheaper here') + ', expires in 3 bars)', 'info');
   } else if (intent.size > TWAP_ABOVE) {
     a.twap = { side, left: 3, slice: qty / 3, intent };
     log(ts, a.sym, 'twap', 'Order of ' + (intent.size * 100).toFixed(0) + '% of equity split into 3 TWAP slices', 'info');
