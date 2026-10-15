@@ -728,6 +728,18 @@ td canvas.spark { width: 110px; height: 28px; }
       <dl class="tk-facts" id="tkFacts" style="max-width:40rem"></dl>
       <p class="note" style="max-width:70ch">A large share of supply not yet circulating is tokens still to be unlocked or issued, and someone will sell them. Fully diluted value far above the market cap says the same thing in dollars. CoinGecko has no unlock calendar: read the project's vesting schedule before buying.</p>
     </section>
+    <section class="panel" aria-label="Smart-money wallets">
+      <h2><span>Smart-money wallets · GMGN public leaderboard (Solana)</span><span class="note" id="smNote">Not read yet.</span></h2>
+      <div class="controls">
+        <label class="field" for="smPeriod">Window <select id="smPeriod"><option value="7d">7 days</option><option value="30d">30 days</option><option value="1d">1 day</option></select></label>
+        <label class="field" for="smSort">Ranked by <select id="smSort"><option value="pnl">return</option><option value="realized_profit">realized profit</option><option value="winrate">win rate</option></select></label>
+        <button type="button" class="primary" id="smGo">Read top 40 · 5 credits</button>
+        <button type="button" id="smSave" hidden>Save candidates CSV</button>
+      </div>
+      <p class="note" id="smSum"></p>
+      <div class="tw" style="max-height:22rem"><table><thead><tr><th>#</th><th>Wallet</th><th class="n">Return</th><th class="n">Win rate</th><th class="n">Trades/day</th><th class="n">Avg hold</th><th>Tags</th><th>Verdict</th></tr></thead><tbody id="smBody"></tbody></table></div>
+      <p class="note" style="max-width:74ch">GMGN publishes this ranking and tags wallets itself (wash_trader, arbitrager, kol, fomo…), read here through the Firecrawl data catalogue. A short-window leaderboard ranks luck as well as skill, so nothing here is copied: save the candidates and run <code>tradebot whales score --wallets-file wallets.csv</code>, which rebuilds each wallet's trades from the chain and applies the copy gate with every wallet read here counted against them.</p>
+    </section>
     <section class="panel" aria-label="Weather market">
       <h2><span>Weather market vs NWS forecast</span><span class="note" id="wxNote">Not run yet.</span></h2>
       <div class="controls">
@@ -2389,7 +2401,7 @@ function renderExtra() {
   if (VIEW === 'journal') { renderJournal(); renderTax(); }
   if (VIEW === 'bots') renderBots(now);
   if (VIEW === 'wallet') renderWallet(eq, now);
-  if (VIEW === 'research') { renderResearch(); renderTokenomics(); }
+  if (VIEW === 'research') { renderResearch(); renderTokenomics(); renderSmartMoney(); }
   if (VIEW === 'lab') renderLab();
   if (VIEW === 'settings') renderFees();
 }
@@ -3212,6 +3224,52 @@ $('taxCsv').addEventListener('click', () => {
     try { await dl.save({ filename: 'tax-lots-paper.csv', data: csv }); }
     catch (e) { const c = e && e.code; if (c !== 'declined') $('taxSum').textContent = c === 'rate_limited' ? 'A save prompt is already open; try again in a moment.' : 'The file could not be saved here (' + (c || 'error') + ').'; }
   })();
+});
+
+
+// ---------- smart-money wallets: GMGN's public leaderboard via the Firecrawl data catalogue ----------
+const SM = { rows: null, busy: false, note: 'Not read yet.', screened: 0 };
+async function smartMoney() {
+  if (SM.busy) return;
+  if (!MCP) { SM.note = 'Needs the Firecrawl connector.'; rerender(); return; }
+  SM.busy = true; SM.note = 'Reading the leaderboard…'; rerender();
+  const period = $('smPeriod').value, sort = $('smSort').value + '_' + period;
+  try {
+    const r = unwrap(await MCP.callTool(FC, 'firecrawl_scrape', { alexandria: { provider: 'gmgn-ai', capability: 'crypto/wallet_rank', options: { chain: 'sol', period, sort_by: sort, limit: 40 } },
+      objective: 'Public smart-money wallet leaderboard to pick candidates for a paper copy-trading gate.' }, { cache: false }));
+    const a = r && r.data && r.data.alexandria && r.data.alexandria[0], wallets = a && a.data && a.data.wallets;
+    if (!wallets) throw { code: r && r.delivery === 'retained' ? 'too_large' : 'empty', message: r && r.delivery === 'retained' ? 'response too large to read inline' : 'no wallets came back' };
+    const now = Date.now() / 1000;
+    SM.rows = wallets.map((w, i) => {
+      const tags = w.tags || [], perDay = (w.txs_7d || 0) / 7, hold = w.avg_holding_period_7d, why = [];
+      if (tags.includes('wash_trader')) why.push('wash trader');
+      if (tags.includes('arbitrager')) why.push('arbitrager (uncopyable)');
+      if (perDay > 200) why.push(Math.round(perDay) + ' trades/day: bot');
+      if (hold != null && hold < 300) why.push('holds seconds');
+      if (w.last_active && (now - w.last_active) / 86400 > 3) why.push('inactive');
+      return { rank: i + 1, addr: w.address, url: w.source_url, pnl: w['pnl_' + period] ?? w.pnl_7d, wr: w['winrate_' + period] ?? w.winrate_7d, perDay, hold, tags, why };
+    });
+    SM.screened = wallets.length;
+    SM.note = 'Read ' + new Date().toISOString().slice(11, 16) + ' UTC';
+  } catch (e) { SM.note = 'Read failed: ' + ((e && e.code) || 'error') + (e && e.message ? ' · ' + e.message : ''); }
+  finally { SM.busy = false; rerender(); }
+}
+function renderSmartMoney() {
+  $('smNote').textContent = SM.note; $('smGo').disabled = SM.busy;
+  const rows = SM.rows, keep = rows ? rows.filter(r => !r.why.length) : [];
+  $('smSave').hidden = !keep.length;
+  $('smSum').textContent = rows ? SM.screened + ' wallets read → ' + keep.length + ' candidates to score · dropped: ' + ['wash trader', 'arbitrager', 'bot', 'holds seconds', 'inactive'].map(k => k + ' ' + rows.filter(r => r.why.some(x => x.startsWith(k) || x.includes(k))).length).join(', ') : '';
+  const pct = v => v == null ? '—' : (v * 100).toFixed(1) + '%', hrs = s => s == null ? '—' : s >= 86400 ? (s / 86400).toFixed(1) + ' d' : (s / 3600).toFixed(1) + ' h';
+  $('smBody').innerHTML = rows ? rows.map(r => '<tr><td class="n">' + r.rank + '</td><td><a href="' + esc(r.url || ('https://solscan.io/account/' + r.addr)) + '" target="_blank" rel="noopener"><code>' + esc(r.addr.slice(0, 4) + '…' + r.addr.slice(-4)) + '</code></a></td><td class="n">' + pct(r.pnl) + '</td><td class="n">' + pct(r.wr) + '</td><td class="n">' + r.perDay.toFixed(0) + '</td><td class="n">' + hrs(r.hold) + '</td><td>' + r.tags.filter(t => /wash|arbit|kol|fomo|smart/.test(t)).map(t => '<span class="tag ' + (/wash|arbit/.test(t) ? 'p-risk' : t === 'kol' ? 'p-warn' : 'p-info') + '">' + esc(t) + '</span>').join('') + '</td><td>' + (r.why.length ? '<span class="tag p-risk">drop</span> <span class="note">' + esc(r.why.join(', ')) + '</span>' : '<span class="tag p-good">score it</span>') + '</td></tr>').join('')
+    : '<tr><td colspan="8" class="note">Read the leaderboard to see who ranks, and how many of them could actually be copied.</td></tr>';
+}
+$('smGo').addEventListener('click', smartMoney);
+$('smSave').addEventListener('click', async () => {
+  const keep = (SM.rows || []).filter(r => !r.why.length);
+  const csv = 'wallet,screened,pnl_7d,winrate_7d,trades_per_day,avg_hold_h,tags,source\n' + keep.map(r => [r.addr, SM.screened, r.pnl ?? '', r.wr ?? '', r.perDay.toFixed(1), r.hold == null ? '' : (r.hold / 3600).toFixed(1), r.tags.join(' '), r.url || ''].join(',')).join('\n') + '\n';
+  const dl = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('downloads') : null;
+  if (!dl) { $('smSave').hidden = true; $('smSum').textContent = 'Saving files is not available in this view.'; return; }
+  try { await dl.save({ filename: 'wallets.csv', data: csv }); } catch (e) { if (e && e.code !== 'declined') $('smSum').textContent = 'Could not save (' + ((e && e.code) || 'error') + ').'; }
 });
 
 // ---------- ask Claude ----------

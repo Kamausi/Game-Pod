@@ -410,6 +410,19 @@ def _universe(a) -> int:
 def _whales(a) -> int:
     from . import whales as wh
     from .onchain import SolanaRPC
+    if a.what == "discover":
+        import csv
+        out = wh.discover(json.loads(Path(a.rank_json).read_text()), a.lag)
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        with open(a.out, "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["wallet", "screened", "pnl_7d", "winrate_7d", "trades_per_day", "avg_hold_h", "tags", "source"])
+            for c in out["candidates"]:
+                w.writerow([c["wallet"], out["screened"], c["pnl_7d"], c["winrate_7d"], c["trades_per_day"], c["avg_hold_h"], " ".join(c["tags"]), c["source"]])
+        _print({"screened": out["screened"], "candidates": len(out["candidates"]), "dropped": len(out["dropped"]),
+                "dropped_why": {k: sum(1 for d in out["dropped"] if any(k in x for x in d["why"])) for k in ("wash trader", "arbitrager", "bot", "too fast", "inactive")},
+                "wrote": a.out, "next": f"tradebot whales score --wallets-file {a.out}"})
+        return 0
     rpc = SolanaRPC(a.rpc)
     if a.what == "score":
         import csv
@@ -418,7 +431,8 @@ def _whales(a) -> int:
         if a.wallets_file:
             rows = [r for r in csv.DictReader(open(a.wallets_file)) if (r.get("wallet") or "").strip()]
             wallets += [r["wallet"].strip() for r in rows]
-            screened = screened or len(rows)
+            # a discover file carries how many leaderboard wallets were read, not just the survivors
+            screened = screened or max([len(rows)] + [int(r["screened"]) for r in rows if (r.get("screened") or "").isdigit()])
         if not wallets:
             raise SystemExit("give wallets or --wallets-file")
         labels = {r[0].strip(): r[1].strip() for r in csv.reader(open(a.labels)) if len(r) >= 2} if a.labels else None

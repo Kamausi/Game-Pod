@@ -773,7 +773,21 @@ These results are pinned in `tests/test_playbook.py`. Changing the rule until th
 - **Exit-liquidity guard** (`--max-chase`, default 3%): no copy when our quoted price is already that far above the whale's fill.
 - **Leaderboard exports** (fomo and the like): `whales score --wallets-file wallets.csv`. Every row counts toward the screening penalty, so a 30-day leaderboard star needs a real record to pass.
 
-**Not built:** pulling data out of fomo's app by capturing its network traffic (the ".har" method), or paid third-party scrapers of it. Those take data the app chose not to publish. Use addresses the trader shows publicly or that you've confirmed on Solscan.
+**Finding wallets: a public leaderboard, not the fomo app's hidden data.** `whales discover` reads GMGN's public smart-money leaderboard (`gmgn-ai/crypto/wallet_rank` in the Firecrawl data catalogue, 5 credits; also the **Smart-money wallets** panel in the page's Research view, which saves `wallets.csv`). GMGN tags wallets itself, and `discover` drops:
+- `wash_trader` and `arbitrager` wallets;
+- bots (200+ trades a day);
+- wallets that hold for seconds;
+- inactive wallets.
+
+It notes KOLs and `fomo`-app wallets, and writes every survivor with the number of wallets read, so `whales score --wallets-file` charges the screening penalty for the whole leaderboard.
+
+On 2026-10-15 the Solana top 100 by 7-day return held 71 arbitragers and 17 wash traders. The #1 wallet made about 800 trades a day.
+
+**Still not built:**
+- capturing fomo's app traffic (the ".har" method) to unmask the wallets it deliberately hides;
+- third-party scrapers of its private data (Apify actors, FomoScan's handle-to-wallet unmasking).
+
+That ties pseudonymous users to their whole financial history against the app's own privacy design. The Composio "fomo" toolkit some guides cite is a different product (website notification events), not fomo.family.
 
 ## WHAT COULD I BE WRONG ABOUT?
 

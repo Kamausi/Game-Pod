@@ -145,3 +145,34 @@ def test_copy_sleeve_cap_and_chase_guard(tmp_path):
     t = PricedTrader(0.101)
     ev = wh.watch(c, t, ["W"], st, now=lambda: 7010, sleeve_usd=60)
     assert t.calls == [("buy", "B")] and "sleeve full" in ev[-1]["copy"]["why"]
+
+
+def gmgn_fixture(now):
+    """Same keys as a real gmgn-ai/crypto/wallet_rank response (2026-10-15); addresses and names made up."""
+    def w(addr, tags, txs, hold, pnl, wr, active=now - 600):
+        return {"address": addr, "tags": tags, "txs_7d": txs, "avg_holding_period_7d": hold, "pnl_7d": pnl, "winrate_7d": wr,
+                "last_active": active, "source_url": f"https://gmgn.ai/sol/address/{addr}", "daily_profit_7d": [], "twitter_username": None}
+    return {"data": {"alexandria": [{"provider": "gmgn-ai", "capability": "crypto/wallet_rank", "data": {"chain": "sol", "count": 6, "wallets": [
+        w("BOT1", ["kol", "wash_trader", "arbitrager"], 5646, 213591, 0.22, 0.68),
+        w("ARB1", ["arbitrager"], 900, 40000, 0.15, 0.7),
+        w("FAST", ["smart_degen"], 300, 90, 0.4, 0.6),
+        w("OLD1", ["smart_degen"], 100, 90000, 0.3, 0.5, active=now - 10 * 86400),
+        w("KOL1", ["kol", "fomo"], 210, 200000, 0.11, 0.38),
+        w("GOOD", ["smart_degen"], 120, 300000, 0.09, 0.45)]}}]}}
+
+
+def test_discover_drops_what_cannot_be_copied_and_keeps_the_screening_count(tmp_path, capsys):
+    from tradebot.cli import main
+    out = wh.discover(gmgn_fixture(1_000_000), lag_s=30, now=1_000_000)
+    assert out["screened"] == 6 and [c["wallet"] for c in out["candidates"]] == ["KOL1", "GOOD"]
+    why = {d["wallet"]: " ".join(d["why"]) for d in out["dropped"]}
+    assert "wash trader" in why["BOT1"] and "bot" in why["BOT1"] and "arbitrager" in why["ARB1"]
+    assert "too fast" in why["FAST"] and "inactive" in why["OLD1"]
+    assert any("KOL" in n for n in out["candidates"][0]["notes"]) and any("fomo" in n for n in out["candidates"][0]["notes"])
+    import time as _t
+    f = tmp_path / "rank.json"
+    f.write_text(json.dumps(gmgn_fixture(_t.time())))
+    main(["whales", "discover", str(f), "--out", str(tmp_path / "w.csv")])
+    res = json.loads(capsys.readouterr().out)
+    lines = (tmp_path / "w.csv").read_text().splitlines()
+    assert res["screened"] == 6 and len(lines) == 3 and lines[1].split(",")[1] == "6"  # the survivors carry the full count

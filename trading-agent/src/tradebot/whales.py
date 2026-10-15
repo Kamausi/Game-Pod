@@ -304,3 +304,50 @@ def watch(rpc, trader, wallets: list[str], state_path: str | Path, usdc_per_copy
 def scorecard_rows(scores: list[Score], gates: list[dict]) -> list[dict]:
     g = {x["wallet"]: x for x in gates}
     return [{**{k: v for k, v in asdict(s).items() if k != "returns"}, **g.get(s.wallet, {})} for s in scores]
+
+
+# ------------------------------------------------------------------ discovery from a public leaderboard
+
+GMGN_SKIP = {"wash_trader": "GMGN tags it a wash trader: fake volume",
+             "arbitrager": "GMGN tags it an arbitrager: atomic trades you cannot copy"}
+
+
+def gmgn_wallets(js: dict) -> list[dict]:
+    """The wallets list from GMGN's smart-money leaderboard, whether given the raw provider data
+    ({chain, wallets}) or the Firecrawl envelope ({data: {alexandria: [{data: {...}}]}})."""
+    if "wallets" in js:
+        return js["wallets"]
+    for a in (js.get("data") or {}).get("alexandria") or []:
+        if isinstance(a.get("data"), dict) and "wallets" in a["data"]:
+            return a["data"]["wallets"]
+    raise ValueError("no wallets in this response")
+
+
+def discover(js: dict, lag_s: float = 30, max_trades_per_day: float = 200, max_idle_days: float = 3, now: float | None = None) -> dict:
+    """Candidates worth scoring from a public leaderboard (GMGN wallet_rank, read through the
+    Firecrawl data catalogue: 5 credits a call). The leaderboard IS a selection by recent profit,
+    so `screened` is every wallet read, and the copy gate's deflated Sharpe uses it."""
+    rows = gmgn_wallets(js)
+    now = now or time.time()
+    keep, drop = [], []
+    for w in rows:
+        tags = set(w.get("tags") or [])
+        why = [GMGN_SKIP[t] for t in sorted(tags & GMGN_SKIP.keys())]
+        per_day = (w.get("txs_7d") or 0) / 7
+        if per_day > max_trades_per_day:
+            why.append(f"{per_day:.0f} trades a day: a bot")
+        hold = w.get("avg_holding_period_7d")
+        if hold is not None and hold < 10 * lag_s:
+            why.append(f"average hold {hold:.0f}s: too fast to follow")
+        if w.get("last_active") and (now - w["last_active"]) / 86400 > max_idle_days:
+            why.append("inactive")
+        notes = []
+        if "kol" in tags:
+            notes.append("KOL: followers pile in after it; it may sell into them")
+        if "fomo" in tags:
+            notes.append("trades through the fomo app")
+        rec = {"wallet": w["address"], "pnl_7d": w.get("pnl_7d"), "winrate_7d": w.get("winrate_7d"), "trades_per_day": round(per_day, 1),
+               "avg_hold_h": None if hold is None else round(hold / 3600, 1), "tags": sorted(tags), "source": w.get("source_url")}
+        (drop if why else keep).append({**rec, ("why" if why else "notes"): why or notes})
+    return {"screened": len(rows), "candidates": keep, "dropped": drop,
+            "note": "a 7-day leaderboard ranks luck as well as skill: candidates still have to pass `whales score` on their own on-chain record"}
