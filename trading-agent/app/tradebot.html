@@ -294,6 +294,7 @@ td canvas.spark { width: 110px; height: 28px; }
       <button type="button" data-view="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</button>
       <button type="button" data-view="trade"><svg viewBox="0 0 24 24"><path d="M7 4v16M4 8h6v7H4zM17 3v18M14 6h6v9h-6z"/></svg>Terminal</button>
       <button type="button" data-view="markets"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 3 6-8 3 3"/><path d="M3 21h18"/></svg>Markets</button>
+      <button type="button" data-view="bots"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="10" cy="17" r="1.6"/></svg>Bots<span class="count" id="navBots">0</span></button>
     </div>
     <div class="nav-group"><h3>Analyze</h3>
       <button type="button" data-view="portfolio"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5V12l6 6"/></svg>Portfolio</button>
@@ -302,6 +303,7 @@ td canvas.spark { width: 110px; height: 28px; }
       <button type="button" data-view="news"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h6M7 13h10M7 16h6"/></svg>News</button>
     </div>
     <div class="nav-group"><h3>Account</h3>
+      <button type="button" data-view="wallet"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14.5h2"/></svg>Wallet</button>
       <button type="button" data-view="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 6.2l2.1 2.1M17.7 15.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 17.8l2.1-2.1M17.7 8.3l2.1-2.1"/></svg>Rules &amp; limits</button>
     </div>
   </nav>
@@ -632,6 +634,71 @@ td canvas.spark { width: 110px; height: 28px; }
     </section>
   </section>
 
+  <!-- ============================== BOTS ============================== -->
+  <section class="view" data-view="bots" aria-label="Bots" hidden>
+    <div class="vhead"><h1>Bots</h1><p>Each bot trades from its own slice of the paper account. Its buys pass the same kill switch, daily-loss, market-hours, stale-data, tier and gross-exposure checks as the agents.</p></div>
+    <div class="grid3" id="botMarket"></div>
+    <section class="panel" aria-label="Set up a bot" id="bkPanel">
+      <h2><span id="bkTitle">Set up a bot</span><span class="seg" id="bkKind"><button type="button" data-k="dca">DCA</button><button type="button" data-k="grid">Grid</button><button type="button" data-k="copy">Copy an agent</button></span></h2>
+      <p class="note" id="bkBlurb"></p>
+      <div class="settings">
+        <label for="bkAsset">Asset<div class="row"><select id="bkAsset"></select></div></label>
+        <label for="bkAlloc">Money for this bot (USD)<div class="row"><input type="number" id="bkAlloc" min="50" step="50" value="1000"></div></label>
+        <label for="bkAmt" data-for="dca">Buy amount (USD)<div class="row"><input type="number" id="bkAmt" min="10" step="10" value="100"></div></label>
+        <label for="bkEvery" data-for="dca">Buy every (minutes)<div class="row"><input type="number" id="bkEvery" min="1" step="1" value="15"></div></label>
+        <label for="bkTp" data-for="dca">Take profit above average cost (%)<div class="row"><input type="number" id="bkTp" min="0" step="0.1" value="1"></div></label>
+        <label for="bkMax" data-for="dca">Buys per cycle<div class="row"><input type="number" id="bkMax" min="1" step="1" value="10"></div></label>
+        <label for="bkLo" data-for="grid">Lowest level<div class="row"><input type="number" id="bkLo" step="any"></div></label>
+        <label for="bkHi" data-for="grid">Highest level<div class="row"><input type="number" id="bkHi" step="any"></div></label>
+        <label for="bkN" data-for="grid">Levels<div class="row"><input type="number" id="bkN" min="3" max="40" step="1" value="8"></div></label>
+        <label for="bkScale" data-for="copy">Size vs the agent's position (×)<div class="row"><input type="number" id="bkScale" min="0.05" max="2" step="0.05" value="0.5"></div></label>
+      </div>
+      <p class="note" id="bkNote"></p>
+      <div class="controls"><button type="button" class="primary" id="bkLaunch">Launch bot</button><span class="msg" id="bkMsg" hidden></span></div>
+    </section>
+    <section class="panel" aria-label="Your bots">
+      <h2><span>Your bots</span><span class="note" id="botsNote"></span></h2>
+      <div class="tw" style="max-height:none"><table><thead><tr><th>Bot</th><th>Status</th><th class="n">Money in</th><th class="n">Value now</th><th class="n">Holding</th><th class="n">Realized</th><th class="n">Open P&amp;L</th><th class="n">Trades</th><th>Last note</th><th></th></tr></thead><tbody id="botsBody"></tbody></table></div>
+    </section>
+    <section class="panel" aria-label="Bot fills">
+      <h2><span>Bot fills</span></h2>
+      <div class="tw"><table><thead><tr><th>Time (UTC)</th><th>Bot</th><th>Side</th><th class="n">Quantity</th><th class="n">Price</th><th>Why</th></tr></thead><tbody id="botFills"></tbody></table></div>
+    </section>
+  </section>
+
+  <!-- ============================== WALLET ============================== -->
+  <section class="view" data-view="wallet" aria-label="Wallet" hidden>
+    <div class="vhead"><h1>Wallet</h1><p>Paper money only. Deposits and withdrawals change the account size, not its P&amp;L, so returns stay honest.</p></div>
+    <div class="statrow" id="wStats"></div>
+    <div class="grid2">
+      <section class="panel" aria-label="Deposit or withdraw">
+        <h2><span>Deposit or withdraw</span><span class="seg" id="wxKind"><button type="button" data-k="dep">Deposit</button><button type="button" data-k="wd">Withdraw</button></span></h2>
+        <label class="tk-row" for="wxAmt">Amount in USD
+          <div class="stepper"><button type="button" id="wxMinus" aria-label="Decrease">−</button><input type="number" id="wxAmt" min="1" step="100" value="1000"><button type="button" id="wxPlus" aria-label="Increase">+</button></div>
+        </label>
+        <p class="note" id="wxNote"></p>
+        <button type="button" class="primary place" id="wxGo">Deposit</button>
+        <div class="msg" id="wxMsg" hidden></div>
+      </section>
+      <section class="panel" aria-label="Swap">
+        <h2><span>Swap</span><span class="note">sells one holding and buys another at market</span></h2>
+        <div class="settings">
+          <label for="swFrom">From<div class="row"><select id="swFrom"></select></div></label>
+          <label for="swTo">To<div class="row"><select id="swTo"></select></div></label>
+          <label for="swAmt">Amount (USD value)<div class="row"><input type="number" id="swAmt" min="1" step="50" value="500"></div></label>
+        </div>
+        <dl class="tk-facts" id="swFacts"></dl>
+        <button type="button" class="primary place" id="swGo">Swap</button>
+        <div class="msg" id="swMsg" hidden></div>
+        <p class="note">Each leg is a market order through the risk layer. A new holding opens with its tier's stop and target attached.</p>
+      </section>
+    </div>
+    <section class="panel" aria-label="Transfers">
+      <h2><span>Transfers</span></h2>
+      <div class="tw" style="max-height:none"><table><thead><tr><th>Time (UTC)</th><th>Type</th><th class="n">Amount</th><th class="n">Cash after</th></tr></thead><tbody id="wxBody"></tbody></table></div>
+    </section>
+  </section>
+
   <!-- ============================== SETTINGS ============================== -->
   <section class="view" data-view="settings" aria-label="Rules and limits" hidden>
     <div class="vhead"><h1>Rules &amp; limits</h1><p>Stricter only. Values outside the locked range snap back.</p></div>
@@ -757,7 +824,7 @@ function freshState(mode) {
     peak: START_CASH, day: -1, dayStart: START_CASH, ordersToday: 0, killed: null, halted: false,
     W, sigPending: [], callPending: [], scored: [], fees: 0, now: 0, liveErr: null, polls: 0, stress: [], corr: null, pendingActs: [], bh0: null,
     impact: Object.fromEntries(SIGNALS.map(k => [k, { a: 0, c: 0 }])), revScores: [], revPending: [], revStats: { f: [0, 0], p: [0, 0] }, revBlocked: 0,
-    entries: ASSETS.map(() => 0), pinned: null, tripLog: [], book: null,
+    entries: ASSETS.map(() => 0), pinned: null, tripLog: [], book: null, bots: [], botId: 0, botLog: [], netDep: 0, transfers: [],
   };
 }
 
@@ -842,8 +909,8 @@ function pWinFromHistory(regime) {  // empirical and shrunk; the prior sits just
 // Portfolio risk: exposure, correlation, stress, sizing
 // =====================================================================================
 function markOf(a) { return a.tick ? (a.tick.bid + a.tick.ask) / 2 : a.bars.length ? a.bars[a.bars.length - 1].c : a.p0; }
-function equity() { return S.cash + S.assets.reduce((s, a) => s + a.pos.qty * markOf(a), 0); }
-function grossExposure(eq) { return S.assets.reduce((s, a) => s + Math.abs(a.pos.qty * markOf(a)), 0) / eq; }
+function equity() { return S.cash + S.assets.reduce((s, a) => s + a.pos.qty * markOf(a), 0) + S.bots.reduce((s, b) => s + b.cash + b.qty * markOf(S.assets[b.i]), 0); }
+function grossExposure(eq) { return S.assets.reduce((s, a, i) => s + (Math.abs(a.pos.qty) + botQty(i)) * markOf(a), 0) / eq; }
 function correlation() {  // pairwise, on one-minute returns over bar times both assets share (markets keep different hours)
   const R = S.assets.map(a => { const b = a.bars.slice(-121), m = new Map(); for (let k = 1; k < b.length; k++) if (b[k].t - b[k - 1].t === BAR) m.set(b[k].ct, Math.log(b[k].c / b[k - 1].c)); return m; });
   let any = false;
@@ -858,7 +925,7 @@ function correlation() {  // pairwise, on one-minute returns over bar times both
 }
 function stressTests(extra) {
   const eq = equity();
-  const book = S.assets.map((a, i) => ({ a, notional: a.pos.qty * markOf(a) + (extra && extra.i === i ? extra.notional : 0) }));
+  const book = S.assets.map((a, i) => ({ a, notional: (a.pos.qty + botQty(i)) * markOf(a) + (extra && extra.i === i ? extra.notional : 0) }));  // bot holdings are long-only and count too
   const dailyVol = a => Math.max(std(logrets(a.bars.slice(-61).map(b => b.c))), 1e-6) * Math.sqrt(TIER[a.tier].bpd);
   const shock = grp => book.reduce((s, x) => s + (TIER[x.a.tier].group === grp ? x.notional * TIER[x.a.tier].stressMove : 0), 0);
   const sc = [
@@ -995,8 +1062,9 @@ function checkOrder(a, side, qty, price, ts, dataTs) {
   if (S.ordersToday >= L.maxOrders) why.push('order count limit');
   if (why.length) return { ok: false, why: why.join(', ') };
   const eq = equity(), cap = TIER[a.tier].maxPos * eq / price;
-  const q = Math.min(qty, Math.max(0, cap - Math.abs(a.pos.qty)));
+  let q = Math.min(qty, Math.max(0, cap - Math.abs(a.pos.qty) - botQty(S.assets.indexOf(a))));
   if (q <= 0) return { ok: false, why: 'position limit' };
+  if (side === 'buy' && a.pos.qty >= 0) { q = Math.min(q, Math.max(0, S.cash) / (price * (1 + FEE))); if (q <= 0) return { ok: false, why: 'not enough cash' }; }  // spot: no borrowing
   return { ok: true, qty: q, clamped: q < qty };
 }
 function fill(a, ts, side, qty, price, reason, kind) {
@@ -1215,7 +1283,8 @@ function afterBar(ts, sim) {
   });
   scoreAll(); scoreReviews();
   S.stress = stressTests();
-  const eq = equity(); S.eq.push({ ts, eq, peak: Math.max(S.peak, eq) });
+  runBots(ts);
+  const eq = equity(); S.eq.push({ ts, eq, peak: Math.max(S.peak, eq), dep: S.netDep });
   if (S.eq.length > 3000) S.eq.splice(0, 1000);
 }
 
@@ -1299,7 +1368,7 @@ async function liveTick() {
     else S.liveErr = null;
     benchmarkAnchor();
     if (newBar) afterBar(now, false);
-    else if (okCount) { riskUpdate(now); S.stress = stressTests(); const eq = equity(); S.eq.push({ ts: now, eq, peak: Math.max(S.peak, eq) }); }
+    else if (okCount) { riskUpdate(now); S.stress = stressTests(); const eq = equity(); S.eq.push({ ts: now, eq, peak: Math.max(S.peak, eq), dep: S.netDep }); }
   } finally { liveBusy = false; render(); fetchBook(); }
 }
 function benchmarkAnchor() {  // equal-weight buy and hold from the first price seen for each asset
@@ -1655,7 +1724,7 @@ function render() {
   const bhx = S.bh0 ? S.assets.map((a, i) => S.bh0[i] ? markOf(a) / S.bh0[i] - 1 : null).filter(x => x != null) : [];
   const bh = bhx.length ? mean(bhx) : 0;
   $('kEq').textContent = usd(eq);
-  $('kEqSub').textContent = pct(eq / START_CASH - 1) + ' · equal-weight hold ' + pct(bh);
+  $('kEqSub').textContent = pct(eq / (START_CASH + S.netDep) - 1) + ' · equal-weight hold ' + pct(bh);
   const dd = Math.max(0, 1 - eq / Math.max(S.peak, eq));
   $('kDd').textContent = (dd * 100).toFixed(2) + '%'; setMeter($('mDd'), dd / L.maxDD, 0.33, 0.66);
   $('kDdSub').textContent = dd >= 0.10 ? 'entries paused (≥ 10%)' : dd > 0.0001 ? 'size scaled to ' + Math.round(clamp(1 - dd / 0.10, 0.25, 1) * 100) + '%' : 'full size';
@@ -1830,7 +1899,7 @@ if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').m
 // Views: overview, terminal, markets, portfolio, agents, journal. Everything below reads the
 // engine's own state (S, SENT, ARB); nothing here invents prices, trades or results.
 // =====================================================================================
-const VIEWS = ['overview', 'trade', 'markets', 'portfolio', 'agents', 'journal', 'news', 'settings'];
+const VIEWS = ['overview', 'trade', 'markets', 'bots', 'portfolio', 'agents', 'journal', 'news', 'wallet', 'settings'];
 const store = {
   get(k, d) { try { const v = localStorage.getItem('tb.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('tb.' + k, JSON.stringify(v)); } catch (e) { /* per-viewer convenience only */ } },
@@ -2099,10 +2168,11 @@ function renderExtra() {
   const t = performance.now(); if (t - lastExtra < 250) return; lastExtra = t;
   const eq = equity(), now = nowTs(), a = S.assets[S.sel];
   // shell: user card, nav counts, search list, top cards, tape, alerts
-  $('ucEq').textContent = usd(eq) + ' · ' + pct(eq / START_CASH - 1);
-  $('ucMode').textContent = (S.mode === 'sim' ? 'Simulated market' : 'Live prices') + ' · started with ' + usd(START_CASH);
+  $('ucEq').textContent = usd(eq) + ' · ' + pct(eq / (START_CASH + S.netDep) - 1);
+  $('ucMode').textContent = (S.mode === 'sim' ? 'Simulated market' : 'Live prices') + ' · started with ' + usd(START_CASH) + (S.netDep ? ', net deposits ' + signedUsd(S.netDep) : '');
   const running = S.assets.filter(x => !x.err && isOpen(x, now) && x.bars.length >= 49).length;
   $('navAgents').textContent = running;
+  $('navBots').textContent = S.bots.filter(b => b.status === 'running').length;
   if (!$('symList').childElementCount) $('symList').innerHTML = S.assets.map(x => '<option value="' + short(x.sym) + '">' + TIER[x.tier].label + '</option>').join('');
   const card = (x, i) => { const c = chg(x, 60); return '<button type="button" class="tcard" data-i="' + i + '"><b>' + short(x.sym) + '</b><span class="ch ' + sgnCls(c) + '">' + pctS(c) + '</span><span class="px">' + (x.bars.length || x.tick ? fmtPx(markOf(x)) : '—') + '</span></button>'; };
   $('tcards').innerHTML = S.assets.map((x, i) => WATCH.includes(x.sym) ? card(x, i) : '').join('') + '<button type="button" class="tcard add" data-go="markets" aria-label="Add symbols from Markets">+</button>';
@@ -2120,6 +2190,8 @@ function renderExtra() {
   if (VIEW === 'portfolio') renderPortfolio(eq);
   if (VIEW === 'agents') renderAgents(now);
   if (VIEW === 'journal') renderJournal();
+  if (VIEW === 'bots') renderBots(now);
+  if (VIEW === 'wallet') renderWallet(eq, now);
 }
 function renderOverview(eq, now) {
   const start0 = S.journal.length ? S.journal[S.journal.length - 1].ts : now, openN = S.assets.filter(x => isOpen(x, now)).length;
@@ -2132,7 +2204,8 @@ function renderOverview(eq, now) {
   const held = S.assets.map((x, i) => ({ x, i, v: Math.abs(x.pos.qty * markOf(x)) })).filter(z => z.v > 0).sort((p, q) => q.v - p.v);
   const parts = held.slice(0, 5).map((z, k) => ({ label: short(z.x.sym) + (z.x.pos.qty < 0 ? ' (short)' : ''), v: z.v, color: PAL[k] }));
   const rest = held.slice(5).reduce((s, z) => s + z.v, 0); if (rest) parts.push({ label: 'Other', v: rest, color: '--c6' });
-  const cash = Math.max(0, eq - held.reduce((s, z) => s + (z.x.pos.qty > 0 ? z.v : 0), 0)); parts.push({ label: 'Cash', v: cash, color: '--cash' });
+  const botsV = S.bots.reduce((s, b) => s + botValue(b), 0); if (botsV > 0) parts.push({ label: 'Bots', v: botsV, color: '--c5' });
+  parts.push({ label: 'Cash', v: Math.max(0, S.cash), color: '--cash' });
   const tot = parts.reduce((s, p) => s + p.v, 0) || 1, gross = grossExposure(eq);
   VC.alloc = { parts, big: (gross * 100).toFixed(0) + '%', small: 'invested' };
   $('allocNote').textContent = held.length + ' open position' + (held.length === 1 ? '' : 's');
@@ -2144,9 +2217,10 @@ function renderOverview(eq, now) {
   if (E.length > 1) {
     const t1 = E[E.length - 1].ts, t0 = Math.max(E[0].ts, t1 - W[0]), span = t1 - t0;
     const step = W[1] || Math.max(60e3, Math.ceil(span / 24 / 60e3) * 60e3);
-    let prev = null; for (let k = E.length - 1; k >= 0; k--) { if (E[k].ts <= t0) { prev = E[k].eq; break; } }
-    if (prev == null) prev = E[0].eq;
-    const lastIn = new Map(); E.forEach(e => { if (e.ts > t0) lastIn.set(bucket(e.ts, step), e.eq); });
+    let prev = null; const net = e => e.eq - (e.dep || 0);  // deposits and withdrawals are not P&L
+    for (let k = E.length - 1; k >= 0; k--) { if (E[k].ts <= t0) { prev = net(E[k]); break; } }
+    if (prev == null) prev = net(E[0]);
+    const lastIn = new Map(); E.forEach(e => { if (e.ts > t0) lastIn.set(bucket(e.ts, step), net(e)); });
     let cum = 0; [...lastIn.entries()].sort((p, q) => p[0] - q[0]).forEach(([b, v]) => { const d = v - prev; prev = v; cum += d; items.push({ label: hhmm(b), v: d, tip: hhmm(b) + '–' + hhmm(b + step) + ' UTC<br>P&L ' + signedUsd(d) + '<br>cumulative ' + signedUsd(cum) }); line.push(cum); });
   }
   VC.pnl = { items, line }; $('pnlNote').textContent = items.length ? 'Net ' + signedUsd(line[line.length - 1]) + ' over the window' : '';
@@ -2212,16 +2286,17 @@ function renderPortfolio(eq) {
   const realized = S.trips.reduce((s, x) => s + x, 0), openPnl = S.assets.reduce((s, x) => s + unreal(x), 0), gross = S.assets.reduce((s, x) => s + Math.abs(x.pos.qty * markOf(x)), 0);
   $('pfHead').textContent = 'Opened with ' + usd(START_CASH) + ' of paper money · ' + (S.mode === 'sim' ? 'simulated market' : 'live prices');
   const stat = (v, l, cls) => '<div class="stat"><b class="' + (cls || '') + '">' + v + '</b><span>' + l + '</span></div>';
-  $('pfStats').innerHTML = stat(usd(eq), 'Equity') + stat(usd(S.cash), 'Cash') + stat(usd(gross), 'Invested (gross)') + stat(signedUsd(openPnl), 'Open P&L', sgnCls(openPnl)) + stat(signedUsd(realized), 'Realized after fees', sgnCls(realized)) + stat(usd(S.fees), 'Fees paid') + stat(pct(eq / START_CASH - 1), 'Return', sgnCls(eq - START_CASH));
+  $('pfStats').innerHTML = stat(usd(eq), 'Equity') + stat(usd(S.cash), 'Cash') + stat(usd(gross), 'Invested (gross)') + stat(signedUsd(openPnl), 'Open P&L', sgnCls(openPnl)) + stat(signedUsd(realized), 'Realized after fees', sgnCls(realized)) + stat(usd(S.bots.reduce((s, b) => s + botValue(b), 0)), 'In bots') + stat(usd(S.fees), 'Fees paid') + stat(pct(eq / (START_CASH + S.netDep) - 1), 'Return on money in', sgnCls(eq - START_CASH - S.netDep));
   const cash = Math.max(0, S.cash), val = x => Math.abs(x.pos.qty * markOf(x));
   const group = keyOf => { const m = new Map(); S.assets.forEach(x => { if (val(x)) m.set(keyOf(x), (m.get(keyOf(x)) || 0) + val(x)); }); return [...m.entries()].sort((p, q) => q[1] - p[1]); };
-  const mk = g => { const parts = g.slice(0, 5).map(([k, v], j) => ({ label: k, v, color: PAL[j] })); const r = g.slice(5).reduce((s, z) => s + z[1], 0); if (r) parts.push({ label: 'Other', v: r, color: '--c6' }); parts.push({ label: 'Cash', v: cash, color: '--cash' }); return parts; };
+  const mk = g => { const parts = g.slice(0, 5).map(([k, v], j) => ({ label: k, v, color: PAL[j] })); const r = g.slice(5).reduce((s, z) => s + z[1], 0); if (r) parts.push({ label: 'Other', v: r, color: '--c6' }); const bv = S.bots.reduce((s, b) => s + botValue(b), 0); if (bv > 0) parts.push({ label: 'Bots', v: bv, color: '--c5' }); parts.push({ label: 'Cash', v: cash, color: '--cash' }); return parts; };
   VC.pf = { asset: mk(group(x => short(x.sym))), cls: mk(group(x => TIER[x.tier].label)), venue: mk(group(x => SRC_LABEL(x))), eq };
   const lg = (id, parts) => { const tot = parts.reduce((s, p) => s + p.v, 0) || 1; $(id).innerHTML = parts.map(p => '<li><span class="dot" style="background:var(' + p.color + ')"></span><span>' + esc(p.label) + '</span><span class="v">' + (p.v / tot * 100).toFixed(1) + '%</span></li>').join(''); };
   lg('pfAssetLgd', VC.pf.asset); lg('pfClassLgd', VC.pf.cls); lg('pfVenueLgd', VC.pf.venue);
   const classes = Object.keys(TIER);
   $('pfTable').innerHTML = classes.map(k => { const xs = S.assets.filter(x => x.tier === k), v = xs.reduce((s, x) => s + val(x), 0), u = xs.reduce((s, x) => s + unreal(x), 0), tr = S.tripLog.filter(t => xs.some(x => x.sym === t.sym)), r = tr.reduce((s, t) => s + t.pnl, 0);
     return '<tr><td>' + TIER[k].label + ' <span class="note">' + xs.map(x => short(x.sym)).join(', ') + '</span></td><td class="n">' + usd(v) + '</td><td class="n">' + (v / eq * 100).toFixed(1) + '%</td><td class="n ' + sgnCls(u) + '">' + signedUsd(u) + '</td><td class="n ' + sgnCls(r) + '">' + signedUsd(r) + '</td><td class="n">' + tr.length + '</td></tr>'; }).join('')
+    + (S.bots.some(b => b.status !== 'stopped') ? (() => { const bs = S.bots.filter(b => b.status !== 'stopped'), v = bs.reduce((s, b) => s + botValue(b), 0), u = bs.reduce((s, b) => s + botUnreal(b), 0), r = S.bots.reduce((s, b) => s + b.realized, 0); return '<tr><td>Bots <span class="note">' + bs.length + ' running or paused</span></td><td class="n">' + usd(v) + '</td><td class="n">' + (v / eq * 100).toFixed(1) + '%</td><td class="n ' + sgnCls(u) + '">' + signedUsd(u) + '</td><td class="n ' + sgnCls(r) + '">' + signedUsd(r) + '</td><td class="n">' + S.bots.reduce((s, b) => s + b.trades, 0) + '</td></tr>'; })() : '')
     + '<tr><td>Cash</td><td class="n">' + usd(S.cash) + '</td><td class="n">' + (S.cash / eq * 100).toFixed(1) + '%</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>';
   VC.pfPnl = S.assets.map(x => { const tr = S.tripLog.filter(t => t.sym === x.sym), v = tr.reduce((s, t) => s + t.pnl, 0); return { label: short(x.sym), v, tip: short(x.sym) + '<br>realized ' + signedUsd(v) + '<br>' + tr.length + ' trades' }; });
 }
@@ -2307,6 +2382,211 @@ function drawViewCharts() {
 }
 function drawAll() { drawCharts(); drawViewCharts(); }
 
+// ---------- bots: DCA, grid and copy-an-agent, each with its own paper sub-account ----------
+const BOT_KINDS = {
+  dca: { name: 'DCA', title: 'DCA bot', blurb: 'Buys a fixed dollar amount on a schedule, then sells everything once price is a set percentage above its average cost and starts a new cycle.' },
+  grid: { name: 'Grid', title: 'Grid bot', blurb: 'Splits its money across price levels between a low and a high. Buys a slice each time price falls through a level and sells it one level higher. It earns in a range and gets stuck holding in a downtrend.' },
+  copy: { name: 'Copy', title: 'Copy an agent', blurb: 'Mirrors one asset agent\'s long entries and exits from its own money at a size you choose. It acts on the bar after the agent, so its fills differ slightly.' },
+};
+const UIB = { kind: 'dca', gridFor: '', wx: 'dep' };
+function botQty(i) { return S.bots.reduce((s, b) => s + (b.i === i ? b.qty : 0), 0); }
+function botValue(b) { return b.cash + b.qty * markOf(S.assets[b.i]); }
+function botUnreal(b) { return b.qty ? b.qty * markOf(S.assets[b.i]) - b.cost : 0; }
+function botFill(b, side, qty, px, ts, reason) {
+  const a = S.assets[b.i], fee = qty * px * FEE;
+  if (side === 'buy') { b.cost += qty * px + fee; b.qty += qty; b.cash -= qty * px + fee; }
+  else {
+    const avg = b.cost / b.qty, pnl = (px - avg) * qty - fee;
+    b.realized += pnl; b.sells++; if (pnl > 0) b.wins++;
+    b.cost -= avg * qty; b.qty -= qty; if (b.qty * px < 1e-6) { b.qty = 0; b.cost = 0; }
+    b.cash += qty * px - fee;
+  }
+  S.fees += fee; b.trades++;
+  S.fills.push({ ts, sym: a.sym, side, qty, price: px, fee, reason: 'bot: ' + reason });
+  S.botLog.unshift({ ts, bot: b.name, side, qty, px, reason }); if (S.botLog.length > 300) S.botLog.length = 300;
+}
+function botBlock(b, usdAmt, ts) {  // why a bot buy may not happen now; null when it may
+  const a = S.assets[b.i], q = quoteOf(a), eq = equity(), tier = TIER[a.tier];
+  if (!q) return 'no price';
+  if (S.killed) return 'kill switch on';
+  if (S.halted) return 'daily loss limit';
+  if (!isOpen(a, ts)) return 'market closed';
+  if (ts - q.ts > Math.max(L.maxAgeMs, tier.maxAgeMs)) return 'stale data';
+  if (usdAmt > b.cash + 1e-9) return 'bot out of money';
+  if (grossExposure(eq) + usdAmt / eq > L.gross) return 'account gross exposure cap';
+  if ((Math.abs(a.pos.qty) + botQty(b.i)) * markOf(a) + usdAmt > tier.maxPos * eq) return tier.label + ' position cap';
+  return null;
+}
+function runBots(ts) {
+  S.bots.forEach(b => {
+    if (b.status !== 'running') return;
+    const a = S.assets[b.i], q = quoteOf(a); if (!q || !a.bars.length) return;
+    const bar = a.bars[a.bars.length - 1]; if (b.lastCt === bar.ct) return; b.lastCt = bar.ct;
+    if (!isOpen(a, ts)) return;
+    const buy = (usdAmt, px, reason) => {
+      usdAmt = Math.min(usdAmt, b.cash / (1 + FEE)); if (usdAmt < 1) { usdAmt = 0; }
+      const why = usdAmt ? botBlock(b, usdAmt * (1 + FEE), ts) : 'bot out of money';
+      if (why) { if (b.block !== why) log(ts, a.sym, 'bot', b.name + ': buy skipped (' + why + ')', 'warn'); b.block = why; return 0; }
+      b.block = null; const qty = usdAmt / px; botFill(b, 'buy', qty, px, ts, reason); return qty;
+    };
+    const sell = (qty, px, reason) => { qty = Math.min(qty, b.qty); if (qty > 0) botFill(b, 'sell', qty, px, ts, reason); return qty; };
+    if (b.kind === 'dca') {
+      const p = b.p;
+      if (b.qty && p.tp > 0 && q.bid * (1 - SLIP) >= b.cost / b.qty * (1 + p.tp)) {
+        const before = b.realized; sell(b.qty, q.bid * (1 - SLIP), 'take profit'); b.cycles++; b.buys = 0; b.lastBuy = 0;
+        log(ts, a.sym, 'bot', b.name + ': take profit, cycle ' + b.cycles + ' closed ' + signedUsd(b.realized - before), 'good');
+      } else if (b.buys < p.maxBuys && (!b.lastBuy || ts - b.lastBuy >= p.every * BAR)) {
+        if (buy(p.amount, q.ask * (1 + SLIP), 'scheduled buy ' + (b.buys + 1) + '/' + p.maxBuys)) { b.buys++; b.lastBuy = ts; }
+      }
+    } else if (b.kind === 'grid') {
+      const lv = b.p.levels;
+      for (let k = 0; k < lv.length - 1; k++) if (b.hold[k] && bar.h >= lv[k + 1]) { sell(b.hold[k], lv[k + 1], 'grid sell at level ' + (k + 2)); b.hold[k] = 0; }
+      for (let k = 0; k < lv.length - 1; k++) if (!b.hold[k] && bar.l <= lv[k] && b.prev > lv[k]) b.hold[k] = buy(b.p.slice, lv[k], 'grid buy at level ' + (k + 1));
+      b.prev = bar.c;
+    } else if (b.kind === 'copy') {
+      const aq = a.pos.qty;
+      if (aq > 0 && !(b.lastAgent > 0)) buy(b.p.scale * aq * markOf(a), q.ask * (1 + SLIP), 'copied the agent\'s entry');
+      if (!(aq > 0) && b.lastAgent > 0 && b.qty) sell(b.qty, q.bid * (1 - SLIP), 'copied the agent\'s exit');
+      b.lastAgent = aq;
+    }
+  });
+}
+function bkMsg(text, tone) { const m = $('bkMsg'); m.hidden = !text; m.textContent = text || ''; m.className = 'msg ' + ({ good: 'p-good', risk: 'p-risk', warn: 'p-warn', info: 'p-info' }[tone] || 'p-mute'); }
+function gridSpec(a) {
+  const lo = +$('bkLo').value, hi = +$('bkHi').value, n = Math.round(+$('bkN').value), alloc = +$('bkAlloc').value;
+  if (!(lo > 0 && hi > lo && n >= 3 && n <= 40)) return { err: 'Set a lowest level below the highest and 3 to 40 levels.' };
+  const levels = Array.from({ length: n }, (_, k) => lo + (hi - lo) * k / (n - 1)), step = (levels[1] - levels[0]) / levels[0];
+  return { levels, step, slice: alloc / (n - 1), lo, hi, n };
+}
+function bkRender() {
+  const k = UIB.kind, a = S.assets[+$('bkAsset').value || 0], alloc = +$('bkAlloc').value || 0, eq = equity();
+  document.querySelectorAll('#bkKind button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k));
+  document.querySelectorAll('#bkPanel [data-for]').forEach(l => { l.hidden = l.dataset.for !== k; });
+  $('bkTitle').textContent = 'Set up · ' + BOT_KINDS[k].title; $('bkBlurb').textContent = BOT_KINDS[k].blurb;
+  if (k === 'grid' && UIB.gridFor !== a.sym && (a.bars.length || a.tick)) { UIB.gridFor = a.sym; const m = markOf(a), w = Math.max(TIER[a.tier].take * 3, 0.006); $('bkLo').value = +(m * (1 - w)).toPrecision(6); $('bkHi').value = +(m * (1 + w)).toPrecision(6); }
+  let note = '';
+  if (k === 'dca') { const amt = +$('bkAmt').value || 0, ev = +$('bkEvery').value || 1, mx = +$('bkMax').value || 1;
+    note = 'Spends up to ' + usd(Math.min(alloc, amt * mx)) + ' over ' + (ev * (mx - 1) / 60).toFixed(1) + ' hours per cycle' + (amt * mx > alloc ? ', but only ' + usd(alloc) + ' is set aside, so it stops early' : '') + '. Round-trip fees are about 0.12%; a take profit below that loses money.'; }
+  if (k === 'grid') { const g = gridSpec(a); note = g.err || ('Slice ' + usd(g.slice) + ' per level, ' + (g.step * 100).toFixed(2) + '% apart. Each completed buy-sell earns about ' + ((g.step - 2 * FEE) * 100).toFixed(2) + '% after fees' + (g.step < 2 * FEE + 0.0003 ? '. That is below fees: widen the range or use fewer levels.' : '. Price outside the range does nothing; below it, the bot just holds.')); }
+  if (k === 'copy') { const sc = +$('bkScale').value || 0; note = 'This agent can hold up to ' + (TIER[a.tier].maxPos * 100) + '% of equity (' + usd(TIER[a.tier].maxPos * eq) + '). At ' + sc + '× the bot buys up to ' + usd(Math.min(alloc, sc * TIER[a.tier].maxPos * eq)) + ' per copied entry. It copies longs only.'; }
+  $('bkNote').textContent = note + ' Money available: ' + usd(Math.max(0, S.cash)) + '.';
+}
+function launchBot() {
+  const k = UIB.kind, i = +$('bkAsset').value || 0, a = S.assets[i], alloc = +$('bkAlloc').value, now = nowTs();
+  if (!(alloc >= 50)) return bkMsg('Give the bot at least $50.', 'risk');
+  if (alloc > S.cash) return bkMsg('Only ' + usd(Math.max(0, S.cash)) + ' of cash is free. Deposit more in Wallet or lower the amount.', 'risk');
+  let p;
+  if (k === 'dca') { p = { amount: +$('bkAmt').value, every: Math.max(1, Math.round(+$('bkEvery').value)), tp: (+$('bkTp').value || 0) / 100, maxBuys: Math.max(1, Math.round(+$('bkMax').value)) };
+    if (!(p.amount >= 10)) return bkMsg('Set a buy amount of at least $10.', 'risk'); }
+  if (k === 'grid') { const g = gridSpec(a); if (g.err) return bkMsg(g.err, 'risk'); if (g.step < 2 * FEE + 0.0003) return bkMsg('Levels are ' + (g.step * 100).toFixed(2) + '% apart, less than fees and slippage. Every round would lose money.', 'risk'); p = { levels: g.levels, slice: g.slice, lo: g.lo, hi: g.hi }; }
+  if (k === 'copy') { p = { scale: +$('bkScale').value }; if (!(p.scale > 0 && p.scale <= 2)) return bkMsg('Pick a size between 0.05× and 2×.', 'risk'); }
+  S.cash -= alloc;
+  const b = { id: ++S.botId, kind: k, i, alloc, cash: alloc, qty: 0, cost: 0, realized: 0, trades: 0, sells: 0, wins: 0, buys: 0, cycles: 0, status: 'running', created: now, p,
+    hold: k === 'grid' ? p.levels.map(() => 0) : [], prev: markOf(a), lastAgent: a.pos.qty, block: null };
+  b.name = BOT_KINDS[k].name + ' ' + short(a.sym) + ' #' + b.id;
+  S.bots.push(b);
+  log(now, a.sym, 'bot', b.name + ' launched with ' + usd(alloc) + (k === 'grid' ? ', ' + p.levels.length + ' levels ' + fmtPx(p.lo) + '–' + fmtPx(p.hi) : k === 'dca' ? ', ' + usd(p.amount) + ' every ' + p.every + ' min' : ', ' + p.scale + '× the agent'), 'info');
+  bkMsg(b.name + ' is running. It acts on each new bar.', 'good'); rerender();
+}
+function stopBot(b) {
+  const a = S.assets[b.i], q = quoteOf(a), now = nowTs();
+  if (b.qty) {
+    if (!q || !isOpen(a, now)) { b.status = 'paused'; b.note = 'market closed: paused, stop again after the open to sell'; rerender(); return; }
+    botFill(b, 'sell', b.qty, q.bid * (1 - SLIP), now, 'stopped by operator');
+  }
+  S.cash += b.cash; log(now, a.sym, 'bot', b.name + ' stopped. ' + usd(b.cash) + ' back to cash, realized ' + signedUsd(b.realized), b.realized >= 0 ? 'good' : 'risk');
+  b.cash = 0; b.status = 'stopped'; rerender();
+}
+function renderBots(now) {
+  const runN = S.bots.filter(b => b.status === 'running').length;
+  $('botMarket').innerHTML = Object.entries(BOT_KINDS).map(([k, d]) => { const n = S.bots.filter(b => b.kind === k && b.status !== 'stopped').length;
+    return '<section class="panel"><h2><span>' + d.title + '</span><span class="tag ' + (n ? 'p-good' : 'p-mute') + '">' + n + ' active</span></h2><p class="note" style="font-size:.84rem;color:var(--fg)">' + esc(d.blurb) + '</p><div><button type="button" class="tradebtn" data-kind="' + k + '"' + (UIB.kind === k ? ' aria-pressed="true"' : '') + '>' + (UIB.kind === k ? 'Selected below' : 'Set up') + '</button></div></section>'; }).join('');
+  if (!$('bkAsset').childElementCount) $('bkAsset').innerHTML = S.assets.map((x, i) => '<option value="' + i + '">' + short(x.sym) + ' · ' + TIER[x.tier].label + '</option>').join('');
+  bkRender();
+  $('botsNote').textContent = runN + ' running · ' + usd(S.bots.reduce((s, b) => s + botValue(b), 0)) + ' in bots';
+  const st = b => b.status === 'stopped' ? ['stopped', 'p-mute'] : b.status === 'paused' ? ['paused', 'p-warn'] : S.killed ? ['kill switch: no buys', 'p-risk'] : !isOpen(S.assets[b.i], now) ? ['market closed', 'p-mute'] : ['running', 'p-good'];
+  $('botsBody').innerHTML = S.bots.slice().reverse().map(b => { const s = st(b), a = S.assets[b.i], u = botUnreal(b);
+    const detail = b.kind === 'grid' ? b.hold.filter(x => x > 0).length + ' of ' + (b.p.levels.length - 1) + ' slices held' : b.kind === 'dca' ? 'buy ' + b.buys + '/' + b.p.maxBuys + ', ' + b.cycles + ' cycles' : 'following ' + short(a.sym) + ' agent';
+    return '<tr><td class="sym">' + esc(b.name) + '<br><span class="note">' + detail + '</span></td><td><span class="tag ' + s[1] + '">' + s[0] + '</span></td><td class="n">' + usd(b.alloc) + '</td><td class="n">' + usd(botValue(b)) + '</td><td class="n">' + (b.qty ? fmtQty(b.qty) + '<br><span class="note">avg ' + fmtPx(b.cost / b.qty) + '</span>' : '—') + '</td><td class="n ' + sgnCls(b.realized) + '">' + signedUsd(b.realized) + '</td><td class="n ' + sgnCls(u) + '">' + (b.qty ? signedUsd(u) : '—') + '</td><td class="n">' + b.trades + (b.sells ? '<br><span class="note">' + Math.round(b.wins / b.sells * 100) + '% wins</span>' : '') + '</td><td><span class="note">' + esc(b.note || (b.block ? 'last buy skipped: ' + b.block : '—')) + '</span></td><td>' +
+      (b.status === 'stopped' ? '' : '<button type="button" class="tradebtn" data-bot="' + b.id + '" data-act="' + (b.status === 'running' ? 'pause' : 'resume') + '">' + (b.status === 'running' ? 'Pause' : 'Resume') + '</button> <button type="button" class="tradebtn" data-bot="' + b.id + '" data-act="stop">Stop &amp; sell</button>') + '</td></tr>'; }).join('')
+    || '<tr><td colspan="10" class="note">No bots yet. Pick one above and launch it.</td></tr>';
+  $('botFills').innerHTML = S.botLog.slice(0, 60).map(f => '<tr><td class="t">' + tfmt(f.ts) + '</td><td class="sym">' + esc(f.bot) + '</td><td>' + sideTag(f.side === 'buy' ? 'long' : 'short').replace('>long<', '>buy<').replace('>short<', '>sell<') + '</td><td class="n">' + fmtQty(f.qty) + '</td><td class="n">' + fmtPx(f.px) + '</td><td>' + esc(f.reason) + '</td></tr>').join('')
+    || '<tr><td colspan="6" class="note">Fills appear here.</td></tr>';
+}
+
+// ---------- wallet: paper deposits, withdrawals and swaps ----------
+function wxMsg(id, text, tone) { const m = $(id); m.hidden = !text; m.textContent = text || ''; m.className = 'msg ' + ({ good: 'p-good', risk: 'p-risk', warn: 'p-warn', info: 'p-info' }[tone] || 'p-mute'); }
+function transfer(kind, amt) {
+  const now = nowTs();
+  if (!(amt > 0)) return wxMsg('wxMsg', 'Enter an amount above $0.', 'risk');
+  if (kind === 'dep' && amt > 1e6) return wxMsg('wxMsg', 'Deposit at most $1,000,000 at a time.', 'risk');
+  if (kind === 'wd' && amt > S.cash) return wxMsg('wxMsg', 'Only ' + usd(Math.max(0, S.cash)) + ' of cash is free. Close positions or stop a bot first.', 'risk');
+  const sg = kind === 'dep' ? 1 : -1;
+  S.cash += sg * amt; S.netDep += sg * amt; S.peak += sg * amt; S.dayStart += sg * amt;  // the risk limits measure trading, not transfers
+  S.transfers.unshift({ ts: now, kind: kind === 'dep' ? 'Deposit' : 'Withdrawal', amt: sg * amt, cash: S.cash });
+  log(now, '—', 'wallet', (kind === 'dep' ? 'Deposited ' : 'Withdrew ') + usd(amt) + ' of paper money', 'info');
+  wxMsg('wxMsg', (kind === 'dep' ? 'Deposited ' : 'Withdrew ') + usd(amt) + '. Cash is now ' + usd(S.cash) + '.', 'good'); rerender();
+}
+function swapPlan() {
+  const from = $('swFrom').value, to = $('swTo').value, amt = +$('swAmt').value || 0;
+  const fa = from === 'USD' ? null : S.assets[+from], ta = to === 'USD' ? null : S.assets[+to];
+  const fq = fa && quoteOf(fa), tq = ta && quoteOf(ta);
+  let sellQty = 0, proceeds = amt;
+  if (fa) { if (!fq) return { err: 'No price for ' + short(fa.sym) + ' yet.' }; sellQty = Math.min(amt / fq.bid, Math.max(0, fa.pos.qty)); proceeds = sellQty * fq.bid * (1 - SLIP) * (1 - FEE); }
+  if (ta && !tq) return { err: 'No price for ' + short(ta.sym) + ' yet.' };
+  const buyQty = ta ? proceeds / (tq.ask * (1 + SLIP) * (1 + FEE)) : 0;
+  return { fa, ta, fq, tq, sellQty, proceeds, buyQty, amt, err: from === to ? 'Pick two different things.' : fa && !(fa.pos.qty > 0) ? 'You hold no ' + short(fa.sym) + ' in the agent book.' : null };
+}
+function renderWallet(eq, now) {
+  const stat = (v, l, cls) => '<div class="stat"><b class="' + (cls || '') + '">' + v + '</b><span>' + l + '</span></div>';
+  const book = S.assets.reduce((s, x) => s + x.pos.qty * markOf(x), 0), bots = S.bots.reduce((s, b) => s + botValue(b), 0), basis = START_CASH + S.netDep;
+  $('wStats').innerHTML = stat(usd(eq), 'Equity') + stat(usd(S.cash), 'Free cash') + stat(usd(book), 'Agent book') + stat(usd(bots), 'In bots') + stat(signedUsd(S.netDep), 'Net deposits') + stat(pct(eq / basis - 1), 'Return on money in', sgnCls(eq - basis));
+  document.querySelectorAll('#wxKind button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === UIB.wx));
+  $('wxGo').textContent = UIB.wx === 'dep' ? 'Deposit' : 'Withdraw';
+  $('wxNote').textContent = UIB.wx === 'dep' ? 'Adds paper cash. The drawdown peak and today\'s starting balance move up by the same amount, so a deposit never looks like profit.' : 'Takes free cash out. Money in open positions and bots stays where it is. You can withdraw up to ' + usd(Math.max(0, S.cash)) + '.';
+  const opts = [['USD', 'USD cash']].concat(S.assets.map((x, i) => [String(i), short(x.sym) + (x.pos.qty > 0 ? ' · held' : '')])), sig = opts.map(o => o[1]).join('|');
+  ['swFrom', 'swTo'].forEach((id, k) => { const el = $(id); if (el.dataset.sig === sig) return; const cur = el.value || (k ? '0' : 'USD'); el.innerHTML = opts.map(o => '<option value="' + o[0] + '">' + esc(o[1]) + '</option>').join(''); el.dataset.sig = sig; el.value = cur; });
+  const sp = swapPlan();
+  $('swFacts').innerHTML = sp.err ? '<dt>Check</dt><dd>' + esc(sp.err) + '</dd>' : [
+    ['You give', sp.fa ? fmtQty(sp.sellQty) + ' ' + short(sp.fa.sym) + ' (' + usd(sp.sellQty * sp.fq.bid) + ')' : usd(sp.amt) + ' cash'],
+    ['You get', sp.ta ? '≈ ' + fmtQty(sp.buyQty) + ' ' + short(sp.ta.sym) : '≈ ' + usd(sp.proceeds) + ' cash'],
+    ['Rate', sp.fa && sp.ta ? '1 ' + short(sp.fa.sym) + ' ≈ ' + fmtQty(sp.fq.bid / sp.tq.ask) + ' ' + short(sp.ta.sym) : sp.ta ? '1 ' + short(sp.ta.sym) + ' = ' + usd(sp.tq.ask) : '1 ' + short(sp.fa.sym) + ' = ' + usd(sp.fq.bid)],
+    ['Fees and slippage', usd(sp.amt * ((sp.fa ? FEE + SLIP : 0) + (sp.ta ? FEE + SLIP : 0)))],
+  ].map(f => '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>').join('');
+  $('swGo').disabled = !!sp.err;
+  $('wxBody').innerHTML = S.transfers.map(t => '<tr><td class="t">' + tfmt(t.ts) + '</td><td>' + t.kind + '</td><td class="n ' + sgnCls(t.amt) + '">' + signedUsd(t.amt) + '</td><td class="n">' + usd(t.cash) + '</td></tr>').join('')
+    || '<tr><td colspan="4" class="note">The account opened with ' + usd(START_CASH) + '. Deposits and withdrawals are listed here.</td></tr>';
+}
+function doSwap() {
+  const sp = swapPlan(), now = nowTs(); if (sp.err) return wxMsg('swMsg', sp.err, 'risk');
+  let cash = sp.amt, sold = '';
+  if (sp.fa) {
+    if (!isOpen(sp.fa, now)) return wxMsg('swMsg', short(sp.fa.sym) + ' market is closed.', 'warn');
+    const c0 = S.cash; if (!marketOrder(sp.fa, now, 'sell', sp.sellQty, sp.fq.bid, sp.fq.ask, sp.fq.ts, 'swap', 'manual')) return wxMsg('swMsg', 'Sell blocked: ' + S.journal[0].text, 'risk');
+    cash = S.cash - c0; sold = 'Sold ' + fmtQty(sp.sellQty) + ' ' + short(sp.fa.sym) + ' for ' + usd(cash) + '. ';
+  }
+  if (!sp.ta) { wxMsg('swMsg', sold || 'Nothing to do.', 'good'); return rerender(); }
+  const ta = sp.ta, tq = sp.tq;
+  if (ta.pos.qty < 0 || ta.pendingLimit || ta.pendingStop || ta.twap) { wxMsg('swMsg', sold + 'Buy skipped: ' + short(ta.sym) + ' has a short or a working order. The money stays as cash.', 'warn'); return rerender(); }
+  const ok = marketOrder(ta, now, 'buy', cash / (tq.ask * (1 + SLIP) * (1 + FEE)), tq.bid, tq.ask, tq.ts, 'swap', 'manual');
+  if (ok) setBracket(ta, bracketFor(ta, ta.feat || { atrPct: 0 }));
+  wxMsg('swMsg', ok ? sold + 'Bought ' + short(ta.sym) + '; stop ' + fmtPx(ta.pos.stop) + ', target ' + fmtPx(ta.pos.take) + '.' : sold + 'Buy blocked: ' + S.journal[0].text.replace('Order blocked by risk layer: ', '') + '. The money stays as cash.', ok ? 'good' : 'warn'); rerender();
+}
+$('botMarket').addEventListener('click', e => { const b = e.target.closest('button[data-kind]'); if (b) { UIB.kind = b.dataset.kind; bkMsg(''); rerender(); $('bkPanel').scrollIntoView({ block: 'nearest' }); } });
+$('bkKind').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (b) { UIB.kind = b.dataset.k; bkMsg(''); rerender(); } });
+['bkAsset', 'bkAlloc', 'bkAmt', 'bkEvery', 'bkTp', 'bkMax', 'bkLo', 'bkHi', 'bkN', 'bkScale'].forEach(id => $(id).addEventListener('input', bkRender));
+$('bkAsset').addEventListener('change', () => { UIB.gridFor = ''; bkRender(); });
+$('bkLaunch').addEventListener('click', launchBot);
+$('botsBody').addEventListener('click', e => { const t = e.target.closest('button[data-bot]'); if (!t) return; const b = S.bots.find(x => x.id === +t.dataset.bot); if (!b) return;
+  if (t.dataset.act === 'stop') return stopBot(b);
+  b.status = t.dataset.act === 'pause' ? 'paused' : 'running'; b.note = null; log(nowTs(), S.assets[b.i].sym, 'bot', b.name + (b.status === 'paused' ? ' paused' : ' resumed'), 'muted'); rerender(); });
+$('wxKind').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (b) { UIB.wx = b.dataset.k; wxMsg('wxMsg', ''); rerender(); } });
+const wxStep = d => { const el = $('wxAmt'), v = +el.value || 0, st = v >= 10000 ? 1000 : 100; el.value = Math.max(st, Math.round((v + d * st) / st) * st); };
+$('wxMinus').addEventListener('click', () => wxStep(-1)); $('wxPlus').addEventListener('click', () => wxStep(1));
+$('wxGo').addEventListener('click', () => transfer(UIB.wx, +$('wxAmt').value));
+['swFrom', 'swTo', 'swAmt'].forEach(id => $(id).addEventListener(id === 'swAmt' ? 'input' : 'change', () => { wxMsg('swMsg', ''); rerender(); }));
+$('swGo').addEventListener('click', doSwap);
+
 // ---------- ask Claude ----------
 function deskState() {
   const eq = equity(), a = S.assets[S.sel], d = a.last;
@@ -2316,7 +2596,8 @@ function deskState() {
     positions: S.assets.filter(x => x.pos.qty).map(x => ({ asset: x.sym, qty: x.pos.qty, avg: x.pos.avg, mark: markOf(x), stop: x.pos.stop, target: x.pos.take, unrealized: +unreal(x).toFixed(2) })),
     working_orders: S.assets.filter(x => x.pendingLimit || x.pendingStop || x.twap).map(x => ({ asset: x.sym, limit: x.pendingLimit && x.pendingLimit.limit, stop_trigger: x.pendingStop && x.pendingStop.trigger, twap: !!x.twap })),
     selected_asset: { asset: a.sym, tier: a.tier, market_open: isOpen(a, nowTs()), bars: a.bars.length, last_decision: d ? { regime: d.d.regime, direction: d.d.direction, confidence: +d.d.direction_confidence.toFixed(3), p_win: d.d.p_win, action: d.intent.action, reason: d.intent.reason, gates: d.intent.gates.map(g => ({ gate: g[0], pass: g[1], detail: g[2] })) } : null },
-    calibration: { scored_calls: S.scored.length }, recent_trades: S.tripLog.slice(-10).map(t => ({ asset: t.sym, side: t.side, pnl: +t.pnl.toFixed(2), R: +t.R.toFixed(2), exit: t.reason, regime: t.regime, manual: t.manual })),
+    calibration: { scored_calls: S.scored.length }, net_deposits: S.netDep,
+    bots: S.bots.map(b => ({ name: b.name, kind: b.kind, asset: S.assets[b.i].sym, status: b.status, value: +botValue(b).toFixed(2), realized: +b.realized.toFixed(2), holding: b.qty, last_block: b.block })), recent_trades: S.tripLog.slice(-10).map(t => ({ asset: t.sym, side: t.side, pnl: +t.pnl.toFixed(2), R: +t.R.toFixed(2), exit: t.reason, regime: t.regime, manual: t.manual })),
     recent_events: S.journal.slice(0, 15).map(j => ({ t: tfmt(j.ts), asset: j.sym, kind: j.kind, text: j.text })) };
 }
 async function askClaude(q) {
