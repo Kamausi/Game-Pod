@@ -3206,8 +3206,12 @@ $('tkGo').addEventListener('click', tokenomicsCheck);
 $('taxCsv').addEventListener('click', () => {
   const iso = t => t ? new Date(t).toISOString().slice(0, 10) : 'UNKNOWN';
   const csv = 'description,date_acquired,date_sold,proceeds,cost_basis,gain,term\n' + taxLots().map(r => [fmtQty(r.qty) + ' ' + short(r.sym), iso(r.bought), iso(r.sold), r.proceeds.toFixed(2), r.basis == null ? '' : r.basis.toFixed(2), r.gain == null ? '' : r.gain.toFixed(2), r.term].join(',')).join('\n') + '\n';
-  try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'tax-lots-paper.csv'; document.body.appendChild(a); a.click(); a.remove(); }
-  catch (e) { $('taxSum').textContent = 'Download blocked in this view.'; }
+  (async () => {
+    const dl = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('downloads') : null;
+    if (!dl) { $('taxCsv').hidden = true; $('taxSum').textContent = 'Saving files is not available in this view.'; return; }
+    try { await dl.save({ filename: 'tax-lots-paper.csv', data: csv }); }
+    catch (e) { const c = e && e.code; if (c !== 'declined') $('taxSum').textContent = c === 'rate_limited' ? 'A save prompt is already open; try again in a moment.' : 'The file could not be saved here (' + (c || 'error') + ').'; }
+  })();
 });
 
 // ---------- ask Claude ----------
