@@ -228,8 +228,12 @@ def main(argv: list[str] | None = None) -> int:
                     ("exit-due", "close positions on their 5th trading day"), ("kill", "KILL file, cancel all orders, list positions"),
                     ("pause", "no new tickets"), ("resume", "remove PAUSE"), ("journal", "log today's tickets and kills (with what kills would have made)"),
                     ("weekly", "weekly review, lessons, decay check"), ("chain-check", "alert CHAIN BROKEN if a morning file is missing"),
-                    ("health", "routines' files for today and what is missing"), ("audit", "fresh-eyes audit of the Quant's tests and holdout")):
+                    ("health", "routines' files for today and what is missing"), ("audit", "fresh-eyes audit of the Quant's tests and holdout"),
+                    ("graph", "every node: route, inputs, outputs and how it scores against its target"),
+                    ("memory", "past theses and how they ended (optionally for one symbol)")):
         x = dsub.add_parser(name, help=h)
+        if name == "memory":
+            x.add_argument("symbol", nargs="?")
         if name == "audit":
             x.add_argument("--repo", default=os.environ.get("TRADEBOT_REPO", "."), help="git checkout holding the tests (env TRADEBOT_REPO)")
     ap_ = dsub.add_parser("approve", help="YOU: place today's tickets by number on the paper account")
@@ -270,6 +274,14 @@ def main(argv: list[str] | None = None) -> int:
     jvq.add_argument("--max-inventory", type=float, default=0.005)
     jvq.add_argument("--maker-fee-bps", type=float, default=0.0)
     jvq.add_argument("--log", default="runs/jevquote.jsonl")
+
+    tc = sub.add_parser("tokencheck", help="read-only: was this Solana token's launch bundled, and do those wallets still hold it?")
+    tc.add_argument("mint")
+    tc.add_argument("--rpc", default=os.environ.get("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com"))
+    tc.add_argument("--early-slots", type=int, default=2)
+    tc.add_argument("--max-pages", type=int, default=10)
+    tc.add_argument("--callouts", help="CSV time,source (unix seconds) to check against --prices")
+    tc.add_argument("--prices", help="CSV time,price (unix seconds)")
 
     aud = sub.add_parser("audit", help="judge a trading claim: headline check, finding, trend200 rival, secrets scan, spec")
     asub = aud.add_subparsers(dest="what", required=True)
@@ -379,7 +391,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if rep.passed else 1
 
     if args.cmd == "brokers":
-        import os
         from .brokers import AlpacaPaper, OandaPractice
 
         if os.environ.get("APCA_API_KEY_ID"):
@@ -710,7 +721,7 @@ def main(argv: list[str] | None = None) -> int:
               f"usage {r.get('usage')}")
         return 0
 
-    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit"):
+    if args.cmd in ("desk", "insider", "weather", "jevquote", "audit", "tokencheck"):
         from .cli_desk import run as run_desk_cli
         return run_desk_cli(args)
     if args.cmd == "review":

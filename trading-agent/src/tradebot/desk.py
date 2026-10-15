@@ -37,6 +37,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from . import graph as gr
 from . import insider as ins
 from .brokers import ALPACA_PAPER, BrokerError, LiveHostRefused, urllib_transport
 
@@ -256,6 +257,10 @@ def analyst(desk: Desk, d: str, get=ins.sec_get, prices=None) -> dict:
         else:
             lines.append(f"- {card.get('why')}")
         lines.append(f"- next 10-Q/10-K (ESTIMATED from filing cadence): {card.get('next_report_estimate') or 'UNVERIFIED'}")
+        mem = card["memory"] = gr.similar(desk, n["symbol"], f"{n['role']} buy, {gr.gap_bucket(card.get('gap_to_base'))}", d)
+        lines.append(f"- memory: {mem['same_pattern_n']} past '{mem['pattern']}' theses with an outcome"
+                     + (f", average {mem['same_pattern_avg_r']:+.2f}R" if mem['same_pattern_n'] else "")
+                     + "".join(f"; {n['symbol']} on {t['date']}: {t['decision']} ({t['why']}), {t['outcome_r']:+.2f}R" for t in mem["same_symbol"]))
         lines.append("")
     out = {"date": d, "cards": cards}
     desk.write(d, "analyst", out, "\n".join(lines))
@@ -294,8 +299,13 @@ def skeptic(desk: Desk, d: str, prices=None, max_move: float = 0.05) -> dict:
                     why = f"already moved {bars[-1].c / at - 1:+.1%} since the filing: in the price"
             else:
                 why = "move since filing UNVERIFIED"
+        mem = (c or {}).get("memory") or {}
+        if not why and mem.get("same_pattern_n", 0) >= 3 and (mem.get("same_pattern_avg_r") or 0) < 0:
+            why = f"memory: {mem['same_pattern_n']} similar theses ({mem['pattern']}) averaged {mem['same_pattern_avg_r']:+.2f}R"
         verdicts.append({"symbol": n["symbol"], "verdict": "KILL" if why else "PASS", "why": why or "every check passed"})
     out = {"date": d, "verdicts": verdicts}
+    desk.write(d, "skeptic", out, "")  # written now so memory can read it; the readable file follows
+    gr.remember(desk, d)
     md = [f"# Skeptic {d}", ""] + [f"- {v['symbol']}: **{v['verdict']}** — {v['why']}" for v in verdicts]
     desk.write(d, "skeptic", out, "\n".join(md or ["NO NAMES"]) + "\n")
     return out
@@ -593,6 +603,7 @@ def journal(desk: Desk, d: str, prices) -> list[dict]:
         w.writeheader()
         for r in old + rows:
             w.writerow({k: r.get(k) for k in FIELDS})
+    gr.settle_outcomes(desk)
     return rows
 
 

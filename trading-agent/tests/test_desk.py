@@ -490,3 +490,116 @@ def test_secrets_scan_and_martingale(tmp_path):
     assert {h["kind"] for h in hits} >= {"AWS key"} and all(h["line"] == 1 and h["redacted"] for h in hits)
     assert audit.martingale([(1, -1), (2, -1), (4, -1), (8, 5)])["flag"]
     assert audit.spec({"entry": "50/200 cross"})["exit"] == "UNKNOWN"
+
+
+# ------------------------------------------------------------------ bundle check (read-only)
+
+from tradebot import bundlecheck as bc, graph as gr
+from tradebot.onchain import SolanaRPC
+
+M, DEV, F = "Mint1111", "Dev1111", "Funder1111"
+
+
+def fake_chain(n_bundle=5, holds=40_000.0, many_pages=False):
+    W = [f"W{i}" for i in range(n_bundle)]
+    txs, mint_sigs = {}, []
+
+    def tx(payer, slot, buyer=None, amount=0.0, fund=None):
+        keys = [payer] + ([buyer] if buyer else []) + ([fund] if fund else [])
+        pre, post = [10**10] + [0] * (len(keys) - 1), [10**10 - 10**9] + [10**9] * (len(keys) - 1)
+        ptb = [{"accountIndex": 1, "mint": M, "owner": buyer, "uiTokenAmount": {"uiAmountString": str(amount)}}] if buyer and amount else []
+        return {"slot": slot, "meta": {"preBalances": pre, "postBalances": post, "preTokenBalances": [], "postTokenBalances": ptb},
+                "transaction": {"message": {"accountKeys": keys}}}
+    txs["create"] = tx(DEV, 100)
+    mint_sigs.append({"signature": "create", "slot": 100, "err": None})
+    for i, w in enumerate(W):
+        txs[f"buy{i}"] = tx(w, 100, w, 50_000.0)
+        mint_sigs.append({"signature": f"buy{i}", "slot": 100, "err": None})
+        funder = DEV if i == n_bundle - 1 else F
+        txs[f"fund{i}"] = tx(funder, 90, fund=w)
+    txs["late"] = tx("Late", 150, "Late", 1000.0)
+    mint_sigs.append({"signature": "late", "slot": 150, "err": None})
+    newest_first = list(reversed(mint_sigs))
+    largest = [{"address": f"ta-{w}", "uiAmountString": str(holds / max(1, n_bundle - 1))} for w in W[:-1]] + [{"address": "ta-dev", "uiAmountString": "50000"}]
+    owners = {f"ta-{w}": w for w in W} | {"ta-dev": DEV}
+
+    def post(url, body):
+        m, p = body["method"], body["params"]
+        if m == "getSignaturesForAddress":
+            if p[0] == M:
+                if many_pages:
+                    return {"result": [{"signature": f"x{i}", "slot": 999, "err": None} for i in range(1000)]}
+                return {"result": newest_first}
+            i = W.index(p[0]) if p[0] in W else None
+            return {"result": [{"signature": f"fund{i}", "slot": 90, "err": None}] if i is not None else []}
+        if m == "getTransaction":
+            return {"result": txs.get(p[0])}
+        if m == "getTokenSupply":
+            return {"result": {"value": {"uiAmountString": "1000000"}}}
+        if m == "getTokenLargestAccounts":
+            return {"result": {"value": largest}}
+        if m == "getAccountInfo":
+            return {"result": {"value": {"data": {"parsed": {"info": {"owner": owners[p[0]]}}}}}}
+        raise AssertionError(m)
+    return SolanaRPC("http://fake", post)
+
+
+def test_bundle_check_finds_shared_funder_and_dev_funded_wallets():
+    rep = bc.check(M, fake_chain())
+    assert rep.deployer == DEV and rep.creation_slot == 100 and len(rep.first_block_buyers) == 5
+    assert rep.verdict == "CAUTION"  # a bundle that has mostly sold already
+    shared = [c for c in rep.clusters if F in c["funders"]]
+    assert shared and len(shared[0]["wallets"]) == 4 and shared[0]["holds_now_share"] == pytest.approx(0.04)
+    assert any(c["funded_by_deployer"] for c in rep.clusters)
+    assert any("took 25% of supply" in r for r in rep.reasons)
+    still = bc.check(M, fake_chain(holds=300_000.0))  # the same cluster still holds 30%
+    assert still.verdict == "DANGER" and any("still holds 30%" in r for r in still.reasons)
+
+
+def test_bundle_check_fails_closed_without_the_launch_block():
+    rep = bc.check(M, fake_chain(many_pages=True), max_pages=2)
+    assert rep.verdict == "UNVERIFIED" and not rep.reached_start
+
+
+def test_callout_check_spots_pre_positioning():
+    prices = [(0, 1.0), (3600, 2.0), (7200, 2.1), (90000, 0.9)]
+    out = bc.callout_check(prices, [(3600, "kol")])[0]
+    assert out["run_up_before"] == pytest.approx(1.0) and out["after_24h"] < 0 and out["worst_24h"] == pytest.approx(-0.55)
+
+
+# ------------------------------------------------------------------ decision graph and memory
+
+
+def test_graph_every_node_has_a_route_and_target(tmp_path):
+    d = dk.Desk(tmp_path)
+    d.init()
+    assert {n.route for n in gr.GRAPH} <= {"code", "ml", "llm", "human"} and any(n.route == "human" for n in gr.GRAPH)
+    rows = ["date,ticker,outcome,entry,exit,pnl_r,pnl_usd,hypothetical,why"]
+    rows += [f"2026-10-0{1 + i % 5},P{i},FILLED,1,1,0.5,1,False,x" for i in range(12)]
+    rows += [f"2026-10-0{1 + i % 5},K{i},KILLED BY SKEPTIC,1,1,-0.8,,True,x" for i in range(12)]
+    d.path("journal", "trades.csv").write_text("\n".join(rows) + "\n")
+    ev = {e["name"]: e for e in gr.evaluate(d)}
+    assert ev["skeptic"]["status"] == "MEETS TARGET" and ev["skeptic"]["value"] == pytest.approx(1.3)
+    assert ev["pm"]["status"].startswith("NOT ENOUGH DATA")
+
+
+def test_memory_kills_a_pattern_that_keeps_losing(tmp_path):
+    d = dk.Desk(tmp_path / "desk")
+    d.init()
+    d.path("memory").mkdir(parents=True)
+    pat = "CFO buy, at or above base"
+    d.path("memory", "theses.jsonl").write_text("".join(json.dumps({"date": f"2026-09-0{i}", "symbol": f"X{i}", "pattern": pat, "decision": "PASS",
+                                                                     "why": "every check passed", "outcome_r": -0.6}) + "\n" for i in range(1, 4)))
+    d2, day, prices, sc, an, sk = run_chain(tmp_path, form4(shares=4000))
+    assert an["cards"][0]["memory"]["same_pattern_n"] == 3
+    assert sk["verdicts"][0]["verdict"] == "KILL" and sk["verdicts"][0]["why"].startswith("memory:")
+    assert any(t["symbol"] == "ACME" and t["date"] == day for t in gr.recall_all(d2))  # today's thesis is remembered
+
+
+def test_cli_parses_and_runs_the_new_commands(tmp_path, capsys):
+    from tradebot.cli import main
+    assert main(["desk", "--dir", str(tmp_path / "d"), "init"]) == 0
+    assert main(["desk", "--dir", str(tmp_path / "d"), "graph"]) == 0
+    assert main(["desk", "--dir", str(tmp_path / "d"), "pause"]) == 0
+    assert main(["audit", "spec"]) == 0
+    assert "NOT ENOUGH DATA" in capsys.readouterr().out

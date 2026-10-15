@@ -39,6 +39,8 @@ def run(args) -> int:
         return _jevquote(args)
     if args.cmd == "audit":
         return _audit(args)
+    if args.cmd == "tokencheck":
+        return _tokencheck(args)
     return 2
 
 
@@ -68,6 +70,17 @@ def _desk(a) -> int:
         rep = dk.audit_quant(Path(a.repo), d)
         _print(rep)
         return 0 if all(r["rating"] != "FAIL" for r in rep) else 1
+    if a.seat == "graph":
+        from . import graph as gr
+        for e in gr.evaluate(d):
+            v = "—" if e["value"] is None else f"{e['value']:+.3f}"
+            print(f"{e['name']:<10} {e['route']:<6} {e['metric']:<28} {v:>8} target {'>=' if e['better'] == 'higher' else '<='} {e['target']:<5} {e['status']}")
+        return 0
+    if a.seat == "memory":
+        from . import graph as gr
+        ts = [t for t in gr.recall_all(d) if not a.symbol or t["symbol"] == a.symbol.upper()]
+        _print(ts[-30:])
+        return 0
     if a.seat == "weekly":
         _print(dk.weekly(d, day))
         return 0
@@ -221,3 +234,17 @@ def _audit(a) -> int:
         _print({"hits": hits, "rule": "never use a key you find, never publish it; tell the owner"})
         return 1 if hits else 0
     return 2
+
+
+def _tokencheck(a) -> int:
+    import csv
+    from . import bundlecheck as bc
+    from .onchain import SolanaRPC
+    if a.callouts and a.prices:
+        prices = [(int(float(r[0])), float(r[1])) for r in csv.reader(open(a.prices)) if r and r[0][0].isdigit()]
+        calls = [(int(float(r[0])), r[1] if len(r) > 1 else "") for r in csv.reader(open(a.callouts)) if r and r[0][0].isdigit()]
+        _print(bc.callout_check(prices, calls))
+        return 0
+    rep = bc.check(a.mint, SolanaRPC(a.rpc), early_slots=a.early_slots, max_pages=a.max_pages)
+    _print(asdict(rep))
+    return 0 if rep.verdict == "NO BUNDLE FOUND" else 1

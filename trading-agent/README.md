@@ -486,6 +486,59 @@ On a synthetic 26-year series, the 200-day rule gave a lower CAGR than buy-and-h
 
 Most of the 23 memecoin repos are wallet hygiene (revoke.cash, Rabby, phishing lists): worth using, nothing to build. On "fake repos": an old account with thousands of stars and a Telegram link is the drainer pattern. `audit secrets` won't catch that; reading the code will.
 
+## 18. Bundle check, the desk as a function, thesis memory (2026-10-15)
+
+### `tradebot tokencheck <mint>`: was this launch bundled? (`bundlecheck.py`, read-only)
+
+This is the "check before you ape" list from the pump.fun bundling post, done from the chain itself. It needs no keys and never sends a transaction.
+- **Launch block.** It walks the mint's history back to the creation transaction and lists every wallet that bought in the first slots, with its share of supply.
+- **Shared funders.** For each of those wallets it finds who funded it (the fee payer of the first transaction that raised its SOL balance). It clusters wallets by a shared funder, by funding from the deployer, or by funding from each other.
+- **Holdings now.** It compares those wallets with today's largest holders: what the cluster and the deployer **still** hold is what can be sold into your buy.
+- **Verdicts:**
+  - DANGER: a cluster still holds 15% or more, or launch-block buyers still hold 20% or more.
+  - CAUTION: there was a bundle, but it has mostly sold.
+  - NO BUNDLE FOUND: not a safety guarantee.
+  - UNVERIFIED: the launch block wasn't reached. It fails closed; busy tokens need an archive RPC.
+- **Callouts.** `--callouts calls.csv --prices prices.csv` compares each callout with the price action: how far price had already run in the hour before the call (pre-positioning), and what it did 1 h and 24 h after.
+
+The Solana RPC shapes (`getSignaturesForAddress` newest first with `before` paging, `getTransaction` token balances by owner) were checked against solana.com/docs. The tests run a fake chain: a 5-wallet launch bundle, 4 wallets sharing one funder, 1 funded by the deployer.
+
+**Not built.** Bundlers, volume bots, holder bots, bump bots, or any shilling or callout automation. They exist to make the "dump on the new buyers" flow in that post work. This repo builds the side that detects it.
+
+### The desk as a function (`graph.py`; `tradebot desk graph`)
+
+Coatue's frame: external + internal context in; what, how much and when out.
+- **Nodes.** The desk is written down as nodes (ingest → scout → analyst → skeptic → risk → PM → execution → journal). Each node has its inputs, outputs and **route**: code for explicit rules, a person for judgment. ML and LLM routes slot in when a node earns one.
+- **Targets.** Each node has a measurable target, scored from the journal:
+
+| Node | Target |
+|---|---|
+| Ingest | source error rate ≤ 5% |
+| Scout | average R of everything scouted ≥ 0 |
+| Analyst | RANGE names beat EXPENSIVE names |
+| Skeptic | passed names beat killed names |
+| Risk | worst loss ≥ −1.5R |
+| You (PM) | approved beat rejected |
+| Execution | fill rate ≥ 60% |
+| Journal | live ≥ half the backtest's R |
+
+  Under 10 outcomes, a node reads "NOT ENOUGH DATA" instead of a verdict.
+
+### Thesis memory ("can it remember why yesterday's thesis failed?")
+
+- **What is stored.** Every scouted name is kept in `desk/memory/theses.jsonl` with its thesis:
+  - role and size;
+  - a valuation bucket ("CFO buy, deep value");
+  - the decision and its reason.
+
+  The journal fills in the outcome in R, actual or what a kill would have made.
+- **What reads it.** The Analyst writes similar past theses into each card. The Skeptic kills a pattern that lost money at least 3 times.
+- **Look it up.** `tradebot desk memory ACME` shows the history for one symbol.
+
+### Fixed
+
+A local `import os` inside `cli.main` shadowed the module-level import, so the previous commit's `tradebot` command line failed on start. It's fixed, and a test now runs the command line end to end.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
