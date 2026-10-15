@@ -44,7 +44,7 @@ from .brokers import ALPACA_PAPER, BrokerError, LiveHostRefused, urllib_transpor
 
 NY = ZoneInfo("America/New_York")
 DEFAULT_LIMITS = {"risk_per_trade_pct": 1.0, "max_open_positions": 5, "max_position_pct": 10,
-                  "max_daily_loss_pct": 3, "paper_only": True}
+                  "max_daily_loss_pct": 3, "max_impact_bps": 25, "paper_only": True}
 CONCEPT = "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik:0>10}/us-gaap/EarningsPerShareDiluted.json"
 
 
@@ -385,8 +385,13 @@ def make_ticket(no: int, symbol: str, bars: list[ins.DayBar], equity: float, lim
     per_share = entry - stop
     shares = math.floor(equity * limits["risk_per_trade_pct"] / 100 / per_share) if per_share > 0 else 0
     shares = min(shares, math.floor(equity * limits["max_position_pct"] / 100 / entry))
+    from . import quant
+    vol = quant.yang_zhang(bars[-21:]) if len(bars) >= 21 else None
+    a_dv = ins.adv(bars, len(bars) - 1)
+    impact = quant.sqrt_impact_bps(shares, entry, a_dv, vol) if vol is not None and a_dv > 0 else None
     return {"no": no, "date": d, "symbol": symbol, "shares": shares, "limit": entry, "stop": stop,
-            "risk_usd": round(shares * per_share, 2), "value_usd": round(shares * entry, 2), "notes": notes}
+            "risk_usd": round(shares * per_share, 2), "value_usd": round(shares * entry, 2),
+            "vol_yz_daily": None if vol is None else round(vol, 5), "impact_bps": None if impact is None else round(impact, 1), "notes": notes}
 
 
 def risk_check(t: dict, account: dict, positions: list[dict], open_orders: list[dict], limits: dict, desk: Desk, paper: bool) -> list[str]:
@@ -410,6 +415,9 @@ def risk_check(t: dict, account: dict, positions: list[dict], open_orders: list[
             fails.append(f"position ${t['value_usd']:.2f} above {limits['max_position_pct']}% of equity")
         if last > 0 and (eq / last - 1) * 100 <= -limits["max_daily_loss_pct"]:
             fails.append(f"daily loss limit hit ({eq / last - 1:+.2%})")
+    cap = limits.get("max_impact_bps", 25)
+    if t.get("impact_bps") is not None and t["impact_bps"] > cap:
+        fails.append(f"expected market impact {t['impact_bps']:.0f} bps above {cap} bps (square-root model): too big for the stock's volume")
     held = {p["symbol"] for p in positions}
     pending = {o["symbol"] for o in open_orders if o.get("side") == "buy"}
     if t["symbol"] in held | pending:
@@ -631,6 +639,13 @@ def weekly(desk: Desk, d: str) -> dict:
     status = "UNKNOWN"
     if len(taken) >= 20 and bt is not None:
         status = "DECAYING" if live < 0.5 * bt else "HOLDING UP"
+    cs = None
+    bt_sd = json.loads(lp.read_text()).get("build", {}).get("r_std") if lp.exists() else None
+    if bt is not None and bt_sd and len(taken) >= 5:
+        from . import quant
+        cs = quant.cusum(taken, bt, bt_sd)  # Page's CUSUM: a drop below the backtest's mean, as soon as it shows
+        if cs["alarm"] and status != "DECAYING":
+            status = "DECAYING (CUSUM)"
     lessons = []
     if killed and taken and mean(killed) > mean(taken):
         lessons.append(f"Skeptic's kills averaged {mean(killed):+.2f}R vs {mean(taken):+.2f}R taken: the filters cost money this period. Find which rule.")
@@ -640,6 +655,8 @@ def weekly(desk: Desk, d: str) -> dict:
         lessons.append(f"Tickets you rejected averaged {mean(rejected):+.2f}R, better than the ones you approved.")
     if status == "DECAYING":
         lessons.append(f"Live average {live:+.2f}R after {len(taken)} trades is under half the backtest's {bt:+.2f}R: strategy DECAYING.")
+    elif status == "DECAYING (CUSUM)":
+        lessons.append(f"CUSUM alarm at trade {cs['alarm_at'] + 1}: live R has drifted below the backtest's {bt:+.2f}R by more than noise explains. Pause and look.")
     iso = date.fromisoformat(d).isocalendar()
     md = [f"# Week {iso[0]}-{iso[1]:02d}", "",
           f"- trades taken: {len(taken)}, average {live:+.2f}R" if live is not None else "- trades taken: 0",
@@ -651,7 +668,7 @@ def weekly(desk: Desk, d: str) -> dict:
     if lessons:
         with desk.path("lessons.md").open("a") as fh:
             fh.write("".join(f"- {d}: {x}\n" for x in lessons[:3]))
-    return {"taken": len(taken), "live_avg_r": live, "backtest_avg_r": bt, "killed_avg_r": mean(killed), "status": status, "lessons": lessons}
+    return {"taken": len(taken), "live_avg_r": live, "backtest_avg_r": bt, "killed_avg_r": mean(killed), "status": status, "lessons": lessons, "cusum": cs}
 
 
 # ------------------------------------------------------------------ QUANT bookkeeping + SKEPTIC audit
@@ -675,7 +692,26 @@ def log_change(desk: Desk, params: dict, result: dict, repo: Path) -> int:
                  f"- changed: {json.dumps(diff) if prev else 'first run'}\n"
                  f"- build: trades {result['trades']}, avg R {result['avg_r']}, win rate {result['win_rate']}, excess vs SPY {result['excess_vs_bench']}\n\n")
     lp.write_text(json.dumps({"params": params, "build": {k: v for k, v in result.items() if k != 'trades_list'}}, indent=1, default=str))
+    with desk.path("quant", "trials.jsonl").open("a") as fh:  # every configuration tried, for the deflated Sharpe
+        fh.write(json.dumps({"run": n, "params": params, "sharpe_per_trade": result.get("sharpe_per_trade"), "trades": result.get("trades")}) + "\n")
     return n
+
+
+def trials(desk: Desk) -> list[dict]:
+    p = desk.path("quant", "trials.jsonl")
+    return [json.loads(x) for x in p.read_text().splitlines() if x.strip()] if p.exists() else []
+
+
+def deflated(desk: Desk, result: dict) -> dict | None:
+    """quant.dsr() for this build, with N = configurations tried so far and the variance of
+    their Sharpe ratios (the estimator's own variance while there is only one)."""
+    from . import quant
+    rs = [t["r"] for t in sorted(result.get("trades_list", []), key=lambda t: t["entry_date"])]
+    if len(rs) < 3:
+        return None
+    srs = [t["sharpe_per_trade"] for t in trials(desk) if t.get("sharpe_per_trade") is not None]
+    v = statistics.variance(srs) if len(srs) >= 2 else None
+    return quant.dsr(rs, max(1, len(srs)), v)
 
 
 def holdout_lock(desk: Desk, params: dict, data_id: str) -> None:

@@ -179,9 +179,10 @@ def _insider(a) -> int:
     if a.what == "backtest":
         res = ins.backtest(build, prices, **kw)
         n = dk.log_change(desk, params, res, Path.cwd())
+        dsr = dk.deflated(desk, res)
         out = {k: v for k, v in res.items() if k != "trades_list"}
-        out.update(signals_build=len(build), signals_held_out=len(hold), holdout_starts=cut, data=stats, run=n,
-                   verdict=ins.verdict(res, None),
+        out.update(signals_build=len(build), signals_held_out=len(hold), holdout_starts=cut, data=stats, run=n, deflated_sharpe=dsr,
+                   verdict=ins.verdict(res, None, dsr),
                    warning="more than 5 changes since the first run: you are fitting noise" if n > 6 else None,
                    bias="survivorship: delisted names can't be priced from today's symbols; the 'unpriced' count is the size of that hole; treat results as a best case")
         _print(out)
@@ -203,11 +204,17 @@ def _insider(a) -> int:
 def _weather(a) -> int:
     from . import weather as wx
     pend = Path(a.log).with_name(Path(a.log).stem + "_pending.jsonl")
+    if a.what == "calibration":
+        _print(wx.calibration(a.log))
+        return 0
     if a.what == "scan":
-        out = wx.scan(a.slug, model=wx.ErrorModel(a.log), bankroll=a.bankroll)
+        out = wx.scan(a.slug, model=wx.ErrorModel(a.log), bankroll=a.bankroll, source=a.source)
         pend.parent.mkdir(parents=True, exist_ok=True)
+        ens = out.get("ensemble") or {}
         with pend.open("a") as fh:
-            fh.write(json.dumps({"station": out["station"], "day": out["day"], "forecast_f": out["forecast"]["max_f"], "lead_h": out["forecast"]["lead_h"]}) + "\n")
+            fh.write(json.dumps({"station": out["station"], "day": out["day"], "forecast_f": out["forecast"]["max_f"], "lead_h": out["forecast"]["lead_h"],
+                                 "ens_mean": ens.get("mean"), "ens_spread": ens.get("spread"),
+                                 "buckets": [[b["lo"], b["hi"], b["model_p"]] for b in out["buckets"]]}) + "\n")
         _print(out)
         return 0
     rows = [json.loads(x) for x in pend.read_text().splitlines() if x.strip()] if pend.exists() else []
@@ -217,7 +224,8 @@ def _weather(a) -> int:
             keep.append(r)
             continue
         try:
-            done.append(wx.settle(a.log, r["station"], r["day"], r["forecast_f"], r["lead_h"]))
+            done.append(wx.settle(a.log, r["station"], r["day"], r["forecast_f"], r["lead_h"], ens_mean=r.get("ens_mean"),
+                                  ens_spread=r.get("ens_spread"), buckets=r.get("buckets")))
         except Exception as e:
             keep.append(r)
             done.append({"day": r["day"], "error": str(e)[:160]})
@@ -266,6 +274,8 @@ def _audit(a) -> int:
             out["buy_and_hold"] = audit.headline_check(bh)
         _print(out)
         return 0
+    if a.what in ("dsr", "pbo", "vr", "hrp", "calibration", "vol"):
+        return _audit_quant(a)
     if a.what == "secrets":
         hits = audit.scan_secrets(a.path)
         _print({"hits": hits, "rule": "never use a key you find, never publish it; tell the owner"})
@@ -319,4 +329,58 @@ def _ccxt(a) -> int:
         _print([asdict(b) for b in v.bars(a.symbol, a.timeframe, limit=a.limit)])
     else:
         _print(v.balance())
+    return 0
+
+
+def _columns(path: str) -> tuple[list[str], list[list[float]]]:
+    import csv
+    rows = list(csv.DictReader(open(path)))
+    names = [c for c in rows[0] if c.lower() not in ("date", "time", "timestamp")]
+    return names, [[float(r[c]) for r in rows] for c in names]
+
+
+def _audit_quant(a) -> int:
+    import math
+    from . import audit, quant
+    if a.what == "dsr":
+        rets = [r for _, r in audit.read_series(a.series)]
+        out = quant.dsr(rets, a.trials, a.trials_sharpe_var)
+        out.update(psr_vs_zero=quant.psr(rets), min_track_record=quant.min_track_record(rets),
+                   reading="real at 95% only if dsr >= 0.95; the benchmark is what the best of that many pure-noise tries would show")
+        _print(out)
+        return 0 if out["dsr"] >= 0.95 else 1
+    if a.what == "pbo":
+        names, cols = _columns(a.matrix)
+        out = quant.pbo_cscv([list(r) for r in zip(*cols)], s=a.blocks)
+        out.update(configurations=len(names), reading="PBO = how often the in-sample winner ranks below median out of sample; above 0.5 means selection is worse than a coin")
+        _print(out)
+        return 0
+    if a.what == "vr":
+        import csv
+        rows = list(csv.DictReader(open(a.prices)))
+        k = {c.lower(): c for c in rows[0]}
+        px = [float(r[k.get("close") or k.get("value")]) for r in rows]
+        _print([quant.variance_ratio(px, q) for q in a.q])
+        return 0
+    if a.what == "hrp":
+        names, cols = _columns(a.matrix)
+        cov, shrink = quant.ledoit_wolf(cols)
+        _print({"hrp_weights": quant.hrp_weights(cols, names), "hrp_weights_shrunk_cov": quant.hrp_weights(cols, names, cov=cov),
+                "ledoit_wolf_shrinkage": shrink})
+        return 0
+    if a.what == "calibration":
+        import csv
+        rows = list(csv.DictReader(open(a.csv)))
+        p, y = [float(r["p"]) for r in rows], [int(float(r["y"])) for r in rows]
+        _print({**quant.reliability(p, y), "log_loss": quant.log_loss(p, y)})
+        return 0
+    from . import insider as ins
+    folder, sym = str(Path(a.bars).parent), Path(a.bars).stem
+    bars = ins.CsvPrices(folder).bars(sym)[-(a.window + 1):]
+    rets = [math.log(b.c / p.c) for p, b in zip(bars, bars[1:])]
+    cc = math.sqrt(sum(r * r for r in rets) / (len(rets) - 1))
+    g = quant.garch11([math.log(b.c / p.c) for p, b in zip(ins.CsvPrices(folder).bars(sym), ins.CsvPrices(folder).bars(sym)[1:])])
+    _print({"window": len(rets), "daily": {"close_to_close": cc, "parkinson": quant.parkinson(bars[1:]), "garman_klass": quant.garman_klass(bars[1:]),
+                                          "rogers_satchell": quant.rogers_satchell(bars[1:]), "yang_zhang": quant.yang_zhang(bars), "ewma_0.94": quant.ewma_vol(rets)},
+            "garch11": g, "annualize": "x sqrt(252)"})
     return 0

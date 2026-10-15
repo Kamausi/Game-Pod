@@ -16,7 +16,8 @@ from .policy import Calibrator, PolicyParams, bracket
 
 
 def brier(ps: list[float], ys: list[int]) -> float:
-    return sum((p - y) ** 2 for p, y in zip(ps, ys)) / len(ps) if ps else float("nan")
+    from .quant import brier as _brier
+    return _brier(ps, ys) if ps else float("nan")
 
 
 def pav(xs: list[float], ys: list[int]) -> list[tuple[float, float]]:

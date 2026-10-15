@@ -12,6 +12,8 @@ stream = ["websockets>=12"]
 solana = ["solders>=0.21", "base58>=2.1"]
 ccxt = ["ccxt>=4.5"]
 openbb = ["openbb>=4.4"]  # heavy; not in "all"
+# independent implementations the tests check quant.py against (never imported by the bot)
+reference = ["pytest", "numpy", "pandas", "scipy", "statsmodels", "arch", "scikit-learn", "pyportfolioopt"]
 all = ["anthropic>=1.0", "grpcio>=1.66", "protobuf>=5.27", "websockets>=12", "solders>=0.21", "base58>=2.1", "ccxt>=4.5"]
 
 [project.scripts]

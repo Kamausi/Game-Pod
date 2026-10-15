@@ -424,6 +424,8 @@ class TradeResult:
     ret: float  # after costs, fraction of entry
     r: float  # after costs, in units of the risk to the stop
     bench_ret: float | None = None
+    car: float | None = None  # market-model abnormal return over the holding days, after costs
+    beta: float | None = None  # estimated on trading days -130..-11 before entry
 
 
 def simulate(sig: Signal, bars: list[DayBar], hold: int = 5, atr_mult: float = 2.0, cost: float = 0.001,
@@ -459,12 +461,36 @@ def simulate(sig: Signal, bars: list[DayBar], hold: int = 5, atr_mult: float = 2
     gross = exit_px / entry - 1
     ret = gross - 2 * cost
     r = ret / ((entry - stop) / entry)
-    bret = None
+    bret, car, beta = None, None, None
     if bench:
         bi = {b.d: b for b in bench}
         if bars[k].d in bi and bars[exit_i].d in bi:
             bret = bi[bars[exit_i].d].c / bi[bars[k].d].o - 1
-    return TradeResult(sig.symbol, sig.filed, bars[k].d, entry, stop, bars[exit_i].d, exit_px, reason, ret, r, bret)
+        car, beta = _event_car(bars, k, exit_i, exit_px, bi, cost)
+    return TradeResult(sig.symbol, sig.filed, bars[k].d, entry, stop, bars[exit_i].d, exit_px, reason, ret, r, bret, car, beta)
+
+
+def _event_car(bars: list[DayBar], k: int, exit_i: int, exit_px: float, bi: dict, cost: float, est: tuple[int, int] = (130, 11)):
+    """Market-model abnormal return (MacKinlay 1997): alpha and beta from daily close-to-close
+    returns over trading days k-130..k-11 (a gap so the estimate cannot see the event), then the
+    stock's actual path (open entry -> exit price) minus alpha + beta x the market's same path."""
+    from .quant import market_model
+    lo, hi = k - est[0], k - est[1]
+    if lo < 1:
+        return None, None
+    xs, ys = [], []
+    for j in range(lo, hi + 1):
+        a, b = bars[j - 1], bars[j]
+        if a.d in bi and b.d in bi and a.c > 0 and bi[a.d].c > 0:
+            ys.append(b.c / a.c - 1)
+            xs.append(bi[b.d].c / bi[a.d].c - 1)
+    if len(xs) < 60 or bars[k].d not in bi or bars[exit_i].d not in bi:
+        return None, None
+    alpha, beta, _ = market_model(ys, xs)
+    days = exit_i - k + 1
+    stock = exit_px / bars[k].o - 1 - 2 * cost
+    mkt = bi[bars[exit_i].d].c / bi[bars[k].d].o - 1
+    return stock - (alpha * days + beta * mkt), beta
 
 
 def report(trades: list[TradeResult], skipped: dict, risk_per_trade: float = 0.01) -> dict:
@@ -487,7 +513,28 @@ def report(trades: list[TradeResult], skipped: dict, risk_per_trade: float = 0.0
         "total_return_at_1pct_risk": eq - 1, "max_drawdown_at_1pct_risk": mdd,
         "stops": sum(t.reason.startswith("stop") for t in trades),
         "skipped": skipped, "unpriced": sum(v for k, v in skipped.items() if k.startswith("unpriced")),
+        **_stats(trades),
     }
+
+
+def _stats(trades: list[TradeResult]) -> dict:
+    """The statistics that say whether avg R is distinguishable from luck (quant.py)."""
+    from . import quant
+    rs = [t.r for t in sorted(trades, key=lambda x: x.entry_date)]
+    if len(rs) < 3:
+        return {"r_std": None, "sharpe_per_trade": None, "psr": None, "avg_r_ci95": None, "min_trades_for_95pct": None,
+                "avg_car": None, "car_t": None, "car_trades": 0}
+    _, sd, _, _ = quant.moments(rs)
+    cars = [t.car for t in trades if t.car is not None]
+    car_t = None
+    if len(cars) >= 3:
+        _, csd, _, _ = quant.moments(cars)
+        car_t = (sum(cars) / len(cars)) / (csd / math.sqrt(len(cars) - 1)) if csd else None
+    return {"r_std": sd, "sharpe_per_trade": quant.sharpe(rs), "psr": quant.psr(rs),
+            # trades in date order, blocks kept together: trades in the same week share news
+            "avg_r_ci95": list(quant.stationary_bootstrap_ci(rs, reps=1000)),
+            "min_trades_for_95pct": quant.min_track_record(rs),
+            "avg_car": sum(cars) / len(cars) if cars else None, "car_t": car_t, "car_trades": len(cars)}
 
 
 def backtest(sigs: list[Signal], prices, *, bench_symbol: str = "SPY", hold: int = 5, atr_mult: float = 2.0,
@@ -518,12 +565,19 @@ def split_holdout(sigs: list[Signal], months: int = 12, today: str | None = None
     return [s for s in sigs if s.filed < cut], [s for s in sigs if s.filed >= cut], cut
 
 
-def verdict(build: dict, holdout: dict | None) -> str:
-    """Plain words. The default is no edge."""
+def verdict(build: dict, holdout: dict | None, deflated: dict | None = None) -> str:
+    """Plain words. The default is no edge. `deflated` is quant.dsr() over the build trades with
+    the number of configurations tried: below 0.95 the best run is what luck alone would show."""
     def ok(r):
         return r and r["trades"] >= 30 and (r["avg_r"] or 0) > 0 and (r["excess_vs_bench"] is None or r["excess_vs_bench"] > 0)
     if not ok(build):
         return "NO EDGE: the build period itself does not beat costs and the benchmark over enough trades."
+    if deflated and deflated.get("dsr") is not None and deflated["dsr"] < 0.95:
+        return (f"NO EDGE (deflated): after {deflated['trials']} configurations tried, the probability this Sharpe is real is "
+                f"{deflated['dsr']:.0%} (needs 95%). The best of many tries looks this good by luck.")
+    ci = build.get("avg_r_ci95")
+    if ci and ci[0] is not None and ci[0] <= 0:
+        return f"NOT PROVEN: average R is positive but its 95% interval ({ci[0]:+.2f}R to {ci[1]:+.2f}R) still includes zero. More data."
     if holdout is None:
         return "NOT FINISHED: the build period looks positive; the holdout has not been run."
     if not ok(holdout):
@@ -592,18 +646,39 @@ def fetch_datasets(quarters: list[str], out: str | Path, get=sec_get) -> list[di
     return rows
 
 
-def fetch_prices(symbols: list[str], prices, out: str | Path) -> list[dict]:
-    """Write <SYMBOL>.csv for each symbol from any .bars() source (AlpacaBars, OpenBBPrices).
+class RateLimit:
+    """Token bucket shared by worker threads: at most `per_minute` calls in any minute."""
+
+    def __init__(self, per_minute: float, clock=time.monotonic, sleep=time.sleep):
+        import threading
+        self.gap, self.next, self.lock, self.clock, self.sleep = 60.0 / per_minute, 0.0, threading.Lock(), clock, sleep
+
+    def wait(self) -> None:
+        with self.lock:
+            now = self.clock()
+            at = max(now, self.next)
+            self.next = at + self.gap
+        if at > now:
+            self.sleep(at - now)
+
+
+def fetch_prices(symbols: list[str], prices, out: str | Path, workers: int = 4, per_minute: float = 180) -> list[dict]:
+    """Write <SYMBOL>.csv for each symbol from any .bars() source (AlpacaBars, OpenBBPrices),
+    `workers` at a time under a shared rate limit (Alpaca's free tier allows 200 requests/min).
     Symbols with no bars are reported: that count is the survivorship hole (delisted names)."""
+    from concurrent.futures import ThreadPoolExecutor
     from .platforms import write_bars_csv
-    rows = []
-    for s in sorted(set(symbols) | {"SPY"}):
+    limit = RateLimit(per_minute)
+
+    def one(s):
+        limit.wait()
         try:
             bars = prices.bars(s)
         except Exception as e:
-            rows.append({"symbol": s, "bars": 0, "error": f"{type(e).__name__}: {e}"[:120]})
-            continue
+            return {"symbol": s, "bars": 0, "error": f"{type(e).__name__}: {e}"[:120]}
         if bars:
             write_bars_csv(bars, Path(out) / f"{s}.csv")
-        rows.append({"symbol": s, "bars": len(bars), "first": bars[0].d if bars else None, "last": bars[-1].d if bars else None})
-    return rows
+        return {"symbol": s, "bars": len(bars), "first": bars[0].d if bars else None, "last": bars[-1].d if bars else None}
+    syms = sorted(set(symbols) | {"SPY"})
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+        return list(ex.map(one, syms))

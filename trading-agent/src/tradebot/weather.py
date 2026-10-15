@@ -142,7 +142,60 @@ def forecast_max(station: str, day: str, get: Get = http_json) -> dict:
     day_start = datetime.fromisoformat(day + "T12:00:00").replace(tzinfo=tz)
     lead = (day_start - datetime.fromisoformat(issued)).total_seconds() / 3600 if issued else 24.0
     return {"station": station, "day": day, "max_f": max(temps), "hours": len(temps), "issued": issued, "lead_h": lead,
-            "grid": pt["forecastHourly"], "partial_day": len(temps) < 20}
+            "grid": pt["forecastHourly"], "partial_day": len(temps) < 20, "lat": lat, "lon": lon, "tz": pt["timeZone"]}
+
+
+# ------------------------------------------------------------------ ensemble (Open-Meteo)
+#
+# Verified 2026-10-15 from a live response (captured in tests/fixtures/openmeteo_ensemble_klga.json):
+#   GET https://ensemble-api.open-meteo.com/v1/ensemble?latitude=&longitude=&hourly=temperature_2m
+#       &models=gfs025,ecmwf_ifs025&temperature_unit=fahrenheit&timezone=America/New_York&forecast_days=3
+#   hourly.time local ISO hours; with two models the keys carry the model's own suffix, which is NOT
+#   the requested id: temperature_2m_ncep_gefs025 (control) + temperature_2m_member01..30_ncep_gefs025,
+#   temperature_2m_ecmwf_ifs025_ensemble + member01..50. 31 + 51 = 82 runs. The point snaps to the
+#   0.25 degree grid (40.75, -74.0 for KLGA), so the station bias still has to be learned.
+#   Free for non-commercial use (open-meteo.com terms); self-host the open-source server otherwise.
+#
+# Model: ensemble dressing (Roulston & Smith 2003). Each run's daily max, minus the learned bias,
+# is the centre of a small normal kernel; P(bucket) = average over runs. The kernel covers what
+# the ensemble does not: grid-vs-station offset and hourly sampling. Its width starts at 1.5 F and
+# is learned once a station has 30 settled days: kernel^2 = var(ens mean error) - mean(spread^2).
+
+OPEN_METEO = "https://ensemble-api.open-meteo.com/v1/ensemble"
+ENS_MODELS = ("gfs025", "ecmwf_ifs025")
+KERNEL_SD = 1.5
+_ENS_KEY = re.compile(r"^temperature_2m(?:_member(\d+))?(?:_(.+))?$")
+
+
+def parse_ensemble(js: dict, day: str, min_hours: int = 20) -> dict[str, list[float]]:
+    """Daily max of every run (control included) over the local day, by model suffix."""
+    times = js["hourly"]["time"]
+    idx = [i for i, t in enumerate(times) if t[:10] == day]
+    out: dict[str, list[float]] = {}
+    for key, vals in js["hourly"].items():
+        m = _ENS_KEY.match(key)
+        if key == "time" or not m:
+            continue
+        vs = [vals[i] for i in idx if vals[i] is not None]
+        if len(vs) >= min_hours:
+            out.setdefault(m.group(2) or "single", []).append(max(vs))
+    return out
+
+
+def ensemble_max(lat: float, lon: float, day: str, tz: str, get: Get = http_json, models=ENS_MODELS, days: int = 7) -> dict:
+    url = (f"{OPEN_METEO}?latitude={lat:.4f}&longitude={lon:.4f}&hourly=temperature_2m&models={','.join(models)}"
+           f"&temperature_unit=fahrenheit&timezone={urllib.parse.quote(tz)}&forecast_days={days}")
+    js = get(url)
+    by = parse_ensemble(js, day)
+    allm = [v for vs in by.values() for v in vs]
+    if len(allm) < 10:
+        raise ValueError(f"ensemble has {len(allm)} complete runs for {day}")
+    return {"members": allm, "by_model": {k: len(v) for k, v in by.items()}, "mean": statistics.mean(allm),
+            "spread": statistics.stdev(allm), "grid": [js.get("latitude"), js.get("longitude")], "url": url}
+
+
+def ensemble_bucket_prob(b: Bucket, members: list[float], bias: float = 0.0, kernel_sd: float = KERNEL_SD) -> float:
+    return sum(bucket_prob(b, m - bias, kernel_sd) for m in members) / len(members)
 
 
 class ErrorModel:
@@ -158,9 +211,17 @@ class ErrorModel:
     def bucket_of(lead_h: float) -> int:
         return next(i for i, (cap, _) in enumerate(PRIOR) if lead_h <= cap)
 
-    def params(self, station: str, lead_h: float) -> dict:
+    def params(self, station: str, lead_h: float, source: str = "nws") -> dict:
         b = self.bucket_of(lead_h)
-        errs = [r["forecast_f"] - r["actual_f"] for r in self.rows if r["station"] == station and self.bucket_of(r["lead_h"]) == b and r.get("actual_f") is not None]
+        rows = [r for r in self.rows if r["station"] == station and self.bucket_of(r["lead_h"]) == b and r.get("actual_f") is not None
+                and r.get("source", "nws") == source]
+        errs = [r["forecast_f"] - r["actual_f"] for r in rows]
+        if source == "ensemble":
+            if len(errs) >= self.min_n:
+                spread2 = statistics.mean(r.get("spread", 0.0) ** 2 for r in rows)
+                k = math.sqrt(max(0.5 ** 2, statistics.variance(errs) - spread2))
+                return {"bias": statistics.mean(errs), "kernel_sd": k, "n": len(errs), "source": "learned"}
+            return {"bias": 0.0, "kernel_sd": KERNEL_SD, "n": len(errs), "source": f"PRIOR kernel {KERNEL_SD} F (not yet 30 settled days)"}
         if len(errs) >= self.min_n:
             return {"bias": statistics.mean(errs), "sigma": max(1.0, statistics.stdev(errs)), "n": len(errs), "source": "learned"}
         return {"bias": 0.0, "sigma": PRIOR[b][1], "n": len(errs), "source": "PRIOR (not yet 30 settled days)"}
@@ -178,7 +239,9 @@ def kelly_yes(p: float, cost: float) -> float:
 
 
 def scan(slug: str, get: Get = http_json, model: ErrorModel | None = None, bankroll: float = 1000.0,
-         kelly_mult: float = 0.25, cap: float = 0.05, min_edge: float = 0.02) -> dict:
+         kelly_mult: float = 0.25, cap: float = 0.05, min_edge: float = 0.02, source: str = "nws") -> dict:
+    """source: 'nws' (point forecast + error model), 'ensemble' (Open-Meteo runs, dressed), or
+    'blend' (the average of the two probabilities; if the ensemble fails, NWS alone, said so)."""
     ev = parse_event(get(GAMMA + urllib.parse.quote(slug)))
     if ev.unit != "F":
         raise ValueError("Celsius markets are not modelled here yet")
@@ -187,20 +250,34 @@ def scan(slug: str, get: Get = http_json, model: ErrorModel | None = None, bankr
     model = model or ErrorModel()
     prm = model.params(ev.station, fc["lead_h"])
     mu = fc["max_f"] - prm["bias"]
+    ens, ens_prm, notes = None, None, []
+    if source in ("ensemble", "blend"):
+        try:
+            ens = ensemble_max(fc["lat"], fc["lon"], day, fc["tz"], get)
+            ens_prm = model.params(ev.station, fc["lead_h"], "ensemble")
+        except Exception as e:
+            if source == "ensemble":
+                raise
+            notes.append(f"ensemble unavailable ({type(e).__name__}: {str(e)[:80]}): NWS only")
     rows, total = [], 0.0
     for b in ev.buckets:
-        p = bucket_prob(b, mu, prm["sigma"])
+        p_nws = bucket_prob(b, mu, prm["sigma"])
+        p_ens = ensemble_bucket_prob(b, ens["members"], ens_prm["bias"], ens_prm["kernel_sd"]) if ens else None
+        p = p_nws if p_ens is None else p_ens if source == "ensemble" else 0.5 * (p_nws + p_ens)
         total += p
         fee = b.fee_rate * b.ask * (1 - b.ask)
         cost = b.ask + fee
         edge = p - cost if b.tradable else None
         f = kelly_yes(p, cost) * kelly_mult if b.tradable else 0.0
-        rows.append({"bucket": b.title, "model_p": round(p, 4), "bid": b.bid, "ask": b.ask, "fee": round(fee, 4),
+        rows.append({"bucket": b.title, "lo": None if b.lo == -math.inf else b.lo, "hi": None if b.hi == math.inf else b.hi, "model_p": round(p, 4), "nws_p": round(p_nws, 4),
+                     "ensemble_p": None if p_ens is None else round(p_ens, 4), "bid": b.bid, "ask": b.ask, "fee": round(fee, 4),
                      "edge": None if edge is None else round(edge, 4),
                      "stake_usd": round(min(f, cap) * bankroll, 2) if edge is not None and edge >= min_edge else 0.0, "tradable": b.tradable})
     return {"event": ev.title, "slug": ev.slug, "station": ev.station, "day": day, "forecast": fc, "error_model": prm,
-            "mu_f": round(mu, 2), "prob_sum": round(total, 4), "buckets": rows,
-            "note": "read-only; check the event's resolution rules yourself before believing an edge"}
+            "mu_f": round(mu, 2), "prob_sum": round(total, 4), "buckets": rows, "source": source if ens or source == "nws" else "nws",
+            "ensemble": None if not ens else {k: v for k, v in ens.items() if k != "members"} | {"error_model": ens_prm,
+                                                                                               "min": min(ens["members"]), "max": max(ens["members"])},
+            "notes": notes, "note": "read-only; check the event's resolution rules yourself before believing an edge"}
 
 
 def observed_max(station: str, day: str, get: Get = http_json) -> dict:
@@ -218,8 +295,33 @@ def observed_max(station: str, day: str, get: Get = http_json) -> dict:
     return {"station": station, "day": day, "max_f": round(max(temps) * 9 / 5 + 32), "n_obs": len(temps), "quality": "APPROX"}
 
 
-def settle(log_path: str | Path, station: str, day: str, forecast_f: float, lead_h: float, get: Get = http_json) -> dict:
+def settle(log_path: str | Path, station: str, day: str, forecast_f: float, lead_h: float, get: Get = http_json,
+           ens_mean: float | None = None, ens_spread: float | None = None, buckets: list | None = None) -> dict:
+    """Record the observed high against the NWS forecast (and the ensemble mean, if it was used),
+    and every bucket probability with its 0/1 outcome for calibration (<log>_calib.jsonl)."""
     obs = observed_max(station, day, get)
     row = {"station": station, "day": day, "lead_h": lead_h, "forecast_f": forecast_f, "actual_f": obs["max_f"], "quality": obs["quality"]}
-    ErrorModel(log_path).record(row)
+    em = ErrorModel(log_path)
+    em.record(row)
+    if ens_mean is not None:
+        em.record({**row, "source": "ensemble", "forecast_f": ens_mean, "spread": ens_spread or 0.0})
+    if buckets:
+        cp = Path(log_path).with_name(Path(log_path).stem + "_calib.jsonl")
+        with cp.open("a") as fh:
+            for lo, hi, p in buckets:
+                y = int((lo is None or obs["max_f"] >= lo) and (hi is None or obs["max_f"] <= hi))
+                fh.write(json.dumps({"station": station, "day": day, "p": p, "y": y}) + "\n")
     return row
+
+
+def calibration(log_path: str | Path) -> dict:
+    """Are the bucket probabilities honest? Brier score, log loss and a reliability table over
+    every settled bucket (quant.reliability)."""
+    from . import quant
+    cp = Path(log_path).with_name(Path(log_path).stem + "_calib.jsonl")
+    rows = [json.loads(x) for x in cp.read_text().splitlines() if x.strip()] if cp.exists() else []
+    if not rows:
+        return {"n": 0, "note": "nothing settled yet: run `tradebot weather settle` after scanned days pass"}
+    p, y = [r["p"] for r in rows], [r["y"] for r in rows]
+    return {"n": len(rows), "days": len({(r["station"], r["day"]) for r in rows}), **quant.reliability(p, y, bins=5),
+            "log_loss": quant.log_loss(p, y)}

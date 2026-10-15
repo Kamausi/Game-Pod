@@ -48,20 +48,19 @@ def moments(rets: list[float]) -> tuple[float, float]:
 
 
 def expected_max_sharpe(n_trials: int, var_trial_sharpes: float) -> float:
-    """Expected maximum Sharpe among n_trials true-zero strategies."""
-    if n_trials < 2:
-        return 0.0
-    return math.sqrt(max(var_trial_sharpes, 0.0)) * (
-        (1 - EULER_GAMMA) * N.inv_cdf(1 - 1 / n_trials) + EULER_GAMMA * N.inv_cdf(1 - 1 / (n_trials * math.e))
-    )
+    """Expected maximum Sharpe among n_trials true-zero strategies (one implementation: quant.py,
+    checked there against the paper's values)."""
+    from . import quant
+    return quant.expected_max_sharpe(n_trials, max(var_trial_sharpes, 0.0)) if n_trials >= 2 else 0.0
 
 
 def deflated_sharpe(sr: float, n_obs: int, skew: float, kurt: float, n_trials: int, var_trial_sharpes: float) -> float:
+    from . import quant
     sr0 = expected_max_sharpe(n_trials, var_trial_sharpes)
-    denom = 1 - skew * sr + (kurt - 1) / 4 * sr * sr
-    if n_obs < 2 or denom <= 0:
+    if n_obs < 2:
         return 0.0
-    return N.cdf((sr - sr0) * math.sqrt(n_obs - 1) / math.sqrt(denom))
+    v = quant.sharpe_se2(sr, n_obs, skew, kurt)
+    return N.cdf((sr - sr0) / math.sqrt(v)) if v > 0 else 0.0
 
 
 # ---------- running a spec ----------

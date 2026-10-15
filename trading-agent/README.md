@@ -617,6 +617,71 @@ docker compose run --rm desk desk --dir desk approve 1 2    # you, the same day
 
 **Verification.** `docker compose config` validates, and the image's install step (`pip install ".[all]"`, now including ccxt and anthropic ≥ 1.0) was run in a clean Python 3.12 venv. `docker build` itself was not run, because there is no Docker daemon in the build environment.
 
+## 20. The forensic pass: published statistics, an ensemble weather source, one implementation of each (2026-10-15)
+
+### Where the bot was weak, and what fixes it
+
+The approach was to find where the bot was weakest, then fix each gap with the standard published method. Each formula is implemented once, in `quant.py`, in plain Python (the bot still needs no numpy). Each is checked in `tests/test_quant.py` against an independent implementation or the paper's own numbers.
+
+| Weakness found | Method (source) | Checked against | Now used by |
+|---|---|---|---|
+| A backtest that tried many configurations reports the best one as if it were the only one | Deflated Sharpe ratio, probabilistic Sharpe, minimum track record (Bailey & López de Prado 2012, 2014) | The paper's expected-max-Sharpe values (N=100 → 2.53, N=1000 → 3.26) and a 4,000-run simulation | `insider backtest`: every run is logged to `quant/trials.jsonl`, and the verdict says **NO EDGE (deflated)** when DSR < 0.95. Also `audit dsr` |
+| "Average R > 0" with no idea how uncertain it is; trades in the same week aren't independent | Stationary block bootstrap (Politis & Romano 1994) | `arch.bootstrap.StationaryBootstrap`: CI width within 15% | Backtest report `avg_r_ci95`; the verdict says **NOT PROVEN** while the interval includes 0 |
+| No way to tell whether picking the best configuration generalises | Probability of backtest overfitting via CSCV (Bailey, Borwein, López de Prado & Zhu 2015) | Pure noise gives PBO ≈ 0.5; a real edge gives < 0.1 | `audit pbo matrix.csv` |
+| Testing many rules at once inflates false discoveries | Benjamini–Hochberg FDR (1995) | `statsmodels multipletests(fdr_bh)`: identical | `quant.bh_fdr` |
+| "Beat SPY" ignored the stock's beta: a 1.5-beta stock beats SPY in any up week | Market-model event study (MacKinlay 1997): β from trading days −130..−11, gap before the event | `statsmodels` OLS: identical α, β, residual σ | Every backtest trade carries `car` and `beta`; the report shows `avg_car` and `car_t` |
+| Trend rule without a test of whether the series trends at all | Lo–MacKinlay variance ratio, heteroskedasticity-robust z | `arch.unitroot.VarianceRatio`: identical to 1e-6 | `audit vr` |
+| ATR from closes needs many days and ignores overnight gaps | Parkinson, Garman–Klass, Rogers–Satchell, **Yang–Zhang** (2000) range volatility | Simulated price paths recover the true vol; Yang–Zhang's spread is < 0.6× close-to-close's | Every ticket carries `vol_yz_daily`; also `audit vol` |
+| Vol forecasts that ignore clustering | EWMA λ=0.94 (RiskMetrics) and GARCH(1,1) by maximum likelihood (Bollerslev 1986) | `arch.arch_model`: α, β within 0.02–0.03, next-day vol within 3% | `audit vol` |
+| Size limits ignored what the order does to the price | Square-root market impact, cost ≈ ½ spread + σ·√(Q/ADV) (Almgren et al. 2005; Tóth et al. 2011) | The formula itself (doubling at 4× size) | Every ticket carries `impact_bps`; `risk_check` refuses above `max_impact_bps` (25, new in `limits.json`) |
+| Equal or naive weights across correlated sleeves | Ledoit–Wolf shrinkage (2004); Hierarchical Risk Parity (López de Prado 2016) | `sklearn ledoit_wolf`: identical. PyPortfolioOpt HRP: identical to 1e-6 | `audit hrp returns.csv` |
+| Probabilities stated, never scored | Brier score, log loss, reliability bins and ECE; isotonic regression by pool-adjacent-violators | `sklearn` Brier, log loss and `IsotonicRegression`: identical | `weather calibration`, `audit calibration p,y.csv` |
+| "DECAYING" only after 20 trades and below half the backtest | Page's one-sided CUSUM (1954), k = 0.5σ, h = 5σ | No false alarm on 200 in-control trades; a 1σ drop is caught within 30 trades | `desk weekly`: **DECAYING (CUSUM)** as soon as it shows |
+
+**Two bugs the reference checks caught:**
+- **Variance ratio:** my first z statistic was missing a √n factor (θ is the variance of √n·(VR−1)). arch's number exposed it.
+- **HRP clustering:** a common HRP variant clusters on the distances between rows of the distance matrix, while PyPortfolioOpt clusters on the correlation distance itself. Matching it to 1e-6 settled which one.
+
+**Two implementations had grown up twice.** The crypto research workflow already had its own deflated Sharpe (`validation.py`) and Brier score (`review.py`). Both now call `quant.py`, and a test pins them equal.
+
+### Weather: real ensemble members instead of an assumed σ
+
+The scan's known weak spot (§17) was that tail "edges" came from a PRIOR σ. **Open-Meteo's free ensemble API** gives every run of GFS (31) and ECMWF (51), 82 forecasts of tomorrow's high. Verified from a live response on 2026-10-15:
+- **Key names:** with two models the keys carry the model's own suffix, which is not the requested id. `gfs025` comes back as `temperature_2m_member01_ncep_gefs025` and `ecmwf_ifs025` as `..._ecmwf_ifs025_ensemble`; the control run has no member number.
+- **Grid snap:** the point snaps to the 0.25° grid (40.75, −74.0 for KLGA).
+- **Spread:** for 2026-10-16 the runs' highs span about 71.7–78.3 °F around the NWS point forecast of 74.
+
+`weather scan --source blend` (the new default) averages the NWS probability with an **ensemble-dressed** one (Roulston & Smith 2003):
+- **Dressing:** each run's high, minus the station's learned bias, becomes the centre of a 1.5 °F normal kernel. The kernel covers the grid-to-station offset and hourly sampling.
+- **Learning:** after 30 settled days the bias and kernel are learned per station: kernel² = var(ensemble-mean error) − mean(spread²).
+- **Fallback:** if the ensemble host is unreachable, the scan uses NWS alone and says so.
+- **Calibration:** `weather settle` stores every bucket probability with its 0/1 outcome, and `weather calibration` scores them (Brier, reliability).
+
+Open-Meteo is free for non-commercial use (open-meteo.com terms), and the server is open source if you need to self-host. The fixture is a trimmed copy of the real response.
+
+### Efficiency
+
+- **Parallel downloads:** `insider prices` now downloads with 4 threads behind a shared token-bucket limit, 180 requests/min (Alpaca's free tier allows 200). Slow requests overlap instead of queueing, so a few thousand symbols take minutes at the rate cap, not however long one-at-a-time takes.
+- **Python is fast enough here.** Measured on this machine:
+
+| Routine | Time |
+|---|---|
+| Bootstrap, 5,000 trades × 1,000 resamples | 0.7 s |
+| GARCH fit, 10 years of daily bars | 0.2 s |
+| Ledoit–Wolf + HRP, 40 assets × 3 years | 0.4 s |
+| PBO, 50 configurations × 1,000 periods | 3.8 s |
+
+  These run once per backtest or once a day, so numba, polars, a Rust port or moving them into the Go `exechub` would add a toolchain for no visible gain. The Go service stays where latency matters (order routing).
+
+### Considered and not used
+
+| Candidate | Why not |
+|---|---|
+| mlfinlab | Now commercially licensed. The methods above were implemented from the papers instead |
+| TA-Lib | The indicators here are a few lines each, and TA-Lib's C build is a deployment burden |
+| PyPortfolioOpt / arch / statsmodels / scikit-learn at run time | Used as test references only (`pip install '.[reference]'`); the bot keeps zero required dependencies. PyPortfolioOpt 1.6's `HRPOpt.optimize()` is broken on scipy 1.18 (it calls the removed `sch._LINKAGE_METHODS`), so the test runs its own steps |
+| FRED, Quandl | They need keys, and no current strategy uses macro data |
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
