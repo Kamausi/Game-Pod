@@ -847,6 +847,35 @@ It fetches live data by default; `--markets/--trending/--global/--tickers` use s
 
 The page's JavaScript and `scanner.py` give identical lists and watchlists on the saved responses.
 
+## 24. Fees were eating the edge (2026-10-15)
+
+On the live desk, 67 round trips made **+$126 before fees and −$49 after**, because fees came to $175. Three things caused it:
+
+- **Targets narrower than costs.** Crypto majors used a 0.4% stop and a 0.8% target. A round trip at Alpaca's 0.25% taker fee costs about 0.55% once slippage and spread are added. So a winner kept about 0.25% and a loser cost about 0.95%, which needs roughly 80% winners to break even.
+- **Every fill paid the taker rate**, limit orders included.
+- **No pause before re-entering a coin** after exiting it.
+
+**Fixes (page):**
+
+- **Targets at least 4× the round-trip cost.** The round trip is priced as maker entry where used, plus a taker stop, slippage and spread. The stop keeps the tier's 1:2 ratio, so fees take at most a quarter of a win.
+- **Maker fills where they are cheaper.** Crypto entries are resting limit orders only where the venue's maker fee is lower than its taker fee. Take-profit targets fill as resting limits at the maker rate. Stops pay taker.
+- **60-minute cooldown** after an exit before re-entering the same coin.
+- **The Round trips card shows P&L before fees.** The sizing note shows the cost floor.
+
+**Simulated market, 15,000 one-minute bars, same seed:**
+
+| Fees | Version | Round trips | Net | Fees | Before fees |
+|---|---|---|---|---|---|
+| Alpaca (0.15% / 0.25%) | before | 47 | +$37.07 | $87.48 | +$124.55 |
+| Alpaca (0.15% / 0.25%) | after | 59 | +$179.89 | $191.11 | +$371.00 |
+| Binance-class (0.10% / 0.10%) | before | 166 | +$147.14 | $277.15 | +$424.29 |
+| Binance-class (0.10% / 0.10%) | limit entries forced | 106 | −$2.01 | $176.78 | +$174.76 |
+| Binance-class (0.10% / 0.10%) | final | 108 | +$47.76 | $163.10 | +$210.86 |
+
+Forcing limit entries at a maker = taker venue only added adverse selection. That is why they are now conditional.
+
+At Binance-class fees the final rules still do worse than before on this one price path, so the change is not a free win everywhere. The simulator is a random walk with one seed: it shows the cost structure, not live performance. The live check is the before-fees figure on the Round trips card. If fees stay close to it, the signals have no edge worth trading.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers
