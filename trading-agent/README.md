@@ -789,6 +789,64 @@ On 2026-10-15 the Solana top 100 by 7-day return held 71 arbitragers and 17 wash
 
 That ties pseudonymous users to their whole financial history against the app's own privacy design. The Composio "fomo" toolkit some guides cite is a different product (website notification events), not fomo.family.
 
+## 23. Watch the whole market, not a fixed list (2026-10-15)
+
+Until now the desk watched a fixed list of three majors (BTC, ETH, SOL) plus two memes (DOGE, PEPE). It now ranks the whole market on several criteria and lets each one contribute picks.
+
+**Sources** (each checked before any code was written; real responses saved in `tests/fixtures`):
+
+| Source | Gives |
+|---|---|
+| CoinGecko `/coins/markets` | top 250 by market cap: 1h, 24h and 7d change, volume, 24h high and low, distance from ATH |
+| CoinGecko `/search/trending` | the 15 most-searched coins on CoinGecko in the last 24 h |
+| CoinGecko `/global` | market-cap dominance (BTC, ETH, stablecoins) and total cap |
+| Crypto.com `get-tickers` | every listed pair: 444 spot USD pairs and the perps' open interest |
+
+Crypto.com's tickers reach coins outside the CoinGecko top 250.
+
+**Criteria** (one ranked list each):
+- most searched;
+- gainers over 1h, 24h and 7d;
+- losers over 24h;
+- most traded (24h volume);
+- market cap;
+- dominance;
+- volume ÷ market cap (unusual activity);
+- volatility (24h range);
+- nearest the all-time high;
+- Crypto.com's own gainers, losers and most traded;
+- open interest.
+
+Stablecoins, wrapped and staked tokens, and tokenized funds are excluded from every list, as is anything whose price doesn't move.
+
+**The watchlist** is round-robin: list 1's best pick, then list 2's best pick, and so on. That way neither the market-cap lists nor the meme pumps can fill it alone.
+
+A pick must be listed on Crypto.com, trade at least $100K a day there, and the order must be under 1% of that volume. At most one of BTC/ETH/SOL gets a slot by default.
+
+The scan also reports BTC dominance and a 7-day alt-season reading: the share of the top 50 alts that beat BTC.
+
+**On 2026-10-15** BTC dominance was 60.0%, only 7 of 50 alts beat BTC over the week ("bitcoin season"), and the market was down 5.8% on the day. The watchlist was:
+
+> BTC, PYTH, OP, XRP, STRK, XLM, ATOM, NEAR, DOGE, CASHCAT, CRO, LINK
+
+**What it means in practice:** most of the day's top gainers and most-searched coins are not tradable at a useful size on Crypto.com. ZEREBRO, AKE, Q and BNB are not listed there, and ZK traded $43K. The skip column on the page says which.
+
+**Page:** Markets → Whole-market scanner. It costs 3 Firecrawl credits a scan and re-scans hourly by default.
+
+"Desk trades the watchlist" is on by default:
+- The picks join the live desk without resetting the paper account.
+- Coins that drop off the list are **parked**: no new entries, their open positions still exit on their stops, and they stop costing API calls once flat.
+
+Every entry still passes the regime, no-chase and 1% gates.
+
+**CLI:**
+```
+tradebot scan [--n 12] [--max-majors 1] [--min-volume 100000] [--criteria most_searched,gainers_24h,...] [--out scan.json]
+```
+It fetches live data by default; `--markets/--trending/--global/--tickers` use saved files instead.
+
+The page's JavaScript and `scanner.py` give identical lists and watchlists on the saved responses.
+
 ## WHAT COULD I BE WRONG ABOUT?
 
 - **There may be no edge at all.** Per-bar classification of BTC from 18 numbers

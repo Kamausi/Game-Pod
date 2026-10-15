@@ -19,3 +19,14 @@ Crypto.com connector `get_tickers` (all instruments), **trimmed** to 11 of 1,038
 ## yahoo_BTC_USD_daily.csv, yahoo_SOL_USD_daily.csv (captured 2026-10-15)
 
 `GET https://query1.finance.yahoo.com/v8/finance/chart/{BTC-USD,SOL-USD}?range=5y&interval=1d` through the Firecrawl connector, converted to CSV (UTC dates; values rounded to 6 significant figures; days with a missing price dropped). The last row is the day in progress.
+
+## coingecko_markets / coingecko_trending / coingecko_global _2026-10-15.json (captured 2026-10-15 11:42 UTC)
+
+These were fetched through the Firecrawl connector:
+- `GET https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&price_change_percentage=1h,24h,7d`. All 250 rows are kept; the fields are **trimmed** to the ones the scanner reads, with values unchanged.
+- `GET /search/trending`. All 15 coins are kept, trimmed to id, name, symbol, rank and score, plus the price, the USD 24h change, and the market cap and volume strings, which CoinGecko formats like `"$47,448,272"`.
+- `GET /global`. The USD totals and `market_cap_percentage` are kept unchanged; the other currencies are dropped.
+
+## cryptocom_tickers_full_2026-10-15.json (captured 2026-10-15 11:43 UTC)
+
+Crypto.com connector `get_tickers`: all 444 spot `...USD` pairs, plus the 40 perpetuals with the largest open interest. Fields are trimmed (sizes and timestamps dropped); values are unchanged.

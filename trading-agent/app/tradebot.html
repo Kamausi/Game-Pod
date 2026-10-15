@@ -496,6 +496,21 @@ td canvas.spark { width: 110px; height: 28px; }
   <!-- ============================== MARKETS ============================== -->
   <section class="view" data-view="markets" aria-label="Markets" hidden>
     <div class="vhead"><h1>Markets</h1><p id="mkHead">—</p></div>
+    <section class="panel" aria-label="Whole-market scanner">
+      <h2><span>Whole-market scanner · every coin, many criteria</span><span class="note" id="scnNote">Not scanned yet.</span></h2>
+      <p class="note" id="scnGlobal" style="margin:0"></p>
+      <div class="controls">
+        <label class="field" for="scnN">Watchlist size <input type="number" id="scnN" min="3" max="20" step="1" value="10"></label>
+        <label class="field" for="scnMaj">BTC/ETH/SOL slots <input type="number" id="scnMaj" min="0" max="3" step="1" value="1"></label>
+        <label class="field" for="scnMin">Min Crypto.com 24h $K <input type="number" id="scnMin" min="0" step="50" value="100"></label>
+        <label class="field" for="scnEvery">Re-scan <select id="scnEvery"><option value="0">by hand</option><option value="30">every 30 min</option><option value="60">hourly</option><option value="240">every 4 h</option></select></label>
+        <label class="field" for="scnRot"><input type="checkbox" id="scnRot"> desk trades the watchlist</label>
+        <button type="button" class="primary" id="scnGo">Scan the market</button>
+      </div>
+      <div class="seg" role="tablist" id="scnTabs" aria-label="Scanner lists"></div>
+      <div class="tw" style="max-height:26rem"><table><thead id="scnHead"></thead><tbody id="scnBody"></tbody></table></div>
+      <p class="note" style="max-width:80ch">CoinGecko (top 250 by market cap, its 15 most-searched coins, and global dominance) through Firecrawl: 3 credits a scan. Crypto.com's own tickers cover every USD pair it lists, so coins outside the top 250 show up in the Crypto.com lists. The watchlist takes the best pick from each list in turn, so no single list or size tier fills it, and skips stablecoins, wrapped and staked tokens, coins Crypto.com doesn't list, and pairs too thin for the order size. With <b>desk trades the watchlist</b> on, the agents monitor the picks live; coins that drop off are parked (no new entries, open positions still exit on their stops). A list is a reason to look, not to buy: every entry still passes the regime, no-chase and 1% risk gates.</p>
+    </section>
     <section class="panel" aria-label="Low-cost universe">
       <p id="regLine" class="note" style="margin:0"></p>
       <h2><span>Low-cost universe · move per unit of trading cost</span><span class="note" id="uvNote">Not scanned yet.</span></h2>
@@ -1003,7 +1018,12 @@ function rng(seed) { let a = seed >>> 0; return function () { a |= 0; a = a + 0x
 function gauss(r) { let u = 0, v = 0; while (u === 0) u = r(); while (v === 0) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 function freshAsset(a) {
   return { ...a, bars: [], bars15: [], tick: null, index: null, pos: { qty: 0, avg: 0, stop: 0, take: 0, best: 0, stopDist: 0 },
-    pendingLimit: null, pendingStop: null, twap: null, last: null, feat: null, err: null, markers: [], trip: 0 };
+    pendingLimit: null, pendingStop: null, twap: null, last: null, feat: null, err: null, markers: [], trip: 0, rotOut: parkedAtStart(a) };
+}
+// With "desk trades the watchlist" on, the saved watchlist joined ASSETS through altPicks; crypto not on it starts parked.
+function parkedAtStart(a) {
+  if (a.src !== 'cc' || PREF('scanRotate') === false) return false;
+  const r = PREF('scanRes'); return !!(r && r.wl && r.wl.length && !r.wl.some(p => p.sym === a.sym));
 }
 function freshState(mode) {
   const W = {}; REGIMES.forEach(r => { W[r] = {}; SIGNALS.forEach(s => W[r][s] = { n: 0, hit: 0 }); });
@@ -1197,6 +1217,7 @@ function policy(i, a, f, d) {
   g('No regulatory veto (24h)', !d.veto.length, d.veto.length ? 'blocked: ' + d.veto[0].slice(0, 48) : P.news === 'veto' || P.news === 'both' ? 'clear' : 'veto off');
   const altBuy = TIER[a.tier].group === 'crypto' && a.sym !== 'BTC_USD' && d.direction === 'long';
   g('Market regime allows alt buys (BTC daily)', !altBuy || S.mode !== 'live' || REG.state === null || REG.state === 'UP', !altBuy ? 'not an alt buy' : S.mode !== 'live' ? 'not applied to the simulated market' : REG.state === null ? 'not read yet' : 'BTC ' + REG.state + (REG.state === 'UP' ? '' : ': alts wait'));
+  if (a.rotOut) g('On the scanner watchlist', false, 'parked: dropped off the latest market scan (exits only)');
   const run = runUp(a);
   g('No chase (under +15% in 24h)', d.direction !== 'long' || run === null || run < 0.15, run === null ? 'n/a' : (run >= 0 ? '+' : '') + (run * 100).toFixed(1) + '% 24h' + (run >= 0.15 ? ': wait for a pullback' : ''));
   g('Market open', isOpen(a, S.now), tier.hours === 'always' ? '24/7' : isOpen(a, S.now) ? 'open' : tier.hours === 'fx' ? 'closed for the weekend' : 'closed (NYSE 09:30–16:00 New York)');
@@ -1548,18 +1569,20 @@ async function fetchRegime(force) {
   } catch (e) { REG.note = 'regime read failed: ' + ((e && e.code) || 'error'); }
   finally { REG.busy = false; rerender(); }
 }
+const polled = a => a.src === 'cc' && !(a.rotOut && flatA(a));  // a parked coin stops costing calls once it is flat
 async function liveTick() {
   fetchRegime(false);
   if (liveBusy || S.mode !== 'live' || mcpState === 'pending') return;
   liveBusy = true; const mine = S;
   try {
     const with15 = S.polls % 10 === 0; S.polls++;
-    const res = await Promise.allSettled(S.assets.map(a => a.src === 'cc' ? fetchAsset(a, with15) : Promise.resolve(null)));
+    scanDue();
+    const res = await Promise.allSettled(S.assets.map(a => polled(a) ? fetchAsset(a, with15) : Promise.resolve(null)));
     if (S !== mine) return;
     const now = Date.now(); let newBar = false, okCount = 0;
     res.forEach((r, i) => {
       const a = S.assets[i];
-      if (a.src !== 'cc') return;
+      if (!polled(a)) return;
       if (r.status !== 'fulfilled') { const e = r.reason || {}; a.err = { code: e.code || 'error', message: e.message || String(e) }; return; }
       okCount++; a.err = null;
       const m = r.value, lastCt = a.bars.length ? a.bars[a.bars.length - 1].ct : 0;
@@ -1572,7 +1595,7 @@ async function liveTick() {
       if (a.twap && S.running) workTwap(a, now, a.tick.bid, a.tick.ask, a.tick.ts);
     });
     S.now = now;
-    if (okCount === 0) { const e = res[0].reason || {}; S.liveErr = { code: e.code || 'error', message: e.message || String(e) }; }
+    if (okCount === 0) { const e = (res.find(x => x.status === 'rejected') || {}).reason || {}; S.liveErr = { code: e.code || 'error', message: e.message || String(e) }; }
     else S.liveErr = null;
     benchmarkAnchor();
     if (newBar) afterBar(now, false);
@@ -2395,7 +2418,7 @@ function renderExtra() {
 
   if (VIEW === 'overview') renderOverview(eq, now);
   if (VIEW === 'trade') renderTerminal(eq, now, a);
-  if (VIEW === 'markets') { renderMarkets(now); renderUniverse(); }
+  if (VIEW === 'markets') { renderMarkets(now); renderScanner(); renderUniverse(); }
   if (VIEW === 'portfolio') renderPortfolio(eq);
   if (VIEW === 'agents') renderAgents(now);
   if (VIEW === 'journal') { renderJournal(); renderTax(); }
@@ -2490,7 +2513,7 @@ function renderMarkets(now) {
   if (UI.mk === 'lose') list = list.filter(z => z.c < 0).sort((p, q) => p.c - q.c);
   $('mkHead').textContent = S.assets.length + ' assets · ' + S.assets.filter(x => isOpen(x, now)).length + ' open now · ' + (S.mode === 'sim' ? 'simulated prices' : 'Crypto.com live' + (FEEDS.mkt ? ' + Yahoo for stocks and FX' : '; stocks and FX off'));
   $('mkBody').innerHTML = list.map(({ x, i, c }) => { const s = sessChg(x), f = x.feat, q = quoteOf(x), sp = f ? f.spreadBps : q ? (q.ask - q.bid) / ((q.ask + q.bid) / 2) * 1e4 : null, op = isOpen(x, now);
-    return '<tr class="click" data-i="' + i + '"><td class="sym">' + short(x.sym) + '</td><td>' + TIER[x.tier].label + '</td><td class="n">' + (x.bars.length || q ? fmtPx(markOf(x)) : '—') + '</td><td class="n ' + sgnCls(c) + '">' + pctS(c) + '</td><td class="n ' + sgnCls(s) + '">' + pctS(s) + '</td><td class="n">' + (q && q.vol24 ? '$' + fmtBig(q.vol24) : '—') + '</td><td class="n">' + (sp == null ? '—' : sp.toFixed(1) + ' bps') + '</td><td><canvas class="spark" height="28" data-spark="' + i + '"></canvas></td><td>' + (op ? '<span class="tag p-good">open</span>' : '<span class="tag p-mute">closed</span>') + '</td><td><button type="button" class="tradebtn" data-trade="' + i + '">Trade</button></td></tr>'; }).join('')
+    return '<tr class="click" data-i="' + i + '"><td class="sym">' + short(x.sym) + '</td><td>' + TIER[x.tier].label + '</td><td class="n">' + (x.bars.length || q ? fmtPx(markOf(x)) : '—') + '</td><td class="n ' + sgnCls(c) + '">' + pctS(c) + '</td><td class="n ' + sgnCls(s) + '">' + pctS(s) + '</td><td class="n">' + (q && q.vol24 ? '$' + fmtBig(q.vol24) : '—') + '</td><td class="n">' + (sp == null ? '—' : sp.toFixed(1) + ' bps') + '</td><td><canvas class="spark" height="28" data-spark="' + i + '"></canvas></td><td>' + (x.rotOut ? '<span class="tag p-mute">parked</span>' : op ? '<span class="tag p-good">open</span>' : '<span class="tag p-mute">closed</span>') + '</td><td><button type="button" class="tradebtn" data-trade="' + i + '">Trade</button></td></tr>'; }).join('')
     || '<tr><td colspan="10" class="note">Nothing in this list right now.</td></tr>';
   document.querySelectorAll('#mkBody canvas[data-spark]').forEach(cv => drawSpark(cv, closes(S.assets[+cv.dataset.spark], 120)));
 }
@@ -3165,6 +3188,216 @@ $('uvUse').addEventListener('click', () => {
 });
 $('uvReset').addEventListener('click', () => { store.set('altPicks', []); store.set('stockPicks', []); store.set('dropMajors', false); location.reload(); });
 
+
+// ---------- whole-market scanner (CoinGecko via Firecrawl + every Crypto.com ticker); same rules as scanner.py ----------
+// <scanner-core>
+const SCAN = (() => {
+  const STABLE = new Set('usdt usdc dai usds usde fdusd pyusd tusd usd1 rlusd usdd gusd usdp frax lusd susd eurc eurt usdy usdtb usdf bfusd susde syrupusdc usdg xaut paxg buidl'.split(' '));
+  const DERIV = new Set('steth wsteth weth wbtc cbbtc weeth reth meth jitosol msol bnsol cbeth lbtc solvbtc rseth ezeth wbeth jupsol bbsol tbtc wsol clbtc btcb sweth oseth lseth'.split(' '));
+  const DWORDS = /\b(wrapped|staked|bridged|restaked|liquid staking|binance-peg|tokenized|treasury|heloc|money market|yield fund)\b/i;
+  const MAJORS = ['BTC', 'ETH', 'SOL'];
+  const ORDER = ['most_searched', 'gainers_24h', 'cc_gainers', 'turnover', 'cc_most_traded', 'gainers_7d', 'volatility', 'losers_24h', 'gainers_1h', 'most_traded', 'near_ath', 'market_cap', 'cc_losers', 'cc_open_interest', 'dominance'];
+  const num = x => { if (x == null || x === '') return null; if (typeof x === 'string') x = x.replace(/[$,\s]/g, ''); const v = +x; return isFinite(v) ? v : null; };
+  function skip(sym, name, px, hi, lo) {
+    const s = String(sym).toLowerCase();
+    if (STABLE.has(s) || (s.startsWith('usd') && s.length <= 6) || (s.endsWith('usd') && s.length <= 7) || (s.startsWith('eur') && s.length <= 6)) return 'stablecoin';
+    if (px && hi && lo && px > 0.97 && px < 1.03 && (hi - lo) / px < 0.004) return 'stablecoin (pegged near $1)';
+    if (DERIV.has(s) || DWORDS.test(name || '')) return 'wrapped / staked derivative';
+    if (px && hi && lo && (hi - lo) / px < 0.003) return 'does not move';
+    return null;
+  }
+  function ccBase(n) {
+    if (n.endsWith('USDPERP')) return [n.slice(0, -7), 'perp'];
+    if (n.endsWith('_USD')) return [n.slice(0, -4), 'spot'];
+    if (n.endsWith('USD') && !/[_-]/.test(n)) return [n.slice(0, -3), 'spot'];
+    return null;
+  }
+  function ccSpot(tickers) {
+    const out = {}, oi = {}, perpOnly = {};
+    (tickers || []).forEach(t => {
+      const name = t.instrument_name || t.i || '', b = ccBase(name); if (!b) return;
+      const [base, kind] = b;
+      if (kind === 'perp') { oi[base] = (num(t.open_interest ?? t.oi) || 0) * (num(t.last ?? t.a) || 0); return; }
+      const bid = num(t.best_bid ?? t.b), ask = num(t.best_ask ?? t.k), last = num(t.last ?? t.a), hi = num(t.high ?? t.h), lo = num(t.low ?? t.l), vv = num(t.volume_value ?? t.vv);
+      if (!(bid > 0 && ask > 0 && last > 0 && hi > 0 && lo > 0) || vv == null) return;
+      out[base] = { base, bid, ask, last, high: hi, low: lo, volume_usd: vv, change: num(t.change ?? t.c) || 0 };
+    });
+    Object.entries(oi).forEach(([b, v]) => { if (out[b]) out[b].oi = v; else perpOnly[b] = v; });
+    return { spot: out, perpOnly };
+  }
+  function cgRows(markets) {
+    return (markets || []).filter(m => m && m.symbol).map(m => ({ symbol: m.symbol.toUpperCase(), id: m.id, name: m.name || '', price: num(m.current_price),
+      market_cap: num(m.market_cap) || 0, volume: num(m.total_volume) || 0, hi: num(m.high_24h), lo: num(m.low_24h),
+      ch1h: num(m.price_change_percentage_1h_in_currency), ch24h: num(m.price_change_percentage_24h_in_currency ?? m.price_change_percentage_24h),
+      ch7d: num(m.price_change_percentage_7d_in_currency), ath: num(m.ath_change_percentage) }));
+  }
+  function globalView(glob, markets) {
+    const d = (glob && glob.data) || glob || {}, pct = d.market_cap_percentage || {};
+    const out = { total: num((d.total_market_cap || {}).usd), vol: num((d.total_volume || {}).usd), ch24: num(d.market_cap_change_percentage_24h_usd),
+      btc: num(pct.btc), eth: num(pct.eth), stable: Object.keys(pct).length ? Object.entries(pct).filter(([k]) => STABLE.has(k)).reduce((s, [, v]) => s + v, 0) : null };
+    const rows = cgRows(markets), btc = rows.find(r => r.id === 'bitcoin');
+    const alts = rows.filter(r => r.id !== 'bitcoin' && !skip(r.symbol, r.name, r.price, r.hi, r.lo)).slice(0, 50);
+    if (btc && btc.ch7d != null && alts.length) {
+      const beat = alts.filter(r => r.ch7d != null && r.ch7d > btc.ch7d).length, sh = beat / alts.length;
+      out.alt = { beat, of: alts.length, share: sh, reading: sh >= 0.75 ? 'alt season' : sh <= 0.25 ? 'bitcoin season' : 'mixed' };
+    }
+    return out;
+  }
+  function lists(src, top) {
+    top = top || 15; const out = {};
+    const rows = cgRows(src.markets).filter(r => r.hi && r.lo && r.volume >= 1e6 && !skip(r.symbol, r.name, r.price, r.hi, r.lo));
+    const by = (val, rev, filt) => rows.filter(r => (filt ? filt(r) : val(r) != null)).sort((a, b) => rev === false ? val(a) - val(b) : val(b) - val(a)).slice(0, top)
+      .map(r => ({ symbol: r.symbol, id: r.id, name: r.name, value: val(r), ch24h: r.ch24h, volume: r.volume }));
+    if (rows.length) {
+      out.gainers_1h = by(r => r.ch1h); out.gainers_24h = by(r => r.ch24h); out.gainers_7d = by(r => r.ch7d); out.losers_24h = by(r => r.ch24h, false);
+      out.most_traded = by(r => r.volume); out.market_cap = by(r => r.market_cap);
+      out.turnover = by(r => r.volume / r.market_cap, true, r => r.market_cap > 0 && r.volume > 0);
+      out.volatility = by(r => (r.hi - r.lo) / r.price * 100, true, r => r.price && r.hi && r.lo);
+      out.near_ath = by(r => r.ath);
+    }
+    if (src.trending) out.most_searched = (src.trending.coins || []).map(c => c.item || c).filter(it => it.symbol && !skip(it.symbol, it.name))
+      .slice(0, top).map((it, i) => { const d = it.data || {}; return { symbol: it.symbol.toUpperCase(), id: it.id, name: it.name || '', value: i + 1, ch24h: num((d.price_change_percentage_24h || {}).usd), volume: num(d.total_volume) }; });
+    if (src.glob || rows.length) {
+      const g = (src.glob && src.glob.data) || src.glob || {}, total = num((g.total_market_cap || {}).usd) || rows.reduce((s, r) => s + r.market_cap, 0) || 1;
+      out.dominance = rows.slice().sort((a, b) => b.market_cap - a.market_cap).slice(0, top).map(r => ({ symbol: r.symbol, id: r.id, name: r.name, value: r.market_cap / total * 100, ch24h: r.ch24h, volume: r.volume }));
+    }
+    if (src.tickers) {
+      const { spot, perpOnly } = ccSpot(src.tickers);
+      const sp = Object.values(spot).filter(t => !skip(t.base, '', t.last, t.high, t.low)), live = sp.filter(t => t.volume_usd > 0);
+      const mk = (t, v) => ({ symbol: t.base, id: null, name: '', value: v, ch24h: t.change * 100, volume: t.volume_usd });
+      out.cc_gainers = live.slice().sort((a, b) => b.change - a.change).slice(0, top).map(t => mk(t, t.change * 100));
+      out.cc_losers = live.slice().sort((a, b) => a.change - b.change).slice(0, top).map(t => mk(t, t.change * 100));
+      out.cc_most_traded = sp.slice().sort((a, b) => b.volume_usd - a.volume_usd).slice(0, top).map(t => mk(t, t.volume_usd));
+      const oi = sp.filter(t => t.oi).map(t => [t.base, t.oi, t]).concat(Object.entries(perpOnly).map(([b, v]) => [b, v, null]));
+      out.cc_open_interest = oi.filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, top).map(([b, v, t]) => t ? mk(t, v) : { symbol: b, id: null, name: '', value: v, ch24h: null, volume: null });
+    }
+    return out;
+  }
+  // cost: (ticker, orderUsd) -> {cost, move, score}; the page passes its own fee schedule
+  function watchlist(ls, tickers, o) {
+    const n = o.n || 10, minV = o.minVolume ?? 1e5, order = o.orderUsd || 500, maxMaj = o.maxMajors ?? 1;
+    const spot = ccSpot(tickers).spot, crit = (o.order || ORDER).filter(c => ls[c] && ls[c].length), seen = {};
+    crit.forEach(c => ls[c].forEach((r, i) => (seen[r.symbol] = seen[r.symbol] || []).push(c + ' #' + (i + 1))));
+    const picks = [], skipped = {}, taken = new Set(), cur = Object.fromEntries(crit.map(c => [c, 0]));
+    let nMaj = 0;
+    while (picks.length < n && crit.some(c => cur[c] < ls[c].length)) {
+      for (const c of crit) {
+        if (picks.length >= n) break;
+        while (cur[c] < ls[c].length) {
+          const r = ls[c][cur[c]++], s = r.symbol; if (taken.has(s)) continue;
+          const t = spot[s];
+          const why = !t ? 'not listed as ' + s + '_USD on Crypto.com' : t.volume_usd < minV ? 'only $' + Math.round(t.volume_usd).toLocaleString('en-US') + ' traded in 24 h on Crypto.com'
+            : order > 0.01 * t.volume_usd ? 'the order would be over 1% of its daily volume' : MAJORS.includes(s) && nMaj >= maxMaj ? 'majors cap reached' : null;
+          if (why) { if (!(s in skipped)) skipped[s] = why; continue; }
+          taken.add(s); if (MAJORS.includes(s)) nMaj++;
+          const k = o.cost ? o.cost(t, order) : {};
+          picks.push({ symbol: s, sym: s + '_USD', picked_by: c, also_in: (seen[s] || []).filter(x => !x.startsWith(c + ' ')), change: t.change * 100, volume: t.volume_usd,
+            last: t.last, spreadBps: (t.ask - t.bid) / ((t.ask + t.bid) / 2) * 1e4, move: (t.high - t.low) / t.last * 1e4, cost: k.cost, score: k.score });
+          break;
+        }
+      }
+    }
+    return { watchlist: picks, criteria: crit, skipped };
+  }
+  return { skip, ccBase, ccSpot, lists, globalView, watchlist, ORDER, MAJORS };
+})();
+// </scanner-core>
+const SCN_LABEL = { watchlist: 'Watchlist', most_searched: 'Most searched', gainers_24h: 'Gainers 24h', gainers_1h: 'Gainers 1h', gainers_7d: 'Gainers 7d', losers_24h: 'Losers 24h',
+  most_traded: 'Most traded', market_cap: 'Market cap', dominance: 'Dominance', turnover: 'Volume ÷ cap', volatility: 'Volatility', near_ath: 'Near ATH',
+  cc_gainers: 'CDC gainers', cc_losers: 'CDC losers', cc_most_traded: 'CDC most traded', cc_open_interest: 'Open interest' };
+const SCN_VAL = { most_searched: v => '#' + v, gainers_24h: v => pctS(v / 100), gainers_1h: v => pctS(v / 100), gainers_7d: v => pctS(v / 100), losers_24h: v => pctS(v / 100),
+  most_traded: v => '$' + fmtBig(v), market_cap: v => '$' + fmtBig(v), dominance: v => v.toFixed(2) + '%', turnover: v => (v * 100).toFixed(0) + '% of cap',
+  volatility: v => v.toFixed(1) + '% range', near_ath: v => v.toFixed(1) + '% from ATH', cc_gainers: v => pctS(v / 100), cc_losers: v => pctS(v / 100),
+  cc_most_traded: v => '$' + fmtBig(v), cc_open_interest: v => '$' + fmtBig(v) };
+const SCN = { busy: false, note: 'Not scanned yet.', ts: PREF('scanTs') || 0, res: PREF('scanRes') || null, tab: 'watchlist', glob: null, cg: false };
+['scnN', 'scnMaj', 'scnMin'].forEach(id => { const v = PREF(id); if (v != null) $(id).value = v; });
+$('scnEvery').value = String(PREF('scnEvery') ?? 60); $('scnRot').checked = PREF('scanRotate') !== false;  // on by default: the desk follows the market, not a fixed list
+const MEMES = /^(DOGE|SHIB|PEPE|BONK|WIF|FLOKI|BRETT|POPCAT|MEW|TURBO|MOG|PNUT|FARTCOIN|TRUMP|SPX|GOAT|PENGU|NEIRO|CASHCAT|BOME|MOODENG|GIGA)$/;
+function scnCost(t, order) {
+  const fp = FEE_PRESETS[FEE_VENUE] || FEE_PRESETS.alpaca, feeRt = 2 * fp.maker * 1e4, move = (t.high - t.low) / t.last * 1e4;
+  const cost = feeRt + 2 * (move / 2e4) * Math.sqrt(order / t.volume_usd) * 1e4;
+  return { cost, score: move / cost };
+}
+async function marketScan(auto) {
+  if (SCN.busy) return;
+  if (!MCP) { SCN.note = 'Needs the Crypto.com and Firecrawl connectors (open the page on claude.ai with them added).'; rerender(); return; }
+  SCN.busy = true; SCN.note = 'Reading every Crypto.com ticker and CoinGecko’s market lists…'; rerender();
+  const CG = 'https://api.coingecko.com/api/v3', why = 'Rank all coins by gainers, most searched, volume, market cap and dominance for a paper-trading watchlist.';
+  try {
+    const [tk, mk, tr, gl] = await Promise.allSettled([
+      MCP.callTool(SERVER, 'get_tickers', {}, { cache: false }).then(unwrap),
+      fcJSON(CG + '/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&price_change_percentage=1h,24h,7d', why),
+      fcJSON(CG + '/search/trending', why), fcJSON(CG + '/global', why)]);
+    const r = tk.status === 'fulfilled' ? tk.value : null, tickers = Array.isArray(r) ? r : (r && (r.data || (r.result && r.result.data))) || [];
+    if (!tickers.length) throw { code: 'tickers', message: tk.status === 'rejected' ? ((tk.reason && tk.reason.message) || 'Crypto.com tickers failed') : 'no tickers came back' };
+    const src = { tickers, markets: mk.status === 'fulfilled' && Array.isArray(mk.value) ? mk.value : null, trending: tr.status === 'fulfilled' ? tr.value : null, glob: gl.status === 'fulfilled' ? gl.value : null };
+    const ls = SCAN.lists(src, 15), opts = { n: Math.min(20, Math.max(3, +$('scnN').value || 10)), maxMajors: Math.min(3, Math.max(0, +$('scnMaj').value || 0)),
+      minVolume: Math.max(0, +$('scnMin').value || 0) * 1e3, orderUsd: Math.max(10, +$('uvOrder').value || 500), cost: scnCost };
+    const wl = SCAN.watchlist(ls, tickers, opts), g = SCAN.globalView(src.glob, src.markets);
+    const fails = [['CoinGecko markets', mk], ['trending', tr], ['global', gl]].filter(([, x]) => x.status === 'rejected').map(([n]) => n);
+    SCN.res = { ls, wl: wl.watchlist, skipped: wl.skipped, g, ts: Date.now() }; SCN.ts = Date.now();
+    SCN.note = 'Scanned ' + new Date().toISOString().slice(11, 16) + ' UTC · ' + tickers.length + ' Crypto.com instruments' + (src.markets ? ' · ' + src.markets.length + ' CoinGecko coins' : '') + (fails.length ? ' · failed: ' + fails.join(', ') : '');
+    store.set('scanRes', SCN.res); store.set('scanTs', SCN.ts);
+    log(S.now, '—', 'info', 'Market scan: watchlist ' + wl.watchlist.map(p => p.symbol).join(', ') + (g.btc != null ? ' · BTC dominance ' + g.btc.toFixed(1) + '%' : '') + (g.alt ? ' · ' + g.alt.reading : '') + '.', 'info');
+    if ($('scnRot').checked) rotateDesk(wl.watchlist, auto);
+  } catch (e) { SCN.note = 'Scan failed: ' + ((e && e.code) || 'error') + (e && e.message ? ' · ' + e.message : ''); }
+  finally { SCN.busy = false; rerender(); }
+}
+const flatA = a => !a.pos.qty && !a.pendingLimit && !a.pendingStop && !a.twap;
+function assetDef(p) {
+  const ivol = Math.min(0.01, Math.max(0.0004, (p.move || 300) / 2e4 / Math.sqrt(1440)));
+  return { sym: p.sym, idx: null, tier: MEMES.test(p.symbol) ? 'meme' : 'alt', src: 'cc', p0: +p.last || 1, beta: 1.3, ivol, spreadBps: Math.max(0.5, +p.spreadBps || 3), simVol: +p.volume || 2e6, scan: true };
+}
+// Join the watchlist to the running desk without restarting the account. Assets are only ever appended (indices stay put);
+// a crypto asset that falls off the list is parked: no new entries, and live polling stops once it is flat.
+function rotateDesk(wl, auto) {
+  const want = new Set(wl.map(p => p.sym)), added = [], parked = [];
+  wl.forEach(p => {
+    let a = S.assets.find(x => x.sym === p.sym);
+    if (!a) {
+      const def = assetDef(p); if (!ASSETS.some(x => x.sym === def.sym)) ASSETS.push(def);
+      a = freshAsset(def); S.assets.push(a); S.entries.push(0); if (S.bh0) S.bh0.push(null); added.push(p.symbol);
+    }
+    if (a.rotOut) a.rotOut = false;
+  });
+  S.assets.forEach(a => { if (a.src === 'cc' && !want.has(a.sym) && !a.rotOut) { a.rotOut = true; parked.push(short(a.sym)); } });
+  store.set('altPicks', wl.map(p => ({ sym: p.sym, p0: p.last, spreadBps: +p.spreadBps.toFixed(2), ivol: assetDef(p).ivol, vol: p.volume })));
+  store.set('scanRotate', true);
+  if (added.length || parked.length) log(S.now, '—', 'info', (auto ? 'Scheduled re-scan: ' : 'Desk rotated onto the scanner watchlist: ') + (added.length ? 'now monitoring ' + added.join(', ') : 'no new coins') + (parked.length ? '; parked ' + parked.join(', ') + ' (exits only)' : '') + '.', 'info');
+}
+function scanDue() { const m = +$('scnEvery').value || 0; if (m && S.mode === 'live' && !SCN.busy && Date.now() - SCN.ts > m * 60e3) marketScan(true); }
+function renderScanner() {
+  const R = SCN.res, g = R && R.g;
+  $('scnNote').textContent = SCN.ts && !SCN.busy && SCN.note === 'Not scanned yet.' ? 'Last scan ' + new Date(SCN.ts).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : SCN.note;
+  $('scnGo').disabled = SCN.busy; $('scnGo').textContent = SCN.busy ? 'Scanning…' : 'Scan the market · 3 credits';
+  $('scnGlobal').innerHTML = g && g.btc != null ? '<b>BTC dominance ' + g.btc.toFixed(1) + '%</b> · ETH ' + g.eth.toFixed(1) + '% · stablecoins ' + (g.stable || 0).toFixed(1) + '% · total cap $' + (g.total / 1e12).toFixed(2) + 'T (' + pctS(g.ch24 / 100) + ' 24h)'
+    + (g.alt ? ' · <b>' + g.alt.beat + ' of ' + g.alt.of + '</b> top alts beat BTC over 7 days: ' + g.alt.reading : '') + (g.btc >= 60 ? ' · money is concentrated in bitcoin; alts tend to lag' : g.btc < 45 ? ' · capital is spread into alts (and so is the risk)' : '') : '';
+  const tabs = ['watchlist'].concat(R ? SCAN.ORDER.filter(c => R.ls[c] && R.ls[c].length) : []);
+  if (!tabs.includes(SCN.tab)) SCN.tab = 'watchlist';
+  $('scnTabs').innerHTML = tabs.map(t => '<button type="button" role="tab" data-t="' + t + '" aria-selected="' + (t === SCN.tab) + '">' + SCN_LABEL[t] + '</button>').join('');
+  if (!R) { $('scnHead').innerHTML = ''; $('scnBody').innerHTML = '<tr><td class="note">Scan to rank every coin by most searched, top gainers and losers (1h, 24h, 7d), most traded, market cap, dominance, volume ÷ cap, volatility and distance from the all-time high, plus Crypto.com’s own movers.</td></tr>'; return; }
+  const onDesk = sym => { const a = S.assets.find(x => x.sym === sym); return a ? (a.rotOut ? '<span class="tag p-mute">parked</span>' : '<span class="tag p-good">monitoring</span>') : ''; };
+  if (SCN.tab === 'watchlist') {
+    $('scnHead').innerHTML = '<tr><th>Coin</th><th>Picked by</th><th>Also on</th><th class="n">24h</th><th class="n">24h volume (CDC)</th><th class="n">Range</th><th class="n">Cost</th><th class="n">Move ÷ cost</th><th>Desk</th></tr>';
+    $('scnBody').innerHTML = R.wl.map(p => '<tr><td class="sym">' + esc(p.symbol) + (MEMES.test(p.symbol) ? ' <span class="tag p-warn">meme</span>' : '') + '</td><td>' + esc(SCN_LABEL[p.picked_by] || p.picked_by) + '</td><td class="note">' + esc(p.also_in.slice(0, 3).map(x => { const [c, k] = x.split(' '); return (SCN_LABEL[c] || c) + ' ' + k; }).join(', ')) + '</td><td class="n ' + sgnCls(p.change) + '">' + pctS(p.change / 100) + '</td><td class="n">$' + fmtBig(p.volume) + '</td><td class="n">' + (p.move / 100).toFixed(1) + '%</td><td class="n">' + (p.cost != null ? p.cost.toFixed(0) + ' bp' : '—') + '</td><td class="n">' + (p.score != null ? p.score.toFixed(1) : '—') + '</td><td>' + onDesk(p.sym) + '</td></tr>').join('')
+      || '<tr><td colspan="9" class="note">Nothing on the lists is liquid enough on Crypto.com. Lower the volume floor.</td></tr>';
+    return;
+  }
+  const rows = R.ls[SCN.tab] || [], fmt = SCN_VAL[SCN.tab] || (v => String(v));
+  $('scnHead').innerHTML = '<tr><th class="n">#</th><th>Coin</th><th class="n">' + esc(SCN_LABEL[SCN.tab]) + '</th><th class="n">24h</th><th class="n">24h volume</th><th>On Crypto.com</th></tr>';
+  $('scnBody').innerHTML = rows.map((r, i) => { const sk = R.skipped[r.symbol], inWl = R.wl.some(p => p.symbol === r.symbol);
+    return '<tr><td class="n">' + (i + 1) + '</td><td class="sym">' + esc(r.symbol) + (r.name ? ' <span class="note">' + esc(r.name) + '</span>' : '') + '</td><td class="n">' + fmt(r.value) + '</td><td class="n ' + sgnCls(r.ch24h) + '">' + (r.ch24h == null ? '—' : pctS(r.ch24h / 100)) + '</td><td class="n">' + (r.volume ? '$' + fmtBig(r.volume) : '—') + '</td><td>'
+      + (inWl ? '<span class="tag p-good">on the watchlist</span> ' + onDesk(r.symbol + '_USD') : sk ? '<span class="note">' + esc(sk) + '</span>' : '<span class="note">tradable; other lists filled first</span>') + '</td></tr>'; }).join('');
+}
+$('scnGo').addEventListener('click', () => marketScan(false));
+$('scnTabs').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (b) { SCN.tab = b.dataset.t; rerender(); } });
+['scnN', 'scnMaj', 'scnMin', 'scnEvery'].forEach(id => $(id).addEventListener('change', e => { store.set(id, id === 'scnEvery' ? +e.target.value : +e.target.value); rerender(); }));
+$('scnRot').addEventListener('change', e => {
+  store.set('scanRotate', e.target.checked);
+  if (e.target.checked && SCN.res) rotateDesk(SCN.res.wl, false);
+  if (!e.target.checked) { S.assets.forEach(a => { a.rotOut = false; }); log(S.now, '—', 'info', 'Scanner rotation off: every coin on the desk is active again.', 'info'); }
+  rerender();
+});
 
 // ---------- tokenomics (CoinGecko via Firecrawl) and FIFO tax lots ----------
 const TKN = { out: null, busy: false, note: 'Not run yet.' };
