@@ -1,0 +1,745 @@
+<title>Comet Hop</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Chakra+Petch:wght@500;700&display=swap">
+<style>
+  /* Layout: one full-bleed canvas; the world is a 420-unit-wide column scaled to fit, HUD drawn in-canvas. */
+  :root {
+    --space: #050f14;
+    --space-2: #0b2230;
+    --ink: #f4efe1;
+    --gold: #ffcf4a;
+    --coral: #ff6b5b;
+    --mint: #5ff2c4;
+    --font-display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+    --font-data: "Chakra Petch", "Courier New", monospace;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--space);
+    color: var(--ink);
+    overflow: hidden;
+    padding-left: max(0px, env(safe-area-inset-left, 0px));
+    padding-right: max(0px, env(safe-area-inset-right, 0px));
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: pointer;
+    outline: none;
+  }
+  #mute {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(244, 239, 225, .25);
+    background: rgba(5, 15, 20, .5);
+    color: var(--ink);
+    font: 18px var(--font-data);
+    cursor: pointer;
+    z-index: 2;
+  }
+  #mute:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+</style>
+
+<canvas id="c" tabindex="0" aria-label="Comet Hop game. Tap, click or press space to launch."></canvas>
+<button id="mute" type="button" aria-label="Toggle sound">♪</button>
+
+<script>
+(() => {
+  'use strict';
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  const muteBtn = document.getElementById('mute');
+  const CSSV = getComputedStyle(document.documentElement);
+  const FD = CSSV.getPropertyValue('--font-display').trim();
+  const FN = CSSV.getPropertyValue('--font-data').trim();
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- storage ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('comethop.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('comethop.' + k, JSON.stringify(v)); } catch {} }
+  };
+  let best = store.get('best', 0);
+  let dust = store.get('dust', 0);
+  let runs = store.get('runs', 0);
+  let muted = store.get('muted', false);
+
+  // Comets unlock automatically as lifetime stardust grows.
+  const SKINS = [
+    { name: 'Ember',        at: 0,    head: '#fff4d6', trail: ['#ffcf4a', '#ff6b5b'] },
+    { name: 'Glacier',      at: 25,   head: '#e9fbff', trail: ['#8fe9ff', '#3a8dff'] },
+    { name: 'Venom',        at: 70,   head: '#f1ffe8', trail: ['#b6ff5c', '#1fd17a'] },
+    { name: 'Nebula Rose',  at: 140,  head: '#fff0f7', trail: ['#ff8fd1', '#b04dff'] },
+    { name: 'Solar Flare',  at: 250,  head: '#ffffff', trail: ['#ffe14a', '#ff3d00'] },
+    { name: 'Void Walker',  at: 400,  head: '#ffffff', trail: ['#9d8cff', '#1b0f4d'] },
+    { name: 'Prism',        at: 650,  head: '#ffffff', trail: 'rainbow' },
+  ];
+  const skinIndexFor = d => { let i = 0; SKINS.forEach((s, j) => { if (d >= s.at) i = j; }); return i; };
+  let skinIdx = skinIndexFor(dust);
+
+  // ---------- audio ----------
+  let ac = null;
+  function audio() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; } }
+    if (ac && ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function tone(freq, dur, type = 'sine', vol = 0.15, slide = 0, delay = 0) {
+    if (muted) return; const a = audio(); if (!a) return;
+    const t = a.currentTime + delay;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noise(dur, vol = 0.1, freq = 1200) {
+    if (muted) return; const a = audio(); if (!a) return;
+    const n = a.sampleRate * dur, buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    f.type = 'bandpass'; f.frequency.value = freq; g.gain.value = vol;
+    s.buffer = buf; s.connect(f).connect(g).connect(a.destination); s.start();
+  }
+  const PENTA = [0, 2, 4, 7, 9];
+  const note = i => 392 * Math.pow(2, (PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12);
+  const sfx = {
+    launch() { noise(0.18, 0.12, 900); tone(220, 0.15, 'triangle', 0.06, 220); },
+    land(combo, perfect) {
+      const i = Math.min(combo, 12);
+      tone(note(i), 0.18, 'triangle', 0.14);
+      if (perfect) { tone(note(i + 2), 0.22, 'sine', 0.1, 0, 0.06); tone(note(i + 4), 0.3, 'sine', 0.08, 0, 0.12); }
+    },
+    star(gold) { tone(gold ? 1320 : 1760, 0.12, 'sine', 0.08); tone(gold ? 1760 : 2350, 0.16, 'sine', 0.06, 0, 0.05); },
+    die() { tone(180, 0.6, 'sawtooth', 0.09, -140); noise(0.4, 0.15, 300); },
+    best() { [0, 2, 4, 7].forEach((n, k) => tone(523 * Math.pow(2, n / 12), 0.3, 'triangle', 0.1, 0, k * 0.09)); },
+    unlock() { [0, 4, 7, 12, 16].forEach((n, k) => tone(659 * Math.pow(2, n / 12), 0.35, 'sine', 0.09, 0, k * 0.07)); },
+    sector() { tone(330, 0.5, 'sine', 0.08, 330); }
+  };
+  function setMuted(m) { muted = m; store.set('muted', m); muteBtn.textContent = m ? '×' : '♪'; muteBtn.style.opacity = m ? .5 : 1; }
+  setMuted(muted);
+  muteBtn.addEventListener('pointerdown', e => e.stopPropagation());
+  muteBtn.addEventListener('click', e => { e.stopPropagation(); setMuted(!muted); cv.focus(); });
+
+  // ---------- layout ----------
+  const W = 420;
+  let DPR = 1, scale = 1, offX = 0, H = 760, CW = 0, CH = 0;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    CW = cv.clientWidth; CH = cv.clientHeight;
+    cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR);
+    scale = Math.min(CW / W, CH / 640);
+    offX = (CW - W * scale) / 2;
+    H = CH / scale;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- helpers ----------
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const PLANET_PALETTES = [
+    ['#ff8a5b', '#b8341f'], ['#ffd25e', '#c9781a'], ['#5ff2c4', '#13806b'],
+    ['#7fb8ff', '#2a4fb8'], ['#ff7aa8', '#9c2457'], ['#c3a6ff', '#5a37b0'],
+    ['#9ae66e', '#3d8a24'], ['#ffb3e6', '#b0458f']
+  ];
+
+  // ---------- background ----------
+  const bgStars = Array.from({ length: 140 }, () => ({
+    x: Math.random(), y: Math.random(), p: rand(0.05, 0.45), r: rand(0.4, 1.6), tw: rand(0, 6.28)
+  }));
+
+  // ---------- game state ----------
+  let state = 'title';           // title | play | dead
+  let planets, stars, particles, texts, player, camY, score, combo, runDust, hops, shake, flash, deadAt, slowmo, sector, hintT, lastPlanet, newBest, unlockedNow, time = 0;
+
+  function makePlanet(y, x, idx) {
+    const d = clamp(idx / 45, 0, 1);
+    const orbit = lerp(70, 46, d) + rand(-6, 6);
+    const pal = PLANET_PALETTES[Math.floor(Math.random() * PLANET_PALETTES.length)];
+    const p = {
+      x, baseX: x, y, orbit, body: orbit * rand(0.36, 0.46), pal, idx,
+      ring: Math.random() < 0.3, ringTilt: rand(-0.5, 0.5),
+      dir: Math.random() < 0.5 ? 1 : -1,
+      lin: lerp(190, 300, d) + rand(-15, 15),
+      amp: 0, mph: rand(0, 6.28), msp: 0, visited: false, pulse: 0,
+      craters: Array.from({ length: 3 }, () => ({ a: rand(0, 6.28), r: rand(0.2, 0.6), s: rand(0.12, 0.22) }))
+    };
+    if (idx > 6 && Math.random() < 0.2 + 0.4 * d) {
+      p.amp = rand(30, 50 + 50 * d);
+      p.msp = rand(0.7, 1.2 + d);
+      p.baseX = clamp(x, p.orbit + p.amp + 8, W - p.orbit - p.amp - 8);
+      if (p.baseX !== p.baseX || p.orbit * 2 + p.amp * 2 + 16 > W) { p.amp = 0; p.baseX = x; }
+    }
+    return p;
+  }
+
+  function spawnNext() {
+    const prev = planets[planets.length - 1];
+    const idx = prev.idx + 1;
+    const d = clamp(idx / 45, 0, 1);
+    const gap = rand(165, 215) + d * 70;
+    let x, tries = 0;
+    do {
+      x = rand(80, W - 80);
+      tries++;
+    } while (Math.abs(x - prev.baseX) < 50 && tries < 10);
+    const p = makePlanet(prev.y - gap, x, idx);
+    planets.push(p);
+    // stardust along the path
+    const n = Math.random() < 0.35 ? 3 : Math.random() < 0.7 ? 2 : 1;
+    const gold = idx > 3 && Math.random() < 0.15;
+    const off = rand(-30, 30);
+    for (let i = 0; i < n; i++) {
+      const t = (i + 1) / (n + 1);
+      stars.push({
+        x: lerp(prev.baseX, p.baseX, t) + off, y: lerp(prev.y, p.y, t),
+        gold: gold && i === Math.floor(n / 2), ph: rand(0, 6.28), taken: false
+      });
+    }
+  }
+
+  function reset() {
+    planets = []; stars = []; particles = []; texts = [];
+    score = 0; combo = 0; runDust = 0; hops = 0; shake = 0; flash = 0; slowmo = 1; sector = 0; hintT = 0;
+    newBest = false; unlockedNow = null;
+    const first = makePlanet(0, W / 2, 0);
+    first.visited = true;
+    planets.push(first);
+    for (let i = 0; i < 6; i++) spawnNext();
+    player = { x: 0, y: 0, vx: 0, vy: 0, mode: 'orbit', planet: first, angle: Math.PI / 2, dir: 1, r: first.orbit, flyT: 0 };
+    first.dir = 1;
+    lastPlanet = first;
+    camY = first.y - H * 0.7;
+    placeOnOrbit();
+  }
+
+  function placeOnOrbit() {
+    const p = player.planet;
+    player.x = p.x + Math.cos(player.angle) * player.r;
+    player.y = p.y + Math.sin(player.angle) * player.r;
+  }
+
+  function launch() {
+    if (player.mode !== 'orbit') return;
+    const sp = 560 + Math.min(hops, 40) * 3;
+    const a = player.angle, d = player.dir;
+    player.vx = -Math.sin(a) * d * sp;
+    player.vy = Math.cos(a) * d * sp;
+    player.mode = 'fly'; player.flyT = 0;
+    lastPlanet = player.planet;
+    burst(player.x, player.y, 10, skinColor(0.3), 120, 0.4);
+    sfx.launch();
+  }
+
+  function capture(p) {
+    const rx = player.x - p.x, ry = player.y - p.y;
+    const cross = rx * player.vy - ry * player.vx;
+    const v = Math.hypot(player.vx, player.vy);
+    const impact = Math.abs(cross) / v;
+    const perfect = impact < p.orbit * 0.42;
+    player.mode = 'orbit'; player.planet = p;
+    player.angle = Math.atan2(ry, rx);
+    player.dir = cross >= 0 ? 1 : -1;
+    p.dir = player.dir;
+    player.r = Math.hypot(rx, ry);
+    p.pulse = 1;
+
+    if (!p.visited) {
+      p.visited = true;
+      hops++;
+      if (perfect) combo++; else combo = 0;
+      const mult = 1 + Math.min(combo, 4);
+      const gain = perfect ? mult : 1;
+      score += gain;
+      if (perfect) {
+        const words = ['PERFECT', 'GREAT', 'STELLAR', 'COSMIC', 'GODLIKE'];
+        addText(p.x, p.y - p.orbit - 18, words[Math.min(combo - 1, 4)] + (mult > 1 ? '  x' + mult : ''), comboColor(), 26);
+        shake = Math.max(shake, 6 + combo * 1.5);
+        flash = 0.25;
+        burst(player.x, player.y, 18 + combo * 4, comboColor(), 260, 0.7);
+        ringWave(p);
+      } else {
+        addText(p.x, p.y - p.orbit - 18, '+1', '#f4efe1', 22);
+        burst(player.x, player.y, 8, skinColor(0.5), 140, 0.5);
+      }
+      sfx.land(hops, perfect);
+      const newSector = Math.floor(score / 15);
+      if (newSector > sector) {
+        sector = newSector;
+        addText(W / 2, camY + H * 0.32, 'SECTOR ' + (sector + 1), '#5ff2c4', 40, true);
+        sfx.sector();
+      }
+      if (!newBest && best > 0 && score > best) {
+        newBest = true;
+        addText(W / 2, camY + H * 0.4, 'NEW BEST!', '#ffcf4a', 36, true);
+        sfx.best();
+      }
+    } else {
+      sfx.land(0, false);
+    }
+  }
+
+  function die() {
+    state = 'dead'; deadAt = time;
+    shake = 14; flash = 0.4; slowmo = 0.25;
+    burst(player.x, player.y, 40, '#ff6b5b', 300, 1);
+    burst(player.x, player.y, 25, skinColor(0.2), 200, 0.9);
+    sfx.die();
+    if (navigator.vibrate) try { navigator.vibrate(60); } catch {}
+    runs++; store.set('runs', runs);
+    const before = skinIndexFor(dust);
+    dust += runDust; store.set('dust', dust);
+    const after = skinIndexFor(dust);
+    if (after > before) { unlockedNow = SKINS[after]; skinIdx = after; setTimeout(() => sfx.unlock(), 500); }
+    if (score > best) { best = score; store.set('best', best); newBest = true; }
+  }
+
+  // ---------- effects ----------
+  function skinColor(t) {
+    const s = SKINS[skinIdx];
+    if (s.trail === 'rainbow') return `hsl(${(time * 200 + t * 300) % 360},100%,65%)`;
+    return t < 0.5 ? s.trail[0] : s.trail[1];
+  }
+  function comboColor() { return ['#ffcf4a', '#5ff2c4', '#7fb8ff', '#ff7aa8', '#ffffff'][Math.min(Math.max(combo - 1, 0), 4)]; }
+  function burst(x, y, n, color, speed, life) {
+    if (reduceMotion) n = Math.ceil(n / 3);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, s = speed * rand(0.2, 1);
+      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: life * rand(0.5, 1), max: life, color, size: rand(1.5, 3.5), drag: 0.92 });
+    }
+  }
+  function ringWave(p) { particles.push({ ring: true, p, life: 0.5, max: 0.5, color: comboColor() }); }
+  function addText(x, y, text, color, size, screen = false) { texts.push({ x, y, text, color, size, life: 1.1, max: 1.1, screen }); }
+
+  // ---------- update ----------
+  function update(dt) {
+    time += dt;
+    const sdt = dt * slowmo;
+    if (state === 'dead') slowmo = Math.min(1, slowmo + dt * 0.6);
+
+    for (const p of planets) {
+      if (p.amp) p.x = p.baseX + Math.sin(time * p.msp + p.mph) * p.amp;
+      p.pulse = Math.max(0, p.pulse - dt * 2);
+    }
+
+    if (state !== 'dead') {
+      if (player.mode === 'orbit') {
+        const p = player.planet;
+        player.r = lerp(player.r, p.orbit, 1 - Math.pow(0.001, sdt));
+        player.angle += player.dir * (p.lin / p.orbit) * sdt;
+        placeOnOrbit();
+      } else {
+        player.flyT += sdt;
+        player.x += player.vx * sdt;
+        player.y += player.vy * sdt;
+        for (const p of planets) {
+          if (p === lastPlanet) continue;
+          if (Math.hypot(player.x - p.x, player.y - p.y) < p.orbit) { capture(p); break; }
+        }
+        if (state === 'play' && player.mode === 'fly' &&
+          (player.x < -12 || player.x > W + 12 || player.y > camY + H + 30 || player.y < camY - 60 || player.flyT > 2.4)) die();
+      }
+      // trail
+      const s = SKINS[skinIdx];
+      const n = player.mode === 'fly' ? 3 : 1;
+      for (let i = 0; i < n; i++) {
+        particles.push({
+          x: player.x + rand(-2, 2), y: player.y + rand(-2, 2), vx: rand(-15, 15), vy: rand(-15, 15),
+          life: player.mode === 'fly' ? 0.5 : 0.35, max: 0.5, color: skinColor(Math.random()), size: rand(2, 4.5), drag: 0.96, trail: true
+        });
+      }
+      // stars
+      for (const st of stars) {
+        if (st.taken) continue;
+        if (Math.hypot(player.x - st.x, player.y - st.y) < 24) {
+          st.taken = true;
+          const v = st.gold ? 5 : 1;
+          if (state === 'play') runDust += v;
+          addText(st.x, st.y - 14, '+' + v + ' ✦', st.gold ? '#ffcf4a' : '#bfe9ff', st.gold ? 22 : 16);
+          burst(st.x, st.y, st.gold ? 16 : 7, st.gold ? '#ffcf4a' : '#bfe9ff', 150, 0.45);
+          sfx.star(st.gold);
+        }
+      }
+    }
+
+    // camera
+    let target = player.planet.y - H * 0.68;
+    if (state === 'title') target = player.planet.y - H * 0.6;
+    if (player.mode === 'fly' && state === 'play') target = Math.min(target, player.y - H * 0.5);
+    camY = lerp(camY, target, 1 - Math.pow(0.02, dt));
+
+    // world upkeep
+    while (planets[planets.length - 1].y > camY - H) spawnNext();
+    planets = planets.filter(p => p.y < camY + H + 300 || p === player.planet);
+    stars = stars.filter(s => s.y < camY + H + 100 && !(s.taken));
+
+    for (const p of particles) {
+      p.life -= sdt;
+      if (!p.ring) { p.x += p.vx * sdt; p.y += p.vy * sdt; p.vx *= Math.pow(p.drag, sdt * 60); p.vy *= Math.pow(p.drag, sdt * 60); }
+    }
+    particles = particles.filter(p => p.life > 0);
+    for (const t of texts) { t.life -= dt; t.y -= dt * 30; }
+    texts = texts.filter(t => t.life > 0);
+
+    shake = Math.max(0, shake - dt * 30);
+    flash = Math.max(0, flash - dt * 1.5);
+    if (state === 'play') hintT += dt;
+  }
+
+  // ---------- draw ----------
+  function drawBackground() {
+    const depth = -camY / 3000;
+    const hue = (195 + depth * 60) % 360;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const g = ctx.createLinearGradient(0, 0, 0, CH);
+    g.addColorStop(0, `hsl(${hue + 20},55%,9%)`);
+    g.addColorStop(1, `hsl(${hue},60%,4%)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, CW, CH);
+    // nebula blobs
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) {
+      const ny = ((i * 0.37 + (-camY * 0.03) / CH) % 1.4) * CH * 1.2 - CH * 0.2;
+      const nx = CW * (0.2 + 0.6 * ((i * 0.61) % 1));
+      const r = Math.max(CW, CH) * 0.45;
+      const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, r);
+      ng.addColorStop(0, `hsla(${(hue + 120 + i * 70) % 360},80%,45%,0.08)`);
+      ng.addColorStop(1, 'hsla(0,0%,0%,0)');
+      ctx.fillStyle = ng; ctx.fillRect(0, 0, CW, CH);
+    }
+    ctx.restore();
+    for (const s of bgStars) {
+      let y = (s.y * CH - camY * scale * s.p) % CH; if (y < 0) y += CH;
+      const a = 0.4 + 0.6 * Math.abs(Math.sin(time * 1.5 + s.tw));
+      ctx.fillStyle = `rgba(244,239,225,${a * (0.3 + s.p)})`;
+      ctx.fillRect(s.x * CW, y, s.r + s.p * 2, s.r + s.p * 2);
+    }
+  }
+
+  function drawPlanet(p) {
+    const y = p.y;
+    // orbit ring
+    const isCur = p === player.planet;
+    ctx.save();
+    ctx.setLineDash([4, 8]);
+    ctx.lineDashOffset = -time * 20 * p.dir;
+    ctx.strokeStyle = isCur ? 'rgba(244,239,225,0.35)' : p.visited ? 'rgba(244,239,225,0.08)' : 'rgba(95,242,196,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(p.x, y, p.orbit, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    if (!p.visited) { // sweet spot hint
+      ctx.fillStyle = 'rgba(95,242,196,0.05)';
+      ctx.beginPath(); ctx.arc(p.x, y, p.orbit * 0.42 + 6, 0, Math.PI * 2); ctx.fill();
+    }
+    if (p.pulse > 0) {
+      ctx.strokeStyle = `rgba(244,239,225,${p.pulse * 0.6})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(p.x, y, p.orbit + (1 - p.pulse) * 20, 0, Math.PI * 2); ctx.stroke();
+    }
+    // glow
+    const gl = ctx.createRadialGradient(p.x, y, p.body * 0.8, p.x, y, p.body * 2.2);
+    gl.addColorStop(0, p.pal[0] + '40'); gl.addColorStop(1, p.pal[0] + '00');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(p.x, y, p.body * 2.2, 0, Math.PI * 2); ctx.fill();
+    // back half of ring
+    if (p.ring) drawRing(p, y, true);
+    // body
+    const bg = ctx.createRadialGradient(p.x - p.body * 0.4, y - p.body * 0.4, p.body * 0.1, p.x, y, p.body);
+    bg.addColorStop(0, p.pal[0]); bg.addColorStop(1, p.pal[1]);
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(p.x, y, p.body, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    for (const c of p.craters) {
+      ctx.beginPath();
+      ctx.arc(p.x + Math.cos(c.a) * c.r * p.body, y + Math.sin(c.a) * c.r * p.body, c.s * p.body, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // terminator shadow
+    const sh = ctx.createLinearGradient(p.x - p.body, y - p.body, p.x + p.body, y + p.body);
+    sh.addColorStop(0.5, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(p.x, y, p.body, 0, Math.PI * 2); ctx.fill();
+    if (p.ring) drawRing(p, y, false);
+  }
+  function drawRing(p, y, back) {
+    ctx.save();
+    ctx.translate(p.x, y); ctx.rotate(p.ringTilt);
+    ctx.strokeStyle = p.pal[0] + 'aa'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, p.body * 1.7, p.body * 0.45, 0, back ? Math.PI : 0, back ? Math.PI * 2 : Math.PI);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawStar(s) {
+    const r = s.gold ? 9 : 6;
+    const pulse = 1 + Math.sin(time * 5 + s.ph) * 0.15;
+    ctx.save();
+    ctx.translate(s.x, s.y); ctx.rotate(time * (s.gold ? 2 : 1) + s.ph); ctx.scale(pulse, pulse);
+    ctx.fillStyle = s.gold ? '#ffcf4a' : '#bfe9ff';
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 12;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2, rr = i % 2 ? r * 0.38 : r;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawComet(x, y, sk, size = 7) {
+    const s = SKINS[sk];
+    ctx.save();
+    ctx.shadowColor = s.trail === 'rainbow' ? `hsl(${time * 200 % 360},100%,65%)` : s.trail[0];
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = s.head;
+    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawWorld() {
+    ctx.save();
+    const sx = (Math.random() - 0.5) * shake * (reduceMotion ? 0.2 : 1);
+    const sy = (Math.random() - 0.5) * shake * (reduceMotion ? 0.2 : 1);
+    ctx.setTransform(DPR * scale, 0, 0, DPR * scale, DPR * (offX + sx * scale), DPR * (-camY * scale + sy * scale));
+
+    // playfield edges
+    ctx.fillStyle = 'rgba(255,107,91,0.05)';
+    ctx.fillRect(-400, camY - 10, 400, H + 20);
+    ctx.fillRect(W, camY - 10, 400, H + 20);
+    ctx.strokeStyle = 'rgba(255,107,91,0.18)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, camY); ctx.lineTo(0, camY + H); ctx.moveTo(W, camY); ctx.lineTo(W, camY + H); ctx.stroke();
+
+    for (const p of planets) drawPlanet(p);
+    for (const s of stars) if (!s.taken) drawStar(s);
+
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of particles) {
+      const a = p.life / p.max;
+      if (p.ring) {
+        ctx.strokeStyle = p.color; ctx.globalAlpha = a; ctx.lineWidth = 4 * a;
+        ctx.beginPath(); ctx.arc(p.p.x, p.p.y, p.p.orbit * (1 + (1 - a) * 0.8), 0, Math.PI * 2); ctx.stroke();
+        continue;
+      }
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.trail ? a : 1), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    if (state !== 'dead') {
+      // aim guide while orbiting (fades as you get better)
+      if (player.mode === 'orbit' && state !== 'dead' && hops < 4) {
+        const a = player.angle, d = player.dir;
+        const tx = -Math.sin(a) * d, ty = Math.cos(a) * d;
+        const g = ctx.createLinearGradient(player.x, player.y, player.x + tx * 140, player.y + ty * 140);
+        g.addColorStop(0, 'rgba(244,239,225,0.45)'); g.addColorStop(1, 'rgba(244,239,225,0)');
+        ctx.strokeStyle = g; ctx.lineWidth = 2; ctx.setLineDash([3, 6]);
+        ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(player.x + tx * 140, player.y + ty * 140); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      drawComet(player.x, player.y, skinIdx, combo >= 3 ? 8.5 : 7);
+    }
+
+    for (const t of texts) {
+      if (t.screen) continue;
+      drawPop(t);
+    }
+    ctx.restore();
+  }
+
+  function drawPop(t) {
+    const a = Math.min(1, t.life / t.max * 2);
+    const age = 1 - t.life / t.max;
+    const sc = age < 0.15 ? 0.6 + age / 0.15 * 0.6 : 1.2 - Math.min(0.2, (age - 0.15));
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(t.x, t.y); ctx.scale(sc, sc);
+    ctx.font = `${t.size}px ${FD}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(5,15,20,0.8)'; ctx.lineJoin = 'round';
+    ctx.strokeText(t.text, 0, 0);
+    ctx.fillStyle = t.color; ctx.fillText(t.text, 0, 0);
+    ctx.restore();
+  }
+
+  // UI is drawn in a "ui space": logical units, origin top-left of the play column.
+  function ui() { ctx.setTransform(DPR * scale, 0, 0, DPR * scale, DPR * offX, 0); }
+  function text(str, x, y, size, color, font = FD, align = 'center', stroke = true) {
+    ctx.font = `${size}px ${font}`;
+    ctx.textAlign = align; ctx.textBaseline = 'middle';
+    if (stroke) { ctx.lineWidth = Math.max(3, size / 7); ctx.strokeStyle = 'rgba(5,15,20,0.85)'; ctx.lineJoin = 'round'; ctx.strokeText(str, x, y); }
+    ctx.fillStyle = color; ctx.fillText(str, x, y);
+  }
+  function safeTop() { return (parseFloat(getComputedStyle(muteBtn).top) || 12) / scale; }
+
+  function drawHUD() {
+    ui();
+    const top = safeTop() + 6;
+    if (state === 'play') {
+      const bounce = combo > 0 ? 1 + Math.max(0, flash) * 0.8 : 1;
+      ctx.save(); ctx.translate(W / 2, top + 30); ctx.scale(bounce, bounce);
+      text(String(score), 0, 0, 56, '#f4efe1');
+      ctx.restore();
+      if (combo > 0) text('COMBO x' + (1 + Math.min(combo, 4)), W / 2, top + 72, 18, comboColor(), FN);
+      text('✦ ' + runDust, W - 16, top + 14, 20, '#bfe9ff', FN, 'right');
+      if (best > 0) text('BEST ' + best, W - 16, top + 40, 14, 'rgba(244,239,225,0.55)', FN, 'right', false);
+      if (hops === 0 && hintT > 0.3) {
+        const a = 0.6 + 0.4 * Math.sin(time * 5);
+        ctx.globalAlpha = a;
+        text('TAP to launch', W / 2, H * 0.86, 24, '#f4efe1');
+        text('aim through the middle of the next orbit for a PERFECT', W / 2, H * 0.86 + 30, 13, '#5ff2c4', FN);
+        ctx.globalAlpha = 1;
+      }
+    }
+    for (const t of texts) if (t.screen) {
+      ctx.save(); const tt = { ...t, y: t.y - camY }; drawPop(tt); ctx.restore();
+    }
+  }
+
+  function drawTitle() {
+    ui();
+    const cy = H * 0.24;
+    const bob = Math.sin(time * 2) * 4;
+    ctx.save();
+    ctx.translate(W / 2, cy + bob); ctx.rotate(-0.06);
+    text('COMET', 0, -34, 78, '#ffcf4a');
+    text('HOP', 30, 36, 78, '#ff6b5b');
+    ctx.restore();
+    text('one tap · hop planet to planet · don’t drift away', W / 2, cy + 100, 14, 'rgba(244,239,225,0.75)', FN, 'center', false);
+
+    const a = 0.55 + 0.45 * Math.sin(time * 4);
+    ctx.globalAlpha = a;
+    text('TAP TO PLAY', W / 2, H * 0.84, 32, '#f4efe1');
+    ctx.globalAlpha = 1;
+    statLine(H * 0.84 + 44);
+  }
+
+  function statLine(y) {
+    const parts = [`BEST ${best}`, `✦ ${dust}`, SKINS[skinIdx].name.toUpperCase()];
+    text(parts.join('   ·   '), W / 2, y, 14, 'rgba(244,239,225,0.6)', FN, 'center', false);
+  }
+
+  function drawDead() {
+    ui();
+    const t = Math.min(1, (time - deadAt) / 0.5);
+    const ease = 1 - Math.pow(1 - t, 3);
+    ctx.fillStyle = `rgba(5,15,20,${0.55 * ease})`;
+    ctx.fillRect(-offX / scale, 0, CW / scale, H);
+
+    const cy = H * 0.3 + (1 - ease) * 40;
+    ctx.globalAlpha = ease;
+    text(['LOST IN SPACE', 'DRIFTED OFF', 'SPAGHETTIFIED', 'SO CLOSE'][(runs + score) % 4], W / 2, cy - 70, 34, '#ff6b5b');
+    text(String(score), W / 2, cy + 5, 96, '#f4efe1');
+    if (newBest) {
+      const s = 1 + Math.sin(time * 6) * 0.05;
+      ctx.save(); ctx.translate(W / 2, cy + 70); ctx.scale(s, s); text('★ NEW BEST ★', 0, 0, 26, '#ffcf4a'); ctx.restore();
+    } else {
+      text('BEST ' + best, W / 2, cy + 70, 20, 'rgba(244,239,225,0.6)', FN);
+    }
+
+    // stardust + next unlock
+    const by = cy + 125;
+    text(`+${runDust} ✦  stardust`, W / 2, by, 20, '#bfe9ff', FN);
+    const next = SKINS[skinIndexFor(dust) + 1];
+    const bw = 260, bx = W / 2 - bw / 2, bh = 12;
+    if (next) {
+      const prevAt = SKINS[skinIndexFor(dust)].at;
+      const before = clamp((dust - runDust - prevAt) / (next.at - prevAt), 0, 1);
+      const now = clamp((dust - prevAt) / (next.at - prevAt), 0, 1);
+      const fillT = clamp((time - deadAt - 0.6) / 0.8, 0, 1);
+      const f = unlockedNow ? now : lerp(before, now, 1 - Math.pow(1 - fillT, 3));
+      ctx.fillStyle = 'rgba(244,239,225,0.12)';
+      roundRect(bx, by + 24, bw, bh, 6); ctx.fill();
+      const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      g.addColorStop(0, '#5ff2c4'); g.addColorStop(1, '#ffcf4a');
+      ctx.fillStyle = g; roundRect(bx, by + 24, Math.max(bh, bw * f), bh, 6); ctx.fill();
+      text(`${next.at - dust} ✦ to unlock ${next.name}`, W / 2, by + 52, 13, 'rgba(244,239,225,0.7)', FN, 'center', false);
+    } else {
+      text('every comet unlocked. legend.', W / 2, by + 34, 14, '#ffcf4a', FN, 'center', false);
+    }
+
+    if (unlockedNow) {
+      const ut = clamp((time - deadAt - 0.5) / 0.4, 0, 1);
+      const uy = by + 110;
+      ctx.save();
+      ctx.translate(W / 2, uy); const s = 0.5 + 0.5 * (1 - Math.pow(1 - ut, 3)) + Math.sin(time * 4) * 0.02; ctx.scale(s, s);
+      ctx.globalAlpha = ut * ease;
+      ctx.fillStyle = 'rgba(255,207,74,0.12)'; ctx.strokeStyle = '#ffcf4a'; ctx.lineWidth = 2;
+      roundRect(-150, -34, 300, 68, 16); ctx.fill(); ctx.stroke();
+      text('NEW COMET UNLOCKED', 18, -12, 15, '#ffcf4a', FN, 'center', false);
+      text(unlockedNow.name, 18, 14, 26, '#f4efe1');
+      drawComet(-118, 0, SKINS.indexOf(unlockedNow), 10);
+      ctx.restore();
+    }
+
+    if (time - deadAt > 0.7) {
+      ctx.globalAlpha = (0.55 + 0.45 * Math.sin(time * 4)) * ease;
+      text('TAP TO RETRY', W / 2, H * 0.88, 30, '#f4efe1');
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function draw() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawBackground();
+    drawWorld();
+    if (state === 'title') drawTitle();
+    drawHUD();
+    if (state === 'dead') drawDead();
+    if (flash > 0) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = `rgba(244,239,225,${flash * 0.25})`;
+      ctx.fillRect(0, 0, CW * DPR, CH * DPR);
+    }
+  }
+
+  // ---------- input ----------
+  function press() {
+    audio();
+    if (state === 'title') { state = 'play'; hintT = 0; return; }
+    if (state === 'play') { launch(); return; }
+    if (state === 'dead' && time - deadAt > 0.7) { reset(); state = 'play'; }
+  }
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.focus(); press(); });
+  window.addEventListener('keydown', e => {
+    if (e.repeat) return;
+    if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') { e.preventDefault(); press(); }
+    if (e.code === 'KeyM') setMuted(!muted);
+  });
+
+  // ---------- loop ----------
+  reset();
+  let last = performance.now(), acc = 0;
+  const STEP = 1 / 120;
+  function frame(now) {
+    let dt = Math.min(0.05, (now - last) / 1000); last = now;
+    acc += dt;
+    while (acc >= STEP) { update(STEP); acc -= STEP; }
+    draw();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  if (document.fonts && document.fonts.load) { document.fonts.load(`40px ${FD}`); document.fonts.load(`20px ${FN}`); }
+})();
+</script>
