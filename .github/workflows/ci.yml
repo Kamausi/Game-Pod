@@ -39,6 +39,12 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v14
       - name: Build WebAssembly
         run: ./build.sh
+      - name: Bundle single-file HTML
+        run: python3 tools/make_standalone.py build-wasm/mudbuddies_single.js dist/mudbuddies.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mudbuddies-standalone-html
+          path: dist/mudbuddies.html
       - uses: actions/upload-artifact@v4
         with:
           name: web

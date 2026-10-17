@@ -18,6 +18,10 @@ reference photos (see [docs/FORENSICS.md](docs/FORENSICS.md)).
 node server/server.js          # serves web/ + multiplayer + leaderboards on :8787
 open http://localhost:8787
 ```
+**Single file:** [`dist/mudbuddies.html`](dist/mudbuddies.html) is the whole game in one ~1 MB HTML
+(WASM, JS, CSS and CAD parts inlined) — double-click it to play solo offline, or host it anywhere.
+Rebuild it with `python3 tools/make_standalone.py` after `./build.sh`.
+
 The prebuilt WASM is committed in `web/build/`, so no toolchain is needed to play. Any static
 host works for single-player (`web/` folder); multiplayer and global leaderboards need the Node
 server (zero npm dependencies, Node ≥ 18).

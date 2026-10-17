@@ -44,29 +44,29 @@ if(EMSCRIPTEN)
   endif()
 
   # ---- Browser build: WebGL2 + Web Audio + Gamepad API, packaged as WASM ----
-  add_executable(mudbuddies
-    src/devtools/devui.cpp
-    src/main.cpp
-    src/game/game.cpp
-    src/render/renderer.cpp
-    src/render/gl.cpp
-    src/input/input.cpp
-  )
-  target_link_libraries(mudbuddies mbcore)
-  if(MB_DEVTOOLS)
-    target_link_libraries(mudbuddies imgui)
-    target_compile_definitions(mudbuddies PRIVATE MB_DEVTOOLS=1)
-  endif()
-  set_target_properties(mudbuddies PROPERTIES SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/web/build)
-  target_link_options(mudbuddies PRIVATE
+  set(MB_WEB_SOURCES src/devtools/devui.cpp src/main.cpp src/game/game.cpp src/render/renderer.cpp
+      src/render/gl.cpp src/input/input.cpp)
+  set(MB_WEB_LINK
     -sUSE_WEBGL2=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728
     -sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,lengthBytesUTF8,HEAPF32,HEAPU8
     -sEXPORTED_FUNCTIONS=_main,_malloc,_free
     -sENVIRONMENT=web
-    --embed-file ${CMAKE_SOURCE_DIR}/cad/parts@/cad
-  )
+    --embed-file ${CMAKE_SOURCE_DIR}/cad/parts@/cad)
+  foreach(T mudbuddies mudbuddies_single)
+    add_executable(${T} ${MB_WEB_SOURCES})
+    target_link_libraries(${T} mbcore)
+    if(MB_DEVTOOLS)
+      target_link_libraries(${T} imgui)
+      target_compile_definitions(${T} PRIVATE MB_DEVTOOLS=1)
+    endif()
+    target_link_options(${T} PRIVATE ${MB_WEB_LINK})
+  endforeach()
+  set_target_properties(mudbuddies PROPERTIES SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/web/build)
+  # Same game with the .wasm inlined as base64, for the standalone single-file HTML
+  # (tools/make_standalone.py -> dist/mudbuddies.html).
+  set_target_properties(mudbuddies_single PROPERTIES SUFFIX ".js" RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+  target_link_options(mudbuddies_single PRIVATE -sSINGLE_FILE=1)
 else()
   # ---- Native: headless tests + CAD command-line tool + audio forensics probe ----
   add_executable(mb_tests tests/test_main.cpp)
