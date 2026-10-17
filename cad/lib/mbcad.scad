@@ -5,6 +5,7 @@ module mb_cyl(r, r2, h, seg) { rotate([-90,0,0]) cylinder(h=h, r1=r, r2=r2, cent
 module mb_lathe(pts, seg) { rotate([-90,0,0]) rotate_extrude($fn=seg) polygon([for (p=pts) [max(p[0],0), -p[1]]]); }
 module mb_extrude(pts, depth) { rotate([0,90,0]) linear_extrude(height=depth, center=true) polygon([for (p=pts) [-p[0], p[1]]]); }
 module mb_wedge(s) { mb_extrude([[-s[2]/2,-s[1]/2],[s[2]/2,-s[1]/2],[-s[2]/2,s[1]/2]], s[0]); }
+module mb_rbox(s, r) { minkowski() { cube([for (v=s) max(v-2*r, 0.001)], center=true); sphere(r=r, $fn=12); } }
 module mb_tire(r, w, rim, lugs, depth, tread) {
     rt = r - depth;
     rotate([0,0,-90]) {

@@ -1,10 +1,12 @@
 # Crawler dozer (photo 4: yellow, ROPS canopy, straight blade) - the pit groomer and
 # the tow-out service for stuck trucks.
+material steel
 color #1a1a1a
 box size=0.36,0.55,2.30 pos=0.72,0.28,0 mirror=x
 color #2e2e2e
 cyl r=0.27 h=0.36 axis=x pos=0.72,0.28,1.05 mirror=x
 cyl r=0.27 h=0.36 axis=x pos=0.72,0.28,-1.05 mirror=x
+material paint
 color #e2b616
 box size=1.10,0.80,1.70 pos=0,0.95,0.25
 box size=1.00,0.50,0.70 pos=0,0.85,-0.85

@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include <cstdio>
+#include <algorithm>
 #include <cstring>
 
 namespace mb {
@@ -20,12 +21,27 @@ const char* kCommon = R"(
 uniform vec3 uSunDir;
 uniform vec3 uCamPos;
 uniform float uTime;
+uniform int uQuality;
 uniform sampler2DShadow uShadow;
 uniform mat4 uLightVP;
 float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
+vec2 hash2(vec2 p){ return vec2(hash(p), hash(p+19.19)); }
 float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),u.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x), u.y); }
 float fbm(vec2 p){ float s=0.0, a=0.5; for(int i=0;i<4;i++){ s+=a*vnoise(p); p*=2.03; a*=0.5; } return s; }
+float fbm2(vec2 p){ return 0.66*vnoise(p) + 0.34*vnoise(p*2.07+3.1); }
+// Cellular noise: x = distance to nearest feature point, y = distance to the cell border.
+vec2 voronoi(vec2 p){
+  vec2 n = floor(p), f = fract(p), mg = vec2(0), mr = vec2(0); float md = 8.0;
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){
+    vec2 g = vec2(float(i),float(j)); vec2 r = g + hash2(n+g) - f; float d = dot(r,r);
+    if(d < md){ md = d; mr = r; mg = g; } }
+  float be = 8.0;
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){
+    vec2 g = mg + vec2(float(i),float(j)); vec2 r = g + hash2(n+g) - f;
+    if(dot(mr-r,mr-r) > 1e-5) be = min(be, dot(0.5*(mr+r), normalize(r-mr))); }
+  return vec2(sqrt(md), be);
+}
 float shadowAt(vec3 wp, vec3 n){
   vec4 lp = uLightVP*vec4(wp + n*0.06, 1.0);
   vec3 c = lp.xyz/lp.w*0.5+0.5;
@@ -37,20 +53,45 @@ float shadowAt(vec3 wp, vec3 n){
 }
 vec3 skyColor(vec3 d){
   float t = clamp(d.y, 0.0, 1.0);
-  vec3 zen = vec3(0.04,0.20,0.72), hor = vec3(0.36,0.56,0.90);
-  vec3 c = mix(hor, zen, pow(t, 0.45));
+  vec3 zen = vec3(0.06,0.23,0.68), hor = vec3(0.45,0.61,0.88);
+  vec3 c = mix(hor, zen, pow(t, 0.5));
   float s = max(dot(d, uSunDir), 0.0);
-  c += vec3(1.0,0.92,0.75)*pow(s, 900.0)*20.0 + vec3(1.0,0.85,0.6)*pow(s, 6.0)*0.12;
+  c += vec3(1.0,0.92,0.75)*pow(s, 900.0)*20.0 + vec3(1.0,0.85,0.6)*pow(s, 6.0)*0.14;
   if(d.y < 0.0) c = mix(hor, vec3(0.35,0.33,0.28), clamp(-d.y*4.0, 0.0, 1.0));
   return c;
 }
+const vec3 kSun = vec3(1.0, 0.93, 0.82) * 3.1;
+// Pre-blurred environment: sky above, sunlit fall field below, blurrier with roughness.
+vec3 envColor(vec3 d, float rough){
+  float band = 0.04 + rough*0.6;
+  vec3 ground = vec3(0.19,0.17,0.10)*(0.55 + 0.45*max(uSunDir.y, 0.0));
+  vec3 sky = skyColor(normalize(vec3(d.x, max(d.y, 0.0) + rough*0.35, d.z)));
+  sky = mix(sky, vec3(0.42,0.55,0.80), rough*0.7);
+  return mix(ground, sky, smoothstep(-band, band, d.y));
+}
+float D_GGX(float NoH, float a){ float a2 = a*a; float d = NoH*NoH*(a2-1.0)+1.0; return a2/(3.14159*d*d); }
+float V_Smith(float NoV, float NoL, float a){ float k = a*0.5; return 0.25/((NoV*(1.0-k)+k)*(NoL*(1.0-k)+k)); }
+vec3 F_Schlick(vec3 f0, float VoH){ return f0 + (1.0-f0)*pow(1.0-VoH, 5.0); }
+// One shading model for every surface. rough is perceptual roughness, ao attenuates indirect.
+vec3 pbr(vec3 alb, vec3 n, vec3 wp, float rough, float metal, float sh, float ao){
+  vec3 V = normalize(uCamPos - wp), L = uSunDir, H = normalize(L + V);
+  float NoL = max(dot(n, L), 0.0), NoV = max(dot(n, V), 1e-3), NoH = max(dot(n, H), 0.0), VoH = max(dot(V, H), 0.0);
+  float a = max(rough*rough, 0.002);
+  vec3 f0 = mix(vec3(0.04), alb, metal);
+  vec3 F = F_Schlick(f0, VoH);
+  vec3 spec = D_GGX(NoH, a)*V_Smith(NoV, NoL, a)*F;
+  vec3 diff = alb*(1.0-metal)*(1.0-F)/3.14159;
+  vec3 direct = (diff*3.14159 + spec*3.14159)*kSun*NoL*sh;
+  vec3 amb = mix(vec3(0.30,0.25,0.18), vec3(0.42,0.55,0.82), n.y*0.5+0.5)*0.6;
+  // Grazing-angle reflection fades with roughness (microfacet masking) so satin surfaces don't mirror the sky.
+  vec3 Fr = f0 + (1.0 - f0)*pow(1.0-NoV, 5.0)*(1.0-rough)*(1.0-rough);
+  vec3 R = reflect(-V, n);
+  float horizon = clamp(1.0 + dot(R, n), 0.0, 1.0);
+  vec3 env = envColor(R, rough)*Fr*horizon*mix(0.35, 1.0, sh*0.5+0.5);
+  return direct + (alb*(1.0-metal)*amb + env)*ao;
+}
 vec3 shade(vec3 alb, vec3 n, vec3 wp, float wet, float sh){
-  vec3 L = uSunDir; float ndl = max(dot(n, L), 0.0);
-  vec3 V = normalize(uCamPos - wp); vec3 H = normalize(L + V);
-  float spec = pow(max(dot(n, H), 0.0), mix(12.0, 140.0, wet)) * mix(0.03, 0.9, wet);
-  vec3 sun = vec3(1.0, 0.93, 0.82) * 3.1;
-  vec3 amb = mix(vec3(0.32,0.27,0.20), vec3(0.40,0.55,0.85), n.y*0.5+0.5) * 0.62;
-  return alb*(sun*ndl*sh + amb) + sun*spec*sh*ndl;
+  return pbr(alb, n, wp, mix(0.85, 0.18, wet), 0.0, sh, 1.0);
 }
 vec3 finalize(vec3 c, vec3 wp){
   float d = length(wp - uCamPos);
@@ -71,14 +112,16 @@ uniform vec2 uOrigin;
 uniform float uCell;
 uniform mat4 uVP;
 uniform int uWaterPass;
-out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth;
+out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth; out vec2 vTrackGrad;
 float H(ivec2 c){ c = clamp(c, ivec2(0), ivec2(767)); return texelFetch(uHeight, c, 0).r; }
+float T(ivec2 c){ c = clamp(c, ivec2(0), ivec2(767)); return texelFetch(uState, c, 0).a; }
 void main(){
   ivec2 c = clamp(uChunk + ivec2(aGrid.xz), ivec2(0), ivec2(767));
   vec2 hw = texelFetch(uHeight, c, 0).rg;
   float h = hw.r;
   vN = normalize(vec3(H(c-ivec2(1,0)) - H(c+ivec2(1,0)), 2.0*uCell, H(c-ivec2(0,1)) - H(c+ivec2(0,1))));
   vState = texelFetch(uState, c, 0);
+  vTrackGrad = vec2(T(c+ivec2(1,0)) - T(c-ivec2(1,0)), T(c+ivec2(0,1)) - T(c-ivec2(0,1)));
   float y = h - aGrid.y*0.6;
   vDepth = hw.g - h;
   if(uWaterPass == 1){ y = hw.g > -900.0 ? hw.g : h - 0.05; vDepth = hw.g > -900.0 ? hw.g - h : -1.0; }
@@ -88,84 +131,237 @@ void main(){
 )";
 
 const char* kTerrainFS = R"(
-in vec3 vWorld; in vec3 vN; in vec4 vState; in float vDepth;
+in vec3 vWorld; in vec3 vN; in vec4 vState; in float vDepth; in vec2 vTrackGrad;
 uniform int uWaterPass;
+uniform vec4 uOcc[8];   // vehicle contact occlusion: x, z, yaw, length (0 = unused)
 out vec4 frag;
+// Small-scale relief of churned mud: clods, tire-pressed slick ruts and the berms between them.
+float mudRelief(vec2 p, float churn){
+  float clods = fbm2(p*3.1)*0.6 + vnoise(p*11.0)*0.28 + vnoise(p*27.0)*0.12;
+  return clods*churn;
+}
+float contactAO(vec2 p){
+  float ao = 1.0;
+  for(int i = 0; i < 8; i++){
+    vec4 o = uOcc[i];
+    if(o.w <= 0.0) continue;
+    vec2 d = p - o.xy;
+    float c = cos(o.z), s = sin(o.z);
+    vec2 l = vec2(c*d.x - s*d.y, s*d.x + c*d.y);   // x across, y along the truck
+    vec2 e = l / vec2(o.w*0.28, o.w*0.62);
+    ao *= 1.0 - 0.55*exp(-dot(e, e)*1.6);
+  }
+  return ao;
+}
 void main(){
   vec3 n = normalize(vN);
+  vec2 p = vWorld.xz;
   if(uWaterPass == 1){
     if(vDepth < 0.004) discard;
-    vec2 q = vWorld.xz*1.3;
-    vec3 wn = normalize(vec3((vnoise(q+uTime*0.6)-0.5)*0.25, 1.0, (vnoise(q.yx-uTime*0.5)-0.5)*0.25));
+    vec2 q = p*1.3;
+    float t = uTime;
+    vec2 g = vec2(vnoise(q*1.7 + vec2(t*0.35, t*0.2)) - vnoise(q*1.7 + vec2(0.31, 0.0) + vec2(t*0.35, t*0.2)),
+                  vnoise(q.yx*1.9 - t*0.3) - vnoise(q.yx*1.9 + vec2(0.0, 0.29) - t*0.3));
+    vec3 wn = normalize(vec3(g.x*0.7, 1.0, g.y*0.7));
     vec3 V = normalize(uCamPos - vWorld);
-    float fres = 0.04 + 0.96*pow(1.0 - max(dot(wn, V), 0.0), 5.0);
-    vec3 refl = skyColor(reflect(-V, wn));
-    vec3 body = pow(vec3(0.33,0.27,0.19), vec3(2.2)) * (0.85 + 0.3*vnoise(q*0.3));
+    float fres = 0.02 + 0.98*pow(1.0 - max(dot(wn, V), 0.0), 5.0);
+    vec3 refl = envColor(reflect(-V, wn), 0.22);
+    // Suspended clay makes bog water an opaque milky brown; sediment swirls drift slowly.
+    float silt = fbm(p*0.45 + vec2(t*0.02, -t*0.015));
+    vec3 body = pow(vec3(0.40,0.31,0.20)*(0.8 + 0.35*silt), vec3(2.2));
     float sh = shadowAt(vWorld, wn);
-    vec3 c = body*(0.6 + 1.5*sh);
-    c = mix(c, refl*0.7, fres*0.45);
-    c += vec3(1.0,0.9,0.75)*pow(max(dot(reflect(-uSunDir, wn), V), 0.0), 400.0)*2.0*sh;
-    float a = clamp(0.62 + vDepth*1.8, 0.62, 0.95);
+    vec3 c = body*(kSun*max(uSunDir.y, 0.0)*0.55*sh + vec3(0.32,0.36,0.42));
+    c = mix(c, refl, fres*0.55);
+    vec3 H = normalize(uSunDir + V);
+    c += kSun*pow(max(dot(wn, H), 0.0), 600.0)*1.4*sh;
+    // Scum and froth collect along the shoreline.
+    float edge = 1.0 - smoothstep(0.0, 0.07, vDepth);
+    float froth = smoothstep(0.45, 0.75, vnoise(p*9.0 + t*0.1)*0.6 + vnoise(p*23.0)*0.4) * edge;
+    c = mix(c, pow(vec3(0.62,0.55,0.44), vec3(2.2))*(kSun*0.35*sh + 0.4), froth*0.8);
+    float a = clamp(0.78 + vDepth*3.0, 0.78, 0.97) * (1.0 - edge*0.35);
     frag = vec4(finalize(c, vWorld), a);
     return;
   }
   float moist = vState.r, mud = vState.g, grass = vState.b, track = vState.a;
-  vec2 p = vWorld.xz;
   float n1 = fbm(p*0.18), n2 = fbm(p*0.9+7.0), n3 = vnoise(p*6.0);
   vec3 gA = vec3(0.25,0.33,0.14), gB = vec3(0.47,0.45,0.27), gold = vec3(0.60,0.53,0.22);
   vec3 grassC = mix(gA, gB, smoothstep(0.35, 0.7, n1));
   grassC = mix(grassC, gold, smoothstep(0.72, 0.86, n2)*0.45);
-  grassC *= 0.85 + 0.3*n3;
-  vec3 dirt = vec3(0.47,0.40,0.30)*(0.9+0.2*n3);
-  vec3 mudDry = vec3(0.40,0.33,0.24), mudWet = vec3(0.19,0.145,0.10);
+  float blades = vnoise(p*23.0)*vnoise(p*7.0 + 2.0);
+  grassC *= 0.82 + 0.22*n3 + 0.18*blades;
+
   float wetness = smoothstep(0.35, 0.95, moist);
-  vec3 mudC = mix(mudDry, mudWet, wetness)*(0.88 + 0.24*n2);
   float mudAmt = smoothstep(0.0, 0.05, mud)*smoothstep(0.25, 0.55, moist);
+  float churn = clamp(max(mudAmt, wetness*0.7) + track*0.6, 0.0, 1.0) * (1.0 - grass);
+  // Rut walls (track gradient) push up berms of loose clods; rut floors are pressed slick.
+  float berm = clamp(length(vTrackGrad)*1.4, 0.0, 1.0);
+  float slick = track*(1.0 - berm);
+
+  // --- relief normal (finite differences of the procedural height) ---
+  vec3 nd = n;
+  if(uQuality > 0 && churn > 0.02){
+    float amp = 0.05*(0.45 + berm*1.4 - slick*0.35);
+    float e = 0.02;
+    float h0 = mudRelief(p, churn), hx = mudRelief(p + vec2(e, 0.0), churn), hz = mudRelief(p + vec2(0.0, e), churn);
+    nd = normalize(n + vec3(-(hx - h0)/e, 0.0, -(hz - h0)/e)*amp);
+  }
+
+  vec3 dirt = vec3(0.47,0.40,0.30)*(0.9+0.2*n3);
+  vec3 mudDry = vec3(0.43,0.36,0.27), mudWet = vec3(0.23,0.17,0.115);
+  vec3 mudC = mix(mudDry, mudWet, wetness)*(0.84 + 0.3*n2);
+  // Grey-blue clay streaks turned up where tires dig.
+  mudC = mix(mudC, vec3(0.33,0.30,0.25)*(0.6 + 0.4*wetness), smoothstep(0.62, 0.85, fbm2(p*1.7 + 3.0))*churn*0.25);
+  // Loose clods on berms catch light; their tops dry out lighter.
+  float clod = smoothstep(0.55, 0.85, vnoise(p*11.0)*0.7 + vnoise(p*27.0)*0.3);
+  mudC = mix(mudC, mudC*1.45, clod*berm*0.7);
   vec3 soil = mix(dirt, mudC, max(mudAmt, wetness*0.6));
+
+  // Drying crust: polygonal cracks where mud sits on drier ground (pit edges, splash zones).
+  float crust = mudAmt*smoothstep(0.62, 0.42, moist)*(1.0 - track);
+  if(crust > 0.01 && uQuality > 0){
+    vec2 vc = voronoi(p*7.0 + vnoise(p*13.0)*0.5);
+    float crack = 1.0 - smoothstep(0.02, 0.07, vc.y);
+    soil = mix(soil, soil*vec3(1.12,1.08,1.02), crust*0.6);
+    soil = mix(soil, soil*0.62, crack*crust*0.8);
+  }
   vec3 alb = mix(soil, grassC, smoothstep(0.1, 0.8, grass));
-  alb *= 1.0 - 0.35*track*(1.0 - grass);
+  alb *= 1.0 - 0.28*slick*(1.0 - grass);
   alb = pow(alb, vec3(2.2));
-  float wet = mix(0.0, 0.75, wetness*(1.0-grass)) + 0.2*track*wetness;
+
+  // Wet mud is glossy; pressed ruts and standing films are glossier still.
+  // Wet clay is satin, not mirror: only pressed rut floors and scattered films get really glossy.
+  float rough = mix(0.92, 0.55, wetness*(1.0 - grass));
+  rough = mix(rough, 0.38, slick*wetness);
+  rough = mix(rough, 0.75, clod*berm);
+  float film = smoothstep(0.9, 0.98, moist)*smoothstep(0.7, 0.8, fbm(p*0.5 + 11.0))*(1.0 - grass);
+  rough = mix(rough, 0.2, film);
+  nd = normalize(mix(nd, n, film*0.7));
+  alb *= 1.0 - film*0.45;
+
   float sh = shadowAt(vWorld, n);
-  frag = vec4(finalize(shade(alb, n, vWorld, wet, sh), vWorld), 1.0);
+  float ao = contactAO(p);
+  vec3 col = pbr(alb, nd, vWorld, rough, 0.0, sh*ao, ao);
+  frag = vec4(finalize(col, vWorld), 1.0);
 }
 )";
 
 const char* kMeshVS = R"(
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; layout(location=2) in vec3 aColor;
 layout(location=3) in vec4 iM0; layout(location=4) in vec4 iM1; layout(location=5) in vec4 iM2; layout(location=6) in vec4 iM3;
-layout(location=7) in vec4 iTint;
+layout(location=7) in vec4 iTint; layout(location=8) in float aMat;
 uniform mat4 uModel; uniform mat4 uVP;
-out vec3 vWorld; out vec3 vN; out vec3 vColor; out vec3 vLocal;
+out vec3 vWorld; out vec3 vN; out vec3 vColor; out vec3 vLocal; out vec3 vLocalN; flat out int vMat;
 void main(){
   mat4 M = uModel*mat4(iM0, iM1, iM2, iM3);
   vec4 w = M*vec4(aPos, 1.0);
-  vWorld = w.xyz; vN = mat3(M)*aNormal; vColor = aColor*iTint.rgb; vLocal = aPos;
+  vWorld = w.xyz; vN = mat3(M)*aNormal; vColor = aColor*iTint.rgb; vLocal = aPos; vLocalN = aNormal;
+  vMat = int(aMat + 0.5);
   gl_Position = uVP*w;
 }
 )";
 
 const char* kMeshFS = R"(
-in vec3 vWorld; in vec3 vN; in vec3 vColor; in vec3 vLocal;
+in vec3 vWorld; in vec3 vN; in vec3 vColor; in vec3 vLocal; in vec3 vLocalN; flat in int vMat;
 uniform float uDirt; uniform vec2 uDirtRange; uniform float uAlpha; uniform float uSeed; uniform int uMirror;
+uniform vec4 uWheels[4];   // body: wheel centers in body space (x, y, z, radius); w = 0 unused
+uniform float uTireR;      // wheel items: outer tread radius, 0 otherwise
 out vec4 frag;
+float mudHeight(vec3 q){ return fbm2(q.xz*7.0 + q.y*5.0 + uSeed) * 0.7 + vnoise(q.zy*23.0 + q.x*9.0)*0.3; }
 void main(){
   vec3 alb = pow(clamp(vColor, 0.0, 1.0), vec3(2.2));
-  float wet = 0.08;
-  if(uDirt > 0.001){
-    float line = mix(uDirtRange.x, uDirtRange.y, uDirt);
-    float n = fbm(vLocal.xz*2.6 + vLocal.y*1.7 + uSeed);
-    float m = smoothstep(line + 0.12, line - 0.12, vLocal.y + (n - 0.5)*0.7);
-    float spl = step(0.80 - uDirt*0.32, fbm(vLocal.xz*8.0 + vLocal.yy*6.0 + uSeed*3.0));
-    m = max(m, spl*min(1.0, uDirt*1.3));
-    vec3 mudc = pow(vec3(0.37,0.29,0.20)*(0.7 + 0.5*n), vec3(2.2));
-    alb = mix(alb, mudc, m);
-    wet = mix(wet, 0.5, m*(0.5 + 0.5*n));
-  }
   vec3 n = normalize(vN);
   if(gl_FrontFacing == (uMirror == 1)) n = -n;
+  vec3 ln = normalize(vLocalN);
+  float rough = 0.5, metal = 0.0, coat = 0.0, glow = 0.0;
+  if(vMat == 1){ rough = 0.42; coat = 1.0; }                                  // paint: base + clearcoat
+  else if(vMat == 2){ alb = alb*0.35; rough = 0.04; coat = 1.0; }              // glass
+  else if(vMat == 3){ rough = 0.12; metal = 1.0; alb = max(alb, vec3(0.55)); } // chrome
+  else if(vMat == 4){ rough = 0.88; alb *= 0.9; }                              // rubber
+  else if(vMat == 5){ rough = 0.06; coat = 1.0; glow = 0.35; }                 // lamp lens
+  else if(vMat == 6){ rough = 0.92; }                                          // matte
+  else if(vMat == 7){ rough = 0.42; metal = 0.85; }                            // steel
+  else if(vMat == 8){ rough = 0.7; }                                           // baked-on mud
+  float ao = 0.62 + 0.38*smoothstep(-0.9, 0.5, n.y);
+
+  // ---- mud: splash coat + spray fans thrown up behind each tire + specks, drips, packed tread ----
+  float m = 0.0, thick = 0.0, streak = 0.5;
+  if(uDirt > 0.001){
+    vec3 q = vLocal + vec3(uSeed);
+    float n0 = fbm(q.xz*2.2 + q.y*1.3);
+    float nf = vnoise(q.zy*15.0 + q.x*11.0);
+    float line = mix(uDirtRange.x, uDirtRange.y, uDirt);
+    // Tops of panels (hood, roof) catch far less than the sides the tires spray.
+    float edgeY = vLocal.y + max(ln.y, 0.0)*0.3 + (n0 - 0.5)*0.5 + (nf - 0.5)*0.1;
+    m = smoothstep(line + 0.03, line - 0.03, edgeY);
+    if(uTireR <= 0.0){
+      for(int i = 0; i < 4; i++){
+        vec4 w = uWheels[i];
+        if(w.w <= 0.0) continue;
+        vec2 d = vec2(vLocal.z - w.z, vLocal.y - w.y);
+        vec2 dd = vec2(d.x*(d.x < 0.0 ? 0.5 : 1.0), d.y*0.85);   // fan biased up and rearward
+        float ang = atan(d.y, d.x);
+        float ray = vnoise(vec2(ang*9.0 + uSeed, length(d)*1.2));   // radial streaks off the tread
+        float r = length(dd) - ray*0.35*w.w;
+        float fan = 1.0 - smoothstep(w.w*1.05, w.w*(1.45 + uDirt*1.5), r);
+        float side = smoothstep(0.2, 0.75, vLocal.x*sign(w.x)/max(abs(w.x), 0.1));
+        float hit = step(0.5, fan + (n0 - 0.5)*0.5)*side*smoothstep(0.05, 0.5, uDirt);
+        m = max(m, hit);
+        streak = mix(streak, ray, hit*0.7);
+      }
+      m = max(m, smoothstep(-0.1, -0.6, ln.y)*min(1.0, uDirt*2.5));   // underside is always plastered
+    } else {
+      // Mud packs between the lugs first, then cakes patchily over the sidewall and rim.
+      float rr = length(vLocal.yz);
+      float groove = 1.0 - smoothstep(uTireR - 0.032, uTireR - 0.014, rr);
+      m *= smoothstep(0.35, 0.6, n0 + uDirt*0.25);
+      m = max(m, groove*smoothstep(0.06, 0.45, uDirt)*smoothstep(uTireR*0.6, uTireR*0.8, rr));
+    }
+    // Specks: dense just above the coat edge, thinning out with height.
+    float above = edgeY - line;
+    float sn = vnoise(q.zy*vec2(21.0, 27.0) + q.x*23.0);
+    float thr = 0.78 + 0.18*smoothstep(0.0, 0.8, above) - uDirt*0.1;
+    m = max(m, smoothstep(thr, thr + 0.04, sn)*step(0.0, above)*min(1.0, uDirt*1.6));
+    // Drips run down from the caked zone.
+    float drip = smoothstep(0.78, 0.9, vnoise(vec2(vLocal.x*29.0 + vLocal.z*27.0, vLocal.y*1.6 + uSeed)));
+    m = max(m, drip*smoothstep(line + 0.3, line, vLocal.y)*step(0.0, above)*uDirt);
+    if(vMat == 2) m = smoothstep(line + 0.3, line - 0.3, vLocal.y)*(0.3 + 0.25*n0);   // glass: thin smeared film
+    m = clamp(m, 0.0, 1.0);
+    thick = m*(0.55 + 0.45*fbm2(q.zy*6.0 + q.x*5.0));
+    thick *= mix(1.0, 0.55, smoothstep(uDirtRange.x, uDirtRange.y, vLocal.y));   // thinner up high
+  }
+  if(m > 0.01){
+    // Bumpy cake: perturb the normal from the mud height field, chunkier where thick.
+    if(uQuality > 0){
+      float e = 0.012, h0 = mudHeight(vLocal);
+      vec3 g = vec3(mudHeight(vLocal + vec3(e,0,0)) - h0, mudHeight(vLocal + vec3(0,e,0)) - h0, mudHeight(vLocal + vec3(0,0,e)) - h0)/e;
+      n = normalize(n - (g - dot(g, n)*n)*0.035*thick);
+    }
+    // Wet and dark low down and where thick; dries to pale grey-tan up high and in thin films.
+    float hgt = smoothstep(uDirtRange.x, uDirtRange.y, vLocal.y);
+    float wetM = clamp(smoothstep(0.35, 0.85, thick)*(1.0 - hgt*0.6), 0.0, 1.0);
+    vec3 mudDry = vec3(0.52,0.47,0.38), mudWet = vec3(0.25,0.20,0.15);
+    float vstreak = vnoise(vec2(vLocal.x*31.0 + vLocal.z*31.0, vLocal.y*3.0));
+    vec3 mc = mix(mudDry, mudWet, wetM)*(0.86 + 0.16*vstreak + 0.12*(streak - 0.5));
+    mc = pow(mc, vec3(2.2));
+    alb = mix(alb, mc, m);
+    rough = mix(rough, mix(0.95, 0.35, wetM), m);
+    metal = mix(metal, 0.0, m);
+    coat *= 1.0 - m;
+    glow *= 1.0 - m;
+  }
   float sh = shadowAt(vWorld, n);
-  frag = vec4(finalize(shade(alb, n, vWorld, wet, sh), vWorld), uAlpha);
+  vec3 c = pbr(alb, n, vWorld, rough, metal, sh, ao);
+  if(coat > 0.0){
+    // Clearcoat lobe over paint/glass: sharp sun glint + mirror-like sky reflection at grazing angles.
+    vec3 V = normalize(uCamPos - vWorld), H = normalize(uSunDir + V);
+    float NoV = max(dot(n, V), 1e-3), NoL = max(dot(n, uSunDir), 0.0);
+    float Fc = 0.04 + 0.96*pow(1.0 - NoV, 5.0);
+    vec3 R = reflect(-V, n);
+    c += coat*(envColor(R, 0.04)*Fc*clamp(1.0 + dot(R, n), 0.0, 1.0)*ao*0.75 +
+               kSun*D_GGX(max(dot(n, H), 0.0), 0.06*0.06)*V_Smith(NoV, NoL, 0.0036)*Fc*NoL*sh*3.14159);
+  }
+  c += alb*glow;
+  frag = vec4(finalize(c, vWorld), uAlpha);
 }
 )";
 
@@ -194,32 +390,54 @@ layout(location=0) in vec2 aCorner;
 layout(location=1) in vec4 iPos;
 layout(location=2) in vec4 iCol;
 layout(location=3) in float iType;
+layout(location=4) in vec3 iVel;
 uniform mat4 uVP; uniform vec3 uRight; uniform vec3 uUp;
 out vec2 vUV; out vec4 vCol; out float vType; out vec3 vWorld; out float vSeed;
 void main(){
-  vec3 p = iPos.xyz + (uRight*aCorner.x + uUp*aCorner.y)*iPos.w;
+  vec3 rgt = uRight, up = uUp;
+  float stretch = 1.0;
+  // Spray and water droplets streak along their velocity (motion blur in a ~1/30 s exposure).
+  if(iType > 0.5 && iType < 2.5){
+    vec3 v = iVel - dot(iVel, cross(uRight, uUp))*cross(uRight, uUp);
+    float sp = length(v);
+    if(sp > 0.5){ up = v/sp; rgt = normalize(cross(up, cross(uRight, uUp))); stretch = 1.0 + min(sp*0.035/max(iPos.w, 0.01), 4.0); }
+  }
+  vec3 p = iPos.xyz + (rgt*aCorner.x + up*aCorner.y*stretch)*iPos.w;
   vUV = aCorner; vCol = iCol; vType = iType; vWorld = p; vSeed = fract(iPos.x*7.13 + iPos.z*3.71);
   gl_Position = uVP*vec4(p, 1.0);
 }
 )";
 const char* kParticleFS = R"(
 in vec2 vUV; in vec4 vCol; in float vType; in vec3 vWorld; in float vSeed;
-uniform int uSoft; out vec4 frag;
+uniform int uSoft; uniform vec3 uRight; uniform vec3 uUp; out vec4 frag;
 void main(){
   float d = length(vUV);
   bool soft = vType > 2.5 && vType < 4.5;   // mist, smoke
   if((uSoft == 1) != soft) discard;
   float a = vCol.a;
-  if(soft){ a *= smoothstep(1.0, 0.2, d); if(a < 0.01) discard; }
-  else {
-    float edge = 0.55 + 0.45*vnoise(vUV*2.5 + vSeed*17.0);
-    if(d > edge) discard;
-  }
   vec3 alb = pow(vCol.rgb, vec3(2.2));
-  vec3 n = normalize(vec3(vUV*0.6, 1.0));
-  vec3 c = alb*(vec3(1.0,0.93,0.82)*2.2*(0.5+0.5*max(dot(uSunDir, vec3(0,1,0)),0.0)) + vec3(0.35,0.45,0.65)*0.6);
-  if(vType > 1.5 && vType < 2.5) c += vec3(0.25)*pow(max(0.0, 1.0-d), 3.0);  // water sparkle
-  frag = vec4(finalize(c, vWorld), soft ? a : 1.0);
+  if(soft){
+    a *= smoothstep(1.0, 0.2, d)*(0.7 + 0.3*vnoise(vUV*3.0 + vSeed*9.0));
+    if(a < 0.01) discard;
+    vec3 c = alb*(kSun*0.45*(0.5 + 0.5*max(uSunDir.y, 0.0)) + vec3(0.35,0.42,0.55)*0.7);
+    frag = vec4(finalize(c, vWorld), a);
+    return;
+  }
+  float edge = 0.55 + 0.45*vnoise(vUV*2.5 + vSeed*17.0);
+  if(d > edge) discard;
+  // Lit as a lumpy sphere: wet mud and water droplets get a sharp highlight.
+  vec2 q = vUV/edge;
+  float z = sqrt(max(0.0, 1.0 - dot(q, q)));
+  vec3 fwd = cross(uRight, uUp);
+  vec3 lumps = vec3(vnoise(vUV*4.0 + vSeed*31.0) - 0.5, vnoise(vUV*4.0 + 7.0 + vSeed*13.0) - 0.5, 0.0);
+  vec3 nl = normalize(vec3(q, z) + lumps*(vType < 0.5 ? 0.9 : 0.2));
+  vec3 n = normalize(uRight*nl.x + uUp*nl.y - fwd*nl.z);
+  bool water = vType > 1.5 && vType < 2.5;
+  float rough = water ? 0.12 : (vType < 0.5 ? 0.65 : 0.5);
+  float sh = shadowAt(vWorld, n);
+  vec3 c = pbr(alb, n, vWorld, rough, 0.0, sh, 0.8 + 0.2*z);
+  if(water) c = mix(c, envColor(reflect(normalize(vWorld - uCamPos), n), 0.05), 0.35);
+  frag = vec4(finalize(c, vWorld), 1.0);
 }
 )";
 
@@ -369,14 +587,17 @@ bool Renderer::init(int w, int h) {
     glGenBuffers(1, &particleInst);
     glBindBuffer(GL_ARRAY_BUFFER, particleInst);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 36, (void*)0);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 48, (void*)0);
     glVertexAttribDivisor(1, 1);
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 36, (void*)16);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 48, (void*)16);
     glVertexAttribDivisor(2, 1);
     glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 36, (void*)32);
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 48, (void*)32);
     glVertexAttribDivisor(3, 1);
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 48, (void*)36);
+    glVertexAttribDivisor(4, 1);
     glBindVertexArray(0);
 
     glGenVertexArrays(1, &fenceVao);
@@ -644,20 +865,31 @@ void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool sha
     GLint locModel = glGetUniformLocation(prog, "uModel"), locDirt = glGetUniformLocation(prog, "uDirt");
     GLint locRange = glGetUniformLocation(prog, "uDirtRange"), locAlpha = glGetUniformLocation(prog, "uAlpha");
     GLint locSeed = glGetUniformLocation(prog, "uSeed"), locMirror = glGetUniformLocation(prog, "uMirror");
+    GLint locWheels = glGetUniformLocation(prog, "uWheels"), locTire = glGetUniformLocation(prog, "uTireR");
+    const float noWheels[16] = {0};
     glUniform1i(locMirror, 0);
+    glUniform4fv(locWheels, 4, noWheels);
+    glUniform1f(locTire, 0.f);
+    auto itemUniforms = [&](const DrawItem& it) {
+        glUniformMatrix4fv(locModel, 1, GL_FALSE, it.model.m);
+        glUniform1f(locDirt, it.dirt);
+        glUniform2f(locRange, it.dirtLo, it.dirtHi);
+        glUniform1f(locAlpha, it.alpha);
+        glUniform1f(locSeed, it.seed);
+        glUniform1i(locMirror, it.mirror ? 1 : 0);
+        glUniform4fv(locWheels, 4, it.wheels);
+        glUniform1f(locTire, it.tireR);
+    };
     Mat4 I = Mat4::identity();
     if (transparent) {
         for (const DrawItem& it : f.items) {
             if (!it.mesh || it.alpha >= 0.99f) continue;
-            glUniformMatrix4fv(locModel, 1, GL_FALSE, it.model.m);
-            glUniform1f(locDirt, it.dirt);
-            glUniform2f(locRange, it.dirtLo, it.dirtHi);
-            glUniform1f(locAlpha, it.alpha);
-            glUniform1f(locSeed, it.seed);
-            glUniform1i(locMirror, it.mirror ? 1 : 0);
+            itemUniforms(it);
             drawMesh(*it.mesh, 1);
         }
         glUniform1i(locMirror, 0);
+        glUniform4fv(locWheels, 4, noWheels);
+        glUniform1f(locTire, 0.f);
         return;
     }
     // Barrels
@@ -693,15 +925,12 @@ void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool sha
     for (const DrawItem& it : f.items) {
         if (!it.mesh) continue;
         if (it.alpha < 0.99f) continue;  // drawn in the transparent pass
-        glUniformMatrix4fv(locModel, 1, GL_FALSE, it.model.m);
-        glUniform1f(locDirt, it.dirt);
-        glUniform2f(locRange, it.dirtLo, it.dirtHi);
-        glUniform1f(locAlpha, it.alpha);
-        glUniform1f(locSeed, it.seed);
-        glUniform1i(locMirror, it.mirror ? 1 : 0);
+        itemUniforms(it);
         drawMesh(*it.mesh, 1);
-        glUniform1i(locMirror, 0);
     }
+    glUniform1i(locMirror, 0);
+    glUniform4fv(locWheels, 4, noWheels);
+    glUniform1f(locTire, 0.f);
 }
 
 void Renderer::render(World& w, const RenderFrame& f) {
@@ -727,6 +956,7 @@ void Renderer::render(World& w, const RenderFrame& f) {
         glUniform1f(glGetUniformLocation(p, "uTime"), f.time);
         glUniformMatrix4fv(glGetUniformLocation(p, "uLightVP"), 1, GL_FALSE, lightVP.m);
         glUniform1i(glGetUniformLocation(p, "uShadow"), 2);
+        glUniform1i(glGetUniformLocation(p, "uQuality"), quality);
     };
 
     // ---- shadow pass ----
@@ -780,6 +1010,12 @@ void Renderer::render(World& w, const RenderFrame& f) {
     glUniform1i(glGetUniformLocation(progTerrain, "uState"), 1);
     glUniform2f(glGetUniformLocation(progTerrain, "uOrigin"), w.terrain.originX(), w.terrain.originZ());
     glUniform1f(glGetUniformLocation(progTerrain, "uCell"), Terrain::CELL);
+    {
+        float occ[32] = {0};
+        size_t n = std::min<size_t>(32, f.occluders.size());
+        std::copy(f.occluders.begin(), f.occluders.begin() + long(n), occ);
+        glUniform4fv(glGetUniformLocation(progTerrain, "uOcc"), 8, occ);
+    }
     drawTerrain(false, viewProj);
 
     // Meshes
@@ -800,7 +1036,7 @@ void Renderer::render(World& w, const RenderFrame& f) {
     if (f.particles && !f.particles->empty()) {
         scratch.clear();
         for (const Particle& p : *f.particles) {
-            scratch.insert(scratch.end(), {p.p.x, p.p.y, p.p.z, p.size, p.r, p.g, p.b, p.a, float(int(p.type))});
+            scratch.insert(scratch.end(), {p.p.x, p.p.y, p.p.z, p.size, p.r, p.g, p.b, p.a, float(int(p.type)), p.v.x, p.v.y, p.v.z});
             np++;
         }
         glBindBuffer(GL_ARRAY_BUFFER, particleInst);

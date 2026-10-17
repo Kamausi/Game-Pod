@@ -20,6 +20,8 @@ struct DrawItem {
     float alpha = 1;
     float seed = 0;
     bool mirror = false;
+    float wheels[16] = {0};  // body items: wheel centers in body space (x, y, z, radius)
+    float tireR = 0;         // wheel items: outer tread radius (mud packs below it)
 };
 
 struct RenderFrame {
@@ -30,6 +32,8 @@ struct RenderFrame {
     const std::vector<Particle>* particles = nullptr;
     // Lens splats in screen space: x, y (0..1), radius, opacity (>0 mud, <0 water drop).
     std::vector<float> lens;
+    // Contact occlusion under vehicles: x, z, yaw, length (scaled down as they leave the ground).
+    std::vector<float> occluders;
 };
 
 class Renderer {

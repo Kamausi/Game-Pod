@@ -13,7 +13,7 @@ struct GpuMesh {
 };
 
 GLuint compileProgram(const char* name, const std::string& vs, const std::string& fs);
-// Uploads a CAD mesh. Attribute layout: 0 pos, 1 normal, 2 color, 3-6 instance matrix, 7 tint.
+// Uploads a CAD mesh. Attribute layout: 0 pos, 1 normal, 2 color, 3-6 instance matrix, 7 tint, 8 material.
 GpuMesh uploadMesh(const CadMesh& m);
 // Per-instance data: mat4 (16 floats) + tint vec4 (4 floats) = 20 floats.
 void setInstances(GpuMesh& m, const float* data, int count, bool dynamic);

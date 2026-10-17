@@ -1,33 +1,56 @@
 # 1976 full-size sedan "bog car" (photo 3: white, '1976' lettered on the glass).
-# Long hood, formal roofline, chrome bumpers. Front axle z=1.36, rear z=-1.73.
+# Long hood, formal roofline with opera windows, chrome bumpers. Front axle z=1.36, rear z=-1.73.
 param paint_r = 0.88
 param paint_g = 0.88
 param paint_b = 0.86
 set W = 1.98
+set FA = 1.36
+set RA = -1.73
+set AY = -0.26
+set AR = 0.52
 color paint_r paint_g paint_b
-extrude depth=W pts=-2.80,-0.10,2.75,-0.10,2.80,0.30,0.75,0.42,-1.95,0.42,-2.80,0.36
-box size=W-0.08,0.06,1.95 pos=0,0.44,1.75
-color paint_r*0.95 paint_g*0.95 paint_b*0.95
-# Greenhouse: roof + pillars
-box size=W-0.18,0.06,1.55 pos=0,0.98,-0.55
+material paint
+# Whole lower body in one side profile: both arches, long hood, cowl, rear deck
+extrude depth=W bevel=0.07 pts=-2.80,-0.10,arc(RA,AY,AR,162,18,12),arc(FA,AY,AR,162,18,12),2.78,-0.10,2.82,0.06,2.82,0.30,2.76,0.38,1.00,0.445,0.70,0.46,-1.66,0.46,-1.95,0.45,-2.70,0.42,-2.82,0.36,-2.84,0.10
+# Roof skin, A-pillars and the formal C-pillars with opera windows
+extrude depth=W-0.12 bevel=0.04 pts=0.12,0.94,0.06,1.005,-1.06,1.015,-1.16,0.97,-1.16,0.94
+box size=0.07,0.77,0.07 pos=W/2-0.09,0.71,0.37 rot=-49.2,0,0 bevel=0.02 mirror=x
+box size=0.06,0.48,0.08 pos=W/2-0.09,0.72,-0.48 bevel=0.02 mirror=x
+extrude depth=0.06 bevel=0.02 pts=-0.95,0.97,-1.10,0.985,-1.66,0.47,-1.20,0.47 pos=W/2-0.10,0,0 mirror=x
+# Greenhouse
 color #0e1418
-box size=W-0.24,0.62,0.05 pos=0,0.70,0.48 rot=-35,0,0
-box size=W-0.30,0.62,0.05 pos=0,0.70,-1.48 rot=38,0,0
-box size=0.02,0.48,1.50 pos=W/2-0.09,0.72,-0.50 mirror=x
-color #f2f2f2
+material glass
+extrude depth=W-0.20 bevel=0.03 pts=0.66,0.46,0.08,0.96,-1.06,0.98,-1.66,0.46
 # Race number panel on the side glass (the '1976')
-box size=0.025,0.20,0.55 pos=W/2-0.08,0.75,-0.40 mirror=x
+color #f2f2f2
+material matte
+box size=0.025,0.20,0.55 pos=W/2-0.09,0.75,-0.10 mirror=x
 color #111111
-box size=0.03,0.12,0.40 pos=W/2-0.07,0.75,-0.40 mirror=x
-color #b9bcbf
-# Chrome bumpers + grille
-box size=W+0.04,0.16,0.16 pos=0,0.02,2.85
-box size=W+0.04,0.16,0.16 pos=0,0.02,-2.86
-color #2a2c2e
-box size=1.40,0.18,0.04 pos=0,0.22,2.80
+box size=0.03,0.12,0.40 pos=W/2-0.08,0.75,-0.10 mirror=x
+# Door seams, trunk and hood shut lines
+box size=0.006,0.52,0.006 pos=W/2+0.002,0.17,0.66 mirror=x
+box size=0.006,0.52,0.006 pos=W/2+0.002,0.17,-0.50 mirror=x
+box size=0.006,0.52,0.006 pos=W/2+0.002,0.17,-1.62 mirror=x
+box size=W-0.20,0.006,0.006 pos=0,0.465,-1.98
+# Chrome: beltline spear, bumpers, grille surround, wheel-arch lips, hood ornament
+color #c6c8ca
+material chrome
+box size=0.015,0.025,4.60 pos=W/2+0.04,0.30,0.0 bevel=0.008 mirror=x
+box size=W+0.06,0.18,0.18 pos=0,0.02,2.86 bevel=0.04
+box size=W+0.06,0.18,0.18 pos=0,0.02,-2.87 bevel=0.04
+box size=1.46,0.22,0.04 pos=0,0.22,2.815 bevel=0.01
+extrude depth=0.03 pts=arc(FA,AY,AR+0.03,162,18,14),arc(FA,AY,AR,18,162,14) pos=W/2+0.015,0,0 mirror=x
+extrude depth=0.03 pts=arc(RA,AY,AR+0.03,162,18,14),arc(RA,AY,AR,18,162,14) pos=W/2+0.015,0,0 mirror=x
+box size=0.02,0.06,0.08 pos=0,0.475,2.70 bevel=0.008
+color #1b1d1f
+material matte
+box size=1.36,0.16,0.03 pos=0,0.22,2.825
 color #f0eedc
-box size=0.24,0.12,0.04 pos=0.75,0.22,2.81 mirror=x
+material lens
+cyl r=0.075 h=0.04 axis=z seg=18 pos=0.62,0.22,2.83 mirror=x
+cyl r=0.075 h=0.04 axis=z seg=18 pos=0.84,0.22,2.83 mirror=x
 color #a01212
-box size=0.40,0.12,0.04 pos=0.70,0.20,-2.82 mirror=x
+box size=0.50,0.13,0.04 pos=0.66,0.24,-2.84 bevel=0.012 mirror=x
 color #111111
+material steel
 box size=0.12,0.12,4.6 pos=0.52,-0.16,-0.20 mirror=x

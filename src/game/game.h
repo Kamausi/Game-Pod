@@ -75,6 +75,9 @@ private:
     void updateCamera(float dt, const InputState& in);
     void feedAudio(float dt);
     void buildFrame(RenderFrame& f);
+    bool garageSpin = true;
+    bool photoCam = false;
+    float photoYaw = 150, photoDist = 7, photoH = 2.5f;  // turntable in the garage; photo-mode camyaw: stops it
     void addVehicleDraws(RenderFrame& f, const Vehicle& geom, const VehicleVisual& vis, Vec3 pos, Quat rot,
                          const float* comp, const float* spin, float steer, float dirt, float alpha);
 

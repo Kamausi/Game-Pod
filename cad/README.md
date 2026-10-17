@@ -31,7 +31,14 @@ extrude pts=z0,y0,z1,y1,...  depth=1.98        # side profile extruded across th
 tire  r=tire_r w=0.32 rim=0.19 lugs=18 depth=0.028 tread=mt|at|paddle
 rim   r=0.19 w=0.26 spokes=6
 use   wheels/wheel.mbcad pos=... tire_r=0.5
+material paint                 # sticky: plastic|paint|glass|chrome|rubber|lens|matte|steel|mud
+box  size=1,0.5,2 bevel=0.04   # rounded edges with smooth normals (also on extrude)
+extrude depth=1.74 bevel=0.05 pts=0.5,-0.1,arc(1.29,-0.30,0.55,159,21,12),1.95,-0.1,...
+                               # arc(zc,yc,r,a0,a1,n): n+1 points on a circle (wheel arches)
 ```
+Materials drive the game's physically based shading (clearcoat paint, reflective glass,
+chrome, satin rubber, glowing lenses); tires are always rubber. Mud is applied in-shader on
+top, so parts are authored clean.
 Expressions: `+ - * / ^ ( )`, `sin cos sqrt min max abs` (degrees), `pi`.
 
 ## Tooling

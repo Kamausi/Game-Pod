@@ -27,13 +27,13 @@
 | Firm tires | Pacejka Magic Formula, friction ellipse, slip-stiffness semi-implicit wheel integration |
 | Vehicle | 6-DOF rigid body, Euler's rotation equations, raycast spring–damper with curvature-aware footprint sampling, torque converter, open/locked diffs as velocity constraints |
 | Terrain | Multi-layer heightfield (surface, hardpan, water table, moisture, compaction, vegetation, tracks), diffusion re-flow, mass-conserving deposition |
-| Rendering | Vertex-texture displaced terrain, skirted chunk LOD, Gribb–Hartmann frustum culling, PCF shadow mapping, Fresnel (Schlick) water, value-noise fBm, ACES filmic tonemap, instancing |
+| Rendering | Vertex-texture displaced terrain, skirted chunk LOD, Gribb–Hartmann frustum culling, PCF shadow mapping, Cook–Torrance BRDF (GGX/Trowbridge–Reitz NDF, Smith–Schlick visibility, Schlick Fresnel) with a roughness-blurred analytic sky environment and clearcoat lobe, per-vertex materials (paint, glass, chrome, rubber, lens, steel), procedural relief normals by finite differences, Worley/Voronoi crack networks for drying mud, elliptical contact occlusion under vehicles, velocity-stretched spray billboards, value-noise fBm, ACES filmic tonemap, instancing |
 | Audio | Firing-order pulse synthesis, digital waveguides, RBJ biquads, Paul Kellet pink noise, granular synthesis, Minnaert resonance + van den Doel bubble model, modal synthesis, Doppler, equal-power panning, Schroeder-style slapback, peak limiter |
 | AI | Pure-pursuit path following, kinematic brake-distance speed limit `v = √(v_c² + 2ad)`, finite-state stuck recovery |
 | Contact | 2D oriented-box separating-axis test, impulse with restitution + Coulomb friction through body inertia |
 | Post | MSAA resolve, procedural lens splats (noisy-edge SDF), refraction offset, vignette |
 | Net | NTP clock offset, snapshot interpolation (cubic Hermite + slerp), bounded extrapolation, quantization |
-| CAD | Recursive-descent expression parser, ear-clipping triangulation, lathe/extrude/CSG-free features, cofactor normal transform |
+| CAD | Recursive-descent expression parser, ear-clipping triangulation, lathe/extrude/CSG-free features, rounded boxes by clamp-projection onto an inner box, beveled extrusions with mitred profile offsets and angle-thresholded smooth normals, circular-arc profile helpers, cofactor normal transform |
 | Forensics | Radix-2 FFT STFT, harmonic product spectrum, spectral centroid, spectral-flux onsets |
 
 ## Open-source projects worth pulling in

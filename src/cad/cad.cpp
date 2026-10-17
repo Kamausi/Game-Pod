@@ -8,6 +8,13 @@
 namespace mb {
 
 static std::string g_root = "cad/parts";
+
+int cadMaterialId(const std::string& n) {
+    static const char* names[] = {"plastic", "paint", "glass", "chrome", "rubber", "lens", "matte", "steel", "mud"};
+    for (int i = 0; i < 9; i++)
+        if (n == names[i]) return i;
+    return -1;
+}
 void cadSetRoot(const std::string& root) { g_root = root; }
 const std::string& cadRoot() { return g_root; }
 
@@ -27,7 +34,7 @@ void CadMesh::append(const CadMesh& o, const Mat4& m, bool flip) {
         Vec3 n{cof[0] * v.nx + cof[1] * v.ny + cof[2] * v.nz, cof[3] * v.nx + cof[4] * v.ny + cof[5] * v.nz,
                cof[6] * v.nx + cof[7] * v.ny + cof[8] * v.nz};
         n = normalize(n);
-        verts.push_back({p.x, p.y, p.z, n.x, n.y, n.z, v.r, v.g, v.b});
+        verts.push_back({p.x, p.y, p.z, n.x, n.y, n.z, v.r, v.g, v.b, v.mat});
     }
     for (size_t k = 0; k + 2 < o.idx.size(); k += 3) {
         if (flip) {
@@ -59,7 +66,7 @@ struct Builder {
     Vec3 col;
     explicit Builder(Vec3 c) : col(c) {}
     uint32_t v(Vec3 p, Vec3 n) {
-        m.verts.push_back({p.x, p.y, p.z, n.x, n.y, n.z, col.x, col.y, col.z});
+        m.verts.push_back({p.x, p.y, p.z, n.x, n.y, n.z, col.x, col.y, col.z, 0.f});
         return uint32_t(m.verts.size() - 1);
     }
     Vec3 P(uint32_t i) const { return {m.verts[i].px, m.verts[i].py, m.verts[i].pz}; }
@@ -135,6 +142,47 @@ CadMesh box(Vec3 s, Vec3 color) {
             Vec3 uu = mul(u, h), ww = mul(w, h);
             uint32_t i0 = B.v(c - uu - ww, n), i1 = B.v(c + uu - ww, n), i2 = B.v(c + uu + ww, n), i3 = B.v(c - uu + ww, n);
             B.quad(i0, i1, i2, i3, n);
+        }
+    return B.m;
+}
+
+// Box with rounded edges/corners: each face is a grid whose outer bands are projected onto a
+// radius-r rounding about the inner box, giving smooth normals across every edge.
+CadMesh roundedBox(Vec3 s, float bevel, int seg, Vec3 color) {
+    Vec3 h = s * 0.5f;
+    float r = std::min(bevel, 0.999f * std::min(h.x, std::min(h.y, h.z)));
+    if (r <= 1e-5f) return box(s, color);
+    seg = std::max(1, seg);
+    Builder B(color);
+    Vec3 in = h - Vec3{r, r, r};
+    auto coords = [&](float hh, float ii) {
+        std::vector<float> c;
+        for (int k = 0; k <= seg; k++) c.push_back(-hh + (hh - ii) * float(k) / float(seg));
+        for (int k = 0; k <= seg; k++) c.push_back(ii + (hh - ii) * float(k) / float(seg));
+        if (ii < 1e-5f) c.erase(c.begin() + seg + 1);  // inner span collapsed
+        return c;
+    };
+    const Vec3 axes[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    auto comp = [](Vec3 v, int a) { return a == 0 ? v.x : (a == 1 ? v.y : v.z); };
+    for (int a = 0; a < 3; a++)
+        for (int sg = -1; sg <= 1; sg += 2) {
+            int au = (a + 1) % 3, aw = (a + 2) % 3;
+            Vec3 nf = axes[a] * float(sg);
+            std::vector<float> cu = coords(comp(h, au), comp(in, au)), cw = coords(comp(h, aw), comp(in, aw));
+            std::vector<uint32_t> g;
+            for (float w : cw)
+                for (float u : cu) {
+                    Vec3 p = nf * comp(h, a) + axes[au] * u + axes[aw] * w;
+                    Vec3 c{clampf(p.x, -in.x, in.x), clampf(p.y, -in.y, in.y), clampf(p.z, -in.z, in.z)};
+                    Vec3 d = p - c;
+                    float l = length(d);
+                    Vec3 nn = l > 1e-6f ? d * (1.f / l) : nf;
+                    g.push_back(B.v(c + nn * r, nn));
+                }
+            size_t nu = cu.size();
+            for (size_t j = 0; j + 1 < cw.size(); j++)
+                for (size_t i = 0; i + 1 < nu; i++)
+                    B.quad(g[j * nu + i], g[j * nu + i + 1], g[(j + 1) * nu + i + 1], g[(j + 1) * nu + i], nf);
         }
     return B.m;
 }
@@ -219,26 +267,83 @@ CadMesh lathe(const std::vector<Vec2>& prof, int seg, Vec3 color) {
     return B.m;
 }
 
-CadMesh extrude(const std::vector<Vec2>& polyIn, float depth, Vec3 color) {
+CadMesh extrude(const std::vector<Vec2>& poly, float depth, Vec3 color) { return extrudeBevel(poly, depth, 0.f, 0, color); }
+
+// Side-profile extrusion along X with optional rounded rims. Profile edges meeting at less than
+// ~40 degrees share a smoothed normal, so arcs (wheel arches, noses) shade as curves while real
+// corners (windshield base, tailgate) stay crisp.
+CadMesh extrudeBevel(const std::vector<Vec2>& polyIn, float depth, float bevel, int seg, Vec3 color) {
     Builder B(color);
-    std::vector<Vec2> poly = polyIn;
+    std::vector<Vec2> poly;
+    for (const Vec2& p : polyIn)
+        if (poly.empty() || std::fabs(p.x - poly.back().x) + std::fabs(p.y - poly.back().y) > 1e-5f) poly.push_back(p);
+    while (poly.size() > 1 && std::fabs(poly[0].x - poly.back().x) + std::fabs(poly[0].y - poly.back().y) <= 1e-5f) poly.pop_back();
     if (poly.size() < 3) return B.m;
     if (polyArea(poly) < 0) std::reverse(poly.begin(), poly.end());  // CCW in (z, y)
-    float x0 = -depth * 0.5f, x1 = depth * 0.5f;
-    std::vector<int> tris = earClip(poly);
-    for (int side = 0; side < 2; side++) {
-        float x = side ? x1 : x0;
-        Vec3 n{side ? 1.f : -1.f, 0, 0};
-        std::vector<uint32_t> ids;
-        for (auto& p : poly) ids.push_back(B.v({x, p.y, p.x}, n));
-        for (size_t t = 0; t + 2 < tris.size(); t += 3) B.tri(ids[tris[t]], ids[tris[t + 1]], ids[tris[t + 2]], n);
+    const size_t n = poly.size();
+    float r = std::max(0.f, std::min(bevel, depth * 0.45f));
+    if (r <= 1e-5f) seg = 0;
+    seg = std::max(seg, r > 0 ? 1 : 0);
+    // Outward edge normals (CCW -> interior on the left) and per-vertex inward miters.
+    std::vector<Vec2> eo(n), miter(n);
+    for (size_t i = 0; i < n; i++) {
+        Vec2 a = poly[i], b = poly[(i + 1) % n];
+        float dx = b.x - a.x, dy = b.y - a.y, l = std::max(1e-6f, std::sqrt(dx * dx + dy * dy));
+        eo[i] = {dy / l, -dx / l};
     }
-    for (size_t i = 0; i < poly.size(); i++) {
-        Vec2 a = poly[i], b = poly[(i + 1) % poly.size()];
-        float du = b.x - a.x, dv = b.y - a.y;
-        Vec3 n = normalize(Vec3{0, -du, dv});
-        uint32_t q0 = B.v({x0, a.y, a.x}, n), q1 = B.v({x0, b.y, b.x}, n), q2 = B.v({x1, b.y, b.x}, n), q3 = B.v({x1, a.y, a.x}, n);
-        B.quad(q0, q1, q2, q3, n);
+    for (size_t i = 0; i < n; i++) {
+        Vec2 n0 = eo[(i + n - 1) % n], n1 = eo[i];
+        Vec2 m{-(n0.x + n1.x), -(n0.y + n1.y)};
+        float l = std::sqrt(m.x * m.x + m.y * m.y);
+        if (l < 1e-5f) m = {-n1.x, -n1.y};
+        else m = {m.x / l, m.y / l};
+        float c = std::max(0.35f, -(m.x * n1.x + m.y * n1.y));
+        miter[i] = {m.x / c, m.y / c};
+    }
+    auto smoothN = [&](size_t v, size_t e) {  // normal of vertex v as seen from edge e
+        size_t other = (e == v) ? (v + n - 1) % n : (v % n);
+        Vec2 a = eo[e], b = eo[other];
+        if (a.x * b.x + a.y * b.y < 0.766f) return a;  // > 40 deg: hard edge
+        Vec2 m{a.x + b.x, a.y + b.y};
+        float l = std::sqrt(m.x * m.x + m.y * m.y);
+        return Vec2{m.x / l, m.y / l};
+    };
+    float hx = depth * 0.5f;
+    for (size_t e = 0; e < n; e++) {
+        size_t ia = e, ib = (e + 1) % n;
+        Vec2 na = smoothN(ia, e), nb = smoothN(ib, e);
+        Vec3 out{0, eo[e].y, eo[e].x};
+        // rings from -X cap through the side wall to +X cap
+        std::vector<uint32_t> ra, rb;
+        auto ring = [&](float x, float inset, float nx, float wside) {
+            Vec2 pa{poly[ia].x + miter[ia].x * inset, poly[ia].y + miter[ia].y * inset};
+            Vec2 pb{poly[ib].x + miter[ib].x * inset, poly[ib].y + miter[ib].y * inset};
+            ra.push_back(B.v({x, pa.y, pa.x}, normalize(Vec3{nx, na.y * wside, na.x * wside})));
+            rb.push_back(B.v({x, pb.y, pb.x}, normalize(Vec3{nx, nb.y * wside, nb.x * wside})));
+        };
+        for (int k = seg; k >= 0; k--) {
+            float th = seg ? 0.5f * PI * float(k) / float(seg) : 0.f;
+            ring(-(hx - r + r * std::sin(th)), r * (1 - std::cos(th)), -std::sin(th), std::cos(th));
+        }
+        for (int k = 0; k <= seg; k++) {
+            float th = seg ? 0.5f * PI * float(k) / float(seg) : 0.f;
+            ring(hx - r + r * std::sin(th), r * (1 - std::cos(th)), std::sin(th), std::cos(th));
+        }
+        for (size_t k = 0; k + 1 < ra.size(); k++) {
+            float xm = 0.5f * (B.P(ra[k]).x + B.P(ra[k + 1]).x);
+            Vec3 o = normalize(out + Vec3{xm / std::max(hx, 1e-4f) * (seg ? 0.6f : 0.f), 0, 0});
+            B.quad(ra[k], rb[k], rb[k + 1], ra[k + 1], o);
+        }
+    }
+    std::vector<Vec2> cap(n);
+    for (size_t i = 0; i < n; i++) cap[i] = {poly[i].x + miter[i].x * r, poly[i].y + miter[i].y * r};
+    std::vector<int> tris = earClip(cap);
+    for (int side = 0; side < 2; side++) {
+        float x = side ? hx : -hx;
+        Vec3 nn{side ? 1.f : -1.f, 0, 0};
+        std::vector<uint32_t> ids;
+        for (auto& p : cap) ids.push_back(B.v({x, p.y, p.x}, nn));
+        for (size_t t = 0; t + 2 < tris.size(); t += 3) B.tri(ids[size_t(tris[t])], ids[size_t(tris[t + 1])], ids[size_t(tris[t + 2])], nn);
     }
     return B.m;
 }
@@ -420,6 +525,7 @@ namespace {
 struct Interp {
     CadParams vars;
     Vec3 color{0.7f, 0.7f, 0.7f};
+    int material = MatPlastic;
     CadMesh mesh;
     std::string scad;
     std::string err;
@@ -452,8 +558,26 @@ struct Interp {
         std::vector<Vec2> p;
         auto it = a.find("pts");
         if (it == a.end()) return p;
-        auto l = evalList(it->second);
-        for (size_t i = 0; i + 1 < l.size(); i += 2) p.push_back({l[i], l[i + 1]});
+        std::vector<float> l;
+        for (auto& tok : splitTopLevel(it->second, ',')) {
+            std::string t = tok;
+            t.erase(0, t.find_first_not_of(" \t"));
+            if (t.compare(0, 4, "arc(") == 0 && t.back() == ')') {
+                // arc(zc, yc, r, a0, a1, n): flush pending coordinates, then n+1 arc points
+                auto a = evalList(t.substr(4, t.size() - 5));
+                if (a.size() < 6) { err = "arc needs zc,yc,r,a0,a1,n"; return p; }
+                for (size_t i = 0; i + 1 < l.size(); i += 2) p.push_back({l[i], l[i + 1]});
+                l.clear();
+                int cnt = std::max(1, int(a[5] + 0.5f));
+                for (int k = 0; k <= cnt; k++) {
+                    float ang = (a[3] + (a[4] - a[3]) * float(k) / float(cnt)) * DEG;
+                    p.push_back({a[0] + a[2] * std::cos(ang), a[1] + a[2] * std::sin(ang)});
+                }
+                continue;
+            }
+            l.push_back(cadEval(t, vars, &err));
+            if (l.size() == 2) { p.push_back({l[0], l[1]}); l.clear(); }
+        }
         return p;
     }
     static Quat axisQuat(const std::string& axis) {
@@ -467,7 +591,16 @@ struct Interp {
         return "";
     }
 
-    void emit(const CadMesh& prim, const std::map<std::string, std::string>& a, const std::string& scadPrim) {
+    void emit(const CadMesh& prim, const std::map<std::string, std::string>& a, const std::string& scadPrim, int forceMat = -2) {
+        // Primitives take the current material (or a forced one); `use` children keep their own.
+        size_t first = mesh.verts.size();
+        emitRaw(prim, a, scadPrim);
+        if (forceMat != -1) {
+            float m = float(forceMat >= 0 ? forceMat : material);
+            for (size_t k = first; k < mesh.verts.size(); k++) mesh.verts[k].mat = m;
+        }
+    }
+    void emitRaw(const CadMesh& prim, const std::map<std::string, std::string>& a, const std::string& scadPrim) {
         Vec3 pos = vec3(a, "pos", {0, 0, 0}), rot = vec3(a, "rot", {0, 0, 0}), scl = vec3(a, "scale", {1, 1, 1});
         Quat q = Quat::euler(rot.x * DEG, rot.y * DEG, rot.z * DEG);
         Mat4 M = Mat4::trs(pos, q, scl);
@@ -511,6 +644,16 @@ struct Interp {
                 vars[k] = cadEval(v, vars, &err);
                 continue;
             }
+            if (op == "material") {
+                std::stringstream ms(rest);
+                std::string mname;
+                ms >> mname;
+                int id = cadMaterialId(mname);
+                if (id < 0) err = "unknown material '" + mname + "'";
+                else material = id;
+                if (!err.empty()) err = name + ":" + std::to_string(lineNo) + ": " + err;
+                continue;
+            }
             if (op == "color") {
                 std::stringstream cs(rest);
                 std::string t;
@@ -538,7 +681,9 @@ struct Interp {
             }
             if (op == "box") {
                 Vec3 s = vec3(a, "size", {1, 1, 1});
-                emit(cadprim::box(s, color), a, "cube(" + fmt3(s) + ", center=true)");
+                float bv = num(a, "bevel", 0.f);
+                if (bv > 0) emit(cadprim::roundedBox(s, bv, int(num(a, "seg", 2)), color), a, "mb_rbox(" + fmt3(s) + "," + fmt(bv) + ")");
+                else emit(cadprim::box(s, color), a, "cube(" + fmt3(s) + ", center=true)");
             } else if (op == "cyl") {
                 float r = num(a, "r", 0.5f), r2 = num(a, "r2", r), h = num(a, "h", 1.f);
                 int seg = int(num(a, "seg", 20));
@@ -566,8 +711,8 @@ struct Interp {
                     c.append(cadprim::lathe(p, seg, color), Mat4::trs({}, q));
                     emit(c, a, axisScad(ax) + " mb_lathe(" + list + "," + std::to_string(seg) + ")");
                 } else {
-                    float d = num(a, "depth", 1.f);
-                    c = cadprim::extrude(p, d, color);
+                    float d = num(a, "depth", 1.f), bv = num(a, "bevel", 0.f);
+                    c = cadprim::extrudeBevel(p, d, bv, int(num(a, "seg", 2)), color);
                     emit(c, a, "mb_extrude(" + list + "," + fmt(d) + ")");
                 }
             } else if (op == "tire") {
@@ -577,7 +722,8 @@ struct Interp {
                 int tr = t == "paddle" ? 2 : (t == "at" ? 0 : (t == "mt" ? 1 : int(cadEval(t, vars, &err) + 0.5f)));
                 emit(cadprim::tire(r, w, rimR, lugs, d, tr, color), a,
                      "mb_tire(" + fmt(r) + "," + fmt(w) + "," + fmt(rimR) + "," + std::to_string(lugs) + "," + fmt(d) + "," +
-                         std::to_string(tr) + ")");
+                         std::to_string(tr) + ")",
+                     MatRubber);
             } else if (op == "rim") {
                 float r = num(a, "r", 0.19f), w = num(a, "w", 0.25f);
                 int sp = int(num(a, "spokes", 5));
@@ -596,11 +742,12 @@ struct Interp {
                 Interp child;
                 child.vars = ov;
                 child.color = color;
+                child.material = material;
                 child.depth = depth + 1;
                 child.indent = indent + "  ";
                 child.run(src2, positional[0]);
                 if (!child.err.empty()) { err = child.err; break; }
-                emit(child.mesh, a, "{\n" + child.scad + indent + "}");
+                emit(child.mesh, a, "{\n" + child.scad + indent + "}", -1);
             } else {
                 err = "unknown op '" + op + "'";
             }

@@ -4,24 +4,44 @@ param paint_r = 0.92
 param paint_g = 0.92
 param paint_b = 0.90
 set W = 1.50
+set FA = 1.03
+set RA = -1.26
+set AY = -0.18
+set AR = 0.48
+# Black plastic floor tub
 color #1c1c1c
-box size=W-0.2,0.30,2.70 pos=0,0.05,-0.15
+material matte
+box size=W-0.2,0.30,2.70 pos=0,0.05,-0.15 bevel=0.04
+# Painted hood/front fenders and rear fenders/cargo box, arches cut in
 color paint_r paint_g paint_b
-wedge size=W-0.1,0.34,0.95 pos=0,0.28,1.20 rot=0,180,0
-box size=W-0.1,0.18,0.90 pos=0,0.25,-1.30
-box size=0.06,0.30,0.95 pos=W/2-0.06,0.32,1.05 mirror=x
-color #222222
+material paint
+extrude depth=W-0.08 bevel=0.05 pts=0.55,0.00,arc(FA,AY,AR,158,22,10),1.62,0.0,1.70,0.20,1.62,0.42,0.95,0.52,0.60,0.55,0.55,0.45
+extrude depth=W-0.08 bevel=0.05 pts=-0.62,0.05,arc(RA,AY,AR,22,158,10),-1.86,0.05,-1.88,0.36,-0.62,0.40
+# Doors (half doors) in contrast black
+color #202020
+box size=0.05,0.34,0.95 pos=W/2-0.06,0.30,0.0 bevel=0.02 mirror=x
 # Seats
-box size=0.48,0.10,0.50 pos=0.33,0.25,-0.15 mirror=x
-box size=0.48,0.70,0.10 pos=0.33,0.55,-0.42 mirror=x rot=-12,0,0
+color #222222
+box size=0.48,0.10,0.50 pos=0.33,0.25,-0.15 bevel=0.03 mirror=x
+box size=0.48,0.70,0.10 pos=0.33,0.55,-0.42 rot=-12,0,0 bevel=0.03 mirror=x
 # Roll cage
 color #151515
+material steel
 cyl r=0.025 h=1.25 pos=0.62,0.80,0.35 rot=-18,0,0 mirror=x
 cyl r=0.025 h=1.20 pos=0.62,0.78,-0.55 mirror=x
 cyl r=0.025 h=1.25 pos=0,1.40,0.20 axis=x
 cyl r=0.025 h=1.25 pos=0,1.38,-0.55 axis=x
 cyl r=0.025 h=0.80 pos=0.62,1.40,-0.18 axis=z mirror=x
+box size=0.04,0.04,0.80 pos=W/2-0.02,0.40,0.0 bevel=0.015 mirror=x
 color #f5f5f5
-box size=1.30,0.03,0.85 pos=0,1.43,-0.18
-color #e8e2c8
-box size=0.20,0.06,0.03 pos=0.40,0.42,1.66 mirror=x
+material paint
+box size=1.30,0.03,0.85 pos=0,1.43,-0.18 bevel=0.012
+# LED headlights and tail lights
+color #e8eef2
+material lens
+box size=0.22,0.06,0.03 pos=0.40,0.40,1.665 bevel=0.01 mirror=x
+color #b01313
+box size=0.18,0.05,0.03 pos=0.50,0.30,-1.88 bevel=0.01 mirror=x
+color #121212
+material steel
+box size=1.20,0.10,0.10 pos=0,0.10,1.78 bevel=0.02

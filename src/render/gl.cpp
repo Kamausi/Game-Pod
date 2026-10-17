@@ -50,6 +50,8 @@ GpuMesh uploadMesh(const CadMesh& m) {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(CadVertex), (void*)12);
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(CadVertex), (void*)24);
+    glEnableVertexAttribArray(8);
+    glVertexAttribPointer(8, 1, GL_FLOAT, GL_FALSE, sizeof(CadVertex), (void*)36);
     glGenBuffers(1, &g.ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g.ibo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, GLsizeiptr(m.idx.size() * 4), m.idx.data(), GL_STATIC_DRAW);

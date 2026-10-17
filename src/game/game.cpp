@@ -1,6 +1,7 @@
 #include "game.h"
 #include <emscripten.h>
 #include <cstdio>
+#include <cstdlib>
 
 namespace mb {
 
@@ -130,6 +131,17 @@ void Game::action(const std::string& a) {
     } else if (a == "camera") camMode = (camMode + 1) % 3;
     else if (a == "horn") { audio.trigger(SfxType::Horn, player.pos, 1.f); hornTimer = 0.7f; }
     else if (a == "restart") startMode(mode.id, mode.lane, 0);
+    else if (a.rfind("dirt:", 0) == 0) player.dirt = clampf(float(std::atof(a.c_str() + 5)), 0.f, 1.f);  // photo mode
+    else if (a.rfind("camyaw:", 0) == 0) {
+        camYaw = float(std::atof(a.c_str() + 7));
+        garageSpin = false;
+        camTarget = player.pos + Vec3{0, 0.5f, 0};
+        camPos = camTarget + Vec3{std::sin(camYaw) * 7.f, 2.2f, std::cos(camYaw) * 7.f};
+    }
+    else if (a.rfind("photo:", 0) == 0) {  // photo mode orbit: photo:yawDeg,dist,height (photo:off to release)
+        photoCam = a != "photo:off";
+        if (photoCam) std::sscanf(a.c_str() + 6, "%f,%f,%f", &photoYaw, &photoDist, &photoH);
+    }
     else if (a.rfind("warp:", 0) == 0) {  // debug/photo-mode: warp:x,z,yawDegrees
         float x = 0, z = 0, yaw = 90;
         std::sscanf(a.c_str() + 5, "%f,%f,%f", &x, &z, &yaw);
@@ -241,8 +253,16 @@ void Game::updateCamera(float dt, const InputState& in) {
         fov = 1.0f;
         return;
     }
+    if (photoCam && state == AppState::Playing) {
+        float yaw = photoYaw * DEG + std::atan2(player.forward().x, player.forward().z);
+        Vec3 c = player.pos + Vec3{0, 0.3f, 0};
+        camPos = c + Vec3{std::sin(yaw) * photoDist, photoH, std::cos(yaw) * photoDist};
+        camTarget = c;
+        fov = 0.8f;
+        return;
+    }
     if (state == AppState::Garage) {
-        camYaw += in.lookX + dt * 0.25f;
+        camYaw += in.lookX + (garageSpin ? dt * 0.25f : 0.f);
         Vec3 c = player.pos + Vec3{0, 0.5f, 0};
         pos = c + Vec3{std::sin(camYaw) * 7.f, 2.2f, std::cos(camYaw) * 7.f};
         camPos = lerp(camPos, pos, 1.f - std::exp(-4.f * dt));
@@ -364,7 +384,21 @@ void Game::addVehicleDraws(RenderFrame& f, const Vehicle& g, const VehicleVisual
     body.dirtHi = g.body->dims[1] * 0.75f;
     body.alpha = alpha;
     body.seed = float(uintptr_t(&g) % 97);
+    for (int i = 0; i < 4; i++) {
+        const WheelState& w = g.wheels[size_t(i)];
+        Vec3 c = w.mount - Vec3{0, g.travel - comp[i], 0};
+        float* o = body.wheels + i * 4;
+        o[0] = c.x; o[1] = c.y; o[2] = c.z; o[3] = w.radius;
+    }
     f.items.push_back(body);
+    // Soft contact shadow on the ground, fading out as the truck gets air.
+    if (alpha >= 0.99f) {
+        Vec3 fw = rot.rotate({0, 0, 1});
+        float rideH = g.wheels[0].radius - g.body->axleY;
+        float air = pos.y - world.terrain.heightAt(pos.x, pos.z) - rideH;
+        float fade = clampf(1.f - air / 1.5f, 0.f, 1.f);
+        if (fade > 0.01f) f.occluders.insert(f.occluders.end(), {pos.x, pos.z, std::atan2(fw.x, fw.z), 0.82f * g.body->dims[2] * fade});
+    }
     for (int i = 0; i < 4; i++) {
         const WheelState& w = g.wheels[size_t(i)];
         float sus = g.travel - comp[i];
@@ -379,6 +413,7 @@ void Game::addVehicleDraws(RenderFrame& f, const Vehicle& g, const VehicleVisual
         it.dirtHi = 0.55f;
         it.alpha = alpha;
         it.seed = float(i) * 3.1f;
+        it.tireR = w.radius;
         f.items.push_back(it);
     }
 }

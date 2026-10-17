@@ -8,7 +8,19 @@ param tread = 1              # 0 = A/T, 1 = M/T, 2 = paddle
 param beadlock = 0
 color #1b1a19
 tire r=tire_r w=tire_w rim=rim_r lugs=lugs depth=depth tread=tread
-color #202020
+color #222222
+material steel
 rim r=rim_r w=tire_w*0.82 spokes=6
 color #8a8a88
 cyl r=rim_r*1.02 h=0.03 axis=x seg=24 pos=tire_w*0.4,0,0 scale=1,beadlock,beadlock
+# Lug nuts on the hub face
+color #b8b8b4
+material chrome
+set LR = rim_r*0.36
+set LX = tire_w*0.82*0.36+0.025
+cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR,0
+cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(60),LR*sin(60)
+cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(120),LR*sin(120)
+cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,-LR,0
+cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(240),LR*sin(240)
+cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(300),LR*sin(300)
