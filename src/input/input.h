@@ -28,6 +28,10 @@ public:
     // Optional UI overlay (Dear ImGui) gets first look at mouse events; return true to capture.
     static bool (*mouseHook)(int type, float x, float y, int button);
     bool devTogglePressed();   // F1 / backtick edge, independent of `enabled`
+    // On-screen touch controls (web/app.js): analog axes merged like a gamepad, buttons
+    // delivered as one-shot presses through the same edge handling as keys/pad buttons.
+    void setTouch(float throttle, float brake, float steer, bool handbrake, float air, float lookX, float lookY);
+    void pressVirtual(const char* name);
     bool gamepadConnected = false;
     char gamepadName[64] = {0};
 
@@ -36,6 +40,8 @@ private:
     bool prevButtons[20] = {false};
     bool prevKeys[16] = {false};
     bool prevDev = false;
+    struct Touch { float throttle = 0, brake = 0, steer = 0, air = 0, lookX = 0, lookY = 0; bool handbrake = false; } touch;
+    unsigned virtualPresses = 0;
 };
 
 }  // namespace mb

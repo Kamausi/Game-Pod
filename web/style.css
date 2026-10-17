@@ -115,3 +115,104 @@ th { color: var(--dim); font-weight: 600; text-transform: uppercase; font-size: 
 .standings li { padding: 2px 0; }
 .standings li span { float: right; color: var(--dim); }
 .standings li.you { color: var(--pj1); }
+
+/* ===================================================================================
+   Responsive scaling. app.js sets --ui from the viewport (1.0 at 1280x720, clamped
+   0.5..1.5) and --tsize from the touch-controls-size setting. HUD pieces scale from
+   their anchored corner; overlays honor notches via safe-area insets.
+   =================================================================================== */
+:root { --ui: 1; --tsize: 1; --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
+        --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); }
+html, body { height: 100dvh; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+#canvas { touch-action: none; height: 100dvh; }
+input, select, textarea { -webkit-user-select: text; user-select: text; }
+.overlay { padding: max(16px, calc(28px * var(--ui))); padding-left: calc(max(16px, 28px * var(--ui)) + var(--safe-l));
+           padding-top: calc(max(14px, 28px * var(--ui)) + var(--safe-t)); padding-bottom: calc(18px + var(--safe-b)); }
+.panel-left, .panel-right { max-height: 100dvh; overscroll-behavior: contain; touch-action: pan-y; }
+.center { max-height: 92dvh; overflow-y: auto; max-width: 94vw; }
+.touch-only { display: none !important; }
+body.touch .touch-only { display: revert !important; }
+body.touch .form label.row.touch-only { display: flex !important; }
+
+#hudTop { top: calc(10px + var(--safe-t)); transform: translateX(-50%) scale(var(--ui)); transform-origin: top center; }
+#countdown { font-size: calc(140px * var(--ui)); }
+#hudMsg { font-size: calc(32px * var(--ui)); }
+#stuckHint { font-size: calc(18px * var(--ui)); bottom: calc(150px * var(--ui)); padding: 0 12px; }
+#minimap { top: calc(12px + var(--safe-t)); right: calc(12px + var(--safe-r)); width: calc(150px * var(--ui)); height: calc(150px * var(--ui)); }
+#gauges { transform: scale(var(--ui)); transform-origin: bottom right; right: calc(14px + var(--safe-r)); bottom: calc(14px + var(--safe-b)); }
+#others { transform: scale(var(--ui)); transform-origin: top left; left: calc(14px + var(--safe-l)); top: calc(14px + var(--safe-t)); }
+
+/* ---- touch controls ---- */
+#touch { display: none; position: absolute; inset: 0; pointer-events: none; }
+body.touch #touch { display: block; }
+#touch .tzone, #touch .pedal, #touch .tbtn { pointer-events: auto; touch-action: none; }
+#tSteer { position: absolute; left: 0; bottom: 0; width: 46vw; height: 62dvh; }
+#tSteer .tlabel { position: absolute; left: calc(24px + var(--safe-l)); bottom: calc(12px + var(--safe-b)); font-size: 11px; color: #fff8; letter-spacing: .15em; }
+#tBase { position: absolute; left: calc(28px + var(--safe-l)); bottom: calc(34px + var(--safe-b));
+         width: calc(170px * var(--tsize)); height: calc(64px * var(--tsize)); border-radius: 40px;
+         background: #0006; border: 2px solid #fff3; transition: opacity .2s; }
+#tKnob { position: absolute; left: 50%; top: 50%; width: calc(58px * var(--tsize)); height: calc(58px * var(--tsize)); margin: calc(-29px * var(--tsize));
+         border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffd54a, #c98b0f); box-shadow: 0 3px 8px #0008; }
+#tSteer.tilt #tBase { opacity: .25; }
+#tPedals { position: absolute; right: calc(16px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); display: flex; gap: 12px; align-items: flex-end; }
+.pedal { width: calc(88px * var(--tsize)); height: calc(150px * var(--tsize)); border-radius: 14px; display: flex; align-items: flex-start;
+         justify-content: center; padding-top: 12px; text-align: center; font-family: Oswald, sans-serif; font-size: calc(15px * var(--tsize));
+         background: linear-gradient(#5a1e12cc, #2a0e08cc); border: 2px solid #ff5a1488; color: #fff; }
+.pedal.gas { height: calc(190px * var(--tsize)); background: linear-gradient(#2f5e1fcc, #12290ccc); border-color: #8fdc5a99; }
+.pedal small { font-size: 10px; color: #fffa; }
+.pedal.on { filter: brightness(1.5); transform: translateY(2px); }
+.tbtn { display: flex; align-items: center; justify-content: center; min-width: calc(56px * var(--tsize)); height: calc(40px * var(--tsize));
+        padding: 0 8px; border-radius: 10px; background: #000a; border: 2px solid #fff3; color: #fff; font: 600 calc(12px * var(--tsize)) Oswald, sans-serif;
+        letter-spacing: .05em; }
+.tbtn.on { background: #f2c418; color: #111; }
+.tbtn.round { width: calc(46px * var(--tsize)); min-width: 0; border-radius: 50%; }
+#tHand { position: absolute; right: calc(16px + var(--safe-r) + 100px * var(--tsize) + 12px); bottom: calc(16px + var(--safe-b) + 162px * var(--tsize)); }
+/* Button cluster runs along the top edge, left of the minimap, so it never shares space with
+   the pedals however short the screen is; it wraps downward only on narrow screens. */
+#tButtons { position: absolute; right: calc(24px + var(--safe-r) + 150px * var(--ui)); top: calc(12px + var(--safe-t));
+            display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
+            max-width: calc(100vw - 150px * var(--ui) - 120px - var(--safe-l) - var(--safe-r)); }
+#tPause { position: absolute; left: calc(12px + var(--safe-l)); top: calc(12px + var(--safe-t)); }
+body.touch #others { top: calc(66px + var(--safe-t)); }
+body.touch #hudTop { top: calc(22px + var(--safe-t) + 40px * var(--tsize)); }
+body.touch #hudMsg { top: calc(34px + var(--safe-t) + 40px * var(--tsize) + 110px * var(--ui)); }
+body.touch #gauges { right: 50%; transform: translateX(50%) scale(calc(var(--ui) * 0.8)); transform-origin: bottom center; bottom: calc(6px + var(--safe-b)); }
+body.touch #stuckHint { bottom: calc(120px * var(--ui) + 80px); }
+
+#rotate { display: none; position: fixed; inset: 0; z-index: 30; background: #160f0af2; color: var(--ink); text-align: center;
+          flex-direction: column; align-items: center; justify-content: center; font-family: Oswald, sans-serif; font-size: 22px; }
+#rotate div { font-size: 80px; animation: spin 2.4s ease-in-out infinite; }
+@keyframes spin { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(90deg); } }
+@media (orientation: portrait) { body.touch.ingame #rotate { display: flex; } }
+
+/* ---- small screens / phones ---- */
+@media (max-width: 760px), (max-height: 520px) {
+  h2 { font-size: 22px; margin-bottom: 8px; }
+  .logo { font-size: 34px; }
+  .tag { margin: 4px 0 12px; font-size: 13px; }
+  .stack { gap: 6px; }
+  .stack button, .back, .row-inputs button, #hostControls button { padding: 9px 12px; font-size: 15px; }
+  .card { padding: 9px 12px; }
+  .card b { font-size: 17px; }
+  .card small { font-size: 12px; }
+  .form { gap: 6px; }
+  table { font-size: 12px; }
+  th, td { padding: 4px 5px; }
+  #boardTable th:nth-child(3), #boardTable td:nth-child(3), #boardTable th:nth-child(5), #boardTable td:nth-child(5) { display: none; }
+  .pad-hint { position: static; margin-top: 10px; }
+}
+/* Phone held sideways: menus take half the screen so the truck stays visible. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .panel-left, .panel-right { width: min(440px, 52vw); }
+  .panel-left.wide { width: min(760px, 92vw); }
+  #menu nav.stack { display: grid; grid-template-columns: 1fr 1fr; }
+  .cards { grid-template-columns: 1fr 1fr; }
+  #garage .form { grid-template-columns: 1fr 1fr; column-gap: 12px; }
+  .chat #chatLog { height: 70px; }
+}
+/* Portrait phones: menus full width; garage becomes a bottom sheet over the truck. */
+@media (max-width: 760px) and (orientation: portrait) {
+  .panel-left, .panel-left.wide, .panel-right { width: 100vw; border: none; border-top: 4px solid var(--fence); }
+  #garage { top: auto; height: 58dvh; }
+  .cards { grid-template-columns: 1fr; }
+}

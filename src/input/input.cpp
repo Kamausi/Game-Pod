@@ -69,6 +69,23 @@ bool Input::devTogglePressed() {
     return edge;
 }
 
+void Input::setTouch(float throttle, float brake, float steer, bool handbrake, float air, float lookX, float lookY) {
+    touch.throttle = clampf(throttle, 0, 1);
+    touch.brake = clampf(brake, 0, 1);
+    touch.steer = clampf(steer, -1, 1);
+    touch.handbrake = handbrake;
+    touch.air = clampf(air, -1, 1);
+    touch.lookX += lookX;
+    touch.lookY += lookY;
+}
+
+static const char* kVirtual[] = {"shiftup", "shiftdown", "locker", "lowrange", "camera", "reset", "tow", "horn", "pause", "manual"};
+
+void Input::pressVirtual(const char* name) {
+    for (unsigned i = 0; i < sizeof(kVirtual) / sizeof(kVirtual[0]); i++)
+        if (std::strcmp(name, kVirtual[i]) == 0) virtualPresses |= 1u << i;
+}
+
 void Input::init() {
     emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, onKey);
     emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, onKey);
@@ -82,9 +99,19 @@ void Input::rumble(float strong, float weak, int ms) {
     EM_ASM({
         try {
             const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+            let pad = false;
             for (const p of pads) {
-                if (p && p.vibrationActuator && p.vibrationActuator.playEffect)
+                if (p && p.vibrationActuator && p.vibrationActuator.playEffect) {
                     p.vibrationActuator.playEffect("dual-rumble", {duration: $2, strongMagnitude: $0, weakMagnitude: $1});
+                    pad = true;
+                }
+            }
+            // Phones: short haptic tick for big hits only (rate-limited).
+            const now = Date.now();
+            if (!pad && navigator.vibrate && $0 > 0.35 && document.body.classList.contains('touch') &&
+                (!Module.lastBuzz || now - Module.lastBuzz > 250)) {
+                Module.lastBuzz = now;
+                navigator.vibrate(Math.round($2 * $0));
             }
         } catch (e) {}
     }, clampf(strong, 0, 1), clampf(weak, 0, 1), ms);
@@ -94,6 +121,8 @@ InputState Input::poll(float dt) {
     InputState s;
     if (!enabled) {
         std::memset(prevButtons, 0, sizeof prevButtons);
+        virtualPresses = 0;
+        touch.lookX = touch.lookY = 0;
         return s;
     }
     // ---- keyboard ----
@@ -119,6 +148,22 @@ InputState Input::poll(float dt) {
     s.lookX = g_mouseDX * 0.004f;
     s.lookY = g_mouseDY * 0.004f;
     g_mouseDX = g_mouseDY = 0;
+
+    // ---- touch ----
+    if (touch.throttle > s.throttle) s.throttle = touch.throttle;
+    if (touch.brake > s.brake) s.brake = touch.brake;
+    if (std::fabs(touch.steer) > std::fabs(s.steer)) s.steer = touch.steer;
+    s.handbrake = s.handbrake || touch.handbrake;
+    if (touch.air != 0) s.air = touch.air;
+    s.lookX += touch.lookX;
+    s.lookY += touch.lookY;
+    touch.lookX = touch.lookY = 0;
+    {
+        bool* vt[] = {&s.shiftUp, &s.shiftDown, &s.locker, &s.lowRange, &s.camera, &s.reset, &s.tow, &s.horn, &s.pause, &s.manualToggle};
+        for (unsigned i = 0; i < 10; i++)
+            if (virtualPresses & (1u << i)) *vt[i] = true;
+        virtualPresses = 0;
+    }
 
     // ---- gamepad ----
     gamepadConnected = false;

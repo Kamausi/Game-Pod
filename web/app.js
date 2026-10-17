@@ -8,6 +8,10 @@ const store = {
   set(k, v) { try { localStorage.setItem('mb_' + k, JSON.stringify(v)); } catch { /* private mode */ } },
 };
 
+// Platform: phones/tablets get touch controls, lighter rendering defaults and a capped DPR.
+const IS_TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+if (IS_TOUCH) document.body.classList.add('touch');
+
 const BOARDS = {
   bog_time: { label: 'Mud Bog — Fastest Full Pass', lower: true, fmt: fmtTime },
   bog_distance: { label: 'Mud Bog — Farthest', lower: false, fmt: (v) => `${Math.round(v * 3.281)} ft` },
@@ -56,6 +60,9 @@ function boot() {
   initLobby();
   onResize();
   window.addEventListener('resize', onResize);
+  if (window.visualViewport) visualViewport.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', () => setTimeout(onResize, 250));
+  initTouch();
   show('menu');
   api.setState(0);
   setInterval(updateHud, 50);
@@ -64,9 +71,23 @@ function boot() {
   if (params.get('autostart')) startSolo(+params.get('autostart'));
 }
 
+function viewport() {
+  const vv = window.visualViewport;
+  return { w: Math.round(vv ? vv.width : innerWidth), h: Math.round(vv ? vv.height : innerHeight) };
+}
+function applyUiScale() {
+  const { w, h } = viewport();
+  // 1.0 at 1280x720; shrink for phones, grow a little on big monitors.
+  const ui = Math.max(0.5, Math.min(1.5, Math.min(w / 1280, h / 720)));
+  document.documentElement.style.setProperty('--ui', ui.toFixed(3));
+  document.documentElement.style.setProperty('--tsize', String(+($('s_tsize') ? $('s_tsize').value : 1) * Math.max(0.75, Math.min(1.25, Math.min(w, h) / 420))));
+}
 function onResize() {
-  const scale = +(store.get('scale', 1)) * Math.min(window.devicePixelRatio || 1, 2);
-  api.resize(Math.round(innerWidth * scale), Math.round(innerHeight * scale));
+  applyUiScale();
+  const { w, h } = viewport();
+  const dprCap = IS_TOUCH ? 1.5 : 2;   // phones: fill-rate is the bottleneck
+  const scale = +(store.get('scale', IS_TOUCH ? 0.75 : 1)) * Math.min(window.devicePixelRatio || 1, dprCap);
+  api.resize(Math.max(320, Math.round(w * scale)), Math.max(200, Math.round(h * scale)));
 }
 
 // ------------------------------------------------------------------------------------------
@@ -137,6 +158,7 @@ async function startAudio() {
 const screens = ['menu', 'play', 'garage', 'lobby', 'boards', 'settings', 'help', 'pause', 'results'];
 let current = 'menu';
 function show(name) {
+  document.body.classList.toggle('ingame', name === null);
   for (const s of screens) $(s).classList.toggle('show', s === name);
   current = name;
   $('hud').classList.toggle('hidden', name !== 'pause');
@@ -144,7 +166,12 @@ function show(name) {
   if (name === 'boards') loadBoards();
   focusFirst();
 }
-function hideAll() { for (const s of screens) $(s).classList.remove('show'); current = null; $('hud').classList.remove('hidden'); }
+function hideAll() {
+  for (const s of screens) $(s).classList.remove('show');
+  current = null;
+  $('hud').classList.remove('hidden');
+  document.body.classList.add('ingame');
+}
 document.addEventListener('click', (e) => {
   const go = e.target.closest('[data-go]');
   if (go) {
@@ -158,7 +185,17 @@ document.addEventListener('click', (e) => {
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2600); }
 
 let lastMode = 1;
+function goFullscreen() {
+  if (!IS_TOUCH || document.fullscreenElement) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req) Promise.resolve(req.call(el, { navigationUI: 'hide' })).then(() => {
+    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+  }).catch(() => {});
+}
 function startSolo(mode) {
+  goFullscreen();
+  touch.tiltZero = null;   // re-center tilt steering at the start of every event
   lastMode = mode;
   hideAll();
   Module._mb_set_ai_count(net.room ? 0 : +$('s_ai').value);
@@ -225,6 +262,8 @@ function applyCfg() {
 // ------------------------------------------------------------------------------------------
 // Settings
 function initSettings() {
+  // First run on a phone/tablet: lighter defaults (user changes are remembered after that).
+  if (IS_TOUCH && !store.get('settings', null)) store.set('settings', { quality: 0, post: false, ai: 2, tilt: false, tsize: 1 });
   const s = store.get('settings', {});
   for (const k of ['master', 'engine', 'sfx', 'amb']) if (s[k] != null) $('s_' + k).value = s[k];
   if (s.quality != null) $('s_quality').value = s.quality;
@@ -233,9 +272,16 @@ function initSettings() {
   if (s.ai != null) $('s_ai').value = s.ai;
   if (s.ghost != null) $('s_ghost').checked = s.ghost;
   if (s.post != null) $('s_post').checked = s.post;
+  if (s.tilt != null) $('s_tilt').checked = s.tilt;
+  if (s.tsize != null) $('s_tsize').value = s.tsize;
+  $('s_scale').value = store.get('scale', IS_TOUCH ? 0.75 : 1);
   const save = () => {
     store.set('settings', { master: +$('s_master').value, engine: +$('s_engine').value, sfx: +$('s_sfx').value, amb: +$('s_amb').value,
-      quality: +$('s_quality').value, assist: $('s_assist').checked, ai: +$('s_ai').value, ghost: $('s_ghost').checked, post: $('s_post').checked });
+      quality: +$('s_quality').value, assist: $('s_assist').checked, ai: +$('s_ai').value, ghost: $('s_ghost').checked, post: $('s_post').checked,
+      tilt: $('s_tilt').checked, tsize: +$('s_tsize').value });
+    applyUiScale();
+    if ($('s_tilt').checked) enableTilt();
+    else if (touch.tiltOn) { touch.tiltOn = false; $('tSteer').classList.remove('tilt'); }
     Module._mb_set_post(+$('s_post').checked);
     applyVolumes();
     api.quality(+$('s_quality').value);
@@ -546,3 +592,101 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape' && current && current !== 'menu' && current !== 'results') { const back = $(current).querySelector('.back'); if (back) back.click(); }
 });
 window.addEventListener('gamepadconnected', (e) => toast(`Gamepad connected: ${e.gamepad.id.slice(0, 40)}`));
+
+// ------------------------------------------------------------------------------------------
+// Touch controls: floating steering stick (or tilt), analog pedals, buttons -> C++ input.
+const touch = { steer: 0, thr: 0, brk: 0, hb: false, airUp: false, airDown: false, lookX: 0, lookY: 0, tilt: 0, tiltOn: false, tiltZero: null };
+function initTouch() {
+  if (!IS_TOUCH) return;
+  const zone = $('tSteer'), base = $('tBase'), knob = $('tKnob');
+  let sid = null, sx = 0;
+  const steerAt = (x) => {
+    const r = base.clientWidth * 0.5;
+    const dx = Math.max(-r, Math.min(r, x - sx));
+    touch.steer = -dx / r;   // drag right = steer right (negative = right in the sim)
+    knob.style.transform = `translateX(${dx}px)`;
+  };
+  zone.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (touch.tiltOn) return;
+    sid = e.pointerId; sx = e.clientX;
+    zone.setPointerCapture(sid);
+    const rz = zone.getBoundingClientRect();   // stick appears under the thumb
+    base.style.left = `${Math.max(8, e.clientX - rz.left - base.clientWidth / 2)}px`;
+    base.style.bottom = `${Math.max(8, rz.bottom - e.clientY - base.clientHeight / 2)}px`;
+    steerAt(e.clientX);
+  });
+  zone.addEventListener('pointermove', (e) => { if (e.pointerId === sid) steerAt(e.clientX); });
+  const endSteer = (e) => { if (e.pointerId !== sid) return; sid = null; touch.steer = 0; knob.style.transform = ''; base.style.left = ''; base.style.bottom = ''; };
+  zone.addEventListener('pointerup', endSteer);
+  zone.addEventListener('pointercancel', endSteer);
+
+  // Pedals: higher on the pedal = more throttle/brake (40%..100%), so you can feather it in the slop.
+  const pedal = (el, key) => {
+    let id = null;
+    const val = (e) => { const r = el.getBoundingClientRect(); touch[key] = Math.max(0.4, Math.min(1, 1 - (e.clientY - r.top) / r.height * 0.6)); };
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); id = e.pointerId; el.setPointerCapture(id); el.classList.add('on'); val(e); });
+    el.addEventListener('pointermove', (e) => { if (e.pointerId === id) val(e); });
+    const up = (e) => { if (e.pointerId !== id) return; id = null; touch[key] = 0; el.classList.remove('on'); };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  };
+  pedal($('tGas'), 'thr');
+  pedal($('tBrake'), 'brk');
+
+  document.querySelectorAll('#touch [data-press]').forEach((b) => b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    Module.ccall('mb_press', null, ['string'], [b.dataset.press]);
+    b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 150);
+    if (navigator.vibrate) navigator.vibrate(12);
+  }));
+  const holdMap = { hb: 'hb', airup: 'airUp', airdown: 'airDown' };
+  document.querySelectorAll('#touch [data-hold]').forEach((b) => {
+    const k = holdMap[b.dataset.hold];
+    b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); touch[k] = true; b.classList.add('on'); });
+    const up = () => { touch[k] = false; b.classList.remove('on'); };
+    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+  });
+  $('tPause').addEventListener('pointerdown', (e) => { e.preventDefault(); if (current === null) { api.setState(3); show('pause'); } });
+
+  // Drag on the open view (canvas) to look around / orbit the garage camera.
+  const cv = $('canvas');
+  let lid = null, lx = 0, ly = 0;
+  cv.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); lid = e.pointerId; lx = e.clientX; ly = e.clientY; });
+  cv.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== lid) return;
+    touch.lookX += (e.clientX - lx) * 0.006; touch.lookY += (e.clientY - ly) * 0.004;
+    lx = e.clientX; ly = e.clientY;
+  });
+  const lend = (e) => { if (e.pointerId === lid) lid = null; };
+  cv.addEventListener('pointerup', lend); cv.addEventListener('pointercancel', lend);
+
+  const pump = () => {
+    requestAnimationFrame(pump);
+    if (!Module._mb_touch) return;
+    let steer = touch.steer;
+    if (touch.tiltOn && touch.tiltZero != null) steer = Math.max(-1, Math.min(1, -(touch.tilt - touch.tiltZero) / 28));
+    Module._mb_touch(touch.thr, touch.brk, steer, touch.hb ? 1 : 0, touch.airUp ? 1 : (touch.airDown ? -1 : 0), touch.lookX, touch.lookY);
+    touch.lookX = touch.lookY = 0;
+  };
+  requestAnimationFrame(pump);
+}
+
+// Tilt steering: phone held sideways like a wheel. Calibrates "straight" when enabled.
+async function enableTilt() {
+  if (touch.tiltOn || !IS_TOUCH || !window.DeviceOrientationEvent) return;
+  try {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {   // iOS 13+
+      if ((await DeviceOrientationEvent.requestPermission()) !== 'granted') { $('s_tilt').checked = false; return; }
+    }
+  } catch { $('s_tilt').checked = false; return; }
+  touch.tiltOn = true;
+  $('tSteer').classList.add('tilt');
+  window.addEventListener('deviceorientation', (e) => {
+    const angle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+    const v = angle === 90 ? e.beta : (angle === -90 || angle === 270 ? -e.beta : e.gamma);
+    if (v == null) return;
+    touch.tilt = v;
+    if (touch.tiltZero == null) touch.tiltZero = v;
+  });
+  toast('Tilt steering on — hold the phone level to go straight');
+}

@@ -58,6 +58,10 @@ EMSCRIPTEN_KEEPALIVE void mb_set_clock_offset(double off) { if (g_game) g_game->
 EMSCRIPTEN_KEEPALIVE void mb_set_local_id(int id) { if (g_game) { g_game->audio.removeVehicle(g_game->localId); g_game->localId = id; } }
 EMSCRIPTEN_KEEPALIVE double mb_server_now() { return g_game ? g_game->serverNow() : 0; }
 
+EMSCRIPTEN_KEEPALIVE void mb_touch(float thr, float brk, float steer, int hb, float air, float lookX, float lookY) {
+    if (g_game) g_game->input.setTouch(thr, brk, steer, hb != 0, air, lookX, lookY);
+}
+EMSCRIPTEN_KEEPALIVE void mb_press(const char* name) { if (g_game) g_game->input.pressVirtual(name); }
 EMSCRIPTEN_KEEPALIVE void mb_set_post(int on) { if (g_game) g_game->renderer.postEnabled = on != 0; }
 EMSCRIPTEN_KEEPALIVE void mb_set_ai_count(int n) { if (g_game) g_game->setAiCount(n); }
 EMSCRIPTEN_KEEPALIVE void mb_ghost_load(const float* data, int count) { if (g_game) g_game->ghostLoad(data, count); }

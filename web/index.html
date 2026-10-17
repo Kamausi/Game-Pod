@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2a1f16">
 <title>Mud Buddies</title>
 <meta name="description" content="Online multiplayer mud bogging sim-cade. C++ / WebAssembly / WebGL2.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -116,6 +119,8 @@
     <label>Solo rivals (AI) <select data-nav id="s_ai"><option value="0">None</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option></select></label>
     <label class="row"><input data-nav type="checkbox" id="s_ghost" checked> Show personal-best ghost</label>
     <label class="row"><input data-nav type="checkbox" id="s_post" checked> Lens mud &amp; post effects</label>
+    <label class="row touch-only"><input data-nav type="checkbox" id="s_tilt"> Tilt to steer (touch)</label>
+    <label class="touch-only">Touch controls size <input data-nav type="range" id="s_tsize" min="0.7" max="1.4" step="0.05" value="1"></label>
   </div>
   <button data-nav class="back" data-go="menu">&larr; Back</button>
 </div>
@@ -139,6 +144,7 @@
     <tr><td>Horn</td><td>R3</td><td>H</td></tr>
     <tr><td>Pause</td><td>Menu / Options</td><td>Esc / P</td></tr>
   </table>
+  <p class="tip touch-only">Touch: drag anywhere in the left half to steer (or enable tilt steering), hold GAS / BRAKE on the right (higher on the pedal = more), BRAKE at a stop = reverse. Drag the open view to look around.</p>
   <p class="tip">Stuck? Rock it (alternate throttle and reverse), air down for flotation, lock the diffs, keep wheel speed up so the lugs clean out &mdash; or call the dozer.</p>
   <button data-nav class="back" data-go="menu">&larr; Back</button>
 </div>
@@ -189,7 +195,28 @@
     </div>
   </div>
   <div id="others"></div>
+
+  <!-- On-screen controls (shown on touch devices) -->
+  <div id="touch">
+    <div id="tSteer" class="tzone"><div id="tBase"><div id="tKnob"></div></div><span class="tlabel">STEER</span></div>
+    <div id="tPedals">
+      <div id="tBrake" class="pedal"><span>BRAKE<br><small>REV</small></span></div>
+      <div id="tGas" class="pedal gas"><span>GAS</span></div>
+    </div>
+    <div id="tHand" class="tbtn" data-hold="hb">E-BRAKE</div>
+    <div id="tButtons">
+      <div class="tbtn" data-press="locker">LOCK</div>
+      <div class="tbtn" data-press="lowrange">4-LO</div>
+      <div class="tbtn" data-hold="airup">AIR+</div>
+      <div class="tbtn" data-hold="airdown">AIR&minus;</div>
+      <div class="tbtn" data-press="camera">CAM</div>
+      <div class="tbtn" data-press="tow">TOW</div>
+    </div>
+    <div id="tPause" class="tbtn round">&#10074;&#10074;</div>
+  </div>
 </div>
+
+<div id="rotate"><div>&#x21bb;</div><p>Turn your phone sideways to drive</p></div>
 
 <div id="toast"></div>
 
