@@ -17,5 +17,8 @@ A one-tap arcade game. Open `index.html` in any browser.
 - **Pilot ranks:** XP from every run raises your rank and switches on permanent perks (bonus stardust, longer power-ups, a free starting Shield, and more).
 - **Cosmic Crates:** every 60 points earns a crate with a random stardust prize, from Common up to Legendary.
 - A dashed line marks where your best run ended.
+- **Wormholes** warp you three planets ahead; **pulsar** planets have orbits that grow and shrink; **shooting stars** pay 15 stardust if you catch one.
+- Score **milestones** (25, 50, 100...) pay bonus stardust.
+- The title screen shows your comet collection: tap any unlocked comet to fly it.
 - Lifetime stardust unlocks ten comets automatically.
 - **M** mutes sound.

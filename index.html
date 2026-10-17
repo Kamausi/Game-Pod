@@ -93,7 +93,8 @@
     { name: 'Prism',        at: 1600, head: '#ffffff', trail: 'rainbow' },
   ];
   const skinIndexFor = d => { let i = 0; SKINS.forEach((s, j) => { if (d >= s.at) i = j; }); return i; };
-  let skinIdx = skinIndexFor(dust);
+  let skinIdx = Math.min(store.get('skin', 99), skinIndexFor(dust));
+  const equip = i => { skinIdx = i; store.set('skin', i); };
 
   // ---------- missions ----------
   // Every mission is "in one run". Finishing one pays stardust and levels that mission type up.
@@ -180,7 +181,9 @@
     const y = new Date(today); y.setDate(y.getDate() - 1);
     let streak = last === y.toISOString().slice(0, 10) ? store.get('streak', 0) + 1 : 1;
     const amount = 20 + 10 * Math.min(streak - 1, 6);
-    dust += amount; skinIdx = skinIndexFor(dust);
+    const had = skinIndexFor(dust);
+    dust += amount;
+    if (skinIndexFor(dust) > had) equip(skinIndexFor(dust));
     store.set('dust', dust); store.set('lastDay', key); store.set('streak', streak);
     gift = { amount, streak };
   })();
@@ -311,6 +314,8 @@
   let planets, stars, powers, particles, texts, banners, player, camY, score, combo, runDust, hops, shake, flash, deadAt, slowmo, sector, hintT, lastPlanet, newBest, unlockedNow, time = 0;
   let shield, magnetT, doubleT, slowT, novaT, run, missionDone, missionDust;
   let asteroids, holes, modifier, runIdx, rankBonus, xpGain, xpBefore, rankedUp, crate;
+  let portals, shooters, shootT, milestoneI;
+  const MILESTONES = [25, 50, 75, 100, 150, 200, 250, 300, 400, 500];
 
   function makePlanet(y, x, idx) {
     const d = clamp(idx / 45, 0, 1);
@@ -326,6 +331,7 @@
     const roll = Math.random();
     if (idx > 4 && roll < (modifier === 'gold' ? 0.3 : perk.golden())) { p.kind = 'golden'; p.pal = ['#fff1a8', '#d99a00']; p.ring = true; }
     else if (idx > 2 && roll < 0.2) { p.kind = 'nebula'; }
+    else if (idx > 8 && roll < 0.3) { p.kind = 'pulsar'; p.baseOrbit = p.orbit; p.pal = ['#eef9ff', '#4f8fe0']; p.ring = false; }
     else if (idx > 6 && Math.random() < 0.2 + 0.4 * d) {
       p.amp = rand(30, 50 + 50 * d);
       p.msp = rand(0.7, 1.2 + d);
@@ -359,7 +365,9 @@
     const idx = p.idx;
     const off = rand(-30, 30);
     if (!modOnly) {
-      if (idx > 3 && Math.random() < 0.16) {
+      if (idx > 8 && Math.random() < 0.07) {
+        portals.push({ x: lerp(prev.baseX, p.baseX, 0.5) + off, y: lerp(prev.y, p.y, 0.5), target: idx + 3, ph: rand(0, 6.28), used: false });
+      } else if (idx > 3 && Math.random() < 0.16) {
         const type = pick(Object.keys(POWERS));
         powers.push({ type, x: lerp(prev.baseX, p.baseX, 0.5) + off, y: lerp(prev.y, p.y, 0.5), ph: rand(0, 6.28), taken: false });
       } else {
@@ -413,6 +421,7 @@
 
   function reset() {
     planets = []; stars = []; powers = []; particles = []; texts = []; banners = []; asteroids = []; holes = [];
+    portals = []; shooters = []; shootT = rand(10, 16); milestoneI = 0;
     score = 0; combo = 0; runDust = 0; hops = 0; shake = 0; flash = 0; slowmo = 1; sector = 0; hintT = 0;
     newBest = false; unlockedNow = null; modifier = null; runIdx = 0; crate = null; rankedUp = 0;
     shield = perk.shield(); magnetT = perk.magnet() ? 8 : 0; doubleT = 0; slowT = 0; novaT = 0;
@@ -508,6 +517,8 @@
       }
       if (perfect && combo % 5 === 0) startNova();
       score += gain; run.score = score;
+      checkMilestones();
+      if (perfect && navigator.vibrate) try { navigator.vibrate(combo % 5 === 0 ? 30 : 8); } catch {}
       const newSector = Math.floor(score / 15);
       if (newSector > sector) {
         sector = newSector; run.sector = sector + 1;
@@ -524,6 +535,43 @@
     } else {
       sfx.land(0, false);
     }
+  }
+
+  function checkMilestones() {
+    while (milestoneI < MILESTONES.length && score >= MILESTONES[milestoneI]) {
+      const m = MILESTONES[milestoneI++];
+      const v = addDust(Math.round(m / 5));
+      banners.push({ title: `MILESTONE · ${m} POINTS`, sub: `+${v} ✦ stardust`, color: '#ffcf4a', t: 0 });
+      sfx.best();
+    }
+  }
+
+  // Wormholes throw you three planets ahead and pay for every planet you skipped.
+  function warp(w) {
+    w.used = true;
+    const target = planets.find(q => q.idx === w.target);
+    if (!target) return;
+    burst(player.x, player.y, 50, '#c3a6ff', 320, 0.9);
+    let skipped = 0;
+    for (const q of planets) if (!q.visited && q.idx < target.idx && q.idx > player.planet.idx) { q.visited = true; skipped++; }
+    target.visited = true;
+    lastPlanet = target;
+    player.mode = 'orbit'; player.planet = target;
+    player.angle = Math.PI / 2; player.r = target.orbit * 1.8; player.dir = target.dir;
+    placeOnOrbit();
+    target.pulse = 1;
+    hops += skipped + 1; run.hops = hops;
+    runIdx = Math.max(runIdx, target.idx);
+    const gain = skipped + 3;
+    score += gain; run.score = score;
+    addText(target.x, target.y - target.orbit - 24, `WARP  +${gain}`, '#c3a6ff', 34);
+    burst(player.x, player.y, 50, '#c3a6ff', 320, 0.9);
+    flash = 0.7; shake = 12;
+    tone(180, 0.7, 'sine', 0.12, 1400); noise(0.5, 0.1, 3000);
+    const newSector = Math.floor(score / 15);
+    if (newSector > sector) { sector = newSector; run.sector = sector + 1; startModifier(); sfx.sector(); }
+    checkMilestones();
+    checkMissions();
   }
 
   function startNova() {
@@ -581,7 +629,7 @@
     const before = skinIndexFor(dust);
     dust += runDust + missionDust + rankBonus; store.set('dust', dust);
     const after = skinIndexFor(dust);
-    if (after > before) { unlockedNow = SKINS[after]; skinIdx = after; setTimeout(() => sfx.unlock(), 500); }
+    if (after > before) { unlockedNow = SKINS[after]; equip(after); setTimeout(() => sfx.unlock(), 500); }
     if (score > best) { best = score; store.set('best', best); newBest = true; }
     if (runIdx > bestIdx) { bestIdx = runIdx; store.set('bestIdx', bestIdx); }
     xpGain = score * 2 + runDust; xpBefore = xp; xp += xpGain; store.set('xp', xp);
@@ -610,7 +658,7 @@
     const before = skinIndexFor(dust);
     dust += tier.dust; store.set('dust', dust);
     const after = skinIndexFor(dust);
-    if (after > before) { unlockedNow = SKINS[after]; skinIdx = after; setTimeout(() => sfx.unlock(), 700); }
+    if (after > before) { unlockedNow = SKINS[after]; equip(after); setTimeout(() => sfx.unlock(), 700); }
     burst(W / 2, camY + H * 0.45, tier === CRATE_TIERS[0] ? 40 : 90, tier.color, 380, 1.2);
     flash = 0.6; shake = 10;
     sfx.jackpot();
@@ -647,6 +695,7 @@
     for (const p of planets) {
       if (p.amp) { p.mph += p.msp * wdt; p.x = p.baseX + Math.sin(p.mph) * p.amp; }
       p.pulse = Math.max(0, p.pulse - dt * 2);
+      if (p.kind === 'pulsar') p.orbit = p.baseOrbit * (1 + 0.3 * Math.sin(time * 2.2 + p.mph));
     }
 
     if (state !== 'dead') {
@@ -723,6 +772,30 @@
       for (const pu of powers) {
         if (!pu.taken && state === 'play' && Math.hypot(player.x - pu.x, player.y - pu.y) < 28) grabPower(pu);
       }
+      for (const w of portals) {
+        if (!w.used && state === 'play' && player.mode === 'fly' && Math.hypot(player.x - w.x, player.y - w.y) < 26) { warp(w); break; }
+      }
+      // shooting stars streak across now and then; catch one for a big payout
+      if (state === 'play' && hops > 0) {
+        shootT -= dt;
+        if (shootT <= 0) {
+          shootT = rand(14, 24);
+          const fromLeft = Math.random() < 0.5;
+          shooters.push({ x: fromLeft ? -40 : W + 40, y: camY + H * rand(0.15, 0.45), vx: (fromLeft ? 1 : -1) * rand(150, 210), vy: rand(15, 45), done: false });
+          tone(2400, 0.4, 'sine', 0.04, -1200);
+        }
+      }
+      for (const s of shooters) {
+        if (s.done || state !== 'play') continue;
+        if (Math.hypot(player.x - s.x, player.y - s.y) < 30) {
+          s.done = true;
+          const v = addDust(15);
+          addText(s.x, s.y - 18, `SHOOTING STAR +${v} ✦`, '#ffcf4a', 26);
+          burst(s.x, s.y, 40, '#ffcf4a', 300, 0.9);
+          flash = 0.4; sfx.jackpot();
+          checkMissions();
+        }
+      }
     }
 
     // camera
@@ -742,6 +815,12 @@
     }
     asteroids = asteroids.filter(a => !a.dead && a.y < camY + H + 100);
     holes = holes.filter(h => h.y < camY + H + 200);
+    portals = portals.filter(w => !w.used && w.y < camY + H + 100);
+    for (const s of shooters) {
+      s.x += s.vx * wdt; s.y += s.vy * wdt;
+      if (!s.done && Math.random() < 0.6) particles.push({ x: s.x, y: s.y, vx: -s.vx * 0.1 + rand(-10, 10), vy: rand(-10, 10), life: 0.6, max: 0.6, color: '#ffe680', size: rand(1.5, 3.5), drag: 0.95, trail: true });
+    }
+    shooters = shooters.filter(s => !s.done && s.x > -60 && s.x < W + 60);
     if (crate) {
       crate.t += dt;
       if (crate.state === 'opening' && crate.t > 0.9) openCrate();
@@ -831,6 +910,15 @@
     sh.addColorStop(0.5, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.35)');
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(p.x, y, p.body, 0, Math.PI * 2); ctx.fill();
     if (p.ring) drawRing(p, y, false);
+    if (p.kind === 'pulsar') {
+      ctx.save(); ctx.translate(p.x, y); ctx.rotate(time * 1.5);
+      const bg2 = ctx.createLinearGradient(0, -p.body * 3, 0, p.body * 3);
+      bg2.addColorStop(0, 'rgba(160,210,255,0)'); bg2.addColorStop(0.5, 'rgba(160,210,255,0.35)'); bg2.addColorStop(1, 'rgba(160,210,255,0)');
+      ctx.fillStyle = bg2;
+      ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(-10, -p.body * 3); ctx.lineTo(10, -p.body * 3); ctx.lineTo(3, 0);
+      ctx.lineTo(10, p.body * 3); ctx.lineTo(-10, p.body * 3); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
     if (p.kind === 'golden' && !p.visited) {
       ctx.save(); ctx.globalAlpha = 0.6 + 0.4 * Math.sin(time * 6);
       ctx.font = `14px ${FN}`; ctx.textAlign = 'center'; ctx.fillStyle = '#ffcf4a';
@@ -903,6 +991,22 @@
     ctx.beginPath(); ctx.arc(pu.x, y, 22 + Math.sin(time * 5) * 2, time * 2, time * 2 + 4); ctx.stroke();
     ctx.restore();
     powerIcon(pu.type, pu.x, y, 17);
+  }
+
+  function drawPortal(w) {
+    ctx.save();
+    ctx.translate(w.x, w.y);
+    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
+    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.35, 'rgba(195,166,255,0.6)'); g.addColorStop(1, 'rgba(95,242,196,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    for (let i = 0; i < 4; i++) {
+      const s = -time * 4 + w.ph + i * Math.PI / 2;
+      ctx.strokeStyle = i % 2 ? '#5ff2c4' : '#c3a6ff';
+      ctx.beginPath(); ctx.arc(0, 0, 12 + i * 3, s, s + 1.4); ctx.stroke();
+    }
+    ctx.restore();
+    text('WARP', w.x, w.y + 34, 11, '#c3a6ff', FN, 'center', true);
   }
 
   function drawAsteroid(a) {
@@ -980,6 +1084,14 @@
     for (const a of asteroids) drawAsteroid(a);
     for (const s of stars) if (!s.taken) drawStar(s);
     for (const pu of powers) if (!pu.taken) drawPower(pu);
+    for (const w of portals) drawPortal(w);
+    for (const s of shooters) {
+      ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(time * 4);
+      ctx.fillStyle = '#fff6c2'; ctx.shadowColor = '#ffcf4a'; ctx.shadowBlur = 24;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, r = i % 2 ? 4.5 : 11; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    }
 
     ctx.globalCompositeOperation = 'lighter';
     for (const p of particles) {
@@ -1151,10 +1263,40 @@
       ctx.restore();
     }
 
+    drawCollection(H - 140);
+
     ctx.globalAlpha = 0.55 + 0.45 * Math.sin(time * 4);
     text('TAP TO PLAY', W / 2, H - 80, 32, '#f4efe1');
     ctx.globalAlpha = 1;
     statLine(H - 42);
+  }
+
+  // Comet hangar: every comet in a row, tap an unlocked one to fly it.
+  const COLL_GAP = 36;
+  const collX = i => W / 2 + (i - (SKINS.length - 1) / 2) * COLL_GAP;
+  function drawCollection(y) {
+    const owned = skinIndexFor(dust) + 1;
+    text(`COMETS ${owned}/${SKINS.length}  ·  tap one to fly it`, W / 2, y - 26, 12, 'rgba(244,239,225,0.55)', FN, 'center', false);
+    SKINS.forEach((s, i) => {
+      const x = collX(i);
+      if (i < owned) {
+        if (i === skinIdx) {
+          ctx.strokeStyle = '#ffcf4a'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x, y, 14 + Math.sin(time * 4) * 1.5, 0, Math.PI * 2); ctx.stroke();
+        }
+        drawComet(x, y, i, i === skinIdx ? 7 : 6);
+      } else {
+        ctx.strokeStyle = 'rgba(244,239,225,0.2)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
+        text('?', x, y + 1, 10, 'rgba(244,239,225,0.3)', FN, 'center', false);
+      }
+    });
+  }
+  function collectionHit(ux, uy) {
+    const y = H - 140;
+    if (Math.abs(uy - y) > 20) return -1;
+    for (let i = 0; i < SKINS.length; i++) if (Math.abs(ux - collX(i)) < COLL_GAP / 2) return i;
+    return -1;
   }
 
   function statLine(y) {
@@ -1336,7 +1478,20 @@
       reset(); state = 'play';
     }
   }
-  cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.focus(); press(); });
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault(); cv.focus();
+    if (state === 'title') {
+      const r = cv.getBoundingClientRect();
+      const hit = collectionHit((e.clientX - r.left - offX) / scale, (e.clientY - r.top) / scale);
+      if (hit >= 0) {
+        audio();
+        if (hit <= skinIndexFor(dust)) { equip(hit); burst(player.x, player.y, 20, skinColor(0.3), 160, 0.5); tone(880, 0.15, 'triangle', 0.08); }
+        else tone(160, 0.15, 'square', 0.05);
+        return;
+      }
+    }
+    press();
+  });
   window.addEventListener('keydown', e => {
     if (e.repeat) return;
     if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') { e.preventDefault(); press(); }
