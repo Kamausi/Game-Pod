@@ -22,6 +22,18 @@ EM_BOOL onKey(int type, const EmscriptenKeyboardEvent* e, void*) {
     return game ? EM_TRUE : EM_FALSE;
 }
 EM_BOOL onMouse(int type, const EmscriptenMouseEvent* e, void*) {
+    if (Input::mouseHook) {
+        double cw = 1, ch = 1;
+        emscripten_get_element_css_size("#canvas", &cw, &ch);
+        int pw = 1, ph = 1;
+        emscripten_get_canvas_element_size("#canvas", &pw, &ph);
+        float x = float(e->targetX * pw / cw), y = float(e->targetY * ph / ch);
+        if (type != EMSCRIPTEN_EVENT_MOUSEDOWN) {   // window-level events: targetX is canvas-relative only for canvas
+            x = float((e->clientX) * pw / cw);
+            y = float((e->clientY) * ph / ch);
+        }
+        if (Input::mouseHook(type, x, y, e->button)) { g_mouseDown = false; return EM_TRUE; }
+    }
     if (type == EMSCRIPTEN_EVENT_MOUSEDOWN) g_mouseDown = true;
     else if (type == EMSCRIPTEN_EVENT_MOUSEUP) g_mouseDown = false;
     else if (type == EMSCRIPTEN_EVENT_MOUSEMOVE && g_mouseDown) {
@@ -47,6 +59,15 @@ float shapeAxis(float v, float dead, float expo) {
     return signf(v) * std::pow(clampf(a, 0.f, 1.f), expo);
 }
 }  // namespace
+
+bool (*Input::mouseHook)(int, float, float, int) = nullptr;
+
+bool Input::devTogglePressed() {
+    bool k = key("Backquote") || key("F1");
+    bool edge = k && !prevDev;
+    prevDev = k;
+    return edge;
+}
 
 void Input::init() {
     emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, onKey);

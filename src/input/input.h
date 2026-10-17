@@ -25,6 +25,9 @@ public:
     InputState poll(float dt);
     void rumble(float strong, float weak, int ms);
     bool enabled = true;
+    // Optional UI overlay (Dear ImGui) gets first look at mouse events; return true to capture.
+    static bool (*mouseHook)(int type, float x, float y, int button);
+    bool devTogglePressed();   // F1 / backtick edge, independent of `enabled`
     bool gamepadConnected = false;
     char gamepadName[64] = {0};
 
@@ -32,6 +35,7 @@ private:
     float kbSteer = 0;
     bool prevButtons[20] = {false};
     bool prevKeys[16] = {false};
+    bool prevDev = false;
 };
 
 }  // namespace mb

@@ -26,8 +26,26 @@ add_library(mbcore STATIC ${MB_CORE_SOURCES})
 target_include_directories(mbcore PUBLIC src)
 
 if(EMSCRIPTEN)
+  # ---- Dear ImGui (developer / tuning panel, toggled in-game with F1 or `) ----
+  option(MB_DEVTOOLS "Build the Dear ImGui developer panel into the web build" ON)
+  if(MB_DEVTOOLS)
+    include(FetchContent)
+    FetchContent_Declare(imgui
+      GIT_REPOSITORY https://github.com/ocornut/imgui.git
+      GIT_TAG v1.91.9
+      GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(imgui)
+    add_library(imgui STATIC
+      ${imgui_SOURCE_DIR}/imgui.cpp ${imgui_SOURCE_DIR}/imgui_draw.cpp
+      ${imgui_SOURCE_DIR}/imgui_tables.cpp ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+      ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
+    target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES3 IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
+  endif()
+
   # ---- Browser build: WebGL2 + Web Audio + Gamepad API, packaged as WASM ----
   add_executable(mudbuddies
+    src/devtools/devui.cpp
     src/main.cpp
     src/game/game.cpp
     src/render/renderer.cpp
@@ -35,6 +53,10 @@ if(EMSCRIPTEN)
     src/input/input.cpp
   )
   target_link_libraries(mudbuddies mbcore)
+  if(MB_DEVTOOLS)
+    target_link_libraries(mudbuddies imgui)
+    target_compile_definitions(mudbuddies PRIVATE MB_DEVTOOLS=1)
+  endif()
   set_target_properties(mudbuddies PROPERTIES SUFFIX ".js"
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/web/build)
   target_link_options(mudbuddies PRIVATE

@@ -16,7 +16,7 @@
 | ➕ **Lua** (sol2) | Modding: user tracks, game modes |
 
 ## Platform APIs
-✅ WebAssembly (Emscripten 4+), ✅ WebGL2 (GLES3), ✅ Web Audio, ✅ W3C Gamepad API (standard mapping + `vibrationActuator` dual-rumble), ✅ WebSocket (RFC 6455), ✅ Fetch, ✅ localStorage · ➕ WebGPU, ➕ AudioWorklet + SharedArrayBuffer (needs COOP/COEP), ➕ WebTransport/WebRTC DataChannels (unreliable UDP-like snapshots), ➕ Pointer Lock, ➕ Web Workers/pthreads for physics.
+✅ WebAssembly (Emscripten 4+), ✅ WebGL2 (GLES3) incl. multisampled renderbuffers + blit, ✅ Web Audio **AudioWorklet** (ScriptProcessor fallback), ✅ W3C Gamepad API (standard mapping + `vibrationActuator` dual-rumble), ✅ WebSocket (RFC 6455), ✅ Fetch, ✅ localStorage · ➕ WebGPU, ➕ SharedArrayBuffer ring buffer for the worklet (needs COOP/COEP), ➕ WebTransport/WebRTC DataChannels (unreliable UDP-like snapshots), ➕ Pointer Lock, ➕ Web Workers/pthreads for physics.
 
 ## Algorithms & formulas in the code
 | Area | Algorithm |
@@ -29,6 +29,9 @@
 | Terrain | Multi-layer heightfield (surface, hardpan, water table, moisture, compaction, vegetation, tracks), diffusion re-flow, mass-conserving deposition |
 | Rendering | Vertex-texture displaced terrain, skirted chunk LOD, Gribb–Hartmann frustum culling, PCF shadow mapping, Fresnel (Schlick) water, value-noise fBm, ACES filmic tonemap, instancing |
 | Audio | Firing-order pulse synthesis, digital waveguides, RBJ biquads, Paul Kellet pink noise, granular synthesis, Minnaert resonance + van den Doel bubble model, modal synthesis, Doppler, equal-power panning, Schroeder-style slapback, peak limiter |
+| AI | Pure-pursuit path following, kinematic brake-distance speed limit `v = √(v_c² + 2ad)`, finite-state stuck recovery |
+| Contact | 2D oriented-box separating-axis test, impulse with restitution + Coulomb friction through body inertia |
+| Post | MSAA resolve, procedural lens splats (noisy-edge SDF), refraction offset, vignette |
 | Net | NTP clock offset, snapshot interpolation (cubic Hermite + slerp), bounded extrapolation, quantization |
 | CAD | Recursive-descent expression parser, ear-clipping triangulation, lathe/extrude/CSG-free features, cofactor normal transform |
 | Forensics | Radix-2 FFT STFT, harmonic product spectrum, spectral centroid, spectral-flux onsets |
@@ -51,7 +54,8 @@
 * [GameNetworkingSockets](https://github.com/ValveSoftware/GameNetworkingSockets), [yojimbo](https://github.com/mas-bandwidth/yojimbo), [ENet](https://github.com/lsalzman/enet), [uWebSockets](https://github.com/uNetworking/uWebSockets) (C++ WS server), [Colyseus](https://github.com/colyseus/colyseus) (rooms), [Nakama](https://github.com/heroiclabs/nakama) (accounts, leaderboards, matchmaking).
 
 **Engine plumbing / tools**
-* [EnTT](https://github.com/skypjack/entt) (ECS), [GLM](https://github.com/g-truc/glm), [Dear ImGui](https://github.com/ocornut/imgui) (tuning panels for every coefficient in `MudModel`), [Recast/Detour](https://github.com/recastnavigation/recastnavigation) (AI drivers), [Tracy](https://github.com/wolfpld/tracy) (profiling), [doctest](https://github.com/doctest/doctest)/[Catch2](https://github.com/catchorg/Catch2).
+* ✅ [Dear ImGui](https://github.com/ocornut/imgui) v1.91.9 — fetched by CMake `FetchContent`; powers the F1 dev panel (`src/devtools/devui.cpp`).
+* [EnTT](https://github.com/skypjack/entt) (ECS), [GLM](https://github.com/g-truc/glm), [Recast/Detour](https://github.com/recastnavigation/recastnavigation) (AI drivers), [Tracy](https://github.com/wolfpld/tracy) (profiling), [doctest](https://github.com/doctest/doctest)/[Catch2](https://github.com/catchorg/Catch2).
 
 **CAD / DCC**
 * [OpenSCAD](https://github.com/openscad/openscad), [CadQuery](https://github.com/CadQuery/cadquery), [build123d](https://github.com/gumyr/build123d), [FreeCAD](https://github.com/FreeCAD/FreeCAD), [Blender](https://www.blender.org/) (imports the OBJ exports with vertex colors), [Git LFS](https://git-lfs.com/) for binary art.

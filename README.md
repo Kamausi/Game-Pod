@@ -33,6 +33,11 @@ server (zero npm dependencies, Node ≥ 18).
 | **Leaderboards** | Fastest pass, farthest distance, best lap, race time, freestyle score, crown time — server-validated, with local fallback. |
 | **Multiplayer** | Rooms / quick match (8 players), lane assignment, clock-synced countdowns, 20 Hz snapshots with Hermite interpolation, chat. [docs/NETCODE.md](docs/NETCODE.md) |
 | **CAD repo** | `cad/` — parametric `.mbcad` part files are the single source of truth; the game builds meshes from them at runtime; `mbcad` exports OBJ + OpenSCAD. [cad/README.md](cad/README.md) |
+| **AI rivals** | Solo events field up to 3 rivals with distinct builds (bog car, diesel crew cab on paddles, UTV, built Comanches) running the same terramechanics: pure-pursuit steering, brake-distance speed planning, and a human stuck strategy — air down, rock it, give up or call the dozer. |
+| **Contact** | Truck-vs-truck collisions (2D OBB separating-axis test + restitution/friction impulses), knockable barrels, leaning fence posts, venue boundary. |
+| **Ghost** | Your personal-best Mud Bog / Hill & Hole run is recorded at 20 Hz and replayed as a translucent ghost. |
+| **Post FX** | 4x MSAA offscreen target, mud splats and refracting water drops on the camera lens from nearby roost, vignette and late-afternoon grade. |
+| **Dev panel** | Dear ImGui overlay (**F1** or **`**): live terramechanics/vehicle multipliers, per-wheel telemetry table + plots, wet/dry the pit, sun position, audio mix. |
 | **Input** | W3C Gamepad API (Xbox/PlayStation standard mapping) with rumble, full menu navigation by pad; keyboard + mouse. |
 
 ## Controls
@@ -47,6 +52,7 @@ server (zero npm dependencies, Node ≥ 18).
 | Air up / down | D-pad ↑ / ↓ | F / V |
 | Camera | RB | C |
 | Dozer tow · reset · horn · pause | View · L3 · R3 · Menu | T · R · H · Esc |
+| Developer panel | — | F1 or ` |
 
 ## Build from source
 ```bash
@@ -54,8 +60,9 @@ server (zero npm dependencies, Node ≥ 18).
 cmake -B build-native -DCMAKE_BUILD_TYPE=Release && cmake --build build-native -j
 ./build-native/mb_tests && node tests/server_test.mjs
 
-# WebAssembly (requires emsdk)
+# WebAssembly (requires emsdk; fetches Dear ImGui via CMake FetchContent)
 ./build.sh            # = emcmake cmake -B build-wasm && cmake --build build-wasm  → web/build/
+                      # add -DMB_DEVTOOLS=OFF to leave the dev panel out (~400 KB smaller)
 ```
 
 ## Layout

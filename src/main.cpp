@@ -4,16 +4,20 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include "devtools/devui.h"
 #include "game/game.h"
 
 using namespace mb;
 
 static Game* g_game = nullptr;
+static DevUI g_dev;
 static std::vector<float> g_audioBuf;
 static std::string g_catalog;
 
 static void loop() {
-    if (g_game) g_game->frame(emscripten_get_now());
+    if (!g_game) return;
+    g_game->frame(emscripten_get_now());
+    g_dev.frame(*g_game);
 }
 
 extern "C" {
@@ -108,6 +112,7 @@ int main() {
     emscripten_webgl_make_context_current(ctx);
     g_game = new Game();
     g_game->init(int(w), int(h));
+    g_dev.init();
     EM_ASM({ if (Module.onGameReady) Module.onGameReady(); });
     emscripten_set_main_loop(loop, 0, false);
     return 0;
