@@ -54,7 +54,7 @@ struct VehicleConfig {
     float axleRatio = 4.56f;
     bool lockFront = false, lockRear = true, fourWD = true, snorkel = false;
     float psi = 18.f;
-    float paint[3] = {0.48f, 0.5f, 0.48f};
+    float paint[3] = {0.36f, 0.38f, 0.36f};
     std::string serialize() const;
     static VehicleConfig parse(const std::string& s);
 };

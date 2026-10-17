@@ -1,0 +1,45 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native tests and tools
+        run: cmake -B build-native -DCMAKE_BUILD_TYPE=Release && cmake --build build-native -j
+      - name: Physics / CAD / net / audio tests
+        run: ./build-native/mb_tests
+      - name: Validate CAD parts
+        run: ./build-native/mbcad check
+      - name: Export CAD (OBJ + OpenSCAD)
+        run: ./build-native/mbcad export-all cad-export
+      - name: Render audio demo
+        run: ./build-native/render_wav v8_350 cad-export/v8_350_demo.wav 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cad-export
+          path: cad-export
+
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tests/server_test.mjs
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Build WebAssembly
+        run: ./build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: web

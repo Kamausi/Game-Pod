@@ -56,7 +56,7 @@ static std::vector<BodySpec> buildBodies() {
     // '86-'92 Jeep Comanche MJ (photo 1/2): 113" wb short bed, 58" track.
     b.push_back({"comanche", "'88 Comanche MJ", "vehicles/comanche.mbcad", 1180, 2.87f, 1.47f, -0.42f, 0.05f,
                  {1.8f, 1.2f, 4.5f}, 1.05f, 0.35f, 1.25f, -0.18f, 0.24f, 35, "i6_40", true, 0.55f,
-                 {0.48f, 0.5f, 0.48f}});
+                 {0.36f, 0.38f, 0.36f}});
     // 1976 full-size sedan bog car (photo 3, "1976" on the window).
     b.push_back({"bogcar76", "'76 Full-Size Bog Car", "vehicles/bogcar76.mbcad", 1650, 3.09f, 1.62f, -0.36f, 0.0f,
                  {2.0f, 1.0f, 5.6f}, 1.1f, 0.3f, 1.55f, -0.18f, 0.22f, 33, "v8_454", false, 0.56f,

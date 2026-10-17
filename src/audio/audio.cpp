@@ -142,7 +142,7 @@ float RoadVoice::render(const VehicleSound& s) {
     out += grainLp.process(nz.white()) * grainEnv * 1.3f;
     grainEnv *= decayCoef(0.016f, sr);
     thumpPh += thumpF / sr;
-    out += std::sin(TWO_PI * thumpPh) * thumpEnv * 0.55f;
+    out += std::sin(TWO_PI * thumpPh) * thumpEnv * 0.35f;
     thumpEnv *= decayCoef(0.03f, sr);
 
     // Continuous squelch with a wandering modulator.

@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mud Buddies</title>
+<meta name="description" content="Online multiplayer mud bogging sim-cade. C++ / WebAssembly / WebGL2.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%235a3b22%22/%3E%3Ccircle cx=%228%22 cy=%228%22 r=%223%22 fill=%22%23f2c418%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+
+<div id="loading" class="overlay show">
+  <div class="logo">MUD<span>BUDDIES</span></div>
+  <div class="bar"><div id="loadbar"></div></div>
+  <p id="loadmsg">Pouring the slop&hellip;</p>
+</div>
+
+<!-- Main menu -->
+<div id="menu" class="overlay panel-left">
+  <div class="logo">MUD<span>BUDDIES</span></div>
+  <p class="tag">Bog it. Sling it. Get stuck with your buddies.</p>
+  <nav class="stack">
+    <button data-nav data-go="play">Play Solo</button>
+    <button data-nav data-go="lobby">Multiplayer</button>
+    <button data-nav data-go="garage">Garage</button>
+    <button data-nav data-go="boards">Leaderboards</button>
+    <button data-nav data-go="settings">Settings</button>
+    <button data-nav data-go="help">Controls</button>
+  </nav>
+  <div class="pad-hint" id="padHint">Connect a gamepad &mdash; press any button</div>
+</div>
+
+<!-- Mode select -->
+<div id="play" class="overlay panel-left">
+  <h2>Choose an event</h2>
+  <div class="cards" id="modeCards">
+    <button data-nav class="card" data-mode="1"><b>Mud Bog</b><small>260 ft drag pit. Full pass = time, otherwise distance. Run ends when forward motion stops.</small></button>
+    <button data-nav class="card" data-mode="2"><b>Hill &amp; Hole</b><small>3 laps of the two-track: whoops, water hole, the spoil mound by the old bus.</small></button>
+    <button data-nav class="card" data-mode="3"><b>Mud Slinger</b><small>90 s freestyle in the bowl. Roost, air and splashes build your combo.</small></button>
+    <button data-nav class="card" data-mode="4"><b>King of the Pit</b><small>120 s. Hold the center puddle while moving. Most crown time wins.</small></button>
+    <button data-nav class="card" data-mode="0"><b>Free Roam</b><small>No clock. Find the deep spots. Rock it, air down, lock it.</small></button>
+  </div>
+  <button data-nav class="back" data-go="menu">&larr; Back</button>
+</div>
+
+<!-- Garage -->
+<div id="garage" class="overlay panel-right">
+  <h2>Garage</h2>
+  <div class="form" id="garageForm">
+    <label>Driver <input data-nav id="g_name" maxlength="16" value="Buddy"></label>
+    <label>Body <select data-nav id="g_body"></select></label>
+    <label>Engine <select data-nav id="g_engine"></select></label>
+    <label>Tires <span class="val" id="v_tire"></span><input data-nav type="range" id="g_tire" min="31" max="44" step="1"></label>
+    <label>Width <span class="val" id="v_width"></span><input data-nav type="range" id="g_width" min="10.5" max="18.5" step="0.5"></label>
+    <label>Tread
+      <select data-nav id="g_tread"><option value="at">All-Terrain</option><option value="mt">Mud-Terrain</option><option value="paddle">Paddles</option></select></label>
+    <label>Lift <span class="val" id="v_lift"></span><input data-nav type="range" id="g_lift" min="0" max="10" step="0.5"></label>
+    <label>Axle gears <select data-nav id="g_axle"><option>3.73</option><option>4.10</option><option>4.56</option><option>4.88</option><option>5.38</option><option>6.17</option></select></label>
+    <label>Air pressure <span class="val" id="v_psi"></span><input data-nav type="range" id="g_psi" min="5" max="35" step="1"></label>
+    <label class="row"><input data-nav type="checkbox" id="g_awd"> 4WD</label>
+    <label class="row"><input data-nav type="checkbox" id="g_lockR"> Rear locker</label>
+    <label class="row"><input data-nav type="checkbox" id="g_lockF"> Front locker</label>
+    <label class="row"><input data-nav type="checkbox" id="g_snorkel"> Snorkel</label>
+    <label>Paint <input data-nav type="color" id="g_paint"></label>
+  </div>
+  <div class="spec" id="specLine"></div>
+  <button data-nav class="back" data-go="menu">&larr; Done</button>
+</div>
+
+<!-- Lobby -->
+<div id="lobby" class="overlay panel-left">
+  <h2>Multiplayer</h2>
+  <div class="row-inputs">
+    <input data-nav id="serverUrl" placeholder="ws://host:8787/ws">
+    <button data-nav id="btnConnect">Connect</button>
+  </div>
+  <div class="row-inputs">
+    <button data-nav id="btnQuick">Quick Match</button>
+    <input data-nav id="roomCode" placeholder="ROOM" maxlength="5">
+    <button data-nav id="btnJoin">Join / Create</button>
+  </div>
+  <div id="roomInfo" class="room"></div>
+  <div id="hostControls" class="hidden">
+    <select data-nav id="mpMode"><option value="1">Mud Bog (4 lanes)</option><option value="2">Hill &amp; Hole</option><option value="3">Mud Slinger</option><option value="4">King of the Pit</option><option value="0">Free Roam</option></select>
+    <button data-nav id="btnStart">Start Event</button>
+  </div>
+  <div class="chat"><div id="chatLog"></div><input data-nav id="chatIn" placeholder="Say something muddy&hellip;" maxlength="120"></div>
+  <p class="status" id="netStatus">Offline</p>
+  <button data-nav class="back" data-go="menu">&larr; Back</button>
+</div>
+
+<!-- Leaderboards -->
+<div id="boards" class="overlay panel-left wide">
+  <h2>Leaderboards</h2>
+  <div class="tabs" id="boardTabs"></div>
+  <table id="boardTable"><thead><tr><th>#</th><th>Driver</th><th>Rig</th><th>Result</th><th>When</th></tr></thead><tbody></tbody></table>
+  <p class="status" id="boardSource"></p>
+  <button data-nav class="back" data-go="menu">&larr; Back</button>
+</div>
+
+<!-- Settings -->
+<div id="settings" class="overlay panel-left">
+  <h2>Settings</h2>
+  <div class="form">
+    <label>Master <input data-nav type="range" id="s_master" min="0" max="1" step="0.05" value="0.8"></label>
+    <label>Engines <input data-nav type="range" id="s_engine" min="0" max="1.5" step="0.05" value="1"></label>
+    <label>Mud &amp; FX <input data-nav type="range" id="s_sfx" min="0" max="1.5" step="0.05" value="1"></label>
+    <label>Crowd &amp; ambience <input data-nav type="range" id="s_amb" min="0" max="1.5" step="0.05" value="0.7"></label>
+    <label>Graphics <select data-nav id="s_quality"><option value="0">Low</option><option value="1">Medium</option><option value="2" selected>High</option></select></label>
+    <label>Render scale <select data-nav id="s_scale"><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option></select></label>
+    <label class="row"><input data-nav type="checkbox" id="s_assist" checked> Countersteer assist</label>
+  </div>
+  <button data-nav class="back" data-go="menu">&larr; Back</button>
+</div>
+
+<div id="help" class="overlay panel-left wide">
+  <h2>Controls</h2>
+  <table class="controls">
+    <tr><th></th><th>Gamepad</th><th>Keyboard</th></tr>
+    <tr><td>Throttle / Brake-Reverse</td><td>RT / LT</td><td>W / S</td></tr>
+    <tr><td>Steer</td><td>Left stick</td><td>A / D</td></tr>
+    <tr><td>Look around</td><td>Right stick</td><td>Mouse drag</td></tr>
+    <tr><td>Handbrake</td><td>A / Cross</td><td>Space</td></tr>
+    <tr><td>Cycle lockers (off / rear / F+R)</td><td>B / Circle</td><td>L</td></tr>
+    <tr><td>Shift down / up (manual)</td><td>X / Y</td><td>Q / E</td></tr>
+    <tr><td>Auto / manual</td><td>D-pad left</td><td>M</td></tr>
+    <tr><td>Low range (4-LO)</td><td>LB</td><td>G</td></tr>
+    <tr><td>Air up / air down</td><td>D-pad up / down</td><td>F / V</td></tr>
+    <tr><td>Camera</td><td>RB</td><td>C</td></tr>
+    <tr><td>Dozer tow</td><td>View / Share</td><td>T</td></tr>
+    <tr><td>Reset upright</td><td>L3</td><td>R</td></tr>
+    <tr><td>Horn</td><td>R3</td><td>H</td></tr>
+    <tr><td>Pause</td><td>Menu / Options</td><td>Esc / P</td></tr>
+  </table>
+  <p class="tip">Stuck? Rock it (alternate throttle and reverse), air down for flotation, lock the diffs, keep wheel speed up so the lugs clean out &mdash; or call the dozer.</p>
+  <button data-nav class="back" data-go="menu">&larr; Back</button>
+</div>
+
+<!-- Pause / results -->
+<div id="pause" class="overlay center">
+  <h2>Paused</h2>
+  <nav class="stack">
+    <button data-nav id="btnResume">Resume</button>
+    <button data-nav id="btnRestart">Restart event</button>
+    <button data-nav id="btnTow">Call the dozer</button>
+    <button data-nav id="btnToGarage">Garage</button>
+    <button data-nav id="btnQuit">Quit to menu</button>
+  </nav>
+</div>
+<div id="results" class="overlay center">
+  <h2 id="resTitle">Results</h2>
+  <div id="resBody"></div>
+  <nav class="stack">
+    <button data-nav id="btnAgain">Run it again</button>
+    <button data-nav id="btnResBoards">Leaderboards</button>
+    <button data-nav id="btnResMenu">Menu</button>
+  </nav>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="hudTop">
+    <div id="hudMode"></div>
+    <div id="hudTimer">0:00.00</div>
+    <div id="hudSub"></div>
+  </div>
+  <div id="countdown"></div>
+  <div id="hudMsg"></div>
+  <div id="stuckHint">STUCK &mdash; rock it &bull; air down &bull; lock it &bull; <b>T / View</b> = dozer tow</div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="gauges">
+    <div class="tach"><div id="tachFill"></div><div id="tachRed"></div></div>
+    <div class="speed"><span id="hudSpeed">0</span><small>MPH</small></div>
+    <div class="gear" id="hudGear">N</div>
+    <div class="lamps">
+      <span id="lamp4wd">4WD</span><span id="lampLo">LO</span><span id="lampLockR">R-LOCK</span><span id="lampLockF">F-LOCK</span><span id="lampMan">MAN</span>
+    </div>
+    <div class="minis">
+      <div><small>PSI</small><b id="hudPsi">18</b></div>
+      <div><small>TEMP</small><b id="hudTemp">85</b></div>
+      <div><small>RAD</small><b id="hudClog">0%</b></div>
+    </div>
+  </div>
+  <div id="others"></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="app.js"></script>
+<script async src="build/mudbuddies.js"></script>
+</body>
+</html>
