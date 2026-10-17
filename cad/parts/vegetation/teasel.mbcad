@@ -1,0 +1,11 @@
+# Dried teasel (Dipsacus) clump at the fence line (photos 5-6): spiny brown heads.
+color #8e8268
+cyl r=0.008 h=1.6 pos=0,0.8,0 seg=4
+cyl r=0.007 h=1.4 pos=0.12,0.7,0.05 rot=0,0,-6 seg=4
+cyl r=0.007 h=1.5 pos=-0.10,0.74,-0.06 rot=6,0,5 seg=4
+cyl r=0.007 h=1.2 pos=0.03,0.6,0.15 rot=-8,0,0 seg=4
+color #5e4a33
+sphere r=0.035 pos=0,1.62,0 scale=1,1.7,1 seg=6
+sphere r=0.03 pos=0.19,1.40,0.05 scale=1,1.7,1 seg=6
+sphere r=0.032 pos=-0.18,1.48,-0.12 scale=1,1.7,1 seg=6
+sphere r=0.028 pos=0.03,1.19,0.31 scale=1,1.7,1 seg=6

@@ -1,0 +1,9 @@
+# Goldenrod (Solidago) clump - late-season yellow plumes (photos 1-2 foreground).
+color #5d6a35
+cyl r=0.01 h=1.0 pos=0,0.5,0 seg=4
+cyl r=0.01 h=0.9 pos=0.15,0.45,0.08 rot=0,0,-8 seg=4
+cyl r=0.01 h=0.95 pos=-0.12,0.47,-0.1 rot=8,0,6 seg=4
+color #c9a92a
+sphere r=0.1 pos=0,1.0,0 scale=1,1.6,1 seg=6
+sphere r=0.09 pos=0.2,0.9,0.1 scale=1,1.5,1 seg=6
+sphere r=0.09 pos=-0.17,0.94,-0.14 scale=1,1.5,1 seg=6

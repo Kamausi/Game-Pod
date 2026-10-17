@@ -1,0 +1,8 @@
+# Dark conifer in the tree line behind the bus (photo 1).
+param h = 7
+color #4d3c2a
+cyl r=0.15 h=1.2 pos=0,0.6,0 seg=6
+color #23402a
+cyl r=1.9 r2=0.1 h=h*0.75 pos=0,1.0+h*0.375,0 seg=9
+color #2c4c31
+cyl r=1.4 r2=0.05 h=h*0.5 pos=0,h*0.55+0.6,0 seg=9

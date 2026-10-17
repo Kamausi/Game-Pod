@@ -1,0 +1,19 @@
+# 55-gallon steel drum used as course markers (photo 3): black w/ yellow sponsor
+# band (PJ1-style), or faded blue. Origin at ground center.
+param r = 0.29
+param h = 0.88
+param body_r = 0.08
+param body_g = 0.08
+param body_b = 0.08
+param band_r = 0.95
+param band_g = 0.82
+param band_b = 0.10
+param band = 1
+color body_r body_g body_b
+cyl r=r h=h pos=0,h/2,0 seg=20
+color body_r*1.3 body_g*1.3 body_b*1.3
+cyl r=r*1.025 h=0.025 pos=0,h*0.33,0 seg=20
+cyl r=r*1.025 h=0.025 pos=0,h*0.66,0 seg=20
+cyl r=r*1.03 h=0.02 pos=0,h-0.01,0 seg=20
+color band_r band_g band_b
+cyl r=r*1.012 h=h*0.22*band pos=0,h*0.82,0 seg=20

@@ -1,0 +1,17 @@
+# Spectator along the fence (photo 3): puffer vest, jeans.
+param shirt_r = 0.55
+param shirt_g = 0.58
+param shirt_b = 0.62
+param vest = 1
+color #3b4a63
+cyl r=0.09 h=0.82 pos=0.10,0.41,0 seg=8 mirror=x
+color shirt_r shirt_g shirt_b
+cyl r=0.20 r2=0.17 h=0.62 pos=0,1.12,0 seg=10
+color #1b1d22
+cyl r=0.215*vest r2=0.185*vest h=0.50 pos=0,1.12,0 seg=10
+color shirt_r shirt_g shirt_b
+cyl r=0.06 h=0.6 pos=0.25,1.10,0 rot=0,0,8 seg=6 mirror=x
+color #d7b49a
+sphere r=0.11 pos=0,1.58,0 seg=10
+color #2b2b2b
+sphere r=0.115 pos=0,1.63,-0.01 scale=1,0.6,1 seg=10

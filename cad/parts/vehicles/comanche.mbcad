@@ -1,0 +1,59 @@
+# '86-'92 Jeep Comanche MJ, lifted, as seen in reference photos 1-2:
+# grey paint, black fender flares (trimmed), front plate bumper with amber lights,
+# chrome mirror, whip antenna, mud spatter (applied in-shader).
+# Body frame: origin at frame height, +Z forward, +X left. Front axle z=1.29, rear z=-1.58.
+param paint_r = 0.48
+param paint_g = 0.50
+param paint_b = 0.48
+set W = 1.74
+color paint_r paint_g paint_b
+# Lower body tub from grille to tailgate
+box size=W,0.52,4.40 pos=0,0.12,-0.26
+# Hood (slight rake) and cowl
+box size=W-0.04,0.08,1.42 pos=0,0.40,1.22 rot=-1.5,0,0
+# Cab
+box size=W-0.06,0.50,1.18 pos=0,0.63,-0.15
+box size=W-0.12,0.05,1.10 pos=0,0.90,-0.20
+color #10161a
+# Windshield (raked) + side & rear glass
+box size=W-0.16,0.46,0.05 pos=0,0.64,0.47 rot=-28,0,0
+box size=0.02,0.32,0.80 pos=W/2-0.02,0.66,-0.08 mirror=x
+box size=W-0.24,0.28,0.03 pos=0,0.68,-0.75
+color paint_r*0.92 paint_g*0.92 paint_b*0.92
+# Bed sides, floor and tailgate
+box size=0.06,0.30,1.66 pos=W/2-0.03,0.52,-1.62 mirror=x
+box size=W-0.12,0.30,0.05 pos=0,0.52,-2.44
+box size=W-0.12,0.04,1.62 pos=0,0.39,-1.62
+color #111111
+# Grille: 8 vertical slots between square headlights
+box size=0.80,0.24,0.03 pos=0,0.24,1.92
+color #303436
+box size=0.04,0.20,0.04 pos=0.05,0.24,1.935 mirror=x
+box size=0.04,0.20,0.04 pos=0.15,0.24,1.935 mirror=x
+box size=0.04,0.20,0.04 pos=0.25,0.24,1.935 mirror=x
+box size=0.04,0.20,0.04 pos=0.35,0.24,1.935 mirror=x
+color #e8e6d8
+box size=0.22,0.16,0.03 pos=0.58,0.25,1.93 mirror=x
+color #d98a1c
+# Amber turn signals in the bumper (photo 1)
+box size=0.12,0.07,0.04 pos=0.72,0.02,2.03 mirror=x
+color #9e1414
+box size=0.06,0.20,0.04 pos=W/2-0.05,0.48,-2.47 mirror=x
+color #161616
+# Black steel plate bumpers
+box size=1.86,0.20,0.14 pos=0,0.02,2.0
+box size=1.80,0.16,0.12 pos=0,0.02,-2.52
+# Fender flares (trimmed for big tires)
+box size=0.10,0.06,1.00 pos=W/2+0.02,0.20,1.29 mirror=x
+box size=0.10,0.32,0.06 pos=W/2+0.02,0.04,1.80 mirror=x rot=-25,0,0
+box size=0.10,0.32,0.06 pos=W/2+0.02,0.04,0.78 mirror=x rot=25,0,0
+box size=0.10,0.06,1.00 pos=W/2+0.02,0.24,-1.58 mirror=x
+box size=0.10,0.32,0.06 pos=W/2+0.02,0.08,-1.07 mirror=x rot=25,0,0
+box size=0.10,0.32,0.06 pos=W/2+0.02,0.08,-2.09 mirror=x rot=-25,0,0
+# Frame rails visible under body
+box size=0.10,0.14,3.80 pos=0.48,-0.14,-0.30 mirror=x
+color #c9c9c4
+# Chrome mirrors + whip antenna
+box size=0.05,0.14,0.10 pos=W/2+0.06,0.72,0.36 mirror=x
+color #222222
+cyl r=0.004 h=0.9 pos=0.82,0.85,0.95

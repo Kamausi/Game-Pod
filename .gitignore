@@ -1,0 +1,5 @@
+/build*/
+/out/
+*.o
+server/data/
+node_modules/

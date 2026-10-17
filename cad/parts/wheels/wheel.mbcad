@@ -1,0 +1,14 @@
+# Wheel assembly: mud tire on a steel/beadlock wheel. Axle along X, rim face toward +X.
+param tire_r = 0.4445        # 35" tire
+param tire_w = 0.3175        # 12.5" section
+param rim_r = 0.1905         # 15" wheel
+param lugs = 18
+param depth = 0.028
+param tread = 1              # 0 = A/T, 1 = M/T, 2 = paddle
+param beadlock = 0
+color #1b1a19
+tire r=tire_r w=tire_w rim=rim_r lugs=lugs depth=depth tread=tread
+color #202020
+rim r=rim_r w=tire_w*0.82 spokes=6
+color #8a8a88
+cyl r=rim_r*1.02 h=0.03 axis=x seg=24 pos=tire_w*0.4,0,0 scale=1,beadlock,beadlock

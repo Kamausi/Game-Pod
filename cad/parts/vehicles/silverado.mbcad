@@ -1,0 +1,31 @@
+# GMT800 crew-cab mud truck (photo 3, far right): caked in tan mud, roof light bar,
+# hood propped open (radiator packed with mud -> overheating). Front axle z=1.56, rear z=-2.34.
+param paint_r = 0.62
+param paint_g = 0.55
+param paint_b = 0.42
+param hood_open = 0
+set W = 1.98
+color paint_r paint_g paint_b
+box size=W,0.62,5.80 pos=0,0.18,-0.25
+box size=W-0.04,0.10,1.55 pos=0,0.55+hood_open*0.55,2.0-hood_open*0.35 rot=-hood_open*55,0,0
+box size=W-0.08,0.62,2.30 pos=0,0.80,0.10
+color #0f1417
+box size=W-0.18,0.52,0.05 pos=0,0.82,1.25 rot=-30,0,0
+box size=0.02,0.38,2.05 pos=W/2-0.04,0.85,0.08 mirror=x
+color paint_r*0.9 paint_g*0.9 paint_b*0.9
+box size=0.07,0.36,1.75 pos=W/2-0.035,0.66,-2.20 mirror=x
+box size=W-0.12,0.36,0.06 pos=0,0.66,-3.10
+color #1b1b1b
+box size=1.10,0.30,0.04 pos=0,0.30,2.90
+box size=2.02,0.24,0.18 pos=0,0.0,2.97
+box size=1.96,0.22,0.16 pos=0,0.0,-3.14
+# LED light bar + mounts
+box size=1.30,0.10,0.10 pos=0,1.18,0.70
+color #e6eef2
+box size=1.22,0.06,0.02 pos=0,1.18,0.76
+color #b01313
+box size=0.06,0.28,0.04 pos=W/2-0.05,0.55,-3.13 mirror=x
+color #121212
+box size=0.10,0.10,1.10 pos=W/2+0.03,0.30,1.56 mirror=x
+box size=0.10,0.10,1.10 pos=W/2+0.03,0.32,-2.34 mirror=x
+box size=0.12,0.16,5.0 pos=0.55,-0.16,-0.30 mirror=x

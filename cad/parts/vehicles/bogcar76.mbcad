@@ -1,0 +1,33 @@
+# 1976 full-size sedan "bog car" (photo 3: white, '1976' lettered on the glass).
+# Long hood, formal roofline, chrome bumpers. Front axle z=1.36, rear z=-1.73.
+param paint_r = 0.88
+param paint_g = 0.88
+param paint_b = 0.86
+set W = 1.98
+color paint_r paint_g paint_b
+extrude depth=W pts=-2.80,-0.10,2.75,-0.10,2.80,0.30,0.75,0.42,-1.95,0.42,-2.80,0.36
+box size=W-0.08,0.06,1.95 pos=0,0.44,1.75
+color paint_r*0.95 paint_g*0.95 paint_b*0.95
+# Greenhouse: roof + pillars
+box size=W-0.18,0.06,1.55 pos=0,0.98,-0.55
+color #0e1418
+box size=W-0.24,0.62,0.05 pos=0,0.70,0.48 rot=-35,0,0
+box size=W-0.30,0.62,0.05 pos=0,0.70,-1.48 rot=38,0,0
+box size=0.02,0.48,1.50 pos=W/2-0.09,0.72,-0.50 mirror=x
+color #f2f2f2
+# Race number panel on the side glass (the '1976')
+box size=0.025,0.20,0.55 pos=W/2-0.08,0.75,-0.40 mirror=x
+color #111111
+box size=0.03,0.12,0.40 pos=W/2-0.07,0.75,-0.40 mirror=x
+color #b9bcbf
+# Chrome bumpers + grille
+box size=W+0.04,0.16,0.16 pos=0,0.02,2.85
+box size=W+0.04,0.16,0.16 pos=0,0.02,-2.86
+color #2a2c2e
+box size=1.40,0.18,0.04 pos=0,0.22,2.80
+color #f0eedc
+box size=0.24,0.12,0.04 pos=0.75,0.22,2.81 mirror=x
+color #a01212
+box size=0.40,0.12,0.04 pos=0.70,0.20,-2.82 mirror=x
+color #111111
+box size=0.12,0.12,4.6 pos=0.52,-0.16,-0.20 mirror=x
