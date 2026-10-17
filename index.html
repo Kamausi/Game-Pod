@@ -107,6 +107,53 @@
     golden:   { desc: n => `Land on ${n} golden planet${n > 1 ? 's' : ''}`, target: l => 1 + Math.floor(l / 2), stat: 'golden' },
     nova:     { desc: n => `Go Supernova ${n} time${n > 1 ? 's' : ''}`, target: l => 1 + Math.floor(l / 2), stat: 'novas' },
     hops:     { desc: n => `Hop ${n} planets`,             target: l => 12 + 8 * l,  stat: 'hops' },
+    close:    { desc: n => `Pull off ${n} close call${n > 1 ? 's' : ''}`, target: l => 1 + l, stat: 'close' },
+    sector:   { desc: n => `Reach sector ${n}`,            target: l => 2 + Math.floor(l / 2), stat: 'sector' },
+  };
+
+  // ---------- ranks ----------
+  // XP from every run raises your pilot rank; each rank switches on a permanent perk.
+  const RANKS = [
+    { name: 'Cadet',     at: 0,    perk: 'Your journey begins' },
+    { name: 'Pilot',     at: 150,  perk: '+10% stardust every run' },
+    { name: 'Navigator', at: 400,  perk: 'Power-ups last 30% longer' },
+    { name: 'Ace',       at: 800,  perk: 'Start every run with a Shield' },
+    { name: 'Captain',   at: 1400, perk: 'Bigger magnet, more golden planets' },
+    { name: 'Commander', at: 2200, perk: '+25% stardust every run' },
+    { name: 'Admiral',   at: 3300, perk: 'Start every run with a Magnet too' },
+    { name: 'Star Lord', at: 4800, perk: 'Supernova lasts 10 seconds' },
+  ];
+  let xp = store.get('xp', 0);
+  const rankFor = x => { let i = 0; RANKS.forEach((r, j) => { if (x >= r.at) i = j; }); return i; };
+  let rank = rankFor(xp);
+  const perk = {
+    dust: () => rank >= 5 ? 0.25 : rank >= 1 ? 0.1 : 0,
+    dur: () => rank >= 2 ? 1.3 : 1,
+    shield: () => rank >= 3,
+    magnetR: () => rank >= 4 ? 210 : 150,
+    golden: () => rank >= 4 ? 0.12 : 0.08,
+    magnet: () => rank >= 6,
+    nova: () => rank >= 7 ? 10 : 7,
+  };
+
+  // ---------- crates & best-run marker ----------
+  const CRATE_AT = 60;
+  let crateP = store.get('crate', 0);
+  let bestIdx = store.get('bestIdx', 0);
+  const CRATE_TIERS = [
+    { name: 'COMMON',    chance: 0.60, dust: 25,  color: '#bfe9ff' },
+    { name: 'RARE',      chance: 0.28, dust: 60,  color: '#5ff2c4' },
+    { name: 'EPIC',      chance: 0.10, dust: 150, color: '#c3a6ff' },
+    { name: 'LEGENDARY', chance: 0.02, dust: 400, color: '#ffcf4a' },
+  ];
+
+  // ---------- sector events ----------
+  const MODS = {
+    meteor:  { name: 'METEOR FIELD',   sub: 'dodge the rocks while you fly',   color: '#ff8a5b' },
+    storm:   { name: 'STARDUST STORM', sub: 'the sky is full of stardust',     color: '#bfe9ff' },
+    hyper:   { name: 'HYPERDRIVE',     sub: 'faster orbits, +1 point per hop', color: '#ff7aa8' },
+    gravity: { name: 'GRAVITY WELLS',  sub: 'black holes bend your path',      color: '#c3a6ff' },
+    gold:    { name: 'GOLD RUSH',      sub: 'golden planets everywhere',       color: '#ffcf4a' },
   };
   let mLevels = store.get('mlevels', {});
   let missions = store.get('missions', null);
@@ -263,6 +310,7 @@
   let state = 'title';           // title | play | dead
   let planets, stars, powers, particles, texts, banners, player, camY, score, combo, runDust, hops, shake, flash, deadAt, slowmo, sector, hintT, lastPlanet, newBest, unlockedNow, time = 0;
   let shield, magnetT, doubleT, slowT, novaT, run, missionDone, missionDust;
+  let asteroids, holes, modifier, runIdx, rankBonus, xpGain, xpBefore, rankedUp, crate;
 
   function makePlanet(y, x, idx) {
     const d = clamp(idx / 45, 0, 1);
@@ -276,7 +324,7 @@
       craters: Array.from({ length: 3 }, () => ({ a: rand(0, 6.28), r: rand(0.2, 0.6), s: rand(0.12, 0.22) }))
     };
     const roll = Math.random();
-    if (idx > 4 && roll < 0.08) { p.kind = 'golden'; p.pal = ['#fff1a8', '#d99a00']; p.ring = true; }
+    if (idx > 4 && roll < (modifier === 'gold' ? 0.3 : perk.golden())) { p.kind = 'golden'; p.pal = ['#fff1a8', '#d99a00']; p.ring = true; }
     else if (idx > 2 && roll < 0.2) { p.kind = 'nebula'; }
     else if (idx > 6 && Math.random() < 0.2 + 0.4 * d) {
       p.amp = rand(30, 50 + 50 * d);
@@ -303,29 +351,72 @@
         stars.push({ x: p.x + Math.cos(a) * p.orbit, y: p.y + Math.sin(a) * p.orbit, gold: false, ph: rand(0, 6.28), taken: false });
       }
     }
+    decorateGap(prev, p, false);
+  }
+
+  // Fills the space between two planets. With modOnly, adds just the current sector event's extras.
+  function decorateGap(prev, p, modOnly) {
+    const idx = p.idx;
     const off = rand(-30, 30);
-    if (idx > 3 && Math.random() < 0.16) {
-      const type = pick(Object.keys(POWERS));
-      powers.push({ type, x: lerp(prev.baseX, p.baseX, 0.5) + off, y: lerp(prev.y, p.y, 0.5), ph: rand(0, 6.28), taken: false });
-      return;
+    if (!modOnly) {
+      if (idx > 3 && Math.random() < 0.16) {
+        const type = pick(Object.keys(POWERS));
+        powers.push({ type, x: lerp(prev.baseX, p.baseX, 0.5) + off, y: lerp(prev.y, p.y, 0.5), ph: rand(0, 6.28), taken: false });
+      } else {
+        const n = Math.random() < 0.35 ? 3 : Math.random() < 0.7 ? 2 : 1;
+        const gold = idx > 3 && Math.random() < 0.15;
+        for (let i = 0; i < n; i++) {
+          const t = (i + 1) / (n + 1);
+          stars.push({
+            x: lerp(prev.baseX, p.baseX, t) + off, y: lerp(prev.y, p.y, t),
+            gold: gold && i === Math.floor(n / 2), ph: rand(0, 6.28), taken: false
+          });
+        }
+      }
     }
-    const n = Math.random() < 0.35 ? 3 : Math.random() < 0.7 ? 2 : 1;
-    const gold = idx > 3 && Math.random() < 0.15;
-    for (let i = 0; i < n; i++) {
-      const t = (i + 1) / (n + 1);
-      stars.push({
-        x: lerp(prev.baseX, p.baseX, t) + off, y: lerp(prev.y, p.y, t),
-        gold: gold && i === Math.floor(n / 2), ph: rand(0, 6.28), taken: false
-      });
+    if (modifier === 'storm') {
+      for (let i = 0; i < 5; i++) {
+        const t = rand(0.15, 0.85);
+        stars.push({ x: clamp(lerp(prev.baseX, p.baseX, t) + rand(-70, 70), 16, W - 16), y: lerp(prev.y, p.y, t), gold: Math.random() < 0.2, ph: rand(0, 6.28), taken: false });
+      }
+    }
+    if (idx > 2 && (modifier === 'meteor' || (!modOnly && idx > 15 && Math.random() < 0.12))) {
+      const top = p.y + p.orbit + 16, bot = prev.y - prev.orbit - 16;
+      const n = modifier === 'meteor' && Math.random() < 0.5 ? 2 : 1;
+      if (bot - top > 8) for (let i = 0; i < n; i++) {
+        const r = rand(11, 17);
+        asteroids.push({
+          x: rand(0, W), y: rand(top, bot), vx: (Math.random() < 0.5 ? -1 : 1) * rand(50, 110), r, rot: 0, vr: rand(-2, 2),
+          pts: Array.from({ length: 8 }, () => rand(0.75, 1.1)), dead: false
+        });
+      }
+    }
+    if (modifier === 'gravity' && Math.random() < 0.75) {
+      const mx = (prev.baseX + p.baseX) / 2, my = (prev.y + p.y) / 2;
+      const hx = clamp(mx + (Math.random() < 0.5 ? -1 : 1) * rand(100, 140), 30, W - 30);
+      if (Math.hypot(hx - prev.baseX, my - prev.y) > prev.orbit + 50 + prev.amp && Math.hypot(hx - p.baseX, my - p.y) > p.orbit + 50 + p.amp) {
+        holes.push({ x: hx, y: my, ph: rand(0, 6.28) });
+      }
+    }
+  }
+
+  function startModifier() {
+    const keys = Object.keys(MODS).filter(k => k !== modifier);
+    modifier = pick(keys);
+    const M = MODS[modifier];
+    banners.push({ title: `SECTOR ${sector + 1} · ${M.name}`, sub: M.sub, color: M.color, t: 0 });
+    // apply to gaps the player hasn't reached yet (skip the very next one so nothing pops in unfairly)
+    for (let i = 1; i < planets.length; i++) {
+      if (planets[i].idx >= player.planet.idx + 2 && planets[i - 1].idx === planets[i].idx - 1) decorateGap(planets[i - 1], planets[i], true);
     }
   }
 
   function reset() {
-    planets = []; stars = []; powers = []; particles = []; texts = []; banners = [];
+    planets = []; stars = []; powers = []; particles = []; texts = []; banners = []; asteroids = []; holes = [];
     score = 0; combo = 0; runDust = 0; hops = 0; shake = 0; flash = 0; slowmo = 1; sector = 0; hintT = 0;
-    newBest = false; unlockedNow = null;
-    shield = false; magnetT = 0; doubleT = 0; slowT = 0; novaT = 0;
-    run = { score: 0, maxChain: 0, dust: 0, perfects: 0, power: 0, moving: 0, golden: 0, novas: 0, hops: 0 };
+    newBest = false; unlockedNow = null; modifier = null; runIdx = 0; crate = null; rankedUp = 0;
+    shield = perk.shield(); magnetT = perk.magnet() ? 8 : 0; doubleT = 0; slowT = 0; novaT = 0;
+    run = { score: 0, maxChain: 0, dust: 0, perfects: 0, power: 0, moving: 0, golden: 0, novas: 0, hops: 0, close: 0, sector: 1 };
     missionDone = [false, false, false]; missionDust = 0;
     const first = makePlanet(0, W / 2, 0);
     first.visited = true; first.kind = 'normal'; first.amp = 0;
@@ -384,10 +475,17 @@
     if (!p.visited) {
       p.visited = true;
       hops++; run.hops = hops;
+      runIdx = Math.max(runIdx, p.idx);
+      if (runIdx === bestIdx + 1 && bestIdx > 3) addText(W / 2, camY + H * 0.52, 'UNCHARTED SPACE', '#5ff2c4', 30, true);
+      if (player.flyT > 1.1 || player.x < 28 || player.x > W - 28) {
+        run.close++;
+        const v = addDust(3);
+        addText(p.x, p.y + p.orbit + 22, `CLOSE CALL +${v} ✦`, '#ff8a5b', 22);
+      }
       if (p.amp) run.moving++;
       if (perfect) { combo++; run.perfects++; run.maxChain = Math.max(run.maxChain, combo); } else combo = 0;
       const mult = 1 + Math.min(combo, 4);
-      let gain = perfect ? mult : 1;
+      let gain = (perfect ? mult : 1) + (modifier === 'hyper' ? 1 : 0);
       if (perfect) {
         const words = ['PERFECT', 'GREAT', 'STELLAR', 'COSMIC', 'GODLIKE'];
         addText(p.x, p.y - p.orbit - 18, words[Math.min(combo - 1, 4)] + (mult > 1 ? '  x' + mult : ''), comboColor(), 26);
@@ -412,8 +510,9 @@
       score += gain; run.score = score;
       const newSector = Math.floor(score / 15);
       if (newSector > sector) {
-        sector = newSector;
+        sector = newSector; run.sector = sector + 1;
         addText(W / 2, camY + H * 0.32, 'SECTOR ' + (sector + 1), '#5ff2c4', 40, true);
+        startModifier();
         sfx.sector();
       }
       if (!newBest && best > 0 && score > best) {
@@ -428,7 +527,7 @@
   }
 
   function startNova() {
-    novaT = 7; run.novas++;
+    novaT = perk.nova(); run.novas++;
     addText(W / 2, camY + H * 0.45, 'SUPERNOVA!', '#ffffff', 48, true);
     flash = 0.8; shake = 16;
     burst(player.x, player.y, 70, '#ffffff', 420, 1.2);
@@ -445,9 +544,9 @@
     pu.taken = true; run.power++;
     const P = POWERS[pu.type];
     if (pu.type === 'shield') shield = true;
-    if (pu.type === 'magnet') magnetT = P.dur;
-    if (pu.type === 'double') doubleT = P.dur;
-    if (pu.type === 'slow') slowT = P.dur;
+    if (pu.type === 'magnet') magnetT = P.dur * perk.dur();
+    if (pu.type === 'double') doubleT = P.dur * perk.dur();
+    if (pu.type === 'slow') slowT = P.dur * perk.dur();
     addText(pu.x, pu.y - 20, P.label, P.color, 26);
     burst(pu.x, pu.y, 30, P.color, 240, 0.7);
     sfx.power();
@@ -478,11 +577,20 @@
     sfx.die();
     if (navigator.vibrate) try { navigator.vibrate(60); } catch {}
     runs++; store.set('runs', runs);
+    rankBonus = Math.round(runDust * perk.dust());
     const before = skinIndexFor(dust);
-    dust += runDust + missionDust; store.set('dust', dust);
+    dust += runDust + missionDust + rankBonus; store.set('dust', dust);
     const after = skinIndexFor(dust);
     if (after > before) { unlockedNow = SKINS[after]; skinIdx = after; setTimeout(() => sfx.unlock(), 500); }
     if (score > best) { best = score; store.set('best', best); newBest = true; }
+    if (runIdx > bestIdx) { bestIdx = runIdx; store.set('bestIdx', bestIdx); }
+    xpGain = score * 2 + runDust; xpBefore = xp; xp += xpGain; store.set('xp', xp);
+    const nr = rankFor(xp);
+    if (nr > rank) { rankedUp = nr; setTimeout(() => sfx.best(), 900); }
+    rank = nr;
+    crateP += score;
+    if (crateP >= CRATE_AT) { crateP = Math.min(crateP - CRATE_AT, CRATE_AT - 1); crate = { state: 'closed', t: 0, tier: null }; }
+    store.set('crate', crateP);
     // finished missions level up and get replaced for the next run
     deadMissions = missions.map((m, i) => ({ ...m, done: missionDone[i], progress: run[MISSION_TYPES[m.type].stat] }));
     missions = missions.map((m, i) => {
@@ -494,6 +602,19 @@
     store.set('mlevels', mLevels); store.set('missions', missions);
   }
   let deadMissions = [];
+
+  function openCrate() {
+    let r = Math.random(), tier = CRATE_TIERS[0];
+    for (const t of CRATE_TIERS) { if (r < t.chance) { tier = t; break; } r -= t.chance; }
+    crate.state = 'open'; crate.t = 0; crate.tier = tier;
+    const before = skinIndexFor(dust);
+    dust += tier.dust; store.set('dust', dust);
+    const after = skinIndexFor(dust);
+    if (after > before) { unlockedNow = SKINS[after]; skinIdx = after; setTimeout(() => sfx.unlock(), 700); }
+    burst(W / 2, camY + H * 0.45, tier === CRATE_TIERS[0] ? 40 : 90, tier.color, 380, 1.2);
+    flash = 0.6; shake = 10;
+    sfx.jackpot();
+  }
 
   // ---------- effects ----------
   function skinColor(t) {
@@ -532,12 +653,21 @@
       if (player.mode === 'orbit') {
         const p = player.planet;
         player.r = lerp(player.r, p.orbit, 1 - Math.pow(0.001, wdt));
-        player.angle += player.dir * (p.lin / p.orbit) * wdt;
+        player.angle += player.dir * (p.lin * (modifier === 'hyper' ? 1.3 : 1) / p.orbit) * wdt;
         placeOnOrbit();
       } else {
         player.flyT += wdt;
         const steps = 2;
-        for (let k = 0; k < steps && player.mode === 'fly'; k++) {
+        for (let k = 0; k < steps && player.mode === 'fly' && state !== 'dead'; k++) {
+          for (const h of holes) {
+            const dx = h.x - player.x, dy = h.y - player.y, d = Math.hypot(dx, dy);
+            if (d < 15 && state === 'play') { die(); break; }
+            if (d < 180) {
+              const a = Math.min(2200, 8.5e5 / (d * d));
+              player.vx += dx / d * a * wdt / steps; player.vy += dy / d * a * wdt / steps;
+            }
+          }
+          if (player.mode !== 'fly' || state === 'dead') break;
           player.x += player.vx * wdt / steps;
           player.y += player.vy * wdt / steps;
           for (const p of planets) {
@@ -556,8 +686,25 @@
           life: player.mode === 'fly' ? 0.5 : 0.35, max: 0.5, color: skinColor(Math.random()), size: rand(2, 4.5) * (novaT > 0 ? 1.6 : 1), drag: 0.96, trail: true
         });
       }
+      // asteroids only hurt while you're flying
+      for (const a of asteroids) {
+        if (a.dead || player.mode !== 'fly' || state !== 'play') continue;
+        if (Math.hypot(player.x - a.x, player.y - a.y) < a.r + 5) {
+          a.dead = true;
+          burst(a.x, a.y, 24, '#c9a98f', 220, 0.7);
+          if (novaT > 0) {
+            const v = addDust(2);
+            addText(a.x, a.y - 16, `SMASH +${v} ✦`, '#ffffff', 22);
+            shake = Math.max(shake, 8); noise(0.25, 0.15, 400);
+          } else if (shield) {
+            shield = false;
+            addText(a.x, a.y - 16, 'SHIELD BLOCKED', '#7fb8ff', 22);
+            shake = Math.max(shake, 8); sfx.shield();
+          } else { die(); break; }
+        }
+      }
       // stardust
-      const pull = novaT > 0 ? 220 : magnetT > 0 ? 150 : 0;
+      const pull = novaT > 0 ? 220 : magnetT > 0 ? perk.magnetR() : 0;
       for (const st of stars) {
         if (st.taken) continue;
         const dx = player.x - st.x, dy = player.y - st.y, dist = Math.hypot(dx, dy);
@@ -589,6 +736,16 @@
     planets = planets.filter(p => p.y < camY + H + 300 || p === player.planet || p === lastPlanet);
     stars = stars.filter(s => s.y < camY + H + 100 && !s.taken);
     powers = powers.filter(s => s.y < camY + H + 100 && !s.taken);
+    for (const a of asteroids) {
+      a.x += a.vx * wdt; a.rot += a.vr * wdt;
+      if (a.x < -30) a.x = W + 30; else if (a.x > W + 30) a.x = -30;
+    }
+    asteroids = asteroids.filter(a => !a.dead && a.y < camY + H + 100);
+    holes = holes.filter(h => h.y < camY + H + 200);
+    if (crate) {
+      crate.t += dt;
+      if (crate.state === 'opening' && crate.t > 0.9) openCrate();
+    }
 
     for (const p of particles) {
       p.life -= sdt;
@@ -748,6 +905,42 @@
     powerIcon(pu.type, pu.x, y, 17);
   }
 
+  function drawAsteroid(a) {
+    ctx.save();
+    ctx.translate(a.x, a.y); ctx.rotate(a.rot);
+    const g = ctx.createRadialGradient(-a.r * 0.3, -a.r * 0.3, 1, 0, 0, a.r);
+    g.addColorStop(0, '#b39a88'); g.addColorStop(1, '#4a3a33');
+    ctx.fillStyle = g;
+    ctx.shadowColor = 'rgba(255,138,91,0.5)'; ctx.shadowBlur = 10;
+    ctx.beginPath();
+    a.pts.forEach((k, i) => { const an = (i / a.pts.length) * Math.PI * 2; ctx.lineTo(Math.cos(an) * a.r * k, Math.sin(an) * a.r * k); });
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.arc(a.r * 0.25, a.r * 0.1, a.r * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawHole(h) {
+    ctx.save();
+    ctx.translate(h.x, h.y);
+    const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 70);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.25, 'rgba(20,0,40,0.9)'); g.addColorStop(1, 'rgba(157,107,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 70, 0, Math.PI * 2); ctx.fill();
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      ctx.strokeStyle = `rgba(195,166,255,${0.5 - i * 0.12})`; ctx.lineWidth = 3 - i * 0.7;
+      const r = 22 + i * 12, s = time * (3 - i) + h.ph + i;
+      ctx.beginPath(); ctx.arc(0, 0, r, s, s + 2.2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r, s + Math.PI, s + Math.PI + 1.6); ctx.stroke();
+    }
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#c3a6ff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.setLineDash([2, 10]); ctx.strokeStyle = 'rgba(195,166,255,0.15)'; ctx.lineDashOffset = time * 20;
+    ctx.beginPath(); ctx.arc(0, 0, 180, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
   function drawComet(x, y, sk, size = 7) {
     const s = SKINS[sk];
     ctx.save();
@@ -770,7 +963,21 @@
     ctx.strokeStyle = 'rgba(255,107,91,0.18)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, camY); ctx.lineTo(0, camY + H); ctx.moveTo(W, camY); ctx.lineTo(W, camY + H); ctx.stroke();
 
+    // where your best run ended
+    if (bestIdx > 3 && runIdx < bestIdx && state !== 'title') {
+      const bp = planets.find(p => p.idx === bestIdx);
+      if (bp) {
+        const ly = bp.y - bp.orbit - 24;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,207,74,0.45)'; ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -time * 20;
+        ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(W, ly); ctx.stroke();
+        ctx.restore();
+        text('YOUR BEST', 10, ly - 12, 13, '#ffcf4a', FN, 'left', true);
+      }
+    }
+    for (const h of holes) drawHole(h);
     for (const p of planets) drawPlanet(p);
+    for (const a of asteroids) drawAsteroid(a);
     for (const s of stars) if (!s.taken) drawStar(s);
     for (const pu of powers) if (!pu.taken) drawPower(pu);
 
@@ -856,12 +1063,13 @@
       ctx.restore();
       if (novaT > 0) text('SUPERNOVA  ' + Math.ceil(novaT), W / 2, top + 72, 18, `hsl(${time * 300 % 360},100%,75%)`, FN);
       else if (combo > 0) text('COMBO x' + (1 + Math.min(combo, 4)), W / 2, top + 72, 18, comboColor(), FN);
+      if (modifier) text(MODS[modifier].name, W / 2, top + 94, 12, MODS[modifier].color, FN, 'center', false);
       text('✦ ' + runDust, W - 16, top + 14, 20, (doubleT > 0 || novaT > 0) ? '#ffcf4a' : '#bfe9ff', FN, 'right');
       if (best > 0) text('BEST ' + best, W - 16, top + 40, 14, 'rgba(244,239,225,0.55)', FN, 'right', false);
       // active power-ups
       let px = 26;
       const py = top + 66;
-      const active = [['shield', shield ? 1 : 0, 0], ['magnet', magnetT, 9], ['double', doubleT, 10], ['slow', slowT, 6]];
+      const active = [['shield', shield ? 1 : 0, 0], ['magnet', magnetT, 9 * perk.dur()], ['double', doubleT, 10 * perk.dur()], ['slow', slowT, 6 * perk.dur()]];
       for (const [type, v, dur] of active) {
         if (!v) continue;
         ctx.fillStyle = 'rgba(5,15,20,0.7)';
@@ -879,7 +1087,7 @@
         text('aim through the middle of the next orbit for a PERFECT', W / 2, H * 0.86 + 30, 13, '#5ff2c4', FN);
         ctx.globalAlpha = 1;
       }
-      if (banners.length) drawBanner(banners[0], top + 110);
+      if (banners.length) drawBanner(banners[0], top + 132);
     }
     for (const t of texts) if (t.screen) drawPop({ ...t, y: t.y - camY });
   }
@@ -950,8 +1158,8 @@
   }
 
   function statLine(y) {
-    const parts = [`BEST ${best}`, `✦ ${dust}`, SKINS[skinIdx].name.toUpperCase()];
-    text(parts.join('   ·   '), W / 2, y, 14, 'rgba(244,239,225,0.6)', FN, 'center', false);
+    const parts = [RANKS[rank].name.toUpperCase(), `BEST ${best}`, `✦ ${dust}`, SKINS[skinIdx].name.toUpperCase()];
+    fitText(parts.join('  ·  '), W / 2, y, 14, 'rgba(244,239,225,0.6)', FN, W - 30);
   }
 
   function drawDead() {
@@ -961,7 +1169,7 @@
     ctx.fillStyle = `rgba(5,15,20,${0.7 * ease})`;
     ctx.fillRect(-offX / scale, 0, CW / scale, H);
 
-    const blockH = 470;
+    const blockH = 530;
     let y = Math.max(safeTop() + 40, (H - blockH) / 2 - 10) + (1 - ease) * 30;
     ctx.globalAlpha = ease;
     text(['LOST IN SPACE', 'DRIFTED OFF', 'SPAGHETTIFIED', 'SO CLOSE'][(runs + score) % 4], W / 2, y, 30, '#ff6b5b');
@@ -975,8 +1183,32 @@
       text('BEST ' + best, W / 2, y, 18, 'rgba(244,239,225,0.6)', FN);
     }
     y += 40;
-    text(`+${runDust} ✦ stardust` + (missionDust ? `   +${missionDust} ✦ missions` : ''), W / 2, y, 17, '#bfe9ff', FN);
-    y += 26;
+    fitText(`+${runDust} ✦ stardust` + (missionDust ? `   +${missionDust} missions` : '') + (rankBonus ? `   +${rankBonus} rank` : ''), W / 2, y, 17, '#bfe9ff', FN, W - 30);
+    y += 34;
+
+    // pilot rank
+    if (rankedUp) {
+      const s = 1 + Math.sin(time * 5) * 0.03;
+      ctx.save(); ctx.translate(W / 2, y + 8); ctx.scale(s, s);
+      ctx.fillStyle = 'rgba(95,242,196,0.12)'; ctx.strokeStyle = '#5ff2c4'; ctx.lineWidth = 2;
+      roundRect(-160, -22, 320, 44, 12); ctx.fill(); ctx.stroke();
+      text(`RANK UP · ${RANKS[rankedUp].name.toUpperCase()}`, 0, -7, 17, '#5ff2c4', FD, 'center', false);
+      fitText(RANKS[rankedUp].perk, 0, 12, 12, '#f4efe1', FN, 300);
+      ctx.restore();
+    } else {
+      const nextR = RANKS[rank + 1];
+      text(`${RANKS[rank].name.toUpperCase()}  ·  +${xpGain} XP`, W / 2, y, 13, 'rgba(244,239,225,0.75)', FN, 'center', false);
+      if (nextR) {
+        const bw = 200, bx = W / 2 - bw / 2;
+        const span = nextR.at - RANKS[rank].at;
+        const fillT = clamp((time - deadAt - 0.4) / 0.8, 0, 1);
+        const f = clamp((lerp(xpBefore, xp, 1 - Math.pow(1 - fillT, 3)) - RANKS[rank].at) / span, 0, 1);
+        ctx.fillStyle = 'rgba(244,239,225,0.12)'; roundRect(bx, y + 11, bw, 6, 3); ctx.fill();
+        ctx.fillStyle = '#5ff2c4'; roundRect(bx, y + 11, Math.max(6, bw * f), 6, 3); ctx.fill();
+        text(`${nextR.at - xp} XP to ${nextR.name}`, W / 2, y + 28, 11, 'rgba(244,239,225,0.5)', FN, 'center', false);
+      }
+    }
+    y += 52;
 
     if (unlockedNow) {
       const ut = clamp((time - deadAt - 0.5) / 0.4, 0, 1);
@@ -1012,10 +1244,61 @@
     }
     y += 76;
     drawMissions(y, deadMissions, false);
+    text(`next Cosmic Crate in ${CRATE_AT - crateP} points`, W / 2, y + 140, 12, 'rgba(195,166,255,0.8)', FN, 'center', false);
 
-    if (time - deadAt > 0.7) {
+    if (time - deadAt > 0.7 && !crate) {
       ctx.globalAlpha = (0.55 + 0.45 * Math.sin(time * 4)) * ease;
-      text('TAP TO RETRY', W / 2, Math.max(y + 150, H - 50), 30, '#f4efe1');
+      text('TAP TO RETRY', W / 2, Math.max(y + 180, H - 44), 30, '#f4efe1');
+    }
+    ctx.globalAlpha = 1;
+    if (crate) drawCrate();
+  }
+
+  function drawCrate() {
+    const k = crate.state === 'closed' ? clamp((time - deadAt - 0.9) / 0.3, 0, 1) : 1;
+    if (!k) return;
+    ctx.globalAlpha = k;
+    ctx.fillStyle = 'rgba(5,15,20,0.94)';
+    ctx.fillRect(-offX / scale, 0, CW / scale, H);
+    const cy = H * 0.45;
+    if (crate.state !== 'open') {
+      const opening = crate.state === 'opening';
+      const wob = opening ? Math.sin(crate.t * 70) * 0.18 * crate.t : Math.sin(time * 5) * 0.06;
+      const s = (opening ? 1 + crate.t * 0.35 : 1 + Math.sin(time * 3) * 0.03) * (0.6 + 0.4 * k);
+      text('COSMIC CRATE', W / 2, cy - 120, 34, '#c3a6ff');
+      ctx.save(); ctx.translate(W / 2, cy); ctx.rotate(wob); ctx.scale(s, s);
+      ctx.shadowColor = '#c3a6ff'; ctx.shadowBlur = 30 + (opening ? crate.t * 60 : 0);
+      const g = ctx.createLinearGradient(0, -55, 0, 55);
+      g.addColorStop(0, '#6b4bd6'); g.addColorStop(1, '#2a1a73');
+      ctx.fillStyle = g; roundRect(-55, -50, 110, 100, 14); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ffcf4a'; ctx.fillRect(-55, -22, 110, 10); ctx.fillRect(-7, -50, 14, 100);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2; roundRect(-55, -50, 110, 100, 14); ctx.stroke();
+      text('?', 0, 18, 36, '#f4efe1');
+      ctx.restore();
+      if (!opening) {
+        ctx.globalAlpha = k * (0.55 + 0.45 * Math.sin(time * 4));
+        text('TAP TO OPEN', W / 2, cy + 110, 26, '#f4efe1');
+      }
+    } else {
+      const t = crate.tier, e = 1 - Math.pow(1 - clamp(crate.t / 0.4, 0, 1), 3);
+      ctx.save(); ctx.translate(W / 2, cy); ctx.rotate(time * 0.6);
+      ctx.fillStyle = t.color; ctx.globalAlpha = 0.12;
+      for (let i = 0; i < 12; i++) {
+        ctx.rotate(Math.PI / 6);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-18, -260); ctx.lineTo(18, -260); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      ctx.save(); ctx.translate(W / 2, cy); ctx.scale(0.5 + 0.5 * e, 0.5 + 0.5 * e);
+      text(t.name, 0, -60, 30, t.color);
+      text(`+${t.dust} ✦`, 0, 10, 72, '#f4efe1');
+      text('stardust', 0, 60, 16, '#bfe9ff', FN, 'center', false);
+      ctx.restore();
+      if (crate.t > 0.6) {
+        ctx.globalAlpha = 0.55 + 0.45 * Math.sin(time * 4);
+        text('TAP TO CONTINUE', W / 2, cy + 130, 22, '#f4efe1');
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -1044,7 +1327,14 @@
     audio();
     if (state === 'title') { state = 'play'; hintT = 0; gift = null; return; }
     if (state === 'play') { launch(); return; }
-    if (state === 'dead' && time - deadAt > 0.7) { reset(); state = 'play'; }
+    if (state === 'dead' && time - deadAt > 0.7) {
+      if (crate) {
+        if (crate.state === 'closed' && time - deadAt > 1.1) { crate.state = 'opening'; crate.t = 0; tone(200, 0.9, 'sawtooth', 0.05, 600); }
+        else if (crate.state === 'open' && crate.t > 0.6) crate = null;
+        return;
+      }
+      reset(); state = 'play';
+    }
   }
   cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.focus(); press(); });
   window.addEventListener('keydown', e => {
