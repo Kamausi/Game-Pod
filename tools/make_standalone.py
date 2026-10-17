@@ -20,7 +20,10 @@ def read(p):
 
 def script_safe(js):
     # An inline <script> ends at the first "</script"; break any occurrence inside the code.
-    return re.sub(r'</(script)', r'<\\/\1', js, flags=re.IGNORECASE)
+    js = re.sub(r'</(script)', r'<\\/\1', js, flags=re.IGNORECASE)
+    # Emscripten's SINGLE_FILE embeds the wasm as raw bytes in a JS string literal; the HTML
+    # parser replaces NUL with U+FFFD, which corrupts the binary, so escape it.
+    return js.replace('\x00', '\\x00')
 
 html = read(os.path.join(root, 'web', 'index.html'))
 css = read(os.path.join(root, 'web', 'style.css'))
