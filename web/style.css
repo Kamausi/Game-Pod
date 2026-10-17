@@ -108,3 +108,10 @@ th { color: var(--dim); font-weight: 600; text-transform: uppercase; font-size: 
   #minimap { width: 100px; height: 100px; }
   #countdown { font-size: 90px; }
 }
+
+#others div { padding: 2px 8px; margin-bottom: 2px; background: #0006; border-radius: 4px; min-width: 190px; display: flex; justify-content: space-between; gap: 12px; }
+#others div.you { background: #f2c41866; }
+.standings { text-align: left; margin: 12px auto 0; max-width: 320px; font-size: 18px; padding-left: 28px; }
+.standings li { padding: 2px 0; }
+.standings li span { float: right; color: var(--dim); }
+.standings li.you { color: var(--pj1); }

@@ -72,22 +72,63 @@ function onResize() {
 // ------------------------------------------------------------------------------------------
 // Audio: C++ synthesizes every sample; Web Audio just pulls interleaved stereo frames.
 let audioCtx = null;
-function startAudio() {
+// Preferred path: an AudioWorklet sink fed with blocks rendered by the C++ engine on the main
+// thread, kept ~80 ms ahead of the audio clock. Fallback: ScriptProcessorNode.
+const SINK_SRC = `class MBSink extends AudioWorkletProcessor {
+  constructor() { super(); this.q = []; this.off = 0; this.port.onmessage = (e) => this.q.push(e.data); }
+  process(_in, outputs) {
+    const L = outputs[0][0], R = outputs[0][1] || outputs[0][0], n = L.length;
+    let i = 0;
+    while (i < n) {
+      const b = this.q[0];
+      if (!b) { L.fill(0, i); R.fill(0, i); break; }
+      const take = Math.min((b.length >> 1) - this.off, n - i);
+      for (let k = 0; k < take; k++) { L[i + k] = b[(this.off + k) * 2]; R[i + k] = b[(this.off + k) * 2 + 1]; }
+      i += take; this.off += take;
+      if (this.off >= (b.length >> 1)) { this.q.shift(); this.off = 0; }
+    }
+    if (this.q.length > 40) this.q.splice(0, this.q.length - 20);   // drop if we fell far behind
+    return true;
+  }
+}
+registerProcessor('mb-sink', MBSink);`;
+async function startAudio() {
   if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
-    api.audioInit(audioCtx.sampleRate);
-    const node = audioCtx.createScriptProcessor(2048, 0, 2);
-    node.onaudioprocess = (e) => {
-      const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
-      const n = L.length;
-      const ptr = Module._mb_audio_render(n) >> 2;
-      const heap = Module.HEAPF32;
-      for (let i = 0; i < n; i++) { L[i] = heap[ptr + 2 * i]; R[i] = heap[ptr + 2 * i + 1]; }
-    };
-    node.connect(audioCtx.destination);
-    applyVolumes();
-  } catch (err) { console.warn('audio unavailable', err); }
+  } catch (err) { console.warn('audio unavailable', err); return; }
+  api.audioInit(audioCtx.sampleRate);
+  applyVolumes();
+  if (audioCtx.audioWorklet && window.AudioWorkletNode) {
+    try {
+      await audioCtx.audioWorklet.addModule(URL.createObjectURL(new Blob([SINK_SRC], { type: 'application/javascript' })));
+      const node = new AudioWorkletNode(audioCtx, 'mb-sink', { numberOfInputs: 0, outputChannelCount: [2] });
+      node.connect(audioCtx.destination);
+      const BLOCK = 512, lead = Math.round(audioCtx.sampleRate * 0.08);
+      let produced = 0;
+      const pump = () => {
+        const now = Math.round(audioCtx.currentTime * audioCtx.sampleRate);
+        if (produced < now) produced = now;           // tab was throttled: skip, don't burst
+        let guard = 0;
+        while (produced < now + lead && guard++ < 24) {
+          const ptr = Module._mb_audio_render(BLOCK) >> 2;
+          const buf = Module.HEAPF32.slice(ptr, ptr + BLOCK * 2);
+          node.port.postMessage(buf, [buf.buffer]);
+          produced += BLOCK;
+        }
+      };
+      setInterval(pump, 8);
+      console.log('audio: AudioWorklet sink @', audioCtx.sampleRate);
+      return;
+    } catch (err) { console.warn('AudioWorklet failed, falling back', err); }
+  }
+  const node = audioCtx.createScriptProcessor(2048, 0, 2);
+  node.onaudioprocess = (e) => {
+    const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1), n = L.length;
+    const ptr = Module._mb_audio_render(n) >> 2, heap = Module.HEAPF32;
+    for (let i = 0; i < n; i++) { L[i] = heap[ptr + 2 * i]; R[i] = heap[ptr + 2 * i + 1]; }
+  };
+  node.connect(audioCtx.destination);
 }
 ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => window.addEventListener(ev, startAudio, { passive: true }));
 
@@ -120,15 +161,17 @@ let lastMode = 1;
 function startSolo(mode) {
   lastMode = mode;
   hideAll();
+  Module._mb_set_ai_count(net.room ? 0 : +$('s_ai').value);
+  loadGhost(net.room ? -1 : mode);
   api.startMode(mode, 0, 0);
   $('canvas').focus();
 }
 $('btnResume').onclick = () => { hideAll(); api.setState(2); };
-$('btnRestart').onclick = () => { hideAll(); if (net.room && net.isHost) net.send({ t: 'start', mode: lastMode }); else api.startMode(lastMode, net.lane || 0, 0); };
+$('btnRestart').onclick = () => { if (net.room && net.isHost) { hideAll(); net.send({ t: 'start', mode: lastMode }); } else if (!net.room) startSolo(lastMode); else hideAll(); };
 $('btnTow').onclick = () => { hideAll(); api.setState(2); api.action('tow'); };
 $('btnToGarage').onclick = () => show('garage');
 $('btnQuit').onclick = () => { api.setState(0); show('menu'); };
-$('btnAgain').onclick = () => { hideAll(); api.startMode(lastMode, net.lane || 0, 0); };
+$('btnAgain').onclick = () => { if (net.room) { hideAll(); api.startMode(lastMode, net.lane || 0, 0); } else startSolo(lastMode); };
 $('btnResBoards').onclick = () => { api.setState(0); show('boards'); };
 $('btnResMenu').onclick = () => { api.setState(0); show('menu'); };
 
@@ -187,9 +230,13 @@ function initSettings() {
   if (s.quality != null) $('s_quality').value = s.quality;
   $('s_scale').value = store.get('scale', 1);
   if (s.assist != null) $('s_assist').checked = s.assist;
+  if (s.ai != null) $('s_ai').value = s.ai;
+  if (s.ghost != null) $('s_ghost').checked = s.ghost;
+  if (s.post != null) $('s_post').checked = s.post;
   const save = () => {
     store.set('settings', { master: +$('s_master').value, engine: +$('s_engine').value, sfx: +$('s_sfx').value, amb: +$('s_amb').value,
-      quality: +$('s_quality').value, assist: $('s_assist').checked });
+      quality: +$('s_quality').value, assist: $('s_assist').checked, ai: +$('s_ai').value, ghost: $('s_ghost').checked, post: $('s_post').checked });
+    Module._mb_set_post(+$('s_post').checked);
     applyVolumes();
     api.quality(+$('s_quality').value);
     api.assist($('s_assist').checked ? 1 : 0);
@@ -238,7 +285,8 @@ function updateHud() {
   $('hudMsg').textContent = hud.message || '';
   $('stuckHint').style.display = hud.stuck ? 'block' : 'none';
   drawMinimap();
-  $('others').innerHTML = (hud.others || []).map((o) => `${esc(net.names[o.id] || 'Buddy ' + o.id)}: ${hud.mode === 1 ? Math.round(o.dist * 3.281) + ' ft' : Math.round(o.score)}`).join('<br>');
+  $('others').innerHTML = hud.mode && (hud.standings || []).length > 1
+    ? hud.standings.map((r, i) => `<div class="${r.you ? 'you' : ''}">${i + 1}. ${esc(r.name)} <span>${esc(r.text)}</span></div>`).join('') : '';
   if (hud.finishSerial !== lastSerial) {
     lastSerial = hud.finishSerial;
     if (hud.results && hud.results.length) onResults(hud.results);
@@ -254,11 +302,40 @@ function drawMinimap() {
   g.beginPath(); [x, y] = P(60, -66); g.arc(x, y, 17 * s, 0, 7); g.fill();
   g.fillStyle = '#5b6e8a'; g.beginPath(); [x, y] = P(0, 32); g.arc(x, y, 9 * s, 0, 7); g.fill();
   g.fillStyle = '#ff5a14';
-  for (const o of hud.others || []) { [x, y] = P(o.x, o.z); g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
+  for (const o of hud.others || []) { g.fillStyle = o.ai ? '#e8e2d0' : '#ff5a14'; [x, y] = P(o.x, o.z); g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
   [x, y] = P(hud.x, hud.z);
   g.save(); g.translate(x, y); g.rotate(-hud.heading + Math.PI);
   g.fillStyle = '#f2c418'; g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(-5, 6); g.closePath(); g.fill();
   g.restore();
+}
+
+// ------------------------------------------------------------------------------------------
+// Ghost replay of your personal best (stored per mode in localStorage as base64 float32).
+const PRIMARY = { 1: 'bog_distance', 2: 'circuit_race' };
+function f32ToB64(f) { const u = new Uint8Array(f.buffer, f.byteOffset, f.byteLength); let s = ''; for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return btoa(s); }
+function b64ToF32(b) { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return new Float32Array(u.buffer); }
+function loadGhost(mode) {
+  let f = new Float32Array(0);
+  try { const g = localStorage.getItem('mb_ghost_' + mode); if (g && $('s_ghost').checked) f = b64ToF32(g); } catch { /* none */ }
+  const p = Module._malloc(Math.max(4, f.byteLength));
+  Module.HEAPF32.set(f, p >> 2);
+  Module._mb_ghost_load(p, f.length);
+  Module._free(p);
+}
+function maybeSaveGhost(mode, results) {
+  const board = PRIMARY[mode];
+  if (!board) return false;
+  // Bog: a full pass (time) beats any distance; otherwise compare distance.
+  const r = results.find((x) => x.board === 'bog_time') || results.find((x) => x.board === board);
+  if (!r) return false;
+  const key = 'ghostbest_' + mode;
+  const prev = store.get(key, null);
+  const score = r.board === 'bog_time' ? 1000 - r.value : r.board === 'circuit_race' ? -r.value : r.value;
+  if (prev != null && prev >= score) return false;
+  const len = Module._mb_ghost_trace_len();
+  if (len < 16) return false;
+  const f = Module.HEAPF32.slice(Module._mb_ghost_trace_ptr() >> 2, (Module._mb_ghost_trace_ptr() >> 2) + len);
+  try { localStorage.setItem('mb_ghost_' + mode, f32ToB64(f)); store.set(key, score); return true; } catch { return false; }
 }
 
 // ------------------------------------------------------------------------------------------
@@ -290,7 +367,10 @@ function rigLabel() {
 async function onResults(results) {
   api.setState(3);
   $('resTitle').textContent = hud.modeName;
-  $('resBody').innerHTML = results.map((r) => `<div>${r.summary}</div><div class="rank" id="rank_${r.board}">&nbsp;</div>`).join('');
+  const pb = !net.room && maybeSaveGhost(hud.mode, results);
+  const st = (hud.standings || []).length > 1 ? `<ol class="standings">${hud.standings.map((r) => `<li class="${r.you ? 'you' : ''}">${esc(r.name)} <span>${esc(r.text)}</span></li>`).join('')}</ol>` : '';
+  $('resBody').innerHTML = results.map((r) => `<div>${r.summary}</div><div class="rank" id="rank_${r.board}">&nbsp;</div>`).join('') +
+    (pb ? '<div class="rank">New personal best — ghost saved</div>' : '') + st;
   show('results');
   for (const r of results) {
     const reply = await postScore(r);
@@ -393,6 +473,8 @@ function onNet(m) {
     }
     case 'start':
       lastMode = m.mode;
+      Module._mb_set_ai_count(0);
+      loadGhost(-1);
       net.lane = (m.lanes && m.lanes[net.id]) || 0;
       hideAll();
       api.startMode(m.mode, net.lane, m.startAt);

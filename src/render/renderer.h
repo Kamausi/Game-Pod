@@ -28,6 +28,8 @@ struct RenderFrame {
     float time = 0;
     std::vector<DrawItem> items;
     const std::vector<Particle>* particles = nullptr;
+    // Lens splats in screen space: x, y (0..1), radius, opacity (>0 mud, <0 water drop).
+    std::vector<float> lens;
 };
 
 class Renderer {
@@ -39,14 +41,21 @@ public:
     void render(World& w, const RenderFrame& f);
     int width = 1280, height = 720;
     int quality = 2;  // 0 low, 1 medium, 2 high
+    bool postEnabled = true;
+    Vec3 sunDirection() const { return sunDir; }
+    void setSun(float azimuthDeg, float elevationDeg);
     Mat4 viewProj;
 
 private:
     void uploadTerrain(Terrain& t, bool full);
     void drawTerrain(bool water, const Mat4& vp);
     void drawStatic(GLuint prog);
-    void drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass);
+    void drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass, bool transparent = false);
     void buildFence(World& w);
+    void ensureTargets();
+    void postPass(const RenderFrame& f);
+    GLuint progPost = 0, msFbo = 0, msColor = 0, msDepth = 0, resolveFbo = 0, resolveTex = 0, postVao = 0;
+    int targetW = 0, targetH = 0;
 
     GLuint progTerrain = 0, progMesh = 0, progShadow = 0, progSky = 0, progParticle = 0, progFence = 0;
     GLuint texHeight = 0, texState = 0, shadowTex = 0, shadowFbo = 0;

@@ -21,7 +21,7 @@ static std::string fmtTime(float t) {
     return b;
 }
 
-Vec3 ModeRunner::spawnPos(World& w, float& yaw) const {
+Vec3 ModeRunner::spawnFor(const World& w, int lane, float& yaw) const {
     switch (id) {
         case ModeId::MudBog:
             yaw = PI * 0.5f;
@@ -45,7 +45,7 @@ Vec3 ModeRunner::spawnPos(World& w, float& yaw) const {
 
 void ModeRunner::resetToSpawn(World& w, Vehicle& v) {
     float yaw;
-    Vec3 p = spawnPos(w, yaw);
+    Vec3 p = spawnFor(w, lane, yaw);
     p.y = w.terrain.heightAt(p.x, p.z) - v.rideAxleY + v.wheels[0].radius + 0.25f;
     v.reset(p, yaw);
 }

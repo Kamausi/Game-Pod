@@ -80,12 +80,35 @@ void Game::setState(AppState s) {
 }
 
 void Game::startMode(ModeId m, int lane, double startAt) {
+    lens.clear();
     if (startAt <= 0) startAt = serverNow() + 3.5;
     world.resetDynamics();
     particles.clear();
     g_userManual = player.manual;
     mode.start(m, world, player, lane, startAt);
     if (m != ModeId::FreeRoam) player.manual = true;  // hold neutral during the countdown
+    for (int i = 0; i < 3; i++) audio.removeVehicle(100 + i);
+    ais.clear();
+    aiVis.clear();
+    aiReleased = false;
+    runTrace.clear();
+    traceTimer = 0;
+    if (m != ModeId::FreeRoam && aiCount > 0 && remotes.empty()) {
+        ais = makeRivals(aiCount, uint32_t(serverNow() * 7.0));
+        for (size_t i = 0; i < ais.size(); i++) {
+            AiDriver& a = ais[i];
+            a.lane = (lane + 1 + int(i)) % 4;
+            float yaw;
+            Vec3 p = mode.spawnFor(world, a.lane, yaw);
+            p.y = world.terrain.heightAt(p.x, p.z) - a.v.rideAxleY + a.v.wheels[0].radius + 0.25f;
+            a.v.reset(p, yaw);
+            a.v.gear = 0;
+            a.v.manual = true;
+            VehicleVisual vis;
+            vis.build(renderer, a.cfg);
+            aiVis.push_back(vis);
+        }
+    }
     player.dirt *= 0.5f;
     camYaw = camPitch = 0;
     setState(AppState::Playing);
@@ -139,10 +162,25 @@ void Game::simulate(float dt, const InputState& in) {
     }
     player.step(world.terrain, vi, dt);
     world.collideStatic(player, dt);
+    bool locked = mode.controlsLocked(serverNow());
+    for (auto& a : ais) {
+        VehicleInput ai = a.input;
+        if (locked) { ai.handbrake = true; ai.brake = 0; a.v.gear = 0; }
+        a.v.step(world.terrain, ai, dt);
+        world.collideStatic(a.v, dt);
+    }
+    // Vehicle-vs-vehicle contacts: player and rivals are dynamic, network replicas kinematic.
+    for (size_t i = 0; i < ais.size(); i++) {
+        collideVehicles(player, ais[i].v, true);
+        for (size_t k = i + 1; k < ais.size(); k++) collideVehicles(ais[i].v, ais[k].v, true);
+    }
+    for (auto& kv : remotes)
+        if (kv.second.valid) collideVehicles(player, kv.second.geom, false);
 }
 
-void Game::spawnWheelFx(const Vehicle& vc, float dt) {
+float Game::spawnWheelFx(const Vehicle& vc, float dt) {
     Vehicle& v = const_cast<Vehicle&>(vc);
+    float total = 0;
     Rng& R = particles.rng;
     Vec3 U = v.up();
     for (auto& w : v.wheels) {
@@ -156,7 +194,7 @@ void Game::spawnWheelFx(const Vehicle& vc, float dt) {
         Vec3 mcol{lerpf(kMudDry[0], kMudWet[0], w.moisture), lerpf(kMudDry[1], kMudWet[1], w.moisture),
                   lerpf(kMudDry[2], kMudWet[2], w.moisture)};
         if (vol > 0) {
-            ejected += vol;
+            total += vol;
             int n = std::min(10, int(vol * 2500.f) + 1);
             float spd = clampf(wr, 2.f, 32.f);
             for (int k = 0; k < n; k++) {
@@ -187,6 +225,7 @@ void Game::spawnWheelFx(const Vehicle& vc, float dt) {
         Vec3 tp = v.pos + v.rot.rotate({-0.6f, v.body->bellyY + 0.1f, -v.body->dims[2] * 0.5f});
         particles.emit(PType::Smoke, tp, v.forward() * -2.f + U * 1.2f, 0.25f, 2.5f, {0.12f, 0.12f, 0.12f});
     }
+    return total;
 }
 
 void Game::updateCamera(float dt, const InputState& in) {
@@ -243,46 +282,52 @@ void Game::updateCamera(float dt, const InputState& in) {
     fov = approach(fov, 1.05f + clampf(spd / 30.f, 0.f, 1.f) * 0.22f, 3.f, dt);
 }
 
-void Game::feedAudio(float dt) {
-    Vec3 cf = camTarget - camPos;
-    audio.setListener(camPos, cf, player.vel);
+VehicleSound Game::soundFor(const Vehicle& v, bool local, float ejectedVol, float dt) {
     VehicleSound s;
-    s.engine = player.engine;
-    s.pos = player.pos;
-    s.vel = player.vel;
-    s.rpm = player.engineRpm;
-    s.throttle = player.throttleApplied;
-    s.load = clampf(player.throttleApplied * (0.6f + 0.4f * (1.f - player.clutchSlip)), 0.f, 1.f);
-    s.boost = player.boost;
-    s.fuelCut = player.fuelCut;
-    s.running = player.stallTimer <= 0;
-    s.local = true;
-    int lugs = lugCount(player.cfg.tread);
+    s.engine = v.engine;
+    s.pos = v.pos;
+    s.vel = v.vel;
+    s.rpm = v.engineRpm;
+    s.throttle = v.throttleApplied;
+    s.load = clampf(v.throttleApplied * (0.6f + 0.4f * (1.f - v.clutchSlip)), 0.f, 1.f);
+    s.boost = v.boost;
+    s.fuelCut = v.fuelCut;
+    s.running = v.stallTimer <= 0;
+    s.local = local;
+    int lugs = lugCount(v.cfg.tread);
     float slap = 0, lug = 0, roll = 0, squeal = 0, firm = 0, water = 0, nMud = 0;
-    for (auto& w : player.wheels) {
+    for (auto& w : v.wheels) {
         if (!w.contact) continue;
         float ws = std::fabs(w.omega);
         if (w.mudW > 0.05f) {
             slap += w.mudW * clampf(std::fabs(w.slipSpeed) / 5.f + ws * w.radius / 20.f, 0.f, 1.f);
             lug += ws * lugs / (2.f * PI);
-            roll += w.mudW * clampf(std::fabs(dot(player.vel, w.fwdDir)) / 4.f, 0.f, 1.f);
+            roll += w.mudW * clampf(std::fabs(dot(v.vel, w.fwdDir)) / 4.f, 0.f, 1.f);
             nMud += 1;
         }
         firm += (1.f - w.mudW);
         squeal += (1.f - w.mudW) * clampf((std::fabs(w.slipAngle) - 0.12f) * 2.f + (std::fabs(w.slipRatio) - 0.25f), 0.f, 1.f);
-        if (w.waterDepth > 0.03f) water = std::max(water, player.speed() + ws * w.radius * 0.3f);
+        if (w.waterDepth > 0.03f) water = std::max(water, v.speed() + ws * w.radius * 0.3f);
     }
     s.mudSlap = clampf(slap / 2.f, 0.f, 1.f);
     s.lugRate = nMud > 0 ? lug / nMud : 0;
     s.mudRoll = clampf(roll / 3.f, 0.f, 1.f);
-    s.waterSpeed = std::max(water, player.submerged > 0 ? player.speed() : 0.f);
-    s.firmSpeed = player.speed() * firm / 4.f;
+    s.waterSpeed = std::max(water, v.submerged > 0 ? v.speed() : 0.f);
+    s.firmSpeed = v.speed() * firm / 4.f;
     s.squeal = clampf(squeal / 2.f, 0.f, 1.f);
-    s.scrape = player.events.bellyScrape;
-    s.debris = clampf(ejected / std::max(dt, 1e-3f) * 4000.f, 0.f, 80.f);
-    s.tireLugHz = player.speed() / (2.f * PI * player.wheels[0].radius) * lugs;
+    s.scrape = v.events.bellyScrape;
+    s.debris = clampf(ejectedVol / std::max(dt, 1e-3f) * 4000.f, 0.f, 80.f);
+    s.tireLugHz = v.speed() / (2.f * PI * v.wheels[0].radius) * lugs;
+    return s;
+}
+
+void Game::feedAudio(float dt) {
+    Vec3 cf = camTarget - camPos;
+    audio.setListener(camPos, cf, player.vel);
+    VehicleSound s = soundFor(player, true, ejected, dt);
     audio.setVehicle(localId, s);
     g_playerSound = s;
+    for (size_t i = 0; i < ais.size(); i++) audio.setVehicle(100 + int(i), soundFor(ais[i].v, false, 0.f, dt));
     for (auto& kv : remotes) {
         Remote& r = kv.second;
         if (!r.valid) continue;
@@ -338,7 +383,34 @@ void Game::addVehicleDraws(RenderFrame& f, const Vehicle& g, const VehicleVisual
     }
 }
 
+void Game::updateLens(float dt) {
+    for (auto& l : lens) {
+        l.a -= dt * (l.a > 0 ? 0.12f : -0.6f);   // mud fades slowly, water drops evaporate fast
+        if (l.a < 0) l.y -= dt * 0.03f;          // water runs down the lens
+    }
+    lens.erase(std::remove_if(lens.begin(), lens.end(), [](const LensSplat& l) { return std::fabs(l.a) < 0.02f; }), lens.end());
+    if (state != AppState::Playing || !renderer.postEnabled) return;
+    Rng& R = particles.rng;
+    int added = 0;
+    for (const Particle& p : particles.all()) {
+        if (added >= 2) break;
+        if (p.type != PType::MudChunk && p.type != PType::MudSpray && p.type != PType::Water) continue;
+        Vec3 d = camPos - p.p;
+        float dd = dot(d, d);
+        if (dd > 2.6f * 2.6f || dot(p.v, d) <= 0) continue;
+        Vec3 ndc = renderer.viewProj.transformPoint(p.p);
+        if (std::fabs(ndc.x) > 1 || std::fabs(ndc.y) > 1 || ndc.z > 1) continue;
+        if (R.uniform() > 0.35f) continue;
+        bool water = p.type == PType::Water;
+        LensSplat l{ndc.x * 0.5f + 0.5f, ndc.y * 0.5f + 0.5f, R.range(0.02f, 0.07f) * (water ? 0.6f : 1.f), water ? -0.9f : R.range(0.6f, 0.95f)};
+        if (lens.size() >= 16) lens.erase(lens.begin());
+        lens.push_back(l);
+        added++;
+    }
+}
+
 void Game::buildFrame(RenderFrame& f) {
+    for (auto& l : lens) f.lens.insert(f.lens.end(), {l.x, l.y, l.r, l.a});
     f.camPos = camPos;
     f.camTarget = camTarget;
     f.fov = fov;
@@ -354,6 +426,26 @@ void Game::buildFrame(RenderFrame& f) {
         float c2[4];
         for (int i = 0; i < 4; i++) c2[i] = r.cur.wheelComp[i] * r.geom.travel;
         addVehicleDraws(f, r.geom, r.vis, r.cur.pos, r.cur.rot, c2, r.spin, r.cur.steer * 0.5f, r.cur.dirt, 1.f);
+    }
+    for (size_t i = 0; i < ais.size(); i++) {
+        const Vehicle& v = ais[i].v;
+        for (int k = 0; k < 4; k++) { comp[k] = v.wheels[size_t(k)].compression; spin[k] = v.wheels[size_t(k)].spin; }
+        addVehicleDraws(f, v, aiVis[i], v.pos, v.rot, comp, spin, v.steerApplied, v.dirt, 1.f);
+    }
+    // Translucent ghost of the personal best, sampled at the current race time.
+    if (ghostTrace.size() >= 16 && mode.phase == Phase::Running) {
+        size_t n = ghostTrace.size() / 8, lo = 0, hi = n - 1;
+        float t = mode.elapsed;
+        if (t <= ghostTrace[(n - 1) * 8]) {
+            while (hi - lo > 1) { size_t mid = (lo + hi) / 2; (ghostTrace[mid * 8] <= t ? lo : hi) = mid; }
+            const float *a = &ghostTrace[lo * 8], *b = &ghostTrace[hi * 8];
+            float u = clampf((t - a[0]) / std::max(1e-4f, b[0] - a[0]), 0.f, 1.f);
+            Vec3 gp = lerp(Vec3{a[1], a[2], a[3]}, Vec3{b[1], b[2], b[3]}, u);
+            Quat gq = slerp(Quat{a[4], a[5], a[6], a[7]}, Quat{b[4], b[5], b[6], b[7]}, u);
+            float gc[4], gs[4];
+            for (int k = 0; k < 4; k++) { gc[k] = player.travel * 0.38f; gs[k] = t * 20.f; }
+            addVehicleDraws(f, player, playerVis, gp, gq, gc, gs, 0.f, 0.f, 0.32f);
+        }
     }
 }
 
@@ -389,6 +481,9 @@ void Game::frame(double nowMs) {
     }
     hornTimer -= dt;
 
+    bool running = mode.phase == Phase::Running;
+    for (auto& a : ais) aiThink(a, mode.id, world, dt, running ? mode.elapsed : time, running);
+
     // Fixed-step physics.
     accum += dt;
     int steps = 0;
@@ -416,6 +511,10 @@ void Game::frame(double nowMs) {
     player.events = ev;
     splashMax = ev.splash;
 
+    if (running && !aiReleased) {
+        for (auto& a : ais) { a.v.manual = false; a.v.gear = 1; }
+        aiReleased = true;
+    }
     // Countdown over: drop it in gear.
     if (mode.phase == Phase::Running && mode.id != ModeId::FreeRoam && player.gear == 0 && player.manual && !g_userManual) {
         player.manual = false;
@@ -424,6 +523,7 @@ void Game::frame(double nowMs) {
 
     // Remote replicas
     std::vector<Vehicle*> vehicles{&player};
+    for (auto& a : ais) vehicles.push_back(&a.v);
     double rt = serverNow() - kInterpDelay;
     for (auto& kv : remotes) {
         Remote& r = kv.second;
@@ -441,7 +541,26 @@ void Game::frame(double nowMs) {
     world.stepDynamics(dt, vehicles, wev);
     relaxTimer += dt;
     if (relaxTimer > 0.05f) { world.terrain.relax(player.pos, 7.f, relaxTimer); relaxTimer = 0; }
-    spawnWheelFx(player, dt);
+    ejected = spawnWheelFx(player, dt);
+    for (size_t i = 0; i < ais.size(); i++) {
+        AiDriver& a = ais[i];
+        float e = spawnWheelFx(a.v, dt);
+        if (mode.phase == Phase::Running) aiProgress(a, mode.id, world, dt, mode.elapsed, e);
+        if (a.v.events.impact > 1500.f) audio.trigger(SfxType::Impact, a.v.events.impactPos, clampf(a.v.events.impact / 9000.f, 0.f, 1.2f));
+        if (a.v.events.splash > 0.4f) audio.trigger(SfxType::Splash, a.v.events.splashPos, clampf(a.v.events.splash / 2.f, 0.2f, 1.2f));
+        for (int k = 0; k < std::min(a.v.events.backfires, 2); k++) audio.backfire(100 + int(i));
+        a.v.events.clear();
+        if (relaxTimer == 0 && length(a.v.pos - player.pos) < 70.f) world.terrain.relax(a.v.pos, 6.f, 0.05f);
+    }
+    // Ghost: record this run, and replay the stored personal best.
+    if (mode.phase == Phase::Running && (mode.id == ModeId::MudBog || mode.id == ModeId::Circuit)) {
+        traceTimer -= dt;
+        if (traceTimer <= 0) {
+            traceTimer = 0.05f;
+            const float smp[8] = {mode.elapsed, player.pos.x, player.pos.y, player.pos.z, player.rot.x, player.rot.y, player.rot.z, player.rot.w};
+            if (runTrace.size() < 8 * 20 * 600) runTrace.insert(runTrace.end(), smp, smp + 8);
+        }
+    }
     particles.update(dt, world.terrain);
 
     // Events -> audio, rumble, camera, crowd
@@ -496,14 +615,49 @@ void Game::frame(double nowMs) {
     g_lastPhase = mode.phase;
 
     updateCamera(dt, in);
+    updateLens(dt);
     feedAudio(dt);
     RenderFrame f;
     buildFrame(f);
     renderer.render(world, f);
 }
 
+std::string Game::standingsJson() {
+    struct Row { std::string name, text; float key; bool you; };
+    std::vector<Row> rows;
+    auto ft = [](float m) { return std::to_string(int(m * 3.281f)) + " ft"; };
+    auto tm = [](float t) { char b[24]; int mi = int(t / 60); std::snprintf(b, sizeof b, "%d:%05.2f", mi, t - mi * 60); return std::string(b); };
+    const int n = int(world.circuit.size());
+    auto add = [&](const std::string& nm, bool you, float dist, bool fin, float ftime, float lapProg, float score) {
+        Row r{nm, "", 0, you};
+        switch (mode.id) {
+            case ModeId::MudBog: r.key = fin ? 1000.f - ftime : dist; r.text = fin ? "PASS " + tm(ftime) : ft(dist); break;
+            case ModeId::Circuit: r.key = fin ? 100.f - ftime / 1000.f : lapProg; r.text = fin ? tm(ftime) : "Lap " + std::to_string(std::min(3, int(lapProg) + 1)); break;
+            case ModeId::Freestyle: r.key = score; r.text = std::to_string(int(score)) + " pts"; break;
+            case ModeId::King: r.key = score; r.text = tm(score); break;
+            default: r.key = 0; r.text = ""; break;
+        }
+        rows.push_back(r);
+    };
+    bool pfin = mode.phase == Phase::Finished;
+    float pLap = float(mode.lap) + float((mode.nextCp - 1 + n) % n) / float(n);
+    add(player.cfg.name, true, mode.distance, pfin && (mode.id != ModeId::MudBog || mode.distance > 79.9f),
+        mode.elapsed + mode.penalty, pLap, mode.id == ModeId::King ? mode.kingTime : mode.score);
+    for (auto& a : ais) add(a.name, false, a.distance, a.finished, a.finishTime, a.score, a.id_score());
+    for (auto& kv : remotes)
+        if (kv.second.valid) add(kv.second.net.name, false, kv.second.cur.distance, false, 0, kv.second.cur.score, kv.second.cur.score);
+    std::stable_sort(rows.begin(), rows.end(), [](const Row& x, const Row& y) { return x.key > y.key; });
+    std::string out = "[";
+    for (size_t i = 0; i < rows.size(); i++) {
+        std::string nm;
+        for (char c : rows[i].name) if (c != '"' && c != '\\' && c >= 32) nm += c;
+        out += (i ? "," : "") + std::string("{\"name\":\"") + nm + "\",\"text\":\"" + rows[i].text + "\",\"you\":" + (rows[i].you ? "true" : "false") + "}";
+    }
+    return out + "]";
+}
+
 const char* Game::hud() {
-    char buf[4096];
+    char buf[8192];
     const EngineSpec& e = *player.engine;
     double now = serverNow();
     std::string res = "[";
@@ -525,7 +679,14 @@ const char* Game::hud() {
         others += r;
         first = false;
     }
+    for (size_t i = 0; i < ais.size(); i++) {
+        char r[160];
+        std::snprintf(r, sizeof r, "%s{\"id\":%d,\"x\":%.1f,\"z\":%.1f,\"ai\":true}", first ? "" : ",", 100 + int(i), ais[i].v.pos.x, ais[i].v.pos.z);
+        others += r;
+        first = false;
+    }
     others += "]";
+    std::string standings = standingsJson();
     Vec3 f = player.forward();
     std::snprintf(buf, sizeof buf,
                   "{\"state\":%d,\"mph\":%.1f,\"rpm\":%.0f,\"redline\":%.0f,\"gear\":%d,\"manual\":%s,\"low\":%s,\"awd\":%s,"
@@ -534,7 +695,7 @@ const char* Game::hud() {
                   "\"distance\":%.2f,\"score\":%.1f,\"combo\":%.2f,\"lap\":%d,\"laps\":%d,\"bestLap\":%.2f,\"lastLap\":%.2f,"
                   "\"penalty\":%.1f,\"king\":%.2f,\"stuck\":%s,\"belly\":%.2f,\"slip\":%.2f,\"air\":%.2f,\"message\":\"%s\","
                   "\"finishSerial\":%d,\"results\":%s,\"x\":%.1f,\"z\":%.1f,\"heading\":%.3f,\"others\":%s,"
-                  "\"pause\":%s,\"pad\":%s,\"padName\":\"%s\",\"engine\":\"%s\",\"dirt\":%.2f,\"lane\":%d}",
+                  "\"pause\":%s,\"pad\":%s,\"padName\":\"%s\",\"engine\":\"%s\",\"dirt\":%.2f,\"lane\":%d,\"standings\":%s,\"ghost\":%s}",
                   int(state), player.speed() * 2.237f, player.engineRpm, e.redlineRpm, player.gear, player.manual ? "true" : "false",
                   player.lowRange ? "true" : "false", player.fourWD ? "true" : "false", player.lockFront ? "true" : "false",
                   player.lockRear ? "true" : "false", player.psi, player.engineTemp, player.radiatorClog, player.boost,
@@ -543,7 +704,8 @@ const char* Game::hud() {
                   mode.bestLap, mode.lastLap, mode.penalty, mode.kingTime, mode.stuck ? "true" : "false", player.bellyLoad,
                   player.avgSlip, player.airTime, mode.messageTimer > 0 ? mode.message.c_str() : "", g_finishSerial, res.c_str(),
                   player.pos.x, player.pos.z, std::atan2(f.x, f.z), others.c_str(), g_pauseRequested ? "true" : "false",
-                  input.gamepadConnected ? "true" : "false", input.gamepadName, e.name.c_str(), player.dirt, mode.lane);
+                  input.gamepadConnected ? "true" : "false", input.gamepadName, e.name.c_str(), player.dirt, mode.lane,
+                  standings.c_str(), ghostTrace.size() >= 16 ? "true" : "false");
     hudJson = buf;
     g_pauseRequested = false;
     return hudJson.c_str();

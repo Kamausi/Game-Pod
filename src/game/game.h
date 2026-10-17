@@ -6,6 +6,8 @@
 #include "../input/input.h"
 #include "../net/net.h"
 #include "../render/renderer.h"
+#include "../physics/collide.h"
+#include "ai.h"
 #include "modes.h"
 #include "particles.h"
 #include "world.h"
@@ -47,6 +49,11 @@ public:
     void addRemote(int id, const std::string& cfg, const std::string& name);
     void removeRemote(int id);
 
+    // Solo rivals + ghost replay
+    void setAiCount(int n) { aiCount = std::max(0, std::min(3, n)); }
+    void ghostLoad(const float* data, int count) { ghostTrace.assign(data, data + count); }
+    const std::vector<float>& lastRunTrace() const { return runTrace; }
+
     World world;
     Renderer renderer;
     AudioEngine audio;
@@ -62,7 +69,9 @@ public:
 
 private:
     void simulate(float dt, const InputState& in);
-    void spawnWheelFx(const Vehicle& v, float dt);
+    float spawnWheelFx(const Vehicle& v, float dt);
+    VehicleSound soundFor(const Vehicle& v, bool local, float ejectedVol, float dt);
+    std::string standingsJson();
     void updateCamera(float dt, const InputState& in);
     void feedAudio(float dt);
     void buildFrame(RenderFrame& f);
@@ -86,6 +95,15 @@ private:
     float slurpTimer = 0, hornTimer = 0;
     std::string hudJson, resultsJson;
     int lockerState = 1;
+    std::vector<AiDriver> ais;
+    std::vector<VehicleVisual> aiVis;
+    int aiCount = 3;
+    bool aiReleased = false;
+    std::vector<float> ghostTrace, runTrace;   // 8 floats per sample: t, pos.xyz, rot.xyzw
+    float traceTimer = 0;
+    struct LensSplat { float x, y, r, a; };
+    std::vector<LensSplat> lens;
+    void updateLens(float dt);
     float relaxTimer = 0;
 };
 

@@ -210,7 +210,7 @@ void Terrain::relax(Vec3 center, float radius, float dt) {
             if (m < 0.45f) continue;
             int lx = i - b.i0, lz = j - b.j0;
             float avg = 0.25f * (tmp[lz * w + lx - 1] + tmp[lz * w + lx + 1] + tmp[(lz - 1) * w + lx] + tmp[(lz + 1) * w + lx]);
-            float rate = clampf(sq((m - 0.45f) / 0.55f) * 1.6f * dt, 0.f, 0.25f);
+            float rate = clampf(sq((m - 0.45f) / 0.55f) * 1.6f * g_tuning.reflow * dt, 0.f, 0.25f);
             float nh = tmp[lz * w + lx] + (avg - tmp[lz * w + lx]) * rate;
             nh = std::max(nh, base[k]);
             if (std::fabs(nh - h[k]) > 1e-5f) {

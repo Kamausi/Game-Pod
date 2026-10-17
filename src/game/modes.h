@@ -30,6 +30,8 @@ public:
     void update(float dt, double now, World& w, Vehicle& v, float ejectedVolume, float splash, int barrelsKnocked);
     void requestTow(World& w, Vehicle& v);
     void resetToSpawn(World& w, Vehicle& v);
+    // Spawn location/heading for any lane of the current mode (also used for AI drivers).
+    Vec3 spawnFor(const World& w, int lane, float& yaw) const;
 
     ModeId id = ModeId::FreeRoam;
     Phase phase = Phase::Idle;
@@ -52,7 +54,6 @@ public:
 private:
     void finish(const std::string& msg);
     void flash(const std::string& m, float t = 2.5f) { message = m; messageTimer = t; }
-    Vec3 spawnPos(World& w, float& yaw) const;
 };
 
 const char* modeName(ModeId id);

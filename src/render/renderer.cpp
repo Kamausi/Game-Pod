@@ -243,6 +243,44 @@ void main(){
 }
 )";
 
+const char* kPostVS = R"(
+out vec2 vUV;
+void main(){ vec2 p = vec2((gl_VertexID<<1)&2, gl_VertexID&2); vUV = p; gl_Position = vec4(p*2.0-1.0, 0.0, 1.0); }
+)";
+const char* kPostFS = R"(
+in vec2 vUV;
+uniform sampler2D uScene;
+uniform vec4 uSplats[16];
+uniform int uSplatN;
+uniform vec2 uRes;
+out vec4 frag;
+float h21(vec2 p){ p = fract(p*vec2(233.34, 851.73)); p += dot(p, p+23.45); return fract(p.x*p.y); }
+void main(){
+  vec2 uv = vUV;
+  float aspect = uRes.x/uRes.y;
+  float mud = 0.0; vec2 refr = vec2(0.0); float shade = 0.0;
+  for(int i = 0; i < 16; i++){
+    if(i >= uSplatN) break;
+    vec4 s = uSplats[i];
+    vec2 d = (uv - s.xy)*vec2(aspect, 1.0);
+    float ang = atan(d.y, d.x), fi = float(i);
+    float edge = s.z*(0.78 + 0.16*sin(ang*5.0 + fi*1.7) + 0.08*sin(ang*11.0 + fi*3.1));
+    float dist = length(d);
+    float m = 1.0 - smoothstep(edge*0.82, edge, dist);
+    if(s.w > 0.0){ mud = max(mud, m*s.w); shade += (1.0 - smoothstep(edge, edge*1.25, dist))*s.w*0.25; }
+    else refr += normalize(d + 1e-5)*m*(-s.w)*(dist/max(edge,1e-4))*s.z*0.5;
+  }
+  vec3 col = texture(uScene, clamp(uv - refr, 0.001, 0.999)).rgb;
+  col *= 1.0 - clamp(shade, 0.0, 0.35);
+  vec3 mudCol = vec3(0.24, 0.18, 0.12)*(0.75 + 0.5*h21(floor(uv*uRes/2.5)));
+  col = mix(col, mudCol, clamp(mud, 0.0, 0.94));
+  vec2 q = uv - 0.5;
+  col *= 1.0 - dot(q, q)*0.6;                      // vignette
+  col = mix(col, col*vec3(1.05, 1.0, 0.93), 0.6);  // warm late-afternoon grade
+  frag = vec4(col, 1.0);
+}
+)";
+
 std::string src(const char* body) { return std::string(kHeader) + kCommon + body; }
 
 void extractPlanes(const Mat4& m, float planes[6][4]) {
@@ -274,6 +312,8 @@ bool Renderer::init(int w, int h) {
     progSky = compileProgram("sky", std::string(kHeader) + kSkyVS, src(kSkyFS));
     progParticle = compileProgram("particle", src(kParticleVS), src(kParticleFS));
     progFence = compileProgram("fence", src(kFenceVS), src(kFenceFS));
+    progPost = compileProgram("post", std::string(kHeader) + kPostVS, std::string(kHeader) + kPostFS);
+    glGenVertexArrays(1, &postVao);
     glGenVertexArrays(1, &skyVao);
 
     // Terrain chunk grid shared by all chunks: 65x65 + skirt rings.
@@ -385,6 +425,63 @@ bool Renderer::init(int w, int h) {
 }
 
 void Renderer::resize(int w, int h) { width = w; height = h; }
+
+void Renderer::setSun(float az, float el) {
+    sunDir = normalize(Vec3{std::cos(el * DEG) * std::sin(az * DEG), std::sin(el * DEG), std::cos(el * DEG) * std::cos(az * DEG)});
+}
+
+void Renderer::ensureTargets() {
+    if (targetW == width && targetH == height && msFbo) return;
+    targetW = width;
+    targetH = height;
+    if (!msFbo) {
+        glGenFramebuffers(1, &msFbo);
+        glGenRenderbuffers(1, &msColor);
+        glGenRenderbuffers(1, &msDepth);
+        glGenFramebuffers(1, &resolveFbo);
+        glGenTextures(1, &resolveTex);
+    }
+    GLint maxS = 4;
+    glGetIntegerv(GL_MAX_SAMPLES, &maxS);
+    GLsizei samples = std::min<GLint>(4, maxS);
+    glBindRenderbuffer(GL_RENDERBUFFER, msColor);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, msDepth);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT24, width, height);
+    glBindFramebuffer(GL_FRAMEBUFFER, msFbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, msColor);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, msDepth);
+    glBindTexture(GL_TEXTURE_2D, resolveTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resolveTex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::postPass(const RenderFrame& f) {
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, msFbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
+    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, width, height);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glUseProgram(progPost);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, resolveTex);
+    glUniform1i(glGetUniformLocation(progPost, "uScene"), 0);
+    int n = std::min<int>(16, int(f.lens.size() / 4));
+    glUniform1i(glGetUniformLocation(progPost, "uSplatN"), n);
+    if (n) glUniform4fv(glGetUniformLocation(progPost, "uSplats"), n, f.lens.data());
+    glUniform2f(glGetUniformLocation(progPost, "uRes"), float(width), float(height));
+    glBindVertexArray(postVao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glEnable(GL_DEPTH_TEST);
+}
 
 const GpuMesh* Renderer::mesh(const std::string& part, const CadParams& params) {
     std::string key = part;
@@ -543,12 +640,26 @@ void Renderer::drawStatic(GLuint prog) {
     for (auto& b : batches) drawMesh(b.mesh, b.count);
 }
 
-void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass) {
+void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass, bool transparent) {
     GLint locModel = glGetUniformLocation(prog, "uModel"), locDirt = glGetUniformLocation(prog, "uDirt");
     GLint locRange = glGetUniformLocation(prog, "uDirtRange"), locAlpha = glGetUniformLocation(prog, "uAlpha");
     GLint locSeed = glGetUniformLocation(prog, "uSeed"), locMirror = glGetUniformLocation(prog, "uMirror");
     glUniform1i(locMirror, 0);
     Mat4 I = Mat4::identity();
+    if (transparent) {
+        for (const DrawItem& it : f.items) {
+            if (!it.mesh || it.alpha >= 0.99f) continue;
+            glUniformMatrix4fv(locModel, 1, GL_FALSE, it.model.m);
+            glUniform1f(locDirt, it.dirt);
+            glUniform2f(locRange, it.dirtLo, it.dirtHi);
+            glUniform1f(locAlpha, it.alpha);
+            glUniform1f(locSeed, it.seed);
+            glUniform1i(locMirror, it.mirror ? 1 : 0);
+            drawMesh(*it.mesh, 1);
+        }
+        glUniform1i(locMirror, 0);
+        return;
+    }
     // Barrels
     glUniformMatrix4fv(locModel, 1, GL_FALSE, I.m);
     glUniform1f(locDirt, 0.15f);
@@ -581,7 +692,7 @@ void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool sha
     // Vehicles, wheels, etc.
     for (const DrawItem& it : f.items) {
         if (!it.mesh) continue;
-        if (it.alpha < 0.99f && shadowPass) continue;
+        if (it.alpha < 0.99f) continue;  // drawn in the transparent pass
         glUniformMatrix4fv(locModel, 1, GL_FALSE, it.model.m);
         glUniform1f(locDirt, it.dirt);
         glUniform2f(locRange, it.dirtLo, it.dirtHi);
@@ -641,8 +752,9 @@ void Renderer::render(World& w, const RenderFrame& f) {
     glDrawArrays(GL_TRIANGLES, 0, fenceVerts);
     glDisable(GL_POLYGON_OFFSET_FILL);
 
-    // ---- main pass ----
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // ---- main pass (into the MSAA target when post-processing is on) ----
+    if (postEnabled) ensureTargets();
+    glBindFramebuffer(GL_FRAMEBUFFER, postEnabled ? msFbo : 0);
     glViewport(0, 0, width, height);
     glClearColor(0.5f, 0.65f, 0.9f, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -708,6 +820,11 @@ void Renderer::render(World& w, const RenderFrame& f) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     setCommon(progTerrain);
     drawTerrain(true, viewProj);
+    setCommon(progMesh);
+    glUniformMatrix4fv(glGetUniformLocation(progMesh, "uVP"), 1, GL_FALSE, viewProj.m);
+    glDepthMask(GL_FALSE);
+    drawDynamic(w, f, progMesh, false, true);
+    glDepthMask(GL_TRUE);
     if (np) {
         glDepthMask(GL_FALSE);
         setCommon(progParticle);
@@ -717,6 +834,7 @@ void Renderer::render(World& w, const RenderFrame& f) {
         glDepthMask(GL_TRUE);
     }
     glDisable(GL_BLEND);
+    if (postEnabled) postPass(f);
     glBindVertexArray(0);
 }
 

@@ -8,6 +8,7 @@
 #pragma once
 #include <cmath>
 #include "../core/math.h"
+#include "tuning.h"
 
 namespace mb {
 
@@ -87,13 +88,13 @@ struct MudModel {
         const float mm[4] = {0.f, 0.3f, 0.6f, 1.0f};
         int s = m < 0.3f ? 0 : (m < 0.6f ? 1 : 2);
         float t = (m - mm[s]) / (mm[s + 1] - mm[s]);
-        return std::exp(lerpf(lk[s], lk[s + 1], t));
+        return std::exp(lerpf(lk[s], lk[s + 1], t)) * g_tuning.soilStiffness;
     }
     static float cohesion(float m) {  // Pa
         m = clampf(m, 0, 1);
-        return m < 0.5f ? lerpf(68.95e3f, 20.69e3f, m / 0.5f) * 0.25f : lerpf(5.17e3f, 1.2e3f, (m - 0.5f) / 0.5f);
+        return g_tuning.cohesion * (m < 0.5f ? lerpf(68.95e3f, 20.69e3f, m / 0.5f) * 0.25f : lerpf(5.17e3f, 1.2e3f, (m - 0.5f) / 0.5f));
     }
-    static float phi(float m) { return lerpf(20.f, 4.f, clampf(m, 0, 1)) * DEG; }
+    static float phi(float m) { return std::atan(std::tan(lerpf(20.f, 4.f, clampf(m, 0, 1)) * DEG) * g_tuning.friction); }
     static float shearK(float m) { return lerpf(0.012f, 0.04f, clampf(m, 0, 1)); }
     // Pseudo-viscosity (Pa per m/s of sinkage rate): high = slow to sink (momentum helps).
     static float viscosity(float m) {
@@ -102,7 +103,7 @@ struct MudModel {
         const float mm[4] = {0.f, 0.5f, 0.8f, 1.0f};
         int s = m < 0.5f ? 0 : (m < 0.8f ? 1 : 2);
         float t = (m - mm[s]) / (mm[s + 1] - mm[s]);
-        return std::exp(lerpf(lv[s], lv[s + 1], t));
+        return std::exp(lerpf(lv[s], lv[s + 1], t)) * g_tuning.soilViscosity;
     }
     // "Stickiness" of clay: peaks around the plastic limit (~55-75% moisture in our scale).
     static float stickiness(float m) { return std::exp(-sq((m - 0.65f) / 0.18f)); }

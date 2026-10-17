@@ -9,6 +9,9 @@ namespace {
 constexpr float G = 9.81f;
 constexpr float IN = 0.0254f;
 Rng g_rng(0xC0FFEEu);
+}  // namespace
+Tuning g_tuning;
+namespace {
 
 struct TreadCoeffs {
     float firm, lateral, lateralMud, grouser, dig, packRate, clearRate;
@@ -131,7 +134,7 @@ void Vehicle::stepDrivetrain(float dt, const VehicleInput& in, float& totalTorqu
     if (engineRpm > e.redlineRpm && !fuelCut) { fuelCut = true; events.limiterHits++; if (g_rng.uniform() < 0.35f) events.backfires++; }
     if (fuelCut && engineRpm < e.redlineRpm - 260.f) fuelCut = false;
 
-    float Te = fuelCut ? 0.f : thr * e.torqueAt(engineRpm) * derate() * boostMul;
+    float Te = fuelCut ? 0.f : thr * e.torqueAt(engineRpm) * derate() * boostMul * g_tuning.engineTorque;
     if (shiftTimer > 0) Te *= 0.25f;
     const float Tfric = (0.05f + 0.13f * engineRpm / e.redlineRpm) * e.peakTorque() * (1.f - 0.85f * thr);
 
@@ -254,7 +257,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
 
         float Fs = 0;
         if (w.contact) {
-            Fs = springK * std::min(compression, travel) + damperC * compVel;
+            Fs = springK * g_tuning.spring * std::min(compression, travel) + damperC * g_tuning.damper * compVel;
             float stop = travel * 0.9f;
             if (compression > stop) {
                 Fs += springK * 14.f * std::min(compression - stop, 0.08f) + damperC * 2.f * std::max(0.f, compVel);
@@ -341,7 +344,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         const float fmaxM = A * coh * tc.grouser + w.load * tanEff;
         const float Kshear = MudModel::shearK(m);
         const float wetness = clampf((m - 0.3f) / 0.7f, 0.f, 1.f);
-        const float muFirm = lerpf(0.8f, 0.62f, ts.grass) * (1.f - 0.38f * wetness) * tc.firm *
+        const float muFirm = g_tuning.firmGrip * lerpf(0.8f, 0.62f, ts.grass) * (1.f - 0.38f * wetness) * tc.firm *
                              (1.f - 0.3f * clampf(ts.waterDepth / 0.1f, 0.f, 1.f));
         const float psiLat = 1.f - 0.25f * clampf(1.f - psi / 25.f, 0.f, 1.f);
 
@@ -374,7 +377,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         float zc = std::min(wall, rr) * 0.6f;
         float Rc = compactionResistance(b, kEq, nExp, zc);
         float Rb = rankineBulldozing(b, wall, MudModel::unitWeight, coh, phi);
-        float Rs = MudModel::stickiness(m) * A * 3500.f * clampf(wall / (rr * 0.5f), 0.f, 1.f);
+        float Rs = g_tuning.suction * MudModel::stickiness(m) * A * 3500.f * clampf(wall / (rr * 0.5f), 0.f, 1.f);
         float Rroll = w.load * (0.015f + 0.01f * clampf((15.f - psi) / 10.f, 0.f, 1.f));
         // Slurry / water drag on the buried part of the tire: 0.5 rho Cd A v^2.
         float buried = std::min(wall + 0.5f * defl, 2.f * rr) * mudW;
@@ -404,7 +407,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         float Td = driven ? driveTorque / nDriven : 0.f;
         w.driveTorque = Td;
         // Churning slurry resists a spinning tire (paddle-wheel drag ~ omega^2).
-        float churnK = 0.45f * (cfg.tread == Tread::Paddle ? 1.6f : 1.f) * mudW * std::min(wall + defl + 0.1f, 2.f * rr);
+        float churnK = 0.45f * g_tuning.churn * (cfg.tread == Tread::Paddle ? 1.6f : 1.f) * mudW * std::min(wall + defl + 0.1f, 2.f * rr);
         float Tchurn = churnK * w.omega * std::fabs(w.omega);
         w.omega += dt * (Td - Fx * rr - Tchurn) / (Iw + dt * (rr * dFdw + 2.f * churnK * std::fabs(w.omega)));
         float Tb = brakePedal * (w.front ? 3400.f : 2400.f) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
@@ -423,7 +426,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         if (mud > 0.01f && ss > 1.0f) {
             float loadFrac = clampf(w.load / (mass * G * 0.25f), 0.f, 1.3f);  // unloaded tires can't dig
             // Lugs can only carry so much slop per revolution: saturate with slip speed.
-            float depth = 0.006f * tc.dig * (0.35f + 0.65f * m) * std::min(ss - 1.f, 8.f) * loadFrac * dt;
+            float depth = 0.006f * g_tuning.digRate * tc.dig * (0.35f + 0.65f * m) * std::min(ss - 1.f, 8.f) * loadFrac * dt;
             Vec3 dc{w.worldCenter.x, gy, w.worldCenter.z};
             w.ejectVolume += terrain.digPatch(dc, f, std::max(Lc * 0.5f, rs * 0.45f), b * 0.55f, depth);
         }
@@ -490,7 +493,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         float k = lerpf(1.6e5f, 3.0e4f, soft), c = lerpf(9000.f, 5000.f, soft);
         float Fn = std::max(0.f, k * pen - c * vn);
         float suction = 0;
-        if (soft > 0.2f && vn > 0.f) suction = -std::min(9000.f * soft * (0.5f + MudModel::stickiness(ts.moisture)), 6000.f * vn);
+        if (soft > 0.2f && vn > 0.f) suction = -g_tuning.suction * std::min(9000.f * soft * (0.5f + MudModel::stickiness(ts.moisture)), 6000.f * vn);
         Vec3 vt = vp - n * vn;
         float vtl = length(vt);
         Vec3 Fc = n * (Fn + suction);

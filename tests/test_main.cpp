@@ -12,6 +12,8 @@
 #include "net/net.h"
 #include "physics/terramechanics.h"
 #include "physics/vehicle.h"
+#include "physics/collide.h"
+#include "game/ai.h"
 
 using namespace mb;
 
@@ -223,6 +225,70 @@ int main() {
         CHECK(finite, "NaN/inf in audio output");
         CHECK(peak <= 1.f, "limiter: peak %.3f", peak);
         CHECK(rms > 0.01f, "audible output, rms %.4f", rms);
+    });
+
+    test("collisions: trucks can't drive through each other", [] {
+        Terrain t;
+        makePit(t, 0.2f, 0);
+        Vehicle a, b;
+        a.configure(VehicleConfig{});
+        b.configure(VehicleConfig::parse("body=silverado;engine=duramax"));
+        a.reset({-80, -a.rideAxleY + a.wheels[0].radius, 0}, PI / 2);
+        b.reset({-60, -b.rideAxleY + b.wheels[0].radius, 0}, -PI / 2);
+        VehicleInput in;
+        in.throttle = 1;
+        float minGap = 1e9f, maxJ = 0;
+        for (int i = 0; i < 240 * 6; i++) {
+            a.step(t, in, Vehicle::DT);
+            b.step(t, in, Vehicle::DT);
+            maxJ = std::max(maxJ, collideVehicles(a, b, true));
+            minGap = std::min(minGap, std::fabs(a.pos.x - b.pos.x));
+        }
+        CHECK(maxJ > 100.f, "impact registered (%.0f N*s)", maxJ);
+        CHECK(minGap > 4.9f, "bodies stayed apart (closest %.2f m between centers)", minGap);
+        CHECK(a.pos.x < b.pos.x, "no tunneling");
+    });
+
+    test("ai: rivals race the circuit and attack the bog", [] {
+        static World w;
+        w.generate(1976);
+        ModeRunner m;
+        m.id = ModeId::Circuit;
+        auto rivals = makeRivals(2, 3);
+        for (auto& r : rivals) {
+            float yaw;
+            Vec3 p = m.spawnFor(w, r.lane, yaw);
+            p.y = w.terrain.heightAt(p.x, p.z) - r.v.rideAxleY + r.v.wheels[0].radius + 0.2f;
+            r.v.reset(p, yaw);
+        }
+        for (int f = 0; f < 60 * 70; f++) {
+            for (auto& r : rivals) {
+                aiThink(r, ModeId::Circuit, w, 1.f / 60, f / 60.f, true);
+                for (int s = 0; s < 4; s++) { r.v.step(w.terrain, r.input, Vehicle::DT); w.collideStatic(r.v, Vehicle::DT); }
+                aiProgress(r, ModeId::Circuit, w, 1.f / 60, f / 60.f, 0);
+            }
+            collideVehicles(rivals[0].v, rivals[1].v, true);
+        }
+        for (auto& r : rivals) {
+            std::printf("    %s: lap %d cp %d (%.1f)\n", r.name.c_str(), r.lap, r.nextCp, r.score);
+            CHECK(r.score >= 0.5f, "%s should make real progress around the circuit", r.name.c_str());
+        }
+        AiDriver bog = makeRivals(1, 9)[0];
+        bog.cfg = VehicleConfig::parse("body=comanche;engine=ls53_sc;tire=40;tread=paddle;lockF=1;lockR=1;psi=9");
+        bog.v.configure(bog.cfg);
+        m.id = ModeId::MudBog;
+        float yaw;
+        Vec3 p = m.spawnFor(w, 2, yaw);
+        bog.lane = 2;
+        p.y = w.terrain.heightAt(p.x, p.z) - bog.v.rideAxleY + bog.v.wheels[0].radius + 0.2f;
+        bog.v.reset(p, yaw);
+        for (int f = 0; f < 60 * 40 && !bog.finished && !bog.gaveUp; f++) {
+            aiThink(bog, ModeId::MudBog, w, 1.f / 60, f / 60.f, true);
+            for (int s = 0; s < 4; s++) bog.v.step(w.terrain, bog.input, Vehicle::DT);
+            aiProgress(bog, ModeId::MudBog, w, 1.f / 60, f / 60.f, 0);
+        }
+        std::printf("    bog AI: %.1f m %s\n", bog.distance, bog.finished ? "(full pass)" : "");
+        CHECK(bog.distance > 30.f, "built AI should get deep into the pit");
     });
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);

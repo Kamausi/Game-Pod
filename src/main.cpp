@@ -54,6 +54,12 @@ EMSCRIPTEN_KEEPALIVE void mb_set_clock_offset(double off) { if (g_game) g_game->
 EMSCRIPTEN_KEEPALIVE void mb_set_local_id(int id) { if (g_game) { g_game->audio.removeVehicle(g_game->localId); g_game->localId = id; } }
 EMSCRIPTEN_KEEPALIVE double mb_server_now() { return g_game ? g_game->serverNow() : 0; }
 
+EMSCRIPTEN_KEEPALIVE void mb_set_post(int on) { if (g_game) g_game->renderer.postEnabled = on != 0; }
+EMSCRIPTEN_KEEPALIVE void mb_set_ai_count(int n) { if (g_game) g_game->setAiCount(n); }
+EMSCRIPTEN_KEEPALIVE void mb_ghost_load(const float* data, int count) { if (g_game) g_game->ghostLoad(data, count); }
+EMSCRIPTEN_KEEPALIVE const float* mb_ghost_trace_ptr() { return g_game ? g_game->lastRunTrace().data() : nullptr; }
+EMSCRIPTEN_KEEPALIVE int mb_ghost_trace_len() { return g_game ? int(g_game->lastRunTrace().size()) : 0; }
+
 // Catalog for the garage UI (bodies, engines) as JSON.
 EMSCRIPTEN_KEEPALIVE const char* mb_catalog() {
     g_catalog = "{\"bodies\":[";

@@ -333,6 +333,17 @@ void World::stepDynamics(float dt, std::vector<Vehicle*>& vehicles, WorldEvents&
 
 void World::collideStatic(Vehicle& v, float dt) {
     (void)dt;
+    // Venue boundary (the barbed-wire perimeter): soft wall that turns you around.
+    const float lim = terrain.size() * 0.5f - 4.f;
+    for (int ax = 0; ax < 3; ax += 2) {
+        float& p = ax == 0 ? v.pos.x : v.pos.z;
+        float& vel = ax == 0 ? v.vel.x : v.vel.z;
+        if (std::fabs(p) > lim) {
+            float s = signf(p);
+            p = s * lim;
+            if (vel * s > 0) vel = -vel * 0.3f;
+        }
+    }
     const float w = v.body->dims[0] * 0.5f, l = v.body->dims[2] * 0.5f, hh = v.body->dims[1] * 0.5f;
     Vec3 pts[10];
     int n = 0;

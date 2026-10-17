@@ -12,6 +12,8 @@ set(MB_CORE_SOURCES
   src/terrain/terrain.cpp
   src/physics/specs.cpp
   src/physics/vehicle.cpp
+  src/physics/collide.cpp
+  src/game/ai.cpp
   src/cad/cad.cpp
   src/audio/synth.cpp
   src/audio/audio.cpp
