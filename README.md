@@ -7,6 +7,12 @@ reference photos (see [docs/FORENSICS.md](docs/FORENSICS.md)).
 
 > Bog it. Sling it. Get stuck with your buddies.
 
+| The pit | Garage | Two-track & the old bus |
+|---|---|---|
+| ![pit](docs/screenshots/pit.png) | ![garage](docs/screenshots/garage.png) | ![circuit](docs/screenshots/circuit.png) |
+
+<sub>Captured headless with the software rasterizer; real GPUs render the same scene at full frame rate.</sub>
+
 ## Play
 ```bash
 node server/server.js          # serves web/ + multiplayer + leaderboards on :8787
