@@ -1,5 +1,8 @@
 # Goldenrod (Solidago) clump - late-season yellow plumes (photos 1-2 foreground): five leafy
 # stems, each arching over at the top into a one-sided spray of golden flower clusters.
+# lod=1: far version (no leaves, one plume blob per stem).
+param lod = 0
+set nl = 1-lod
 for i = 0, 4
   set a = i*72+17
   set h = 0.85+0.2*abs(sin(i*53))
@@ -12,11 +15,13 @@ for i = 0, 4
   # narrow lance leaves up the stem
   color #4f6a2a
   material leaf
-  box size=0.025,0.008,0.16 pos=ox+0.05*sin(a+90),h*0.35,oz+0.05*cos(a+90) rot=-30,a+90,0
-  box size=0.022,0.008,0.14 pos=ox+0.05*sin(a-90),h*0.55,oz+0.05*cos(a-90) rot=-30,a-90,0
+  box size=0.025*nl,0.008,0.16 pos=ox+0.05*sin(a+90),h*0.35,oz+0.05*cos(a+90) rot=-30,a+90,0
+  box size=0.022*nl,0.008,0.14 pos=ox+0.05*sin(a-90),h*0.55,oz+0.05*cos(a-90) rot=-30,a-90,0
   # plume: clusters arching out and down from the tip
   for k = 0, 2
     color 0.80-0.04*k 0.64-0.05*k 0.14
-    sphere r=0.055-0.008*k pos=ox+(0.05+0.07*k)*sin(a),h+0.04-0.03*k*k,oz+(0.05+0.07*k)*cos(a) scale=1,0.7,1.5 rot=0,a,0 seg=4
+    sphere r=(0.055-0.008*k)*nl pos=ox+(0.05+0.07*k)*sin(a),h+0.04-0.03*k*k,oz+(0.05+0.07*k)*cos(a) scale=1,0.7,1.5 rot=0,a,0 seg=4
   end
+  color 0.78 0.62 0.14
+  sphere r=0.10*lod pos=ox+0.1*sin(a),h,oz+0.1*cos(a) scale=1,0.8,1.6 rot=0,a,0 seg=4
 end

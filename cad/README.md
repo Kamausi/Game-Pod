@@ -41,6 +41,9 @@ for i = 0, 12 [, step]         # repeat the lines up to `end` (inclusive range, 
   box size=0.38,0.045,0.13 pos=0.72,0.3+0.27*sin(a),0.27*cos(a) rot=90-a,0,0
 end
 ```
+Distance LOD: a part that declares `param lod = 0` and builds a cheaper mesh with `lod=1` gets that
+version drawn beyond ~60 m (45 m Medium, 30 m Low) when it has 20+ instances (trees, weeds).
+
 Materials drive the game's physically based shading (clearcoat paint, reflective glass,
 chrome, satin rubber, glowing lenses); tires are always rubber. Mud is applied in-shader on
 top, so parts are authored clean.

@@ -2,6 +2,8 @@
 # of drooping branch sprays, each tier rotated against the last so the silhouette is ragged,
 # lighter new growth at the tips, a spire leader on top.
 param h = 7
+param lod = 0          # 1 = far version: drooping cone tiers instead of individual sprays
+set nl = 1-lod
 color #4d3c2a
 material matte
 cyl r=0.17 r2=0.05 h=h pos=0,h/2,0 seg=6
@@ -21,11 +23,18 @@ for t = 0, 8
     set a = k*60+t*37
     # outer sprays catch lighter new growth at the tips
     color 0.13+0.04*sin(t*71+k*43) 0.25+0.06*sin(t*29+k*61) 0.15+0.02*sin(k*53)
-    sphere r=R*0.42 pos=R*0.52*sin(a),Y-R*0.12,R*0.52*cos(a) scale=0.38,0.34,1 rot=24,a,0 seg=5
+    sphere r=R*0.42*nl pos=R*0.52*sin(a),Y-R*0.12,R*0.52*cos(a) scale=0.38,0.34,1 rot=24,a,0 seg=5
     # a shorter, darker spray between each pair, tucked higher and further in
     color 0.09 0.18+0.03*sin(t*41+k*17) 0.11
-    sphere r=R*0.3 pos=R*0.36*sin(a+30),Y+0.05,R*0.36*cos(a+30) scale=0.45,0.38,1 rot=18,a+30,0 seg=5
+    sphere r=R*0.3*nl pos=R*0.36*sin(a+30),Y+0.05,R*0.36*cos(a+30) scale=0.45,0.38,1 rot=18,a+30,0 seg=5
   end
+end
+# far tiers (lod=1): one drooping cone per whorl
+for t = 0, 8
+  set R = 2.45*(1-t/9.6)+0.25
+  set Y = h*(0.13+t*0.093)
+  color 0.12+0.02*sin(t*71) 0.23+0.03*sin(t*29) 0.14
+  cyl r=R*0.86*lod r2=0.1*lod h=1.1 pos=0,Y+0.25,0 seg=8
 end
 # leader
 color #24452b

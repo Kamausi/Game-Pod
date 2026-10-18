@@ -239,6 +239,12 @@ int main(int argc, char** argv) {
         CHECK(txt.error.empty() && !txt.mesh.verts.empty(), "text primitive: %s", txt.error.c_str());
         CHECK(std::fabs(txt.mesh.boundsMax().x + txt.mesh.boundsMin().x) < 0.06f && txt.mesh.boundsMax().y > 0.3f, "text is centred, cap height ~0.7");
         CHECK(!cadBuildSource("text str=A?B\n", {}, "badtext").error.empty(), "unknown glyph should error");
+        for (const char* lp : {"vegetation/poplar.mbcad", "vegetation/spruce.mbcad", "vegetation/goldenrod.mbcad"}) {
+            CadResult nearM = cadBuild(lp), farM = cadBuild(lp, {{"lod", 1.f}});
+            CHECK(farM.error.empty() && farM.mesh.verts.size() * 3 < nearM.mesh.verts.size() * 2, "%s: far LOD should be well under the near mesh", lp);
+            Vec3 a = nearM.mesh.boundsMax() - nearM.mesh.boundsMin(), b = farM.mesh.boundsMax() - farM.mesh.boundsMin();
+            CHECK(std::fabs(a.y - b.y) < 0.2f * a.y && std::fabs(a.x - b.x) < 0.35f * a.x, "%s: LOD silhouette should match", lp);
+        }
         CadResult flat = cadBuildSource("param on = 0\nbox size=1*on,1,1\ncyl r=0.2 h=0.5*on\nsphere r=0.3 scale=1,on,1\nbox size=1,1,1\n", {}, "flat");
         CHECK(flat.error.empty() && flat.mesh.verts.size() == one.mesh.verts.size(), "zero-size features emit nothing (%zu verts)", flat.mesh.verts.size());
         CHECK(std::fabs(cadEval("1.5e2+2e-1", {}, &err) - 150.2f) < 1e-3f && err.empty(), "exponent literals: %s", err.c_str());

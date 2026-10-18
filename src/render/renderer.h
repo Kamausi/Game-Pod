@@ -87,8 +87,9 @@ private:
     GLsizei fenceVerts = 0;
     std::map<std::string, GpuMesh> meshes;
     struct Batch {
-        GpuMesh mesh;
-        int count = 0, visible = 0;
+        GpuMesh mesh, lodMesh;              // lodMesh: built with lod=1, drawn beyond the LOD distance
+        bool hasLod = false;
+        int count = 0, visible = 0, visibleFar = 0;
         std::vector<float> inst;          // 20 floats per instance (matrix + tint)
         std::vector<Vec3> centers;
         std::vector<float> scales;
@@ -100,7 +101,7 @@ private:
     GpuMesh barrelInst[2], postInst;
     Mat4 lightVP;
     Vec3 sunDir;
-    std::vector<float> scratch;
+    std::vector<float> scratch, scratchFar;
     std::vector<uint8_t> scratch8, scratchDir;
 };
 

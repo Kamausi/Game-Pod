@@ -1286,6 +1286,16 @@ void Renderer::loadWorld(World& w) {
             inst.insert(inst.end(), {1, 1, 1, p->dirt});
         }
         setInstances(b.mesh, inst.data(), int(g.second.size()), true);
+        // Distance LOD: plentiful parts that declare a 'lod' param get a cheap far version.
+        if (g.second.size() >= 20) {
+            CadParams lp = g.second[0]->params;
+            lp["lod"] = 1;
+            CadResult lr = cadBuild(g.second[0]->part, lp);
+            if (lr.error.empty() && lr.mesh.verts.size() < r.mesh.verts.size()) {
+                b.lodMesh = uploadMesh(lr.mesh);
+                b.hasLod = true;
+            }
+        }
         b.count = int(g.second.size());
         b.inst = inst;
         Vec3 ext = b.mesh.bmax - b.mesh.bmin;
@@ -1358,22 +1368,32 @@ void Renderer::drawTerrain(bool water, const Mat4& vp) {
 void Renderer::cullStatic(const Mat4& vp, Vec3 eye, float maxDist) {
     float planes[6][4];
     extractPlanes(vp, planes);
+    const float lodD2 = sq(quality >= 2 ? 60.f : (quality == 1 ? 45.f : 30.f));
     for (auto& b : batches) {
         scratch.clear();
-        int n = 0;
+        scratchFar.clear();
+        int n = 0, nf = 0;
         for (size_t k = 0; k < b.centers.size(); k++) {
             const Vec3& c = b.centers[k];
             float r = b.radius * b.scales[k];
-            if (sq(c.x - eye.x) + sq(c.z - eye.z) > sq(maxDist + r)) continue;
+            float d2 = sq(c.x - eye.x) + sq(c.z - eye.z);
+            if (d2 > sq(maxDist + r)) continue;
             bool vis = true;
             for (int pl = 0; pl < 6 && vis; pl++)
                 if (planes[pl][0] * c.x + planes[pl][1] * c.y + planes[pl][2] * c.z + planes[pl][3] < -r * std::sqrt(planes[pl][0] * planes[pl][0] + planes[pl][1] * planes[pl][1] + planes[pl][2] * planes[pl][2])) vis = false;
             if (!vis) continue;
+            if (b.hasLod && d2 > lodD2) {
+                scratchFar.insert(scratchFar.end(), b.inst.begin() + long(k * 20), b.inst.begin() + long(k * 20 + 20));
+                nf++;
+                continue;
+            }
             scratch.insert(scratch.end(), b.inst.begin() + long(k * 20), b.inst.begin() + long(k * 20 + 20));
             n++;
         }
         b.visible = n;
+        b.visibleFar = nf;
         if (n) setInstances(b.mesh, scratch.data(), n, true);
+        if (nf) setInstances(b.lodMesh, scratchFar.data(), nf, true);
     }
 }
 
@@ -1384,8 +1404,10 @@ void Renderer::drawStatic(GLuint prog) {
     glUniform2f(glGetUniformLocation(prog, "uDirtRange"), -0.45f, 1.0f);
     glUniform1f(glGetUniformLocation(prog, "uSeed"), 7.f);
     glUniform1f(glGetUniformLocation(prog, "uAlpha"), 1.f);
-    for (auto& b : batches)
+    for (auto& b : batches) {
         if (b.visible) drawMesh(b.mesh, b.visible);
+        if (b.visibleFar) drawMesh(b.lodMesh, b.visibleFar);
+    }
 }
 
 void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass, bool transparent) {
