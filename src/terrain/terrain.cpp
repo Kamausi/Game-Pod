@@ -14,6 +14,7 @@ Terrain::Terrain() {
     grass.assign(n, 255);
     track.assign(n, 0);
     trackDir.assign(n, 0);
+    soil.assign(n, 0);
 }
 
 static inline void bilinearSetup(const Terrain& t, float x, float z, int& i, int& j, float& fx, float& fz) {
@@ -62,6 +63,8 @@ TerrainSample Terrain::sample(float x, float z) const {
     float wl = water[idx(ni, nj)];
     s.waterDepth = wl > NO_WATER + 1 ? std::max(0.f, wl - s.height) : 0.f;
     s.grass = grass[idx(ni, nj)] / 255.f;
+    s.soil = soil[idx(ni, nj)];
+    s.disturb = track[idx(ni, nj)] / 255.f;
     if (s.waterDepth > 0.f) s.moisture = 1.f;
     return s;
 }
@@ -98,11 +101,11 @@ float Terrain::pressPatch(Vec3 center, Vec3 fwd, float halfLen, float halfWidth,
             float avail = h[k] - base[k];
             if (avail <= 1e-4f) continue;
             float m = water[k] > h[k] ? 1.f : moist[k];
-            float n = MudModel::n(m), kEq = MudModel::kEq(m);
-            float pBear = bekkerPressure(kEq, n, comp[k]);
+            SoilState ss = soilState(m, soil[k], track[k] / 255.f);
+            float pBear = bekkerPressure(ss.kEq, ss.n, comp[k]);
             float excess = pressure - pBear;
             if (excess <= 0) continue;
-            float low = std::min(avail, excess / MudModel::viscosity(m) * dt);
+            float low = std::min(avail, excess / ss.visc * dt);
             h[k] -= low;
             comp[k] += low * 0.75f;
             total += low;

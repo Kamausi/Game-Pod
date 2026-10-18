@@ -43,6 +43,10 @@ struct BodySpec {
     float paint[3];
 };
 
+// Differential per axle (field guide 5): open, limited-slip, selectable locker, spool/welded.
+enum class Diff : uint8_t { Open = 0, Limited, Locker, Spool };
+const char* diffName(Diff d);
+
 struct VehicleConfig {
     std::string name = "Buddy";
     std::string body = "comanche";
@@ -52,7 +56,11 @@ struct VehicleConfig {
     Tread tread = Tread::MudTerrain;
     float liftIn = 4.f;
     float axleRatio = 4.56f;
-    bool lockFront = false, lockRear = true, fourWD = true, snorkel = false;
+    bool lockFront = false, lockRear = true, fourWD = true, snorkel = false;  // lock*: locker engaged at start
+    Diff diffF = Diff::Open, diffR = Diff::Locker;
+    bool beadlock = false;   // bead-lock rings: safe to air down below ~8 psi
+    bool btc = false;        // brake traction control (electronic)
+    bool winch = false;      // front winch fitted
     float psi = 18.f;
     float paint[3] = {0.36f, 0.38f, 0.36f};
     std::string serialize() const;
@@ -64,6 +72,19 @@ const std::vector<BodySpec>& bodyCatalog();
 const EngineSpec& findEngine(const std::string& id);
 const BodySpec& findBody(const std::string& id);
 const char* treadName(Tread t);
+
+// Garage spec sheet (field guide 6, 7, 14): the numbers a builder works from.
+struct SpecSheet {
+    float crawlRatio;      // 1st x low range x axle
+    float effRatio;        // axle ratio as the stock tire would feel it
+    float regearTarget;    // standard ratio that restores the stock effective gearing
+    float diffClearIn;     // ground to the bottom of the diff housing (in)
+    float groundKpa;       // average tire contact pressure at the set psi
+    float lbPerHp;
+    const char* cls;       // Stock / Modified / Pro
+    std::string json() const;
+};
+SpecSheet specSheet(const VehicleConfig& c);
 
 // Gearbox (3-speed auto like a TH400 / A904 family, plus 2.72 transfer-case low range).
 struct Gearbox {

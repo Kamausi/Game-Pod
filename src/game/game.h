@@ -10,6 +10,7 @@
 #include "ai.h"
 #include "modes.h"
 #include "particles.h"
+#include "recovery.h"
 #include "world.h"
 
 namespace mb {
@@ -64,6 +65,9 @@ public:
     VehicleVisual playerVis;
     AppState state = AppState::Attract;
     double clockOffset = 0;
+    Recovery recovery;
+    std::string coach;            // field-guide coaching line for the HUD
+    bool recoverMenu = false;     // tow key asks the UI for the recovery menu
     int localId = 0;
     bool steeringAssist = true;
 
@@ -108,6 +112,10 @@ private:
     std::vector<LensSplat> lens;
     void updateLens(float dt);
     float relaxTimer = 0;
+    float diggingTimer = 0, tractionBackTimer = 0;
+    void say(const std::string& m, float t = 2.5f) { if (!m.empty()) { mode.message = m; mode.messageTimer = t; } }
+    void updateCoach(float dt);
+    bool competitionRun() const;
 };
 
 }  // namespace mb

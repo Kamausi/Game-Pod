@@ -32,7 +32,13 @@ server (zero npm dependencies, Node ≥ 18).
 | **Terramechanics** | Bekker pressure–sinkage per terrain cell with viscous sinkage rate (momentum matters), Janosi–Hanamoto shear traction, Rankine bulldozing, suction, slurry/water drag. Tires dig holes, roost re-deposits where it lands, ruts fill with water, soupy mud flows back. [docs/PHYSICS.md](docs/PHYSICS.md) |
 | **Map** | 384 m × 384 m deformable world: the mud-bog venue (drag pit, freestyle bowl, two-track circuit, pond, old bus) in the middle, ringed by back-country — a wooded trail loop with mud holes, a 16 m hill with a mud climb chute, a creek with fords, western mud flats, patchy forest. North-up minimap built from the terrain. |
 | **Suspension** | Quarter-car per corner (unsprung wheel mass, pressure-dependent tire spring, bump/rebound damping, hydraulic bump stops, anti-roll bars), load-sensitive tires; `mb_tests --probe` prints a handling report. |
-| **Getting stuck** | High-centering on diff pumpkins and frame rails, tread packing with clay (wheel speed flings it out), open diffs vs lockers, hydrolock, radiator clogging → overheating. Ways out: rock it, air down, lockers, 4-LO, or the dozer tow. |
+| **Soils** | Five soil types with their own Bekker/shear parameters and colour: sticky **clay gumbo** (packs treads, remolds to grease when churned), weak **silt**, strong-but-draggy **wet sand**, bottomless **peat muck**, honest **loam**. Placed by area (clay pit and chute, silty pond and creek, sand flats, peat swamp). |
+| **Getting stuck** | High-centering on diff pumpkins and frame rails, tread packing with clay (wheel speed flings it out), open diffs vs lockers, radiator clogging → overheating. Ways out: rock it, air down, lockers, 4L, then the recovery kit. |
+| **Drivetrain** | Part-time transfer case **2H / 4H / 4L** (4H windup on grippy ground snaps the front U-joint), per-axle **open / limited-slip / selectable locker / spool**, brake traction control, beadlocks. Lockers engage only when slow and not spinning. |
+| **Hazards** | Real **hydrolock** (dead until it drains; crank it underwater and you bend a rod), UTV **CVT belt** heat in high range, **wet brakes** after crossings, mud **caked in the wheels** shakes the truck, **bead pops** below 8 psi without beadlocks. |
+| **Recovery kit** | Recovery menu (T / View): **scout** the section ahead (water, soft depth, soil, firm bottom, your ground pressure), **shovel** out ramps and the belly, wedge **traction boards** under the drive tires, **winch** to a tree / rig / post (drum layers, duty cycle, shock-load line snap), then the **dozer** as last resort. |
+| **Coaching** | A field-guide coach line on the HUD: digging, bellied out, packed tread, traction back, driveline binding, belt heat, flooded, wet brakes, bead off. In-game **Field Guide** screen. |
+| **Garage spec sheet** | Crawl ratio, diff clearance, ground pressure, lb/hp, effective gearing on bigger tires with the re-gear target, and the competition class (Stock / Modified / Pro). Pressure-wash & repair. |
 | **Vehicles** | '88 Comanche MJ, '76 full-size bog car, crew-cab diesel mud truck, sport UTV; 6 engines; tire size 31–44", width, A/T / M/T / paddles, lift, axle gears, lockers, 4WD, snorkel, on-board air, paint. |
 | **Audio** | Per-cylinder firing-order pulses into exhaust waveguides (real cross-plane V8 burble, limiter bounce, pops), diesel clatter, turbo/blower, lug-slap granular mud, Minnaert water bubbles, debris patter, barrel modal synthesis, crowd, dozer idle, tree-line slapback, Doppler. [docs/AUDIO.md](docs/AUDIO.md) |
 | **Modes** | **Mud Bog** (4-lane drag pit with whoops, sinkholes and a deep soup section; no clock — full pass = time, else distance when you call the dozer), **Hill & Hole** (3-lap circuit), **Mud Slinger** (90 s freestyle combo scoring), **King of the Pit** (120 s zone control), Free Roam. |
@@ -52,12 +58,13 @@ server (zero npm dependencies, Node ≥ 18).
 | Throttle / brake-reverse | RT / LT | W / S |
 | Steer · look | Left stick · right stick | A / D · mouse drag |
 | Handbrake | A | Space |
-| Lockers (off → rear → F+R) | B | L |
+| Lockers (selectable only) | B | L |
 | Shift down / up (manual) · auto/manual | X / Y · D-pad ← | Q / E · M |
-| Low range | LB | G |
+| Transfer case 2H → 4H → 4L | LB | G |
 | Air up / down | D-pad ↑ / ↓ | F / V |
 | Camera | RB | C |
-| Dozer tow · reset · horn · pause | View · L3 · R3 · Menu | T · R · H · Esc |
+| Recovery menu · reset · horn · pause | View · L3 · R3 · Menu | T · R · H · Esc |
+| Scout · shovel · traction boards · winch | — · — · — · D-pad → | Z · K · B · J |
 | Developer panel | — | F1 or ` |
 
 ## Build from source

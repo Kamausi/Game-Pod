@@ -1,4 +1,5 @@
 #include "world.h"
+#include "../physics/terramechanics.h"
 #include <cmath>
 #include "../core/noise.h"
 
@@ -73,6 +74,7 @@ void World::generate(uint32_t seed) {
             float grass = 0.78f + 0.2f * n1;
             float base = h - 0.07f;
             float water = Terrain::NO_WATER;
+            uint8_t soil = uint8_t(Soil::Loam);
 
             // Staging + pit apron graded flat.
             float dzP = std::fabs(z - pitZ);
@@ -108,6 +110,7 @@ void World::generate(uint32_t seed) {
                 h = lerpf(h, floor, tp);
                 base = lerpf(base, hPit - 1.3f - 0.5f * std::max(soft, soup) + (n2 - 0.5f) * 0.1f, tp);
                 moist = lerpf(moist, 0.86f + 0.14f * n1, tp);
+                if (tp > 0.3f) soil = uint8_t(Soil::Clay);
                 grass = lerpf(grass, 0.f, std::min(1.f, tp * 2));
                 if (tp > 0.6f) water = hPit - 0.53f;
             }
@@ -129,6 +132,7 @@ void World::generate(uint32_t seed) {
                 base = std::min(base, floor - 0.45f);
                 moist = std::max(moist, lerpf(0.5f, 1.f, t));
                 grass *= 1.f - t;
+                if (t > 0.3f) soil = uint8_t(Soil::Silt);
                 if (dPond < pondRadius + 1) water = hPond - 0.18f;
             }
 
@@ -141,6 +145,7 @@ void World::generate(uint32_t seed) {
                 h = lerpf(h, floor, t);
                 base = lerpf(base, hBowl - 1.05f, t);
                 moist = lerpf(moist, 0.78f + 0.2f * n1, t);
+                if (t > 0.3f) soil = uint8_t(Soil::Clay);
                 grass *= 1.f - t;
                 float rim = dB - (bowlRadius + 3.5f);
                 h += 0.7f * std::exp(-rim * rim / 2.5f);
@@ -194,6 +199,7 @@ void World::generate(uint32_t seed) {
                     base -= 1.0f * ch;
                     moist = std::max(moist, 0.62f + 0.3f * ch * (0.6f + 0.4f * n1));
                     grass *= 1.f - ch;
+                    if (ch > 0.25f) soil = uint8_t(Soil::Clay);
                 }
                 // Mud flats to the west: a big shallow slop field with puddles.
                 float ex = (x - flatsCenter.x) / flatsHalfX, ez = (z - flatsCenter.z) / flatsHalfZ;
@@ -205,6 +211,7 @@ void World::generate(uint32_t seed) {
                     base = lerpf(base, flatH - 0.55f, t);
                     moist = lerpf(moist, 0.72f + 0.25f * n1, t);
                     grass *= 1.f - t;
+                    if (t > 0.3f) soil = uint8_t(Soil::Sand);
                     if (t > 0.6f && n2 > 0.6f) water = flatH - (n1 - 0.5f) * 0.25f - 0.06f;
                 }
                 // Creek across the south: muddy banks, deep pools, shallow fords where the trail crosses.
@@ -223,7 +230,20 @@ void World::generate(uint32_t seed) {
                         water = bank - 0.45f;
                     }
                     moist = std::max(moist, lerpf(1.f, 0.5f, clampf((dz - creekHalfW) / 4.f, 0.f, 1.f)));
+                    if (dz < creekHalfW + 2.f) soil = uint8_t(Soil::Silt);
                     grass *= clampf((dz - creekHalfW) / 4.f, 0.f, 1.f);
+                }
+                // Peat swamp: black organic muck over a very deep soft layer, pools of tea-dark water.
+                float dS = length(Vec2{x - swampCenter.x, z - swampCenter.z});
+                if (dS < swampRadius + 6.f) {
+                    float t = 1.f - smoothstep(swampRadius - 4.f, swampRadius + 5.f, dS);
+                    float sh = natural(swampCenter.x, swampCenter.z) - 0.35f + (n1 - 0.5f) * 0.3f;
+                    h = lerpf(h, sh, t);
+                    base = lerpf(base, sh - 2.2f, t);
+                    moist = lerpf(moist, 0.93f + 0.07f * n2, t);
+                    grass = lerpf(grass, 0.15f * n2, t);
+                    if (t > 0.4f) soil = uint8_t(Soil::Peat);
+                    if (t > 0.7f && n2 > 0.5f) water = sh + 0.12f - (n1 - 0.5f) * 0.3f;
                 }
                 // The trail: two ruts, worn grass, mud holes every so often.
                 float rr = length(Vec2{x, z});
@@ -262,6 +282,7 @@ void World::generate(uint32_t seed) {
             T.water[k] = water;
             T.comp[k] = moist > 0.6f ? 0.01f : 0.08f;
             T.track[k] = 0;
+            T.soil[k] = soil;
         }
 
     auto ground = [&](float x, float z) { return T.heightAt(x, z); };
@@ -430,6 +451,7 @@ void World::generate(uint32_t seed) {
             if (distToSegment({x, z}, {chuteTop.x, chuteTop.z}, {chuteBottom.x, chuteBottom.z}) < 7.f) return false;
             float ex = (x - flatsCenter.x) / flatsHalfX, ez = (z - flatsCenter.z) / flatsHalfZ;
             if (ex * ex + ez * ez < 1.3f) return false;
+            if (length(Vec2{x - swampCenter.x, z - swampCenter.z}) < swampRadius + 2.f) return false;
             if (std::fabs(x) < 8.f || std::fabs(z) < 8.f) return false;   // keep the way out open
             return true;
         };

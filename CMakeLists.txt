@@ -21,6 +21,7 @@ set(MB_CORE_SOURCES
   src/game/world.cpp
   src/game/particles.cpp
   src/game/modes.cpp
+  src/game/recovery.cpp
 )
 add_library(mbcore STATIC ${MB_CORE_SOURCES})
 target_include_directories(mbcore PUBLIC src)

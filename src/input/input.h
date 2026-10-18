@@ -4,7 +4,8 @@
 //   RT throttle . LT brake / reverse . Left stick steer . Right stick look
 //   A handbrake . B cycle lockers . X / Y shift down / up (manual) . LB low range
 //   RB camera . View/Back dozer tow . Menu/Start pause . L3 reset . R3 horn
-//   D-pad up/down on-board air up/down . D-pad left auto/manual
+//   D-pad up/down on-board air up/down . D-pad left auto/manual . D-pad right winch
+//   (View now opens the recovery menu: scout / shovel / boards / winch / dozer)
 #pragma once
 #include "../core/math.h"
 
@@ -16,6 +17,7 @@ struct InputState {
     bool handbrake = false;
     bool shiftUp = false, shiftDown = false, locker = false, lowRange = false, camera = false;
     bool reset = false, tow = false, horn = false, pause = false, manualToggle = false;
+    bool scout = false, shovel = false, boards = false, winch = false;   // recovery kit
     bool gamepad = false;
 };
 
@@ -38,7 +40,7 @@ public:
 private:
     float kbSteer = 0;
     bool prevButtons[20] = {false};
-    bool prevKeys[16] = {false};
+    bool prevKeys[20] = {false};
     bool prevDev = false;
     struct Touch { float throttle = 0, brake = 0, steer = 0, air = 0, lookX = 0, lookY = 0; bool handbrake = false; } touch;
     unsigned virtualPresses = 0;

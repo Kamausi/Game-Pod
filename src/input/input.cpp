@@ -10,12 +10,14 @@ namespace mb {
 
 namespace {
 std::unordered_map<std::string, bool> g_keys;
+std::unordered_map<std::string, bool> g_tapped;   // went down since the last poll (a tap shorter than a frame still counts)
 float g_mouseDX = 0, g_mouseDY = 0;
 bool g_mouseDown = false;
 
 EM_BOOL onKey(int type, const EmscriptenKeyboardEvent* e, void*) {
     bool down = type == EMSCRIPTEN_EVENT_KEYDOWN;
     g_keys[e->code] = down;
+    if (down && !e->repeat) g_tapped[e->code] = true;
     std::string c = e->code;
     // Swallow game keys so the page doesn't scroll, but let typing in UI inputs through.
     bool game = c.rfind("Arrow", 0) == 0 || c == "Space";
@@ -79,7 +81,8 @@ void Input::setTouch(float throttle, float brake, float steer, bool handbrake, f
     touch.lookY += lookY;
 }
 
-static const char* kVirtual[] = {"shiftup", "shiftdown", "locker", "lowrange", "camera", "reset", "tow", "horn", "pause", "manual"};
+static const char* kVirtual[] = {"shiftup", "shiftdown", "locker", "lowrange", "camera", "reset", "tow", "horn", "pause", "manual",
+                                  "scout", "shovel", "boards", "winch"};
 
 void Input::pressVirtual(const char* name) {
     for (unsigned i = 0; i < sizeof(kVirtual) / sizeof(kVirtual[0]); i++)
@@ -122,6 +125,7 @@ InputState Input::poll(float dt) {
     if (!enabled) {
         std::memset(prevButtons, 0, sizeof prevButtons);
         virtualPresses = 0;
+        g_tapped.clear();
         touch.lookX = touch.lookY = 0;
         return s;
     }
@@ -137,13 +141,16 @@ InputState Input::poll(float dt) {
     s.steer = kbSteer;
     s.handbrake = key("Space");
     s.air = (key("KeyF") ? 1.f : 0.f) - (key("KeyV") ? 1.f : 0.f);
-    const char* edgeKeys[] = {"KeyE", "KeyQ", "KeyL", "KeyG", "KeyC", "KeyR", "KeyT", "KeyH", "Escape", "KeyM", "KeyP"};
-    bool* targets[] = {&s.shiftUp, &s.shiftDown, &s.locker, &s.lowRange, &s.camera, &s.reset, &s.tow, &s.horn, &s.pause, &s.manualToggle, &s.pause};
-    for (int i = 0; i < 11; i++) {
+    const char* edgeKeys[] = {"KeyE", "KeyQ", "KeyL", "KeyG", "KeyC", "KeyR", "KeyT", "KeyH", "Escape", "KeyM", "KeyP",
+                              "KeyZ", "KeyK", "KeyB", "KeyJ"};
+    bool* targets[] = {&s.shiftUp, &s.shiftDown, &s.locker, &s.lowRange, &s.camera, &s.reset, &s.tow, &s.horn, &s.pause, &s.manualToggle, &s.pause,
+                       &s.scout, &s.shovel, &s.boards, &s.winch};
+    for (int i = 0; i < 15; i++) {
         bool k = key(edgeKeys[i]);
-        if (k && !prevKeys[i]) *targets[i] = true;
+        if ((k && !prevKeys[i]) || g_tapped[edgeKeys[i]]) *targets[i] = true;
         prevKeys[i] = k;
     }
+    g_tapped.clear();
     s.horn = s.horn || key("KeyH");
     s.lookX = g_mouseDX * 0.004f;
     s.lookY = g_mouseDY * 0.004f;
@@ -159,8 +166,9 @@ InputState Input::poll(float dt) {
     s.lookY += touch.lookY;
     touch.lookX = touch.lookY = 0;
     {
-        bool* vt[] = {&s.shiftUp, &s.shiftDown, &s.locker, &s.lowRange, &s.camera, &s.reset, &s.tow, &s.horn, &s.pause, &s.manualToggle};
-        for (unsigned i = 0; i < 10; i++)
+        bool* vt[] = {&s.shiftUp, &s.shiftDown, &s.locker, &s.lowRange, &s.camera, &s.reset, &s.tow, &s.horn, &s.pause, &s.manualToggle,
+                      &s.scout, &s.shovel, &s.boards, &s.winch};
+        for (unsigned i = 0; i < 14; i++)
             if (virtualPresses & (1u << i)) *vt[i] = true;
         virtualPresses = 0;
     }
@@ -193,7 +201,7 @@ InputState Input::poll(float dt) {
             if (btn(12)) s.air = 1.f;
             if (btn(13)) s.air = -1.f;
             bool* edges[20] = {nullptr, &s.locker, &s.shiftDown, &s.shiftUp, &s.lowRange, &s.camera, nullptr, nullptr,
-                               &s.tow, &s.pause, &s.reset, &s.horn, nullptr, nullptr, &s.manualToggle, nullptr};
+                               &s.tow, &s.pause, &s.reset, &s.horn, nullptr, nullptr, &s.manualToggle, &s.winch};
             for (int b = 0; b < 16; b++) {
                 bool d = btn(b);
                 if (d && !prevButtons[b] && edges[b]) *edges[b] = true;

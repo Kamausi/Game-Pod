@@ -147,7 +147,9 @@ uniform vec2 uOrigin;
 uniform float uCell;
 uniform mat4 uVP;
 uniform int uWaterPass;
-out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth; out vec2 vTrackGrad; out vec2 vTrackDir;
+out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth; out vec2 vTrackGrad; out vec2 vTrackDir; out vec3 vSoil;
+// Soil tint per type (loam, clay gumbo, silt, wet sand, peat muck) - matches kSoils in terramechanics.h.
+const vec3 kSoilTint[5] = vec3[5](vec3(1.0), vec3(0.86,0.84,0.82), vec3(1.10,1.06,1.00), vec3(1.30,1.18,0.92), vec3(0.52,0.46,0.40));
 float H(ivec2 c){ c = clamp(c, ivec2(0), ivec2(TN)); return texelFetch(uHeight, c, 0).r; }
 float T(ivec2 c){ c = clamp(c, ivec2(0), ivec2(TN)); return texelFetch(uState, c, 0).a; }
 void main(){
@@ -158,7 +160,9 @@ void main(){
   vState = texelFetch(uState, c, 0);
   vTrackGrad = vec2(T(c+ivec2(1,0)) - T(c-ivec2(1,0)), T(c+ivec2(0,1)) - T(c-ivec2(0,1)));
   // Tire heading as a doubled angle so opposite directions interpolate cleanly; untracked cells add nothing.
-  float ang = texelFetch(uTrackDir, c, 0).r * 6.2831853;
+  vec2 td = texelFetch(uTrackDir, c, 0).rg;
+  float ang = td.r * 6.2831853;
+  vSoil = kSoilTint[clamp(int(td.g*255.0/40.0 + 0.5), 0, 4)];
   vTrackDir = vec2(cos(ang), sin(ang))*step(0.03, vState.a);
   float y = h - aGrid.y*0.6;
   vDepth = hw.g - h;
@@ -169,7 +173,7 @@ void main(){
 )";
 
 const char* kTerrainFS = R"(
-in vec3 vWorld; in vec3 vN; in vec4 vState; in float vDepth; in vec2 vTrackGrad; in vec2 vTrackDir;
+in vec3 vWorld; in vec3 vN; in vec4 vState; in float vDepth; in vec2 vTrackGrad; in vec2 vTrackDir; in vec3 vSoil;
 uniform int uWaterPass;
 uniform vec4 uOcc[8];   // vehicle contact occlusion: x, z, yaw, length (0 = unused)
 out vec4 frag;
@@ -274,6 +278,7 @@ void main(){
   float clod = smoothstep(0.55, 0.85, vnoise(p*11.0)*0.7 + vnoise(p*27.0)*0.3);
   mudC = mix(mudC, mudC*1.45, clod*berm*0.7);
   vec3 soil = mix(dirt, mudC, max(mudAmt, wetness*0.6));
+  soil = clamp(soil*vSoil, 0.0, 1.0);
 
   // Drying crust: polygonal cracks where mud sits on drier ground (pit edges, splash zones).
   float crust = mudAmt*smoothstep(0.62, 0.42, moist)*(1.0 - track);
@@ -900,7 +905,7 @@ void Renderer::uploadTerrain(Terrain& t, bool full) {
     int w = x1 - x0 + 1, h = z1 - z0 + 1;
     scratch.resize(size_t(w) * h * 2);
     scratch8.resize(size_t(w) * h * 4);
-    scratchDir.resize(size_t(w) * h);
+    scratchDir.resize(size_t(w) * h * 2);
     for (int j = 0; j < h; j++)
         for (int i = 0; i < w; i++) {
             int k = t.idx(x0 + i, z0 + j), o = j * w + i;
@@ -910,7 +915,8 @@ void Renderer::uploadTerrain(Terrain& t, bool full) {
             scratch8[o * 4 + 1] = uint8_t(clampf((t.h[k] - t.base[k]) / 1.5f, 0, 1) * 255);
             scratch8[o * 4 + 2] = t.grass[k];
             scratch8[o * 4 + 3] = t.track[k];
-            scratchDir[size_t(o)] = t.trackDir[k];
+            scratchDir[size_t(o) * 2] = t.trackDir[k];
+            scratchDir[size_t(o) * 2 + 1] = uint8_t(t.soil[k] * 40);   // soil type for the tint
         }
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     if (full) {
@@ -925,7 +931,7 @@ void Renderer::uploadTerrain(Terrain& t, bool full) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         if (!texTrackDir) glGenTextures(1, &texTrackDir);
         glBindTexture(GL_TEXTURE_2D, texTrackDir);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, scratchDir.data());
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, w, h, 0, GL_RG, GL_UNSIGNED_BYTE, scratchDir.data());
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     } else {
@@ -934,7 +940,7 @@ void Renderer::uploadTerrain(Terrain& t, bool full) {
         glBindTexture(GL_TEXTURE_2D, texState);
         glTexSubImage2D(GL_TEXTURE_2D, 0, x0, z0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, scratch8.data());
         glBindTexture(GL_TEXTURE_2D, texTrackDir);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, x0, z0, w, h, GL_RED, GL_UNSIGNED_BYTE, scratchDir.data());
+        glTexSubImage2D(GL_TEXTURE_2D, 0, x0, z0, w, h, GL_RG, GL_UNSIGNED_BYTE, scratchDir.data());
     }
 }
 

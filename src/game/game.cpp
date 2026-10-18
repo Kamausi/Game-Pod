@@ -2,6 +2,7 @@
 #include <emscripten.h>
 #include <cstdio>
 #include <cstdlib>
+#include "../physics/terramechanics.h"
 
 namespace mb {
 
@@ -39,6 +40,7 @@ void Game::init(int w, int h) {
     audio.init(48000.f);
     VehicleConfig c;
     player.configure(c);
+    player.pads = &recovery.pads;
     playerVis.build(renderer, c);
     mode.start(ModeId::FreeRoam, world, player, 0, 0);
     lastMs = emscripten_get_now();
@@ -60,7 +62,7 @@ void Game::setConfig(const std::string& s) {
     player.dirt = dirt;
     player.manual = manual;
     player.gear = g;
-    lockerState = c.lockFront ? 2 : (c.lockRear ? 1 : 0);
+    if (!c.winch) recovery.winch.active = false;
     playerVis.build(renderer, c);
 }
 
@@ -76,6 +78,8 @@ void Game::setState(AppState s) {
                 p.y = world.terrain.heightAt(p.x, p.z) - player.rideAxleY + player.wheels[0].radius + 0.1f;
                 player.reset(p, PI * 0.5f);
                 player.placeOnGround(world.terrain);
+                player.repair();
+                recovery.reset();
             }
         }
     }
@@ -88,6 +92,9 @@ void Game::startMode(ModeId m, int lane, double startAt) {
     particles.clear();
     g_userManual = player.manual;
     mode.start(m, world, player, lane, startAt);
+    player.repair();
+    recovery.reset();
+    recoverMenu = false;
     if (m != ModeId::FreeRoam) player.manual = true;  // hold neutral during the countdown
     for (int i = 0; i < 3; i++) audio.removeVehicle(100 + i);
     ais.clear();
@@ -117,9 +124,59 @@ void Game::startMode(ModeId m, int lane, double startAt) {
     setState(AppState::Playing);
 }
 
+bool Game::competitionRun() const {
+    return mode.id != ModeId::FreeRoam && mode.phase == Phase::Running;
+}
+
 void Game::action(const std::string& a) {
-    if (a == "tow") mode.requestTow(world, player);
-    else if (a == "reset") {
+    if (a == "tow" || a == "dozer") {
+        recoverMenu = false;
+        recovery.reset();
+        mode.requestTow(world, player);
+    } else if (a == "recover") {
+        recoverMenu = !recoverMenu;
+    } else if (a == "scout") {
+        recoverMenu = false;
+        say(recovery.scout(world, player), 6.f);
+    } else if (a == "shovel" || a == "boards" || a == "winch") {
+        recoverMenu = false;
+        if (competitionRun() && mode.id == ModeId::MudBog) { say("No self-recovery in a judged pull - call the dozer (it ends the run)"); return; }
+        if (a == "shovel") say(recovery.startShovel(player), 3.f);
+        else if (a == "boards") say(recovery.placeBoards(world, player), 3.f);
+        else say(recovery.toggleWinch(world, player), 3.f);
+    } else if (a == "wash") {   // garage: pressure-wash and fix everything that broke
+        player.dirt = 0;
+        player.repair();
+        recovery.reset();
+        say("Washed and repaired: mud off the wheels, radiator and brakes, parts replaced", 3.f);
+    } else if (a == "locker") {
+        // Cycle through the selectable lockers this truck has; a spool is always locked.
+        bool selF = player.diffF == Diff::Locker && player.fourWD, selR = player.diffR == Diff::Locker;
+        if (!selF && !selR) { say(player.diffR == Diff::Spool ? "Rear is spooled - always locked" : "No selectable lockers fitted"); return; }
+        if (player.speed() > 4.5f || player.avgSlip > 0.5f) { say("Engage lockers BEFORE the hole - ease off and slow down"); return; }
+        int st = (player.lockRear && selR ? 1 : 0) + (player.lockFront && selF ? 2 : 0);
+        int next = st;
+        for (int k = 0; k < 4; k++) {
+            next = (next + 1) % 4;
+            if ((next & 1) && !selR) continue;
+            if ((next & 2) && !selF) continue;
+            if (next == 2 && selR) continue;   // front-only isn't a useful state when the rear can lock
+            break;
+        }
+        if (selR) player.lockRear = next & 1;
+        if (selF) player.lockFront = (next & 2) != 0;
+        bool f = player.locked(true), r = player.locked(false);
+        say(f && r ? "Front + rear LOCKED - steering will push, keep it straight" : (r ? "Rear locked" : (f ? "Front locked" : "Lockers open")), 1.8f);
+    } else if (a == "transfer") {
+        int t = player.transfer();
+        int next = (t + 1) % 3;
+        if (next == 2 && player.speed() > 1.5f) next = 0;           // 4L only when nearly stopped
+        if (t == 2 && player.speed() > 1.5f) { say("Stop to shift out of 4-LO"); return; }
+        if (!player.cfg.fourWD && next >= 1) { say("2WD only - no transfer case"); return; }
+        player.setTransfer(next);
+        if (!player.fourWD) player.lockFront = false;
+        say(next == 0 ? "2H - rear drive" : (next == 1 ? "4H - part-time 4WD: don't turn hard on grippy ground" : "4L - low range: torque x2.72, crawl and don't spin"), 2.f);
+    } else if (a == "reset") {
         if (mode.id == ModeId::MudBog && mode.phase == Phase::Running) mode.requestTow(world, player);
         else {
             Vec3 f = player.forward();
@@ -483,6 +540,27 @@ void Game::buildFrame(RenderFrame& f) {
         for (int k = 0; k < 4; k++) { comp[k] = v.wheels[size_t(k)].compression; spin[k] = v.wheels[size_t(k)].spin; }
         addVehicleDraws(f, v, aiVis[i], v.pos, v.rot, comp, spin, v.steerApplied, v.dirt, 1.f);
     }
+    // Recovery gear on the ground: traction boards, and the winch line to its anchor.
+    for (const SupportPad& p : recovery.pads) {
+        DrawItem it;
+        it.mesh = renderer.mesh("props/tractionboard.mbcad");
+        Quat q = Quat::axisAngle({0, 1, 0}, std::atan2(p.dir.x, p.dir.z)) * Quat::axisAngle({1, 0, 0}, -std::atan(p.slope));
+        it.model = Mat4::trs({p.center.x, p.top - 0.02f, p.center.z}, q);
+        it.dirt = clampf(0.3f + p.wear, 0.f, 1.f);
+        it.dirtLo = 0; it.dirtHi = 0.06f;
+        f.items.push_back(it);
+    }
+    if (recovery.winch.active) {
+        Vec3 a = recovery.hookPoint(player), d = recovery.winch.anchor - a;
+        float len = length(d);
+        if (len > 0.1f) {
+            DrawItem it;
+            it.mesh = renderer.mesh("props/winchline.mbcad");
+            Quat q = Quat::axisAngle({0, 1, 0}, std::atan2(d.x, d.z)) * Quat::axisAngle({1, 0, 0}, -std::asin(clampf(d.y / len, -1.f, 1.f)));
+            it.model = Mat4::trs(a, q, {1, 1, len});
+            f.items.push_back(it);
+        }
+    }
     // Translucent ghost of the personal best, sampled at the current race time.
     if (ghostTrace.size() >= 16 && mode.phase == Phase::Running) {
         size_t n = ghostTrace.size() / 8, lo = 0, hi = n - 1;
@@ -507,21 +585,15 @@ void Game::frame(double nowMs) {
     InputState in = input.poll(dt);
     if (state == AppState::Playing) {
         if (in.pause) g_pauseRequested = true;
-        if (in.locker) {
-            lockerState = (lockerState + 1) % 3;
-            player.lockRear = lockerState >= 1;
-            player.lockFront = lockerState == 2;
-            mode.message = lockerState == 0 ? "Lockers OFF" : (lockerState == 1 ? "Rear locker ON" : "Front + rear LOCKED");
-            mode.messageTimer = 1.5f;
-        }
-        if (in.lowRange && player.speed() < 4.f) {
-            player.lowRange = !player.lowRange;
-            mode.message = player.lowRange ? "4-LO engaged" : "4-HI";
-            mode.messageTimer = 1.5f;
-        }
+        if (in.locker) action("locker");
+        if (in.lowRange) action("transfer");
         if (in.camera) action("camera");
         if (in.reset) action("reset");
-        if (in.tow) action("tow");
+        if (in.tow) action("recover");
+        if (in.scout) action("scout");
+        if (in.shovel) action("shovel");
+        if (in.boards) action("boards");
+        if (in.winch) action("winch");
         if (in.horn && hornTimer <= 0) action("horn");
         if (in.manualToggle) {
             player.manual = !player.manual;
@@ -543,6 +615,8 @@ void Game::frame(double nowMs) {
     VehicleEvents ev;
     while (accum >= Vehicle::DT && steps < 14) {
         InputState sub = in;
+        say(recovery.stepWinch(player, Vehicle::DT), 3.f);
+        if (recovery.digTimer > 0) { sub.throttle = 0; sub.brake = 1; }
         simulate(Vehicle::DT, sub);
         in.shiftUp = in.shiftDown = false;
         // accumulate events across substeps
@@ -554,6 +628,11 @@ void Game::frame(double nowMs) {
         ev.backfires += player.events.backfires;
         ev.shifts += player.events.shifts;
         ev.hydrolocked = ev.hydrolocked || player.events.hydrolocked;
+        ev.beadPopped = ev.beadPopped || player.events.beadPopped;
+        ev.shaftBroke = ev.shaftBroke || player.events.shaftBroke;
+        ev.beltBurnt = ev.beltBurnt || player.events.beltBurnt;
+        ev.rodBent = ev.rodBent || player.events.rodBent;
+        ev.restarted = ev.restarted || player.events.restarted;
         player.events.clear();
         accum -= Vehicle::DT;
         steps++;
@@ -640,7 +719,14 @@ void Game::frame(double nowMs) {
     }
     if (ev.limiterHits) input.rumble(0.f, 0.25f, 40);
     if (ev.shifts) audio.trigger(SfxType::Shift, player.pos, 0.6f);
-    if (ev.hydrolocked) { mode.message = "HYDROLOCKED! Water in the intake - restarting"; mode.messageTimer = 3.5f; input.rumble(1, 1, 500); }
+    if (ev.hydrolocked) { say("HYDROLOCKED! Engine dead. Get out of the water (winch/tow) - do NOT crank it", 4.f); input.rumble(1, 1, 500); }
+    if (ev.rodBent) { say("BENT A ROD - you cranked a flooded engine. It's done: dozer tow", 5.f); input.rumble(1, 1, 700); }
+    if (ev.restarted) say("Water cleared - she fired back up", 3.f);
+    if (ev.beadPopped) { say("POPPED A BEAD - too little pressure without beadlocks", 4.f); input.rumble(0.6f, 0.6f, 250); }
+    if (ev.shaftBroke) { say("SNAPPED THE FRONT U-JOINT - 4H windup on grippy ground. Rear drive only now", 4.5f); input.rumble(1, 0.8f, 400); camShake = std::max(camShake, 0.6f); }
+    if (ev.beltBurnt) say("CVT BELT BURNT - use low range in the mud. Belt is slipping", 4.5f);
+    say(recovery.update(world, player, dt), 3.f);
+    updateCoach(dt);
     for (size_t k = 0; k < wev.barrelHits.size(); k++) audio.trigger(SfxType::Barrel, wev.barrelHits[k], wev.barrelStrength[k]);
     for (auto& p : wev.fenceHits) audio.trigger(SfxType::Fence, p, 0.8f);
     if (wev.barrelsKnocked && length(player.pos - world.crowdCenter) < 70.f) audio.trigger(SfxType::Cheer, player.pos, 0.25f);
@@ -671,6 +757,34 @@ void Game::frame(double nowMs) {
     RenderFrame f;
     buildFrame(f);
     renderer.render(world, f);
+}
+
+// Field-guide coaching: the single most useful thing to know right now.
+void Game::updateCoach(float dt) {
+    coach.clear();
+    if (state != AppState::Playing) return;
+    const Vehicle& v = player;
+    float spd = v.speed();
+    bool spinning = v.avgSlip > 0.6f && spd < 0.8f && v.throttleApplied > 0.4f;
+    diggingTimer = spinning ? diggingTimer + dt : std::max(0.f, diggingTimer - dt * 2.f);
+    if (diggingTimer > 1.5f && spd > 2.f) tractionBackTimer = 2.5f;
+    tractionBackTimer -= dt;
+    float pack = 0;
+    bool debead = false;
+    for (auto& w : v.wheels) { pack += w.pack * 0.25f; debead = debead || w.debeaded; }
+    if (v.engineBroken) coach = "Engine is broken - call the dozer";
+    else if (v.flooded) coach = v.floodDry > 0 ? "Let the water drain... then throttle to restart" : "Flooded: off the throttle! Get out of the water first";
+    else if (recovery.digTimer > 0) coach = "Shovelling...";
+    else if (recovery.winch.active) coach = "Winching: light throttle to help, never jerk the line";
+    else if (v.isCvt() && !v.lowRange && v.beltTemp > 120.f) coach = "CVT belt is cooking - shift to LOW range";
+    else if (v.windup > 0.45f) coach = "Driveline binding - straighten up or go 2H on grippy ground";
+    else if (debead) coach = "Tire bead is off - limp it out, air up / beadlocks";
+    else if (diggingTimer > 1.5f) coach = v.bellyLoad > 0.25f ? "Bellied out: stop spinning - shovel (K), boards (B) or winch (J)" :
+                                                              "You're digging - ease off, rock it back and forth, lock up";
+    else if (v.bellyLoad > 0.4f && spd < 0.5f) coach = "Hung on the belly - dig it out or winch";
+    else if (pack > 0.65f && spd < 6.f) coach = "Tread packed with mud - a burst of wheel speed cleans the lugs";
+    else if (tractionBackTimer > 0) coach = "Traction back - keep the momentum";
+    else if (v.brakeWet > 0.35f) coach = "Wet brakes - drag them lightly to dry them";
 }
 
 std::string Game::standingsJson() {
@@ -739,6 +853,13 @@ const char* Game::hud() {
     others += "]";
     std::string standings = standingsJson();
     Vec3 f = player.forward();
+    int soilCount[int(Soil::Count)] = {0};
+    bool debead = false;
+    for (auto& w : player.wheels) { if (w.contact) soilCount[w.soil]++; debead = debead || w.debeaded; }
+    int soil = 0;
+    for (int k = 1; k < int(Soil::Count); k++) if (soilCount[k] > soilCount[soil]) soil = k;
+    const char* soilName = soilMods(uint8_t(soil)).name;
+    int winchState = !player.cfg.winch ? 0 : (recovery.winch.broken ? 3 : (recovery.winch.active ? 2 : 1));
     std::snprintf(buf, sizeof buf,
                   "{\"state\":%d,\"mph\":%.1f,\"rpm\":%.0f,\"redline\":%.0f,\"gear\":%d,\"manual\":%s,\"low\":%s,\"awd\":%s,"
                   "\"lockF\":%s,\"lockR\":%s,\"psi\":%.1f,\"temp\":%.1f,\"clog\":%.2f,\"boost\":%.2f,\"stalled\":%s,"
@@ -746,17 +867,24 @@ const char* Game::hud() {
                   "\"distance\":%.2f,\"score\":%.1f,\"combo\":%.2f,\"lap\":%d,\"laps\":%d,\"bestLap\":%.2f,\"lastLap\":%.2f,"
                   "\"penalty\":%.1f,\"king\":%.2f,\"stuck\":%s,\"belly\":%.2f,\"slip\":%.2f,\"air\":%.2f,\"message\":\"%s\","
                   "\"finishSerial\":%d,\"results\":%s,\"x\":%.1f,\"z\":%.1f,\"heading\":%.3f,\"others\":%s,"
-                  "\"pause\":%s,\"pad\":%s,\"padName\":\"%s\",\"engine\":\"%s\",\"dirt\":%.2f,\"lane\":%d,\"standings\":%s,\"ghost\":%s}",
+                  "\"pause\":%s,\"pad\":%s,\"padName\":\"%s\",\"engine\":\"%s\",\"dirt\":%.2f,\"lane\":%d,\"standings\":%s,\"ghost\":%s,"
+                  "\"coach\":\"%s\",\"soil\":\"%s\",\"tcase\":%d,\"diffF\":\"%s\",\"diffR\":\"%s\",\"belt\":%.0f,\"cvt\":%s,"
+                  "\"windup\":%.2f,\"winch\":%d,\"winchKn\":%.1f,\"winchHeat\":%.2f,\"boards\":%d,\"dig\":%.1f,"
+                  "\"flooded\":%s,\"broken\":%s,\"recover\":%s,\"brakeWet\":%.2f,\"bead\":%s,\"shaft\":%s}",
                   int(state), player.speed() * 2.237f, player.engineRpm, e.redlineRpm, player.gear, player.manual ? "true" : "false",
                   player.lowRange ? "true" : "false", player.fourWD ? "true" : "false", player.lockFront ? "true" : "false",
                   player.lockRear ? "true" : "false", player.psi, player.engineTemp, player.radiatorClog, player.boost,
-                  player.stallTimer > 0 ? "true" : "false", int(mode.id), modeName(mode.id), int(mode.phase),
+                  player.stallTimer > 0 || player.flooded || player.engineBroken ? "true" : "false", int(mode.id), modeName(mode.id), int(mode.phase),
                   mode.countdownLeft(now), mode.elapsed, mode.timeLimit, mode.distance, mode.score, mode.combo, mode.lap, mode.laps,
                   mode.bestLap, mode.lastLap, mode.penalty, mode.kingTime, mode.stuck ? "true" : "false", player.bellyLoad,
                   player.avgSlip, player.airTime, mode.messageTimer > 0 ? mode.message.c_str() : "", g_finishSerial, res.c_str(),
                   player.pos.x, player.pos.z, std::atan2(f.x, f.z), others.c_str(), g_pauseRequested ? "true" : "false",
                   input.gamepadConnected ? "true" : "false", input.gamepadName, e.name.c_str(), player.dirt, mode.lane,
-                  standings.c_str(), ghostTrace.size() >= 16 ? "true" : "false");
+                  standings.c_str(), ghostTrace.size() >= 16 ? "true" : "false", coach.c_str(), soilName, player.transfer(),
+                  diffName(player.diffF), diffName(player.diffR), player.beltTemp, player.isCvt() ? "true" : "false", player.windup,
+                  winchState, recovery.winch.force / 1000.f, recovery.winch.heat, recovery.boardsCarried, std::max(0.f, recovery.digTimer),
+                  player.flooded ? "true" : "false", player.engineBroken ? "true" : "false", recoverMenu ? "true" : "false",
+                  player.brakeWet, debead ? "true" : "false", player.frontShaftBroken ? "true" : "false");
     hudJson = buf;
     g_pauseRequested = false;
     return hudJson.c_str();

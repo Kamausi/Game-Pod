@@ -10,6 +10,8 @@ namespace mb {
 
 struct TerrainSample {
     float height = 0, base = 0, moisture = 0, waterDepth = 0, grass = 0, compaction = 0;
+    uint8_t soil = 0;      // Soil enum (loam, clay, silt, sand, peat)
+    float disturb = 0;     // traffic/churn 0..1 (weakens remoldable soils)
     float mudDepth() const { return std::max(0.f, height - base); }
 };
 
@@ -69,6 +71,7 @@ public:
     std::vector<float> h, base, water, moist, comp;
     std::vector<uint8_t> grass, track;
     std::vector<uint8_t> trackDir;  // tire heading mod pi, 0..255
+    std::vector<uint8_t> soil;      // Soil enum per cell
 };
 
 }  // namespace mb

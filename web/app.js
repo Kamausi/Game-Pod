@@ -52,6 +52,7 @@ function boot() {
     clockOffset: c('mb_set_clock_offset', null, ['number']),
     localId: c('mb_set_local_id', null, ['number']),
     catalog: c('mb_catalog', 'string', []),
+    spec: c('mb_spec', 'string', ['string']),
   };
   $('loadbar').style.width = '100%';
   setTimeout(() => $('loading').classList.add('hide'), 250);
@@ -155,7 +156,7 @@ async function startAudio() {
 
 // ------------------------------------------------------------------------------------------
 // Screens
-const screens = ['menu', 'play', 'garage', 'lobby', 'boards', 'settings', 'help', 'pause', 'results'];
+const screens = ['menu', 'play', 'garage', 'lobby', 'boards', 'settings', 'guide', 'help', 'pause', 'recover', 'results'];
 let current = 'menu';
 function show(name) {
   document.body.classList.toggle('ingame', name === null);
@@ -207,6 +208,19 @@ $('btnResume').onclick = () => { hideAll(); api.setState(2); };
 $('btnRestart').onclick = () => { if (net.room && net.isHost) { hideAll(); net.send({ t: 'start', mode: lastMode }); } else if (!net.room) startSolo(lastMode); else hideAll(); };
 $('btnTow').onclick = () => { hideAll(); api.setState(2); api.action('tow'); };
 $('btnToGarage').onclick = () => show('garage');
+// Recovery menu: the tow key pauses and offers the guide's escalation, least force first.
+function openRecover() {
+  api.action('recover');   // clear the request flag
+  api.setState(3);
+  const bog = hud.mode === 1 && hud.phase === 2;
+  $('recNote').textContent = bog ? 'Judged pull: no self-recovery - the dozer ends your run.'
+    : `Least force first. Boards: ${hud.boards}/2 · ${hud.winch ? (hud.winch === 3 ? 'winch line broken' : 'winch ready') : 'no winch fitted'}`;
+  for (const k of ['shovel', 'boards', 'winch']) document.querySelector(`[data-rec="${k}"]`).disabled = bog || (k === 'winch' && hud.winch !== 1 && hud.winch !== 2);
+  $('recWinch').firstChild.textContent = hud.winch === 2 ? 'Release winch ' : 'Winch ';
+  show('recover');
+}
+document.querySelectorAll('[data-rec]').forEach((b) => (b.onclick = () => { hideAll(); api.setState(2); api.action(b.dataset.rec); $('canvas').focus(); }));
+$('btnRecClose').onclick = () => { hideAll(); api.setState(2); $('canvas').focus(); };
 $('btnQuit').onclick = () => { api.setState(0); show('menu'); };
 $('btnAgain').onclick = () => { if (net.room) { hideAll(); api.startMode(lastMode, net.lane || 0, 0); } else startSolo(lastMode); };
 $('btnResBoards').onclick = () => { api.setState(0); show('boards'); };
@@ -216,10 +230,14 @@ $('btnResMenu').onclick = () => { api.setState(0); show('menu'); };
 // Garage
 let catalog = { bodies: [], engines: [] };
 const cfg = Object.assign({ name: 'Buddy', body: 'comanche', engine: 'i6_40', tire: 35, width: 12.5, tread: 'mt', lift: 4, axle: '4.56',
-  lockF: false, lockR: true, awd: true, snorkel: false, psi: 18, paint: '5d625d' }, store.get('cfg', {}));
+  lockF: false, lockR: true, awd: true, snorkel: false, psi: 18, paint: '5d625d', bead: false, btc: false, winch: true }, store.get('cfg', {}));
+// Older saves only had locker on/off flags.
+if (!cfg.diffR) cfg.diffR = cfg.lockR ? 'locker' : 'open';
+if (!cfg.diffF) cfg.diffF = cfg.lockF ? 'locker' : 'open';
 function cfgString() {
   return `name=${cfg.name.replace(/[;=]/g, '')};body=${cfg.body};engine=${cfg.engine};tire=${cfg.tire};width=${cfg.width};tread=${cfg.tread};` +
-    `lift=${cfg.lift};axle=${cfg.axle};lockF=${+cfg.lockF};lockR=${+cfg.lockR};awd=${+cfg.awd};snorkel=${+cfg.snorkel};psi=${cfg.psi};paint=${cfg.paint}`;
+    `lift=${cfg.lift};axle=${cfg.axle};diffF=${cfg.diffF};diffR=${cfg.diffR};lockF=0;lockR=${+(cfg.diffR !== 'open' && cfg.diffR !== 'lsd')};` +
+    `awd=${+cfg.awd};snorkel=${+cfg.snorkel};bead=${+cfg.bead};btc=${+cfg.btc};winch=${+cfg.winch};psi=${cfg.psi};paint=${cfg.paint}`;
 }
 function initGarage() {
   catalog = JSON.parse(api.catalog());
@@ -239,10 +257,13 @@ function initGarage() {
   };
   bind('g_name', 'name'); bind('g_body', 'body'); bind('g_engine', 'engine'); bind('g_tire', 'tire', Number);
   bind('g_width', 'width', Number); bind('g_tread', 'tread'); bind('g_lift', 'lift', Number); bind('g_axle', 'axle');
-  bind('g_psi', 'psi', Number); bind('g_awd', 'awd'); bind('g_lockR', 'lockR'); bind('g_lockF', 'lockF');
+  bind('g_psi', 'psi', Number); bind('g_awd', 'awd'); bind('g_diffF', 'diffF'); bind('g_diffR', 'diffR');
+  bind('g_btc', 'btc'); bind('g_bead', 'bead'); bind('g_winch', 'winch');
   bind('g_snorkel', 'snorkel'); bind('g_paint', 'paint', (v) => v.replace('#', ''));
   applyCfg();
 }
+const DIFF = { open: 'open', lsd: 'LSD', locker: 'locker', spool: 'spool' };
+$('btnWash').onclick = () => { api.action('wash'); toast('Washed and repaired'); };
 function refreshGarage() {
   $('g_engine').value = cfg.engine; $('g_tire').value = cfg.tire; $('g_awd').checked = cfg.awd; $('g_paint').value = '#' + cfg.paint;
 }
@@ -253,7 +274,19 @@ function applyCfg() {
   $('v_psi').textContent = `${cfg.psi} psi`;
   const e = catalog.engines.find((x) => x.id === cfg.engine) || {};
   $('specLine').textContent = `${e.hp || '?'} hp · ${e.tq || '?'} N·m · ${cfg.tire}x${cfg.width} ${cfg.tread.toUpperCase()} · ${cfg.axle} gears · ` +
-    `${cfg.awd ? '4WD' : '2WD'}${cfg.lockR ? ' · rear locker' : ''}${cfg.lockF ? ' · front locker' : ''}${cfg.snorkel ? ' · snorkel' : ''}`;
+    `${cfg.awd ? '4WD' : '2WD'} · ${DIFF[cfg.diffF]} / ${DIFF[cfg.diffR]}${cfg.snorkel ? ' · snorkel' : ''}${cfg.bead ? ' · beadlocks' : ''}${cfg.winch ? ' · winch' : ''}`;
+  try {
+    const sp = JSON.parse(api.spec(cfgString()));
+    $('specSheet').innerHTML =
+      `<div><small>Class</small><b class="cls-${sp.cls}">${sp.cls}</b></div>` +
+      `<div><small>Crawl ratio</small><b>${sp.crawl.toFixed(1)}:1</b></div>` +
+      `<div><small>Diff clearance</small><b>${sp.diffClear.toFixed(1)}"</b></div>` +
+      `<div><small>Ground pressure</small><b>${sp.kpa} kPa</b></div>` +
+      `<div><small>Weight / hp</small><b>${sp.lbhp.toFixed(1)} lb</b></div>` +
+      `<div class="wide"><small>Gearing</small><b>${cfg.axle}s on ${cfg.tire}" tires feel like ${sp.eff.toFixed(2)}s on factory tires` +
+      `${Math.abs(sp.regear - +cfg.axle) > 0.2 ? ` &mdash; re-gear to ~${sp.regear.toFixed(2)}` : ' &mdash; matched'}</b></div>` +
+      (cfg.psi < 8 && !cfg.bead ? '<div class="wide warn">Under 8 psi without beadlocks: you can roll a bead off the rim</div>' : '');
+  } catch { $('specSheet').textContent = ''; }
   store.set('cfg', cfg);
   api.setConfig(cfgString());
   if (net.ws && net.ws.readyState === 1) net.send({ t: 'cfg', cfg: cfgString(), name: cfg.name });
@@ -305,10 +338,23 @@ function updateHud() {
   $('tachFill').style.width = `${Math.min(100, rn * 100)}%`;
   $('hudSpeed').textContent = Math.round(hud.mph);
   $('hudGear').textContent = hud.stalled ? '!' : hud.gear < 0 ? 'R' : hud.gear === 0 ? 'N' : hud.gear;
-  $('lamp4wd').classList.toggle('on', hud.awd);
-  $('lampLo').classList.toggle('on', hud.low);
+  $('lampTcase').textContent = ['2H', '4H', '4L'][hud.tcase] || '2H';
+  $('lampTcase').classList.toggle('lo', hud.tcase === 2);
+  $('lampLockR').textContent = hud.diffR === 'spool' ? 'R-SPOOL' : hud.diffR === 'lsd' ? 'R-LSD' : 'R-LOCK';
+  $('lampLockF').textContent = hud.diffF === 'spool' ? 'F-SPOOL' : hud.diffF === 'lsd' ? 'F-LSD' : 'F-LOCK';
   $('lampLockR').classList.toggle('on', hud.lockR);
-  $('lampLockF').classList.toggle('on', hud.lockF);
+  $('lampLockF').classList.toggle('on', hud.lockF && hud.tcase > 0);
+  $('lampLockR').style.display = hud.diffR === 'open' ? 'none' : '';
+  $('lampLockF').style.display = hud.diffF === 'open' ? 'none' : '';
+  $('lampWinch').style.display = hud.winch ? '' : 'none';
+  $('lampWinch').classList.toggle('on', hud.winch === 2);
+  $('lampWinch').classList.toggle('bad', hud.winch === 3);
+  $('lampWinch').textContent = hud.winch === 2 ? `WINCH ${Math.round(hud.winchKn)} kN` : hud.winch === 3 ? 'LINE SNAPPED' : 'WINCH';
+  const warn = hud.broken ? 'ENGINE DEAD' : hud.flooded ? 'FLOODED' : hud.shaft ? 'FRONT SHAFT' : hud.bead ? 'BEAD OFF' :
+    hud.cvt && hud.belt > 120 ? `BELT ${Math.round(hud.belt)}°C` : hud.windup > 0.45 ? 'BINDING' : hud.brakeWet > 0.35 ? 'WET BRAKES' : '';
+  $('lampWarn').textContent = warn;
+  $('lampWarn').style.display = warn ? '' : 'none';
+  $('hudSoil').textContent = hud.soil;
   $('lampMan').classList.toggle('on', hud.manual);
   $('hudPsi').textContent = hud.psi.toFixed(0);
   $('hudTemp').textContent = `${Math.round(hud.temp * 9 / 5 + 32)}°`;
@@ -322,14 +368,17 @@ function updateHud() {
     case 2: timer = fmtTime(hud.elapsed + hud.penalty); sub = `Lap ${Math.min(hud.lap + 1, hud.laps)}/${hud.laps}${hud.bestLap > 0 ? ' · best ' + fmtTime(hud.bestLap) : ''}`; break;
     case 3: timer = fmtTime(Math.max(0, hud.limit - hud.elapsed)); sub = `${Math.round(hud.score).toLocaleString()} pts · x${hud.combo.toFixed(1)}`; break;
     case 4: timer = fmtTime(Math.max(0, hud.limit - hud.elapsed)); sub = `Crown ${fmtTime(hud.king)}`; break;
-    default: timer = ''; sub = 'Free roam · T = dozer tow';
+    default: timer = ''; sub = 'Free roam · T = recovery';
   }
   $('hudTimer').textContent = timer;
   $('hudSub').textContent = sub;
   const cd = hud.phase === 1 ? Math.ceil(hud.countdown) : 0;
   $('countdown').textContent = hud.phase === 1 && cd > 0 && cd <= 5 ? cd : '';
   $('hudMsg').textContent = hud.message || '';
-  $('stuckHint').style.display = hud.stuck ? 'block' : 'none';
+  $('coach').textContent = hud.coach || '';
+  $('coach').style.display = hud.coach ? 'block' : 'none';
+  $('stuckHint').style.display = hud.stuck && !hud.coach ? 'block' : 'none';
+  if (hud.recover && current === null) openRecover();
   drawMinimap();
   $('others').innerHTML = hud.mode && (hud.standings || []).length > 1
     ? hud.standings.map((r, i) => `<div class="${r.you ? 'you' : ''}">${i + 1}. ${esc(r.name)} <span>${esc(r.text)}</span></div>`).join('') : '';
@@ -572,7 +621,7 @@ function startSnapshots() {
 let navPrev = {}, navRepeat = 0;
 function focusables() {
   if (current === null) return [];
-  return [...$(current).querySelectorAll('[data-nav]')].filter((e) => e.offsetParent !== null);
+  return [...$(current).querySelectorAll('[data-nav]')].filter((e) => e.offsetParent !== null && !e.disabled);
 }
 function focusFirst() { const f = focusables(); if (f.length && !f.includes(document.activeElement)) f[0].focus({ preventScroll: true }); }
 function padNavLoop(t) {

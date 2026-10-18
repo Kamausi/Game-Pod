@@ -73,6 +73,11 @@ EMSCRIPTEN_KEEPALIVE int mb_ghost_trace_len() { return g_game ? int(g_game->last
 EMSCRIPTEN_KEEPALIVE const uint8_t* mb_map_image() { return g_game ? g_game->world.overview.data() : nullptr; }
 EMSCRIPTEN_KEEPALIVE int mb_map_res() { return g_game ? g_game->world.overviewN : 0; }
 EMSCRIPTEN_KEEPALIVE float mb_map_size() { return g_game ? g_game->world.terrain.size() : 0.f; }
+EMSCRIPTEN_KEEPALIVE const char* mb_spec(const char* cfg) {
+    static std::string out;
+    out = specSheet(VehicleConfig::parse(cfg)).json();
+    return out.c_str();
+}
 EMSCRIPTEN_KEEPALIVE const char* mb_catalog() {
     g_catalog = "{\"bodies\":[";
     char b[512];

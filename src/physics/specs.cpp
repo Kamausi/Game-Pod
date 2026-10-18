@@ -1,4 +1,5 @@
 #include "specs.h"
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
@@ -99,20 +100,38 @@ const char* treadName(Tread t) {
     return "mt";
 }
 
+const char* diffName(Diff d) {
+    switch (d) {
+        case Diff::Open: return "open";
+        case Diff::Limited: return "lsd";
+        case Diff::Locker: return "locker";
+        case Diff::Spool: return "spool";
+    }
+    return "open";
+}
+static Diff parseDiff(const std::string& v) {
+    if (v == "lsd" || v == "1") return Diff::Limited;
+    if (v == "locker" || v == "2") return Diff::Locker;
+    if (v == "spool" || v == "3") return Diff::Spool;
+    return Diff::Open;
+}
+
 std::string VehicleConfig::serialize() const {
     char buf[512];
     unsigned r = unsigned(clampf(paint[0], 0, 1) * 255), g = unsigned(clampf(paint[1], 0, 1) * 255),
              bl = unsigned(clampf(paint[2], 0, 1) * 255);
     std::snprintf(buf, sizeof buf,
                   "name=%s;body=%s;engine=%s;tire=%.1f;width=%.1f;tread=%s;lift=%.1f;axle=%.2f;lockF=%d;lockR=%d;"
-                  "awd=%d;snorkel=%d;psi=%.1f;paint=%02x%02x%02x",
+                  "awd=%d;snorkel=%d;psi=%.1f;paint=%02x%02x%02x;diffF=%s;diffR=%s;bead=%d;btc=%d;winch=%d",
                   name.c_str(), body.c_str(), engine.c_str(), tireIn, widthIn, treadName(tread), liftIn, axleRatio,
-                  lockFront, lockRear, fourWD, snorkel, psi, r, g, bl);
+                  diffF >= Diff::Locker, diffR >= Diff::Locker, fourWD, snorkel, psi, r, g, bl, diffName(diffF), diffName(diffR),
+                  beadlock, btc, winch);
     return buf;
 }
 
 VehicleConfig VehicleConfig::parse(const std::string& s) {
     VehicleConfig c;
+    bool haveDiffF = false, haveDiffR = false;
     std::stringstream ss(s);
     std::string kv;
     while (std::getline(ss, kv, ';')) {
@@ -128,8 +147,13 @@ VehicleConfig VehicleConfig::parse(const std::string& s) {
         else if (k == "tread") c.tread = v == "at" ? Tread::AllTerrain : (v == "paddle" ? Tread::Paddle : Tread::MudTerrain);
         else if (k == "lift") c.liftIn = clampf(f, 0, 10);
         else if (k == "axle") c.axleRatio = clampf(f, 3.55f, 6.5f);
-        else if (k == "lockF") c.lockFront = f != 0;
-        else if (k == "lockR") c.lockRear = f != 0;
+        else if (k == "lockF") { c.lockFront = f != 0; if (!haveDiffF) c.diffF = f != 0 ? Diff::Locker : Diff::Open; }
+        else if (k == "lockR") { c.lockRear = f != 0; if (!haveDiffR) c.diffR = f != 0 ? Diff::Locker : Diff::Open; }
+        else if (k == "diffF") { c.diffF = parseDiff(v); haveDiffF = true; c.lockFront = c.diffF >= Diff::Locker; }
+        else if (k == "diffR") { c.diffR = parseDiff(v); haveDiffR = true; c.lockRear = c.diffR >= Diff::Locker; }
+        else if (k == "bead") c.beadlock = f != 0;
+        else if (k == "btc") c.btc = f != 0;
+        else if (k == "winch") c.winch = f != 0;
         else if (k == "awd") c.fourWD = f != 0;
         else if (k == "snorkel") c.snorkel = f != 0;
         else if (k == "psi") c.psi = clampf(f, 5, 35);
@@ -141,6 +165,46 @@ VehicleConfig VehicleConfig::parse(const std::string& s) {
         }
     }
     return c;
+}
+
+SpecSheet specSheet(const VehicleConfig& c) {
+    const BodySpec& b = findBody(c.body);
+    const EngineSpec& e = findEngine(c.engine);
+    Gearbox g;
+    SpecSheet s{};
+    s.crawlRatio = g.ratios[0] * g.lowRange * c.axleRatio;
+    // Bigger tires = taller effective gearing: ratio x stock tire / new tire. Restore it with stock x new / stock.
+    // Factory baseline: 3.73s on ~30" tires (27" on the bog car and the UTV, 4.56 for the UTV's final drive).
+    bool utv = b.id == "utv";
+    float stockAxle = utv ? 4.56f : 3.73f;
+    float factoryTire = utv || b.id == "bogcar76" ? 27.f : 30.f;
+    s.effRatio = c.axleRatio * factoryTire / c.tireIn;
+    float want = stockAxle * c.tireIn / factoryTire;
+    const float std_[] = {3.73f, 4.10f, 4.30f, 4.56f, 4.88f, 5.13f, 5.38f, 5.86f, 6.17f, 6.50f, 7.17f};
+    s.regearTarget = std_[0];
+    for (float r : std_) if (std::fabs(r - want) < std::fabs(s.regearTarget - want)) s.regearTarget = r;
+    float radius = c.tireIn * 0.0254f * 0.5f;
+    s.diffClearIn = (radius - 0.17f) / 0.0254f;
+    float mass = b.mass + e.mass;
+    float load = mass * 9.81f * 0.25f;
+    float kTire = 1.6e5f * std::pow(c.psi / 25.f, 0.85f);
+    float defl = std::min(load / kTire, 0.5f * std::max(0.08f, radius - 0.2f));
+    float L = 2.f * std::sqrt(std::max(1e-4f, 2.f * radius * defl - defl * defl));
+    s.groundKpa = load / std::max(0.01f, c.widthIn * 0.0254f * L) / 1000.f;
+    float hp = 1;
+    for (size_t i = 0; i < e.rpmPts.size(); i++) hp = std::max(hp, e.torquePts[i] * e.rpmPts[i] / 7121.f);
+    s.lbPerHp = mass * 2.2046f / hp;
+    bool pro = c.tireIn >= 44 || c.tread == Tread::Paddle || (hp > 600 && c.tireIn >= 40);
+    bool stock = c.tireIn <= b.defaultTireIn + 2.f && c.liftIn <= 4.f && c.diffR != Diff::Spool && hp < 420;
+    s.cls = pro ? "Pro" : (stock ? "Stock" : "Modified");
+    return s;
+}
+
+std::string SpecSheet::json() const {
+    char b[320];
+    std::snprintf(b, sizeof b, "{\"crawl\":%.1f,\"eff\":%.2f,\"regear\":%.2f,\"diffClear\":%.1f,\"kpa\":%.0f,\"lbhp\":%.1f,\"cls\":\"%s\"}",
+                  crawlRatio, effRatio, regearTarget, diffClearIn, groundKpa, lbPerHp, cls);
+    return b;
 }
 
 }  // namespace mb

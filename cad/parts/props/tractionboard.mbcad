@@ -1,0 +1,20 @@
+# Recovery traction board (MaxTrax-style): orange nylon deck with raised cleats and
+# moulded carry handles. Long axis z, origin at the centre of the underside.
+color #e5670f
+material matte
+box size=0.33,0.03,1.10 pos=0,0.015,0 bevel=0.01
+# Raised cleats in staggered rows: what bites into the tread
+color #cf5a0a
+box size=0.13,0.022,0.03 pos=0.08,0.04,-0.45 bevel=0.006 mirror=x
+box size=0.13,0.022,0.03 pos=0,0.04,-0.34 bevel=0.006
+box size=0.13,0.022,0.03 pos=0.08,0.04,-0.23 bevel=0.006 mirror=x
+box size=0.13,0.022,0.03 pos=0,0.04,-0.12 bevel=0.006
+box size=0.13,0.022,0.03 pos=0.08,0.04,0.0 bevel=0.006 mirror=x
+box size=0.13,0.022,0.03 pos=0,0.04,0.12 bevel=0.006
+box size=0.13,0.022,0.03 pos=0.08,0.04,0.23 bevel=0.006 mirror=x
+box size=0.13,0.022,0.03 pos=0,0.04,0.34 bevel=0.006
+box size=0.13,0.022,0.03 pos=0.08,0.04,0.45 bevel=0.006 mirror=x
+# Handle slots (dark) near each end
+color #2a1a0c
+box size=0.16,0.032,0.05 pos=0,0.016,-0.5
+box size=0.16,0.032,0.05 pos=0,0.016,0.5

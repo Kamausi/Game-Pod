@@ -32,6 +32,7 @@
     <button data-nav data-go="garage">Garage</button>
     <button data-nav data-go="boards">Leaderboards</button>
     <button data-nav data-go="settings">Settings</button>
+    <button data-nav data-go="guide">Field Guide</button>
     <button data-nav data-go="help">Controls</button>
   </nav>
   <div class="pad-hint" id="padHint">Connect a gamepad &mdash; press any button</div>
@@ -64,13 +65,18 @@
     <label>Lift <span class="val" id="v_lift"></span><input data-nav type="range" id="g_lift" min="0" max="10" step="0.5"></label>
     <label>Axle gears <select data-nav id="g_axle"><option>3.73</option><option>4.10</option><option>4.56</option><option>4.88</option><option>5.38</option><option>6.17</option></select></label>
     <label>Air pressure <span class="val" id="v_psi"></span><input data-nav type="range" id="g_psi" min="5" max="35" step="1"></label>
-    <label class="row"><input data-nav type="checkbox" id="g_awd"> 4WD</label>
-    <label class="row"><input data-nav type="checkbox" id="g_lockR"> Rear locker</label>
-    <label class="row"><input data-nav type="checkbox" id="g_lockF"> Front locker</label>
+    <label class="row"><input data-nav type="checkbox" id="g_awd"> 4WD (part-time)</label>
+    <label>Front diff <select data-nav id="g_diffF"><option value="open">Open</option><option value="lsd">Limited-slip</option><option value="locker">Selectable locker</option><option value="spool">Spool (welded)</option></select></label>
+    <label>Rear diff <select data-nav id="g_diffR"><option value="open">Open</option><option value="lsd">Limited-slip</option><option value="locker">Selectable locker</option><option value="spool">Spool (welded)</option></select></label>
+    <label class="row"><input data-nav type="checkbox" id="g_btc"> Brake traction control</label>
+    <label class="row"><input data-nav type="checkbox" id="g_bead"> Beadlocks (safe below 8 psi)</label>
+    <label class="row"><input data-nav type="checkbox" id="g_winch"> Front winch</label>
     <label class="row"><input data-nav type="checkbox" id="g_snorkel"> Snorkel</label>
     <label>Paint <input data-nav type="color" id="g_paint"></label>
   </div>
   <div class="spec" id="specLine"></div>
+  <div class="specsheet" id="specSheet"></div>
+  <button data-nav id="btnWash">Pressure-wash &amp; repair</button>
   <button data-nav class="back" data-go="menu">&larr; Done</button>
 </div>
 
@@ -125,6 +131,43 @@
   <button data-nav class="back" data-go="menu">&larr; Back</button>
 </div>
 
+<div id="guide" class="overlay panel-left wide">
+  <h2>Field Guide</h2>
+  <div class="guide">
+    <h3>Read the mud before you drop in</h3>
+    <p>Press <b>Z</b> (D-pad right menu &rarr; Scout) to read the section ahead: water depth, how deep the soft stuff goes, the soil, and whether there's a firm bottom your tires can reach. The HUD names the soil under you.</p>
+    <ul>
+      <li><b>Clay gumbo</b> &mdash; sticky, packs the tread solid, and turns to grease the more it's churned. Wheel speed cleans the lugs.</li>
+      <li><b>Silt</b> &mdash; weak and slick once it's worked; fine soup with no bite.</li>
+      <li><b>Wet sand</b> &mdash; strong under load but sucks power; momentum and flotation, not wheel speed.</li>
+      <li><b>Peat muck</b> &mdash; almost no bearing strength. Float or sink: air down and keep moving.</li>
+      <li><b>Loam</b> &mdash; the honest stuff. Forgiving traction.</li>
+    </ul>
+    <h3>Momentum, not panic</h3>
+    <p>Carry steady speed in, keep the wheel straight, and stay in it. When forward progress stops, <b>stop spinning</b>: every second of wheelspin digs you down onto the frame. Rock it &mdash; ease forward, reverse into your own tracks, forward again.</p>
+    <h3>4WD, low range and lockers</h3>
+    <p><b>G / LB</b> cycles the transfer case: <b>2H &rarr; 4H &rarr; 4L</b> (4L only when nearly stopped). Part-time 4WD has no centre diff: tight turns in 4H on grippy ground wind up the driveline until the front U-joint snaps. 4L multiplies torque (the garage shows your crawl ratio) &mdash; go slow and steady.</p>
+    <p><b>L / B</b> engages selectable lockers. Lock <i>before</i> the hole &mdash; the game refuses at speed or mid-spin, like a real air locker. A locked front axle pushes straight. A spool is always locked. Open diffs send power to the wheel with the least grip; LSDs help a little; brake traction control brakes the spinning wheel.</p>
+    <h3>Tires and air</h3>
+    <p>Airing down (<b>V</b>) lengthens the footprint and drops ground pressure &mdash; you float instead of cutting in. Below about 8 psi a hard side load will roll the bead off the rim unless you run <b>beadlocks</b>. Big tires raise your diff clearance but make the gearing taller: the garage spec sheet gives the re-gear that restores it.</p>
+    <h3>Water</h3>
+    <p>Know where your air intake is. Suck water and the engine <b>hydrolocks</b>: it's dead until you get out of the water and let it drain, then throttle to restart. Crank it while it's still swamped and you <b>bend a rod</b>. A snorkel raises the intake. After a crossing your brakes are wet &mdash; drag them lightly to dry them.</p>
+    <h3>Recovery: least force first</h3>
+    <ol>
+      <li><b>Stop</b> spinning and look (Scout).</li>
+      <li><b>Shovel</b> (K): dig ramps in front of the tires and clear the belly. 5 seconds.</li>
+      <li><b>Traction boards</b> (B): wedged under the tires that drive &mdash; ease on gently, don't spin on them or you'll chew them up. Drive clear and they're picked up.</li>
+      <li><b>Winch</b> (J): hooks the nearest tree, abandoned rig or post ahead within 38 m. Pull drops ~9% per layer on the drum, the motor needs rest between pulls, and shock-loading the line by driving against it snaps it. Help it with light throttle only.</li>
+      <li><b>Dozer</b> (T): last resort. In a judged Mud Bog pull it's the only help allowed, and it ends your run.</li>
+    </ol>
+    <h3>UTVs</h3>
+    <p>The CVT belt cooks when a side-by-side slogs through mud in high range. Use <b>low range</b> in the slop; a burnt belt slips and won't pull.</p>
+    <h3>After the run</h3>
+    <p>Caked mud inside the wheels throws them out of balance (you'll feel the shake at speed). <b>Pressure-wash &amp; repair</b> in the garage cleans it off and fixes anything you broke.</p>
+  </div>
+  <button data-nav class="back" data-go="menu">&larr; Back</button>
+</div>
+
 <div id="help" class="overlay panel-left wide">
   <h2>Controls</h2>
   <table class="controls">
@@ -133,19 +176,21 @@
     <tr><td>Steer</td><td>Left stick</td><td>A / D</td></tr>
     <tr><td>Look around</td><td>Right stick</td><td>Mouse drag</td></tr>
     <tr><td>Handbrake</td><td>A / Cross</td><td>Space</td></tr>
-    <tr><td>Cycle lockers (off / rear / F+R)</td><td>B / Circle</td><td>L</td></tr>
+    <tr><td>Cycle lockers (selectable only)</td><td>B / Circle</td><td>L</td></tr>
     <tr><td>Shift down / up (manual)</td><td>X / Y</td><td>Q / E</td></tr>
     <tr><td>Auto / manual</td><td>D-pad left</td><td>M</td></tr>
-    <tr><td>Low range (4-LO)</td><td>LB</td><td>G</td></tr>
+    <tr><td>Transfer case 2H / 4H / 4L</td><td>LB</td><td>G</td></tr>
     <tr><td>Air up / air down</td><td>D-pad up / down</td><td>F / V</td></tr>
     <tr><td>Camera</td><td>RB</td><td>C</td></tr>
-    <tr><td>Dozer tow</td><td>View / Share</td><td>T</td></tr>
+    <tr><td>Recovery menu (scout, shovel, boards, winch, dozer)</td><td>View / Share</td><td>T</td></tr>
+    <tr><td>Scout ahead / shovel / traction boards</td><td>&mdash;</td><td>Z / K / B</td></tr>
+    <tr><td>Winch on / off</td><td>D-pad right</td><td>J</td></tr>
     <tr><td>Reset upright</td><td>L3</td><td>R</td></tr>
     <tr><td>Horn</td><td>R3</td><td>H</td></tr>
     <tr><td>Pause</td><td>Menu / Options</td><td>Esc / P</td></tr>
   </table>
   <p class="tip touch-only">Touch: drag anywhere in the left half to steer (or enable tilt steering), hold GAS / BRAKE on the right (higher on the pedal = more), BRAKE at a stop = reverse. Drag the open view to look around.</p>
-  <p class="tip">Stuck? Rock it (alternate throttle and reverse), air down for flotation, lock the diffs, keep wheel speed up so the lugs clean out &mdash; or call the dozer.</p>
+  <p class="tip">Stuck? Stop spinning. Rock it, air down for flotation, lock the diffs &mdash; then shovel, boards, winch, and only then the dozer. See the Field Guide.</p>
   <button data-nav class="back" data-go="menu">&larr; Back</button>
 </div>
 
@@ -158,6 +203,18 @@
     <button data-nav id="btnTow">Call the dozer</button>
     <button data-nav id="btnToGarage">Garage</button>
     <button data-nav id="btnQuit">Quit to menu</button>
+  </nav>
+</div>
+<div id="recover" class="overlay center">
+  <h2>Recovery</h2>
+  <p class="tip" id="recNote">Least force first.</p>
+  <nav class="stack">
+    <button data-nav data-rec="scout">Scout ahead <small>Z</small></button>
+    <button data-nav data-rec="shovel">Shovel out <small>K</small></button>
+    <button data-nav data-rec="boards" id="recBoards">Traction boards <small>B</small></button>
+    <button data-nav data-rec="winch" id="recWinch">Winch <small>J</small></button>
+    <button data-nav data-rec="dozer">Call the dozer <small>T</small></button>
+    <button data-nav class="back" id="btnRecClose">Back to driving</button>
   </nav>
 </div>
 <div id="results" class="overlay center">
@@ -179,19 +236,21 @@
   </div>
   <div id="countdown"></div>
   <div id="hudMsg"></div>
-  <div id="stuckHint">STUCK &mdash; rock it &bull; air down &bull; lock it &bull; <b>T / View</b> = dozer tow</div>
+  <div id="stuckHint">STUCK &mdash; stop spinning &bull; rock it &bull; air down &bull; lock it &bull; <b>T / View</b> = recovery</div>
+  <div id="coach"></div>
   <canvas id="minimap" width="180" height="180"></canvas>
   <div id="gauges">
     <div class="tach"><div id="tachFill"></div><div id="tachRed"></div></div>
     <div class="speed"><span id="hudSpeed">0</span><small>MPH</small></div>
     <div class="gear" id="hudGear">N</div>
     <div class="lamps">
-      <span id="lamp4wd">4WD</span><span id="lampLo">LO</span><span id="lampLockR">R-LOCK</span><span id="lampLockF">F-LOCK</span><span id="lampMan">MAN</span>
+      <span id="lampTcase" class="on">4H</span><span id="lampLockR">R-LOCK</span><span id="lampLockF">F-LOCK</span><span id="lampMan">MAN</span><span id="lampWinch">WINCH</span><span id="lampWarn"></span>
     </div>
     <div class="minis">
       <div><small>PSI</small><b id="hudPsi">18</b></div>
       <div><small>TEMP</small><b id="hudTemp">85</b></div>
       <div><small>RAD</small><b id="hudClog">0%</b></div>
+      <div id="miniSoil"><small>SOIL</small><b id="hudSoil">loam</b></div>
     </div>
   </div>
   <div id="others"></div>
@@ -206,11 +265,11 @@
     <div id="tHand" class="tbtn" data-hold="hb">E-BRAKE</div>
     <div id="tButtons">
       <div class="tbtn" data-press="locker">LOCK</div>
-      <div class="tbtn" data-press="lowrange">4-LO</div>
+      <div class="tbtn" data-press="lowrange">2H/4H/4L</div>
       <div class="tbtn" data-hold="airup">AIR+</div>
       <div class="tbtn" data-hold="airdown">AIR&minus;</div>
       <div class="tbtn" data-press="camera">CAM</div>
-      <div class="tbtn" data-press="tow">TOW</div>
+      <div class="tbtn" data-press="tow">RECOVER</div>
     </div>
     <div id="tPause" class="tbtn round">&#10074;&#10074;</div>
   </div>

@@ -15,6 +15,7 @@
 #include "physics/vehicle.h"
 #include "physics/collide.h"
 #include "game/ai.h"
+#include "game/recovery.h"
 
 using namespace mb;
 
@@ -66,7 +67,7 @@ static float runPit(VehicleConfig c, float moist, float water, float startX, flo
 
 // Drive a lane of the real mud bog pit at full throttle, holding the lane. Returns the best
 // distance into the pit (m). rock = back off and re-hit the throttle when stuck, like a player.
-static float runBog(const VehicleConfig& c, int lane, float secs, bool rock) {
+static float runBog(const VehicleConfig& c, int lane, float secs, bool rock, float zOff = 0) {
     static World w;
     w.generate(1976);
     ModeRunner m;
@@ -77,7 +78,9 @@ static float runBog(const VehicleConfig& c, int lane, float secs, bool rock) {
     Vec3 p = m.spawnFor(w, lane, yaw);
     p.y = w.terrain.heightAt(p.x, p.z) - v.rideAxleY + v.wheels[0].radius + 0.2f;
     v.reset(p, yaw);
-    float laneZ = w.laneZ(lane), best = 0, stuckT = 0, rockT = 0;
+    p.z += zOff;
+    v.reset(p, yaw);
+    float laneZ = w.laneZ(lane) + zOff, best = 0, stuckT = 0, rockT = 0;
     VehicleInput in;
     for (int i = 0; i < int(secs * 240); i++) {
         if (i % 4 == 0) {
@@ -115,8 +118,9 @@ int main(int argc, char** argv) {
     if (argc > 2 && std::string(argv[1]) == "--bog") {   // tuning probe: mb_tests --bog "<cfg>" [secs] [lane]
         float secs = argc > 3 ? float(std::atof(argv[3])) : 120.f;
         int lane = argc > 4 ? std::atoi(argv[4]) : 1;
+        float off = argc > 5 ? float(std::atof(argv[5])) : 0.f;
         VehicleConfig c = VehicleConfig::parse(argv[2]);
-        std::printf("%s: throttle %.1f m, rocking %.1f m (of 80, %g s)\n", argv[2], runBog(c, lane, secs, false), runBog(c, lane, secs, true), secs);
+        std::printf("%s: throttle %.1f m, rocking %.1f m (of 80, %g s)\n", argv[2], runBog(c, lane, secs, false, off), runBog(c, lane, secs, true, off), secs);
         return 0;
     }
 
@@ -138,7 +142,8 @@ int main(int argc, char** argv) {
     test("cad kernel: every part builds", [] {
         const char* parts[] = {"wheels/wheel.mbcad", "vehicles/comanche.mbcad", "vehicles/bogcar76.mbcad", "vehicles/silverado.mbcad",
                                "vehicles/utv.mbcad", "props/barrel.mbcad", "props/tpost.mbcad", "props/schoolbus.mbcad",
-                               "props/dozer450.mbcad", "props/spectator.mbcad", "vegetation/poplar.mbcad", "vegetation/teasel.mbcad"};
+                               "props/dozer450.mbcad", "props/spectator.mbcad", "vegetation/poplar.mbcad", "vegetation/teasel.mbcad",
+                               "props/tractionboard.mbcad", "props/winchline.mbcad"};
         for (auto p : parts) {
             CadResult r = cadBuild(p);
             CHECK(r.error.empty() && r.mesh.idx.size() > 12, "%s: %s", p, r.error.c_str());
@@ -380,7 +385,8 @@ int main(int argc, char** argv) {
             collideVehicles(rivals[0].v, rivals[1].v, true);
         }
         for (auto& r : rivals) {
-            std::printf("    %s: lap %d cp %d (%.1f)\n", r.name.c_str(), r.lap, r.nextCp, r.score);
+            std::printf("    %s: lap %d cp %d (%.1f)%s\n", r.name.c_str(), r.lap, r.nextCp, r.score, r.v.frontShaftBroken ? " [front shaft broken]" : "");
+            CHECK(!r.v.frontShaftBroken && !r.v.engineBroken, "%s shouldn't break parts just racing the circuit", r.name.c_str());
             CHECK(r.score >= 0.5f, "%s should make real progress around the circuit", r.name.c_str());
         }
         AiDriver bog = makeRivals(1, 9)[0];
@@ -399,6 +405,176 @@ int main(int argc, char** argv) {
         }
         std::printf("    bog AI: %.1f m %s\n", bog.distance, bog.finished ? "(full pass)" : "");
         CHECK(bog.distance > 30.f, "built AI should get deep into the pit");
+    });
+
+
+    test("field guide: spec sheet (crawl ratio, regear, diff clearance, class)", [] {
+        VehicleConfig c;   // comanche, 35s on 4.56s
+        SpecSheet s = specSheet(c);
+        std::printf("    %s\n", s.json().c_str());
+        CHECK(std::fabs(s.crawlRatio - 2.48f * 2.72f * 4.56f) < 0.05f, "crawl ratio %.1f", s.crawlRatio);
+        CHECK(s.diffClearIn > 9.f && s.diffClearIn < 12.f, "35in tire diff clearance %.1f in", s.diffClearIn);
+        VehicleConfig big = VehicleConfig::parse("body=comanche;tire=44;tread=paddle;psi=8");
+        SpecSheet b = specSheet(big);
+        CHECK(b.regearTarget > s.regearTarget && std::string(b.cls) == "Pro", "44s want deeper gears (%.2f) and run Pro", b.regearTarget);
+        CHECK(b.groundKpa < s.groundKpa, "aired-down big tires float: %.0f vs %.0f kPa", b.groundKpa, s.groundKpa);
+        CHECK(b.effRatio < s.effRatio, "same axle on taller tires is taller gearing");
+    });
+
+    test("field guide: hydrolock - dead until dry, cranking underwater bends a rod", [] {
+        static Terrain t;
+        makePit(t, 0.9f, 3.f);
+        VehicleConfig c;
+        Vehicle v;
+        v.configure(c);
+        v.reset({30, t.heightAt(30, 0) - v.rideAxleY + v.wheels[0].radius + 0.02f, 0}, PI / 2);
+        VehicleInput in;
+        bool flooded = false;
+        for (int i = 0; i < 240 * 3; i++) { v.step(t, in, Vehicle::DT); flooded = flooded || v.flooded; }
+        CHECK(flooded, "submerged intake floods the engine");
+        in.throttle = 1;
+        for (int i = 0; i < 240 * 3; i++) v.step(t, in, Vehicle::DT);
+        CHECK(v.engineBroken, "cranking it while swamped bends a rod");
+        // On dry ground: wait for it to drain, then it restarts.
+        fieldTerrain(t);
+        Vehicle d;
+        d.configure(c);
+        d.reset({0, 0, 0}, PI / 2);
+        d.placeOnGround(t);
+        settle(d, t);
+        d.flooded = true;
+        VehicleInput w;
+        for (int i = 0; i < 240 * 1; i++) d.step(t, w, Vehicle::DT);
+        CHECK(d.flooded, "still flooded right after");
+        for (int i = 0; i < 240 * 3; i++) d.step(t, w, Vehicle::DT);
+        w.throttle = 1;
+        for (int i = 0; i < 240 * 3; i++) d.step(t, w, Vehicle::DT);
+        CHECK(!d.flooded && !d.engineBroken && d.speed() > 2.f, "drained engine restarts and drives (%.1f m/s)", d.speed());
+    });
+
+    test("field guide: part-time 4WD windup breaks the front shaft on grippy ground", [] {
+        static Terrain t;
+        fieldTerrain(t, 0, false, 0.f);
+        auto circle = [&](int tc) {
+            VehicleConfig c;
+            Vehicle v;
+            v.configure(c);
+            v.reset({0, 0, 0}, PI / 2);
+            v.placeOnGround(t);
+            settle(v, t);
+            v.setTransfer(tc);
+            VehicleInput in;
+            in.throttle = 0.35f; in.steer = 1.f;
+            float maxW = 0;
+            for (int i = 0; i < 240 * 25 && !v.frontShaftBroken; i++) { v.step(t, in, Vehicle::DT); maxW = std::max(maxW, v.windup); }
+            std::printf("    tcase %d: windup peak %.2f %s\n", tc, maxW, v.frontShaftBroken ? "(front U-joint snapped)" : "");
+            return v.frontShaftBroken;
+        };
+        CHECK(circle(1), "tight circles in 4H on dirt should snap the front driveline");
+        CHECK(!circle(0), "2H never binds");
+    });
+
+    test("field guide: UTV CVT belt cooks in high range, survives in low", [] {
+        auto run = [](bool low) {
+            static Terrain t;
+            makePit(t, 0.95f, 0);
+            VehicleConfig c = VehicleConfig::parse("body=utv;engine=twin_1000t;tire=30;width=10;awd=1");
+            Vehicle v;
+            v.configure(c);
+            v.reset({8, t.heightAt(8, 0) - v.rideAxleY + v.wheels[0].radius + 0.02f, 0}, PI / 2);
+            v.setTransfer(low ? 2 : 1);
+            VehicleInput in;
+            in.throttle = 1;
+            float peak = 0;
+            for (int i = 0; i < 240 * 40; i++) { v.step(t, in, Vehicle::DT); peak = std::max(peak, v.beltTemp); if (i % 4 == 0) t.relax(v.pos, 5, 4 * Vehicle::DT); }
+            std::printf("    %s range: belt peak %.0f C%s, moved %.1f m\n", low ? "low" : "high", peak, v.beltBurnt ? " BURNT" : "", v.pos.x - 8);
+            return peak;
+        };
+        float hi = run(false), lo = run(true);
+        CHECK(hi > 130.f, "slogging in high range should overheat the belt (%.0f C)", hi);
+        CHECK(lo < 130.f, "low range keeps the belt alive (%.0f C)", lo);
+    });
+
+    test("field guide: aired down to 5 psi, hard cornering pops a bead unless beadlocked", [] {
+        auto run = [](bool bead) {
+            static Terrain t;
+            fieldTerrain(t, 0, false, 0.f);
+            VehicleConfig c;
+            c.psi = 5; c.beadlock = bead;
+            Vehicle v;
+            v.configure(c);
+            v.reset({-60, 0, 0}, PI / 2);
+            v.placeOnGround(t);
+            settle(v, t);
+            VehicleInput in;
+            bool popped = false;
+            for (int i = 0; i < 240 * 20 && !popped; i++) {
+                in.throttle = 0.8f;
+                in.steer = std::sin(i * Vehicle::DT * 2.5f);
+                v.step(t, in, Vehicle::DT);
+                for (auto& w : v.wheels) popped = popped || w.debeaded;
+            }
+            return popped;
+        };
+        CHECK(run(false), "5 psi without beadlocks should roll a bead off in a slalom");
+        CHECK(!run(true), "beadlocks hold the bead");
+    });
+
+    test("field guide: winch and traction boards get a stuck rig out", [] {
+        static World w;
+        auto stuck = [&](Vehicle& v, VehicleConfig c) {
+            makePit(w.terrain, 1.f, 0);
+            v.configure(c);
+            v.reset({10, w.terrain.heightAt(10, 0) - v.rideAxleY + v.wheels[0].radius + 0.02f, 0}, PI / 2);
+            VehicleInput in;
+            for (int i = 0; i < 240; i++) v.step(w.terrain, in, Vehicle::DT);
+            in.throttle = 1;
+            for (int i = 0; i < 240 * 6; i++) v.step(w.terrain, in, Vehicle::DT);
+        };
+        VehicleConfig s;
+        s.tread = Tread::AllTerrain; s.lockRear = false; s.fourWD = false; s.tireIn = 31; s.liftIn = 0; s.widthIn = 10.5f; s.psi = 30; s.winch = true;
+        // Winch to a tree 25 m ahead.
+        {
+            Vehicle v;
+            Recovery r;
+            stuck(v, s);
+            float x0 = v.pos.x;
+            w.props.clear();
+            PropInstance tree;
+            tree.part = "vegetation/poplar.mbcad";
+            tree.pos = {v.pos.x + 25.f, 0, 0.5f};
+            w.props.push_back(tree);
+            std::string msg = r.toggleWinch(w, v);
+            CHECK(r.winch.active, "winch hooks a tree ahead: %s", msg.c_str());
+            VehicleInput in;
+            in.throttle = 0.2f;
+            for (int i = 0; i < 240 * 40 && r.winch.active; i++) { r.stepWinch(v, Vehicle::DT); v.step(w.terrain, in, Vehicle::DT); }
+            std::printf("    winch: %.1f m -> %.1f m (%s)\n", x0, v.pos.x, r.winch.broken ? "snapped" : "ok");
+            CHECK(v.pos.x - x0 > 8.f && !r.winch.broken, "winch drags the rig toward the anchor (%.1f m)", v.pos.x - x0);
+        }
+        // The guide's sequence: stop spinning, shovel out the belly, boards under the drive tires, ease on.
+        {
+            Vehicle v;
+            Recovery r;
+            v.pads = &r.pads;
+            stuck(v, s);
+            VehicleInput in;
+            in.handbrake = true;
+            float x0 = v.pos.x, belly0 = v.bellyLoad;
+            for (int i = 0; i < 240; i++) v.step(w.terrain, in, Vehicle::DT);
+            r.startShovel(v);
+            for (int i = 0; i < 240 * 6; i++) { v.step(w.terrain, in, Vehicle::DT); if (i % 24 == 0) r.update(w, v, 24 * Vehicle::DT); }
+            for (int i = 0; i < 240; i++) v.step(w.terrain, in, Vehicle::DT);
+            v.gear = 1;
+            std::string msg = r.placeBoards(w, v);
+            CHECK(r.pads.size() == 2, "boards placed: %s", msg.c_str());
+            in.handbrake = false; in.throttle = 0.45f;
+            float onPad = 0;
+            for (int i = 0; i < 240 * 6; i++) { v.step(w.terrain, in, Vehicle::DT); onPad = std::max(onPad, float(v.onPad)); }
+            std::printf("    shovel + boards: belly %.2f -> moved %.1f m\n", belly0, v.pos.x - x0);
+            CHECK(onPad > 0, "tires climbed onto the boards");
+            CHECK(v.pos.x - x0 > 1.5f, "dig + boards gets the stuck rig moving (%.1f m)", v.pos.x - x0);
+        }
     });
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);

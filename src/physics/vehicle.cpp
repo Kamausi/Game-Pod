@@ -38,9 +38,12 @@ void Vehicle::configure(const VehicleConfig& c) {
     body = &findBody(c.body);
     engine = &findEngine(c.engine);
     psi = c.psi;
-    lockFront = c.lockFront;
-    lockRear = c.lockRear;
+    diffF = c.diffF;
+    diffR = c.diffR;
+    lockFront = diffF == Diff::Spool || (diffF == Diff::Locker && c.lockFront);
+    lockRear = diffR == Diff::Spool || (diffR == Diff::Locker && c.lockRear);
     fourWD = c.fourWD;
+    lowRange = false;
     finalDrive = c.axleRatio;
 
     const float r = c.tireIn * IN * 0.5f;
@@ -107,6 +110,21 @@ void Vehicle::reset(Vec3 p, float yaw) {
     events.clear();
 }
 
+void Vehicle::repair() {
+    flooded = engineBroken = beltBurnt = frontShaftBroken = false;
+    floodDry = floodCrank = windup = brakeWet = 0;
+    beltTemp = 60.f;
+    stallTimer = 0;
+    engineTemp = 85.f;
+    radiatorClog = 0;
+    for (auto& w : wheels) { w.debeaded = false; w.beadStress = 0; w.cake = 0; w.pack = 0; }
+}
+
+void Vehicle::setTransfer(int m) {
+    fourWD = m >= 1;
+    lowRange = m == 2;
+}
+
 void Vehicle::placeOnGround(const Terrain& t) {
     Vec3 f = forward();
     float yaw = std::atan2(f.x, f.z);
@@ -142,12 +160,17 @@ void Vehicle::stepDrivetrain(float dt, const VehicleInput& in, float& totalTorqu
     float sd = 0;
     int nDriven = 0;
     for (int i = 0; i < 4; i++)
-        if (!wheels[i].front || fourWD) { sd += wheels[i].omega; nDriven++; }
+        if (!wheels[i].front || (fourWD && !frontShaftBroken)) { sd += wheels[i].omega; nDriven++; }
     sd /= std::max(1, nDriven);
 
     const float thr = throttleApplied;
     const float rpmToW = 2.f * PI / 60.f;
 
+    if (flooded || engineBroken) {   // hydrolocked or broken: no running engine
+        engineRpm = approach(engineRpm, 0.f, 6.f, dt);
+        clutchSlip = 1;
+        return;
+    }
     if (stallTimer > 0) {
         stallTimer -= dt;
         engineRpm = approach(engineRpm, 0.f, 4.f, dt);
@@ -191,6 +214,17 @@ void Vehicle::stepDrivetrain(float dt, const VehicleInput& in, float& totalTorqu
     const float eff = 0.86f;
     float dir = Gr > 0 ? 1.f : -1.f;
     totalTorque = std::fabs(Gr) * (dir * eff * Te * TR - signf(sd) * Tfric * coupling);
+    if (isCvt()) {
+        // Belt CVT: slow, heavy going in HIGH range slips and cooks the belt (field guide 7/11);
+        // low range keeps the sheaves in a happy ratio.
+        float work = clutchSlip * thr * (Te / std::max(e.peakTorque(), 1.f));
+        float heat = work * (lowRange ? 4.f : 22.f);
+        float cool = (beltTemp - 50.f) * 0.035f;
+        beltTemp = clampf(beltTemp + (heat - cool) * dt, 20.f, 200.f);
+        if (beltTemp > 165.f && !beltBurnt) { beltBurnt = true; events.beltBurnt = true; }
+        if (beltBurnt) totalTorque = 0;
+        else if (beltTemp > 130.f) totalTorque *= 0.6f;   // glazed belt slips
+    }
     reflI = e.inertia * Gr * Gr * coupling / std::max(1, nDriven);
 }
 
@@ -233,13 +267,18 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
 
     float driveTorque, reflI;
     stepDrivetrain(dt, in, driveTorque, reflI);
-    int nDriven = fourWD ? 4 : 2;
+    const bool fwd4 = fourWD && !frontShaftBroken;   // a broken front shaft leaves rear drive only
+    int nDriven = fwd4 ? 4 : 2;
+    float omega0[4];
+    for (int i = 0; i < 4; i++) omega0[i] = wheels[i].omega;
+    float mudSum = 0, scrubSum = 0;
 
     // ---- forces ----
     Vec3 F{0, -G * sprungMass, 0}, T{};
     const Vec3 U = up();
     const float cosT = std::max(0.25f, U.y);
     wheelsInContact = 0;
+    onPad = false;
     float slipSum = 0;
     int slipN = 0;
 
@@ -269,11 +308,25 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
             float hh = terrain.heightAt(sp.x, sp.z);
             if (hh > gy) { gy = hh; support = sp; }
         }
+        // Traction boards under the footprint: a firm deck to climb onto.
+        SupportPad* pad = nullptr;
+        if (pads) {
+            for (SupportPad& sp : *pads) {
+                if (sp.wear >= 1.f) continue;
+                Vec3 d = probe - sp.center;
+                float a = d.x * sp.dir.x + d.z * sp.dir.z, b2 = d.x * sp.dir.z - d.z * sp.dir.x;
+                float deck = sp.topAt(clampf(a, -sp.halfL, sp.halfL));
+                if (std::fabs(a) < sp.halfL + 0.3f * rs && std::fabs(b2) < sp.halfW + 0.3f * w.width && probe.y - rs < deck + 0.25f) {
+                    pad = &sp;
+                    if (deck > gy) { gy = deck; support = {probe.x, deck, probe.z}; }
+                }
+            }
+        }
         // ---- quarter car ----
         // Tire: spring between wheel centre and ground, stiffer with pressure; bottoms on the rim.
         const float dist = (mountW.y - gy) / cosT;           // mount to ground along the strut
         float pen = w.radius + w.susLen - dist;               // tire deflection
-        const float kTire = 1.6e5f * std::pow(psi / 25.f, 0.85f);
+        const float kTire = 1.6e5f * std::pow(psi / 25.f, 0.85f) * (w.debeaded ? 0.2f : 1.f);
         const float sidewallH = std::max(0.08f, w.radius - 0.2f);
         // Ground that appears inside the wheel (rut walls, hole edges, berms) can't be absorbed by
         // the rubber: the wheel climbs it, pushing up the strut instead of exploding the tire force.
@@ -337,6 +390,8 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         w.load = Ftire;
         {
             Vec3 Fsv = U * Fs;   // what the chassis feels through the strut
+            // Mud-caked wheel out of balance: m r w^2 shake at wheel speed.
+            if (w.cake > 0.02f) Fsv += U * (6.f * w.cake * 0.12f * w.omega * w.omega * std::sin(w.spin) * 0.5f);
             F += Fsv;
             T += cross(w.worldCenter - pos, Fsv);
         }
@@ -355,12 +410,12 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
             w.mudW = 0;
             w.waterDepth = 0;
             // free spin
-            float Iw = w.inertia + ((!w.front || fourWD) ? reflI : 0.f);
-            float Td = (!w.front || fourWD) ? driveTorque / nDriven : 0.f;
+            float Iw = w.inertia + ((!w.front || fwd4) ? reflI : 0.f);
+            float Td = (!w.front || fwd4) ? driveTorque / nDriven : 0.f;
             w.driveTorque = Td;
             w.omega += Td / Iw * dt;
             w.omega *= std::exp(-0.4f * dt);
-            float Tb = brakePedal * (w.front ? 3400.f : 2400.f) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
+            float Tb = brakePedal * (w.front ? 3400.f : 2400.f) * (1.f - 0.55f * brakeWet) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
             float d = Tb / Iw * dt;
             w.omega = std::fabs(w.omega) <= d ? 0.f : w.omega - signf(w.omega) * d;
             w.spin += w.omega * dt;
@@ -383,7 +438,8 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
 
         const float m = ts.moisture;
         const float mud = ts.mudDepth();
-        const float mudW = smoothstep(0.02f, 0.18f, mud) * smoothstep(0.3f, 0.65f, m);
+        const float mudW = pad ? 0.f : smoothstep(0.02f, 0.18f, mud) * smoothstep(0.3f, 0.65f, m);
+        if (pad) onPad = true;
         w.mudW = mudW;
         w.moisture = m;
         w.waterDepth = ts.waterDepth;
@@ -407,14 +463,16 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
             terrain.pressPatch({w.worldCenter.x, gy, w.worldCenter.z}, f, Lc * 0.5f, b * 0.5f, p, dt);
 
         // Shear / friction parameters
-        const float kEq = MudModel::kEq(m), nExp = MudModel::n(m);
-        const float coh = MudModel::cohesion(m) * (1.f - 0.7f * w.pack);
-        const float phi = MudModel::phi(m);
+        const SoilState soil = soilState(m, ts.soil, ts.disturb);
+        w.soil = ts.soil;
+        const float kEq = soil.kEq, nExp = soil.n;
+        const float coh = soil.coh * (1.f - 0.7f * w.pack);
+        const float phi = soil.phi;
         const float tanEff = std::tan(phi) * (1.f - 0.5f * w.pack) * (1.f + 0.35f * (tc.grouser - 1.f));
         const float fmaxM = A * coh * tc.grouser + w.load * tanEff;
-        const float Kshear = MudModel::shearK(m);
+        const float Kshear = soil.K;
         const float wetness = clampf((m - 0.3f) / 0.7f, 0.f, 1.f);
-        const float muFirm = g_tuning.firmGrip * lerpf(0.8f, 0.62f, ts.grass) * (1.f - 0.38f * wetness) * tc.firm *
+        const float muFirm = pad ? 0.95f : g_tuning.firmGrip * lerpf(0.8f, 0.62f, ts.grass) * (1.f - 0.38f * wetness) * tc.firm *
                              (1.f - 0.3f * clampf(ts.waterDepth / 0.1f, 0.f, 1.f));
         const float psiLat = 1.f - 0.25f * clampf(1.f - psi / 25.f, 0.f, 1.f);
         // Load sensitivity: friction coefficient falls as a tire is loaded up, so weight transfer
@@ -434,6 +492,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
                         (1.f - std::exp(-std::fabs(std::tan(alpha)) * Lc / (1.5f * Kshear)));
             Fx = lerpf(fxF, fxM, mudW);
             Fy = lerpf(fyF, fyM, mudW);
+            if (w.debeaded) { Fx *= 0.6f; Fy *= 0.4f; }
             // Static friction at crawl speeds: a parked tire grips sideways instead of creeping.
             float crawl = 1.f - clampf(std::fabs(vLong) / 1.5f, 0.f, 1.f);
             Fy -= crawl * vLat * w.load / G * 10.f;
@@ -464,7 +523,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         float zc = std::min(wall, rr) * 0.6f;
         float Rc = compactionResistance(b, kEq, nExp, zc);
         float Rb = rankineBulldozing(b, wall, MudModel::unitWeight, coh, phi);
-        float Rs = g_tuning.suction * MudModel::stickiness(m) * A * 3500.f * clampf(wall / (rr * 0.5f), 0.f, 1.f);
+        float Rs = g_tuning.suction * soil.sticky * A * 3500.f * clampf(wall / (rr * 0.5f), 0.f, 1.f);
         float Rroll = w.load * (0.015f + 0.01f * clampf((15.f - psi) / 10.f, 0.f, 1.f));
         // Slurry / water drag on the buried part of the tire: 0.5 rho Cd A v^2.
         float buried = std::min(wall + 0.5f * defl, 2.f * rr) * mudW;
@@ -487,7 +546,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         w.fy = Fy;
 
         // Wheel spin, semi-implicit in tire slip stiffness.
-        bool driven = !w.front || fourWD;
+        bool driven = !w.front || fwd4;
         float Iw = w.inertia + (driven ? reflI : 0.f);
         float Td = driven ? driveTorque / nDriven : 0.f;
         w.driveTorque = Td;
@@ -495,7 +554,14 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         float churnK = 0.45f * g_tuning.churn * (cfg.tread == Tread::Paddle ? 1.6f : 1.f) * mudW * std::min(wall + defl + 0.1f, 2.f * rr);
         float Tchurn = churnK * w.omega * std::fabs(w.omega);
         w.omega += dt * (Td - Fx * rr - Tchurn) / (Iw + dt * (rr * dFdw + 2.f * churnK * std::fabs(w.omega)));
-        float Tb = brakePedal * (w.front ? 3400.f : 2400.f) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
+        float Tb = brakePedal * (w.front ? 3400.f : 2400.f) * (1.f - 0.55f * brakeWet) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
+        // Brake traction control: brake a wheel spinning away from its axle partner so the open
+        // diff sends torque across (field guide 5). Useless once the axle is locked.
+        if (cfg.btc && driven && drivePedal > 0.2f && !locked(w.front)) {
+            float over = (std::fabs(w.omega) - std::fabs(omega0[i ^ 1])) * rr;
+            if (over > 1.2f) Tb += std::min(1800.f, 700.f * (over - 1.2f));
+        }
+        w.brakeT = Tb;
         float dB = Tb / Iw * dt;
         w.omega = std::fabs(w.omega) <= dB ? 0.f : w.omega - signf(w.omega) * dB;
         w.spin += w.omega * dt;
@@ -508,6 +574,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
 
         // Slip excavation: spinning tires dig (and throw) mud.
         float ss = std::fabs(w.slipSpeed);
+        if (pad && ss > 3.f) pad->wear = std::min(1.f, pad->wear + dt * 0.12f * (ss - 3.f));
         if (mud > 0.01f && ss > 1.0f) {
             float loadFrac = clampf(w.load / (mass * G * 0.25f), 0.f, 1.3f);  // unloaded tires can't dig
             // Lugs can only carry so much slop per revolution: saturate with slip speed.
@@ -522,16 +589,28 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
 
         // Tread packing: sticky clay loads the lugs; wheel speed flings it out.
         float ag = w.omega * w.omega * rr / G;
-        w.pack += dt * MudModel::stickiness(m) * mudW * tc.packRate * clampf(std::fabs(wr) / 3.f, 0.f, 1.f) * 0.6f;
+        w.pack += dt * soil.sticky * mudW * tc.packRate * clampf(std::fabs(wr) / 3.f, 0.f, 1.f) * 0.6f;
         w.pack -= dt * std::max(0.f, ag - 14.f) / 18.f * tc.clearRate;
         if (ts.waterDepth > 0.12f) w.pack -= dt * 0.35f;
         w.pack = clampf(w.pack, 0.f, 1.f);
+        // Mud caked inside the wheel (shaken out only by water or a wash) throws it out of balance.
+        w.cake = clampf(w.cake + dt * 0.006f * mudW * clampf(ss, 0.f, 4.f) - (ts.waterDepth > 0.25f ? dt * 0.08f : 0.f), 0.f, 1.f);
+        // Soaked brakes after a crossing; they dry with use.
+        if (ts.waterDepth > 0.3f * rr) brakeWet = 1.f;
+        // Bead retention: very low pressure without beadlocks + big side load rolls the tire off the rim.
+        if (!cfg.beadlock && psi < 8.f && !w.debeaded) {
+            float side = std::fabs(Fy) / std::max(w.load, 100.f);
+            w.beadStress += dt * std::max(0.f, side - 0.4f) * 3.f * (8.f - psi) / 3.f;
+            if (w.beadStress > 1.f) { w.debeaded = true; events.beadPopped = true; }
+        }
+        mudSum += mudW;
+        if (fwd4) scrubSum += (1.f - mudW) * (1.f - clampf(std::fabs(w.slipRatio) * 2.f, 0.f, 1.f));
         dirt = clampf(dirt + dt * 0.004f * ss * mudW, 0.f, 1.f);
     }
     avgSlip = slipN ? slipSum / slipN : 0.f;
 
     // ---- differential / transfer-case constraints ----
-    if (fourWD) {
+    if (fwd4) {
         WheelState &a = wheels[0], &b2 = wheels[1], &c = wheels[2], &d = wheels[3];
         float If = a.inertia + b2.inertia, Ir = c.inertia + d.inertia;
         float sF = 0.5f * (a.omega + b2.omega), sR = 0.5f * (c.omega + d.omega);
@@ -544,7 +623,22 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         l.omega = r.omega = avg;
     };
     if (lockRear) lockAxle(wheels[2], wheels[3]);
-    if (lockFront && fourWD) lockAxle(wheels[0], wheels[1]);
+    if (lockFront && fwd4) lockAxle(wheels[0], wheels[1]);
+    // Limited-slip: clutches resist part of the speed difference across the axle.
+    auto lsd = [](WheelState& l, WheelState& r) {
+        float avg = (l.omega * l.inertia + r.omega * r.inertia) / (l.inertia + r.inertia);
+        l.omega += (avg - l.omega) * 0.12f;
+        r.omega += (avg - r.omega) * 0.12f;
+    };
+    if (diffR == Diff::Limited && !lockRear) lsd(wheels[2], wheels[3]);
+    if (diffF == Diff::Limited && !lockFront && fwd4) lsd(wheels[0], wheels[1]);
+    // Part-time 4WD windup: no centre diff, so turning on high-grip ground fights the driveline.
+    {
+        float bind = fwd4 ? clampf(std::fabs(steerApplied) / 0.62f, 0.f, 1.f) * clampf(spd / 2.f, 0.f, 1.f) * (scrubSum / 4.f) : 0.f;
+        windup = clampf(windup + dt * (bind * 0.35f - 0.1f), 0.f, 1.2f);
+        if (windup >= 1.f && !frontShaftBroken) { frontShaftBroken = true; windup = 0; events.shaftBroke = true; }
+    }
+    brakeWet = std::max(0.f, brakeWet - dt * (0.04f + 0.3f * brakePedal * clampf(spd / 5.f, 0.f, 1.f)));
 
     // ---- chassis / belly contacts (high-centering) ----
     const float bw = body->dims[0], bl = body->dims[2];
@@ -600,6 +694,11 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
     if (bellyLoad > 0.2f) angVel *= std::exp(-1.5f * bellyLoad * dt);
     events.bellyScrape = std::max(events.bellyScrape, scrape);
 
+    // External pull (winch line).
+    if (dot(extForce, extForce) > 1.f) {
+        F += extForce;
+        T += cross(extPoint - pos, extForce);
+    }
     // ---- aero, water, buoyancy ----
     F += vel * (-0.5f * 1.2f * body->cdA * spd);
     TerrainSample here = terrain.sample(pos.x, pos.z);
@@ -642,9 +741,23 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
     // Only liquid kills it: standing water, or soupy slurry. A nose buried in dry dirt doesn't.
     bool liquid = ti.waterDepth > 0.02f || (ti.moisture > 0.8f && ti.mudDepth() > 0.15f);
     float slop = ti.waterDepth > 0 ? ti.height + ti.waterDepth : ti.height;
-    if (stallTimer <= 0 && liquid && slop > intake.y && engineRpm > 200.f) {
-        stallTimer = 4.f;
+    bool intakeWet = liquid && slop > intake.y;
+    if (!flooded && !engineBroken && intakeWet && engineRpm > 200.f) {
+        flooded = true;
+        floodDry = floodCrank = 0;
         events.hydrolocked = true;
+    }
+    if (flooded) {
+        // Water in a cylinder: cranking it while still swamped bends a rod (field guide 8). Get it
+        // out of the water first, wait, then it will clear and restart.
+        if (intakeWet) {
+            floodDry = 0;
+            floodCrank = in.throttle > 0.5f ? floodCrank + dt : std::max(0.f, floodCrank - dt);
+            if (floodCrank > 1.2f) { flooded = false; engineBroken = true; events.rodBent = true; }
+        } else {
+            floodDry += dt;
+            if (floodDry > 3.f && in.throttle > 0.5f) { flooded = false; engineRpm = e.idleRpm; events.restarted = true; }
+        }
     }
 
     // ---- integrate ----

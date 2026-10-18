@@ -21,7 +21,8 @@
 ## Algorithms & formulas in the code
 | Area | Algorithm |
 |---|---|
-| Soil | Bekker pressure–sinkage `p = (k_c/b + k_φ) zⁿ`; viscous sinkage rate; compaction memory per cell |
+| Soil | Bekker pressure–sinkage `p = (k_c/b + k_φ) zⁿ`; viscous sinkage rate; compaction memory per cell; five soil types with remolding (strength loss with disturbance) |
+| Recovery | Winch as a tension-only spring–damper to an anchor with drum-layer pull derating, shock-load failure and duty-cycle heat; traction boards as sloped firm support decks in the tire contact search |
 | Traction | Janosi–Hanamoto shear `F = (Ac + W tanφ)(1 − K/(iL)(1 − e^{−iL/K}))`; grouser factor; tread packing |
 | Resistance | Bekker compaction `b k zⁿ⁺¹/(n+1)`; Rankine passive earth pressure (bulldozing); hydrodynamic drag `½ρC_dAv²` |
 | Firm tires | Pacejka Magic Formula, friction ellipse, slip-stiffness semi-implicit wheel integration |

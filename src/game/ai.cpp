@@ -116,6 +116,9 @@ void aiThink(AiDriver& ai, ModeId mode, const World& w, float dt, float elapsed,
         if (spd > 2.5f && ai.rockPhase == 2) { ai.stuckTimer = 0; ai.rockPhase = 0; ai.rockCycles = 0; }
         if (mode == ModeId::MudBog && ai.rockCycles > 14) ai.gaveUp = true;  // rivals fight it out too
     }
+    // A flooded engine: off the throttle until it drains (cranking it bends a rod).
+    if (v.flooded && v.floodDry < 3.2f) { in.throttle = 0; in.brake = 0; }
+    if (v.engineBroken && mode == ModeId::MudBog) ai.gaveUp = true;
     ai.input = in;
 }
 

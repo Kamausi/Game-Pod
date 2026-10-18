@@ -1,0 +1,4 @@
+# Synthetic winch line, one metre long along +z from the origin (stretched to length at runtime).
+color #c8261c
+material matte
+cyl r=0.007 h=1.0 axis=z seg=8 pos=0,0,0.5

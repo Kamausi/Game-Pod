@@ -84,6 +84,8 @@ public:
     float flatsHalfX = 36, flatsHalfZ = 62;
     float creekZ(float x) const { return 150.f + 10.f * std::sin(x * 0.035f) + 6.f * std::sin(x * 0.011f + 1.f); }
     float creekHalfW = 4.f;
+    Vec3 swampCenter{-120, 0, 104};   // black peat muck: the "bottomless" hole
+    float swampRadius = 17.f;
     // Overview image for the minimap (RGBA, overviewN^2, north = -z up).
     std::vector<uint8_t> overview;
     int overviewN = 256;

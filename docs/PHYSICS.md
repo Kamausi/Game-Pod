@@ -66,6 +66,24 @@ real bog pits are excavated, saturated slurry. `MudModel` keeps Bekker's form bu
 with `η` from 2·10⁶ (dry) to 7·10³ Pa·s/m (soup). Consequence: at 15 m/s a tire crosses a 25 cm
 cell in ~17 ms and sinks a few cm; parked, it goes to the hardpan.
 
+## Soil types
+`SoilMods` (`terramechanics.h`) scales `MudModel` per cell: bearing (k_eq), viscosity η, cohesion c,
+friction φ, stickiness (tread packing) and a **remold** factor:
+```
+weaken = 1 − remold · disturb · smoothstep(0.35, 0.7, m)       disturb = track churn 0..1
+k_eq, c ×= bearing/cohesion · weaken;   η ×= 0.6 + 0.4·weaken
+```
+| soil | bearing | η | c | φ | sticky | remold |
+|---|---|---|---|---|---|---|
+| loam | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 0 |
+| clay gumbo | 1.15 | 1.60 | 1.60 | 0.70 | 1.90 | 0.45 |
+| silt | 0.80 | 0.65 | 0.45 | 0.60 | 0.55 | 0.70 |
+| wet sand | 1.70 | 2.20 | 0.25 | 1.55 | 0.15 | 0.05 |
+| peat muck | 0.42 | 0.55 | 0.70 | 0.80 | 0.50 | 0.30 |
+
+Clay gets *worse* the more it is churned (sensitive clays lose strength when remolded), which is why
+the second truck through a clay hole has it harder; sand barely remolds.
+
 ## Traction
 **Firm ground** — Pacejka Magic Formula:
 ```
@@ -121,12 +139,28 @@ off-boost; boost spools at 1.4 s⁻¹. Open diffs split torque equally (so one u
 it all); lockers and the part-time transfer case are velocity constraints solved by
 inertia-weighted averaging of wheel speeds after integration.
 
+**Transfer case / diffs.** 2H drives the rear only; 4H/4L lock front and rear output shafts together
+(no centre diff). Per axle: open (equal torque), limited-slip (12 % of the speed difference removed
+per step), selectable locker (velocity constraint when engaged), spool (always locked).
+**Windup:** `bind = |steer|/lock · min(1, v/2) · scrub`, `ẇ = 0.35·bind − 0.1`, scrub = share of
+front/rear tires on firm, non-slipping ground; `w ≥ 1` snaps the front U-joint (rear drive only).
+**Brake traction control** brakes a wheel spinning much faster than its axle partner.
+**CVT (UTV):** `Ṫ_belt = slip·throttle·T_e/T_peak · (low ? 4 : 22) − 0.035 (T − 50)`; slips above
+130 °C (60 % torque), burns at 165 °C.
+
 ## Chassis contacts, water, thermals
 * Belly points (frame corners, center, bumpers) + **diff pumpkins** 0.17 m below each axle:
   `F_n = k·pen − c·v_n`, soft in mud (3·10⁴ vs 1.6·10⁵ N/m), Coulomb + plowing friction, and
   suction `−min(9 kN·soft·(½ + stickiness), 6000·v_n)` when lifting.
 * Water: body drag `½ρC_dA|v|v` on the submerged frontal area, buoyancy on 22 % of displaced
-  volume, splash events on entry. Intake below water/slop → **hydrolock** (4 s stall).
+  volume, splash events on entry. Intake below water/slop → **hydrolock**: the engine is dead until
+  the intake has been clear for 3 s and you throttle; more than 1.2 s of throttle while the intake
+  is still wet bends a rod (engine broken until repaired).
+* Water deeper than 0.3 tire radii soaks the brakes (−55 % brake torque), drying with use.
+* Mud cake in the wheel `ċ = 0.006·mudW·slip` (washed by deep water) adds an imbalance force
+  `∝ cake·ω²` at wheel-spin phase — the shake at speed after a run.
+* Bead: below 8 psi without beadlocks, lateral load ratio above 0.4 accumulates bead stress
+  `∝ (8 − psi)`; at 1 the tire is debeaded (soft, low grip).
 * Thermals: `Ṫ = 4.2·load + 0.35 − 0.11 (T − 70)(0.6 + 0.4 v/12)(1 − 0.82 clog)`;
   derate from 118 °C to 45 % torque at 132 °C. Radiator clogs when the nose plows mud, washes
   out in deep water.
@@ -138,3 +172,16 @@ inertia-weighted averaging of wheel speeds after integration.
 * Handling: climbs 20° grass, recovers from a 45 mph lane change, survives 36 cm whoops at 22 mph,
   parked trucks hold on a 15° side slope.
 * Firm ground: > 12 m/s in 5 s, stays upright, brakes to a stop then rolls into reverse.
+* Field guide: spec sheet numbers; hydrolock kills the engine, cranking it underwater bends a rod,
+  a drained engine restarts; tight 4H circles on dirt snap the front shaft (2H never binds); a UTV
+  slogging in high range burns its belt, low range doesn't; 5 psi slalom pops a bead unless
+  beadlocked; a winch drags a stuck rig to a tree; shovel + boards get a bellied rig moving.
+
+## Recovery (`src/game/recovery.cpp`)
+* **Winch:** 30 m of rope, 42 kN rated first-layer pull, −9 % per drum layer (7 m per layer).
+  Line tension `90 kN/m · stretch + 8 kN·s/m · separation rate`, capped at the layer's pull;
+  demand > 1.7 × rated (driving against the line) snaps it. Line speed `0.55 (1 − 0.65 F/F_max)`
+  m/s; motor heat duty cycle. Anchors: trees and parked rigs preferred, fence posts last.
+* **Boards:** 1.1 m × 0.34 m firm decks (μ 0.95, no sinkage) wedged as a ramp from the bottom of
+  the tire's hole to the ground ahead; wear when spun on (slip > 3 m/s); retrieved once clear.
+* **Shovel:** 5 s; digs a ramp ahead of each tire and clears material under the belly.

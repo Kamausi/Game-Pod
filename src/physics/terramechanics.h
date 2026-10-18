@@ -7,6 +7,7 @@
 // See docs/PHYSICS.md for derivations and calibration notes.
 #pragma once
 #include <cmath>
+#include <cstdint>
 #include "../core/math.h"
 #include "tuning.h"
 
@@ -110,5 +111,42 @@ struct MudModel {
     static constexpr float unitWeight = 17000.f;  // N/m^3 wet clay
     static constexpr float slurryDensity = 1450.f; // kg/m^3
 };
+
+// ---------------------------------------------------------------------------------------
+// Soil types (field-guide section 2): the calibrated slurry above is "loam"; the others scale it.
+// Particle-size names (clay, silt, sand) plus organic muck. remold = strength lost when the cell
+// has been churned by traffic ("the first truck made it, the fifth sinks").
+enum class Soil : uint8_t { Loam = 0, Clay, Silt, Sand, Peat, Count };
+struct SoilMods {
+    const char* name;
+    float bearing, viscosity, cohesion, friction, sticky, remold;
+    float r, g, b;  // wet colour tint for the renderer
+};
+inline constexpr SoilMods kSoils[] = {
+    {"loam", 1.00f, 1.00f, 1.00f, 1.00f, 1.00f, 0.0f, 1.00f, 1.00f, 1.00f},
+    {"clay gumbo", 1.15f, 1.60f, 1.60f, 0.70f, 1.90f, 0.45f, 0.86f, 0.84f, 0.82f},
+    {"silt", 0.80f, 0.65f, 0.45f, 0.60f, 0.55f, 0.70f, 1.10f, 1.06f, 1.00f},
+    {"wet sand", 1.70f, 2.20f, 0.25f, 1.55f, 0.15f, 0.05f, 1.30f, 1.18f, 0.92f},
+    {"peat muck", 0.42f, 0.55f, 0.70f, 0.80f, 0.50f, 0.30f, 0.52f, 0.46f, 0.40f},
+};
+inline const SoilMods& soilMods(uint8_t s) { return kSoils[s < uint8_t(Soil::Count) ? s : 0]; }
+
+// Effective soil parameters at a point: moisture m, soil type, disturbance 0..1 (traffic).
+struct SoilState {
+    float n, kEq, coh, phi, K, visc, sticky;
+};
+inline SoilState soilState(float m, uint8_t soil, float disturb) {
+    const SoilMods& sm = soilMods(soil);
+    float weaken = 1.f - sm.remold * clampf(disturb, 0.f, 1.f) * smoothstep(0.35f, 0.7f, m);
+    SoilState s;
+    s.n = MudModel::n(m);
+    s.kEq = MudModel::kEq(m) * sm.bearing * weaken;
+    s.coh = MudModel::cohesion(m) * sm.cohesion * weaken;
+    s.phi = std::atan(std::tan(MudModel::phi(m)) * sm.friction);
+    s.K = MudModel::shearK(m);
+    s.visc = MudModel::viscosity(m) * sm.viscosity * (0.6f + 0.4f * weaken);
+    s.sticky = MudModel::stickiness(m) * sm.sticky;
+    return s;
+}
 
 }  // namespace mb
