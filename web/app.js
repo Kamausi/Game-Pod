@@ -406,6 +406,7 @@ function initSettings() {
       tilt: $('s_tilt').checked, tsize: +$('s_tsize').value, career: $('s_career').checked, weather: +$('s_weather').value, tod: +$('s_tod').value });
     api.action('weather:' + $('s_weather').value);
     api.action('tod:' + $('s_tod').value);
+    api.action('challenges:' + (store.get('challenges', 0) | 0));
     updateWallet();
     applyUiScale();
     if ($('s_tilt').checked) enableTilt();
@@ -475,6 +476,7 @@ function updateHud() {
   $('countdown').textContent = hud.phase === 1 && cd > 0 && cd <= 5 ? cd : '';
   if (hud.rewardSerial !== lastReward) {
     if (lastReward !== null && hud.reward) career.add(hud.reward, 'challenge prize');
+    if (lastReward !== null && hud.challenges) store.set('challenges', hud.challenges.reduce((m, c, i) => m | (c.done ? 1 << i : 0), 0));
     lastReward = hud.rewardSerial;
   }
   $('hudMsg').textContent = hud.message || '';

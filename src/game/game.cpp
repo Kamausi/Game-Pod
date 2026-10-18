@@ -217,6 +217,10 @@ void Game::action(const std::string& a) {
         weatherMode = std::atoi(a.c_str() + 8);
         if (a.back() == '!') { cloudCover = weatherMode == 0 ? 0.f : (weatherMode == 1 ? 0.8f : 1.f); rainAmt = weatherMode == 2 ? 1.f : 0.f; }   // photo mode: no fade
     }
+    else if (a.rfind("challenges:", 0) == 0) {   // restore saved progress (no payout)
+        unsigned mask = unsigned(std::atoi(a.c_str() + 11));
+        for (size_t i = 0; i < challenges.goals.size(); i++) challenges.goals[i].done = (mask >> i) & 1u;
+    }
     else if (a.rfind("soak:", 0) == 0) world.terrain.rainWet = clampf(float(std::atof(a.c_str() + 5)), 0.f, 1.f);   // photo/debug
     else if (a.rfind("tod:", 0) == 0) {
         timeOfDay = std::atoi(a.c_str() + 4);
