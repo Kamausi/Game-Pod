@@ -452,6 +452,9 @@ CadMesh text(const std::string& str, float size, float t, float depth, Vec3 colo
         {'!', {0.5f,0.35f,0.5f,1.4f,0.5f,0.f,0.5f,0.1f}},
         {'&', {0.f,0.f,0.f,0.7f,0.f,0.f,0.8f,0.f,0.f,0.7f,0.6f,1.4f,0.6f,1.4f,0.9f,1.15f,0.2f,1.1f,1.f,0.f}},
         {'\'', {0.5f,1.0f,0.5f,1.4f}},
+        {':', {0.5f,0.25f,0.5f,0.45f,0.5f,0.95f,0.5f,1.15f}},
+        {'.', {0.5f,0.f,0.5f,0.2f}},
+        {'/', {0.f,0.f,1.f,1.4f}},
         {'-', {0.2f,0.7f,0.8f,0.7f}},
         {' ', {}}
     };
@@ -517,6 +520,10 @@ struct Expr {
                 if (id == "cos") return std::cos(A(0) * DEG);
                 if (id == "sqrt") return std::sqrt(std::max(0.f, A(0)));
                 if (id == "abs") return std::fabs(A(0));
+                if (id == "floor") return std::floor(A(0));
+                if (id == "ceil") return std::ceil(A(0));
+                if (id == "round") return std::round(A(0));
+                if (id == "mod") { float b = A(1); return b != 0.f ? A(0) - b * std::floor(A(0) / b) : 0.f; }
                 if (id == "min") return std::min(A(0), A(1));
                 if (id == "max") return std::max(A(0), A(1));
                 fail("unknown function " + id);

@@ -1,21 +1,21 @@
-# Stack of four worn-out truck tyres used as a crash barrier / marker.
-# Origin at ground centre.
-material rubber
-color #1d1d1d
-lathe pts=0.20,0.02,0.34,0,0.38,0.05,0.38,0.19,0.34,0.24,0.20,0.22,0.20,0.02 seg=12
-color #232323
-lathe pts=0.20,0.02,0.34,0,0.38,0.05,0.38,0.19,0.34,0.24,0.20,0.22,0.20,0.02 seg=12 pos=0.03,0.24,-0.02
-color #1a1a1a
-lathe pts=0.20,0.02,0.34,0,0.38,0.05,0.38,0.19,0.34,0.24,0.20,0.22,0.20,0.02 seg=12 pos=-0.02,0.48,0.03 rot=0,15,0
-color #262626
-lathe pts=0.20,0.02,0.34,0,0.38,0.05,0.38,0.19,0.34,0.24,0.20,0.22,0.20,0.02 seg=12 pos=0.01,0.72,0.0 rot=0,7,0
-# Worn tread band suggestion on each tyre
-color #2e2e2e
-cyl r=0.383 h=0.03 pos=0,0.12,0 seg=12
-cyl r=0.383 h=0.03 pos=0.03,0.36,-0.02 seg=12
-cyl r=0.383 h=0.03 pos=-0.02,0.60,0.03 seg=12 rot=0,15,0
-cyl r=0.383 h=0.03 pos=0.01,0.84,0.0 seg=12 rot=0,7,0
-# Dirt/water pooled in the bottom
-material matte
-color #3b2f22
-cyl r=0.20 h=0.01 pos=0,0.015,0 seg=10
+# Stack of four worn-out mud tyres used as a crash barrier / marker: real lugged tyres lying
+# flat and slightly skewed, the top one painted with a white sidewall stripe, mud packed in the
+# lower ones, rainwater and dirt in the bottom. Origin at ground centre.
+for k = 0, 3
+  color 0.10+0.02*k 0.10+0.02*k 0.10+0.015*k
+  tire r=0.40 w=0.27 rim=0.21 lugs=16 depth=0.026 tread=mt pos=0.03*sin(k*97),0.135+k*0.265,0.03*cos(k*61) rot=0,0,90
+end
+# White paint stripe round the top tyre's sidewall (marker)
+color #f0f0ea
+material paint
+lathe seg=20 pts=0.27,1.072,0.33,1.072,0.33,1.077,0.27,1.077 pos=0.03*sin(291),0,0.03*cos(183)
+# Mud caked into the lower two
+color #4e3e2a
+material mud
+lathe seg=16 pts=0.33,0.02,0.40,0.02,0.40,0.30,0.33,0.30
+color #5a4730
+lathe seg=16 pts=0.33,0.30,0.395,0.30,0.395,0.40,0.33,0.40
+# Rainwater and silt in the bottom
+color #2a2a24
+material glass
+cyl r=0.21 h=0.01 pos=0,0.06,0 seg=12

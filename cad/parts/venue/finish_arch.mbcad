@@ -1,0 +1,43 @@
+# Mud-pit finish line: inflatable-style arch tubes on two padded pillars with a checkered band
+# and FINISH lettering, timing eyes on posts at each side. Spans X, faces +Z (toward the oncoming trucks). Origin at ground centre.
+param span = 32
+param clear = 5.8
+set hx = span/2
+# Pillars (padded, sponsor-coloured)
+material matte
+color #c41a1a
+for s = -1, 1, 2
+  cyl r=0.55 h=clear+0.9 pos=s*hx,(clear+0.9)/2,0 seg=14
+  color #f2f0ea
+  cyl r=0.56 h=0.25 pos=s*hx,clear*0.45,0 seg=14
+  color #c41a1a
+end
+# Top beam: a fat padded tube
+color #c41a1a
+cyl r=0.55 h=span axis=x pos=0,clear+0.55,0 seg=14
+# Checkered band across the face (two rows, 0.5 m squares)
+for k = 0, 59
+  set x = -hx+1.0+k*0.5
+  color 0.06+0.88*mod(k,2) 0.06+0.88*mod(k,2) 0.06+0.86*mod(k,2)
+  box size=0.5,0.32,0.02 pos=x,clear+0.72,0.55
+  color 0.94-0.88*mod(k,2) 0.94-0.88*mod(k,2) 0.92-0.86*mod(k,2)
+  box size=0.5,0.32,0.02 pos=x,clear+0.40,0.55
+end
+# FINISH lettering on a white panel
+color #f2f0ea
+material paint
+box size=5.2,0.95,0.03 pos=0,clear+0.56,0.57
+color #c41a1a
+text str=FINISH size=0.34 t=0.10 depth=0.012 pos=0,clear+0.56,0.59
+# Timing eyes: posts with a lens box at bumper height on both sides of the lanes
+for s = -1, 1, 2
+  color #2b2d30
+  material steel
+  cyl r=0.04 h=1.2 pos=s*(hx-1.6),0.6,1.0 seg=8
+  color #1a1a1a
+  material plastic
+  box size=0.18,0.16,0.16 pos=s*(hx-1.6),1.05,1.0 bevel=0.02
+  color #ff3020
+  material lens
+  cyl r=0.04 h=0.02 axis=x pos=s*(hx-1.6)-s*0.10,1.05,1.0 seg=10
+end

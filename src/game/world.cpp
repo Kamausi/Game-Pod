@@ -521,6 +521,7 @@ void World::generate(uint32_t seed) {
     // Parked rig on its own wheels at ride height: body origin = wheel center - axleY.
     auto addParked = [&](const std::string& part, float x, float z, float yaw, float fa, float ra, float track, float axleY,
                          float tireR, float dirt, CadParams pr = {}) {
+        pr["driver"] = 0;   // parked: nobody in the cab (the glass is see-through)
         float c = std::cos(yaw), s = std::sin(yaw);
         auto world = [&](float lx, float lz) { return Vec2{x + lx * c + lz * s, z - lx * s + lz * c}; };
         float gy = 1e9f;
@@ -650,6 +651,14 @@ void World::generate(uint32_t seed) {
                                                      ground(cx, -52.5f) + 0.45f + row * 0.48f - 0.45f);
         }
         building("venue/announcer_tower.mbcad", 0.f, -53.f, 0, {1.6f, 3.f, 1.6f});
+        // Start gantry over the lanes just before the pit, finish arch just past it (both face
+        // the trucks coming from staging in the west); colliders on the towers/pillars only.
+        addProp("venue/start_gantry.mbcad", pitX0 - 4.f, pitZ, -PI * 0.5f);
+        addProp("venue/finish_arch.mbcad", pitX1 + 4.f, pitZ, -PI * 0.5f);
+        for (float s : {-1.f, 1.f}) {
+            boxCol({pitX0 - 4.f, 0, pitZ + s * 16.f}, {0.55f, 3.2f, 0.55f}, 0);
+            boxCol({pitX1 + 4.f, 0, pitZ + s * 16.f}, {0.6f, 3.2f, 0.6f}, 0);
+        }
         building("venue/results_board.mbcad", 30.f, -53.f, 0, {2.f, 2.5f, 0.3f});
         building("venue/results_board.mbcad", -62.f, -14.f, PI * 0.75f, {2.f, 2.5f, 0.3f});
         float fz2 = pitHalfW + 6.5f;

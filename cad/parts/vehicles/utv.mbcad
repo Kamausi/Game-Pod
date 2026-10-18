@@ -4,6 +4,7 @@
 # dash and steering, tube cage (A-pillars into roof rails, B-hoop, rear braces) under a roof,
 # half doors, side intakes, cargo bed with rails and a spare, exhaust, LED tails, whip flag.
 # Body frame: +Z forward, +X left. Front axle z=1.03, rear z=-1.26.
+param driver = 1          # 0 for parked rigs: empty cab
 param paint_r = 0.92
 param paint_g = 0.92
 param paint_b = 0.90
@@ -149,4 +150,4 @@ color #f06010
 material matte
 extrude depth=0.004 pts=0,0,0.30,-0.07,0,-0.18 rot=0,90,0 pos=-0.62,2.0,-0.78
 # Driver in the left seat
-use vehicles/driver.mbcad dx=0.33 sy=0.31 sz=-0.15 bz=-0.66 wy=0.66 wzz=0.12 ry=1.40 suit_r=0.12 suit_g=0.30 suit_b=0.75
+use vehicles/driver.mbcad dx=0.33 sy=0.31 sz=-0.15 bz=-0.66 wy=0.66 wzz=0.12 ry=1.40 suit_r=0.12 suit_g=0.30 suit_b=0.75 driver=driver

@@ -2,6 +2,7 @@
 # grey paint, black fender flares (trimmed), front plate bumper with amber lights,
 # chrome mirror, whip antenna, mud spatter (applied in-shader).
 # Body frame: origin at frame height, +Z forward, +X left. Front axle z=1.29, rear z=-1.58.
+param driver = 1          # 0 for parked rigs: empty cab
 param paint_r = 0.48
 param paint_g = 0.50
 param paint_b = 0.48
@@ -86,4 +87,4 @@ material matte
 box size=0.12,0.02,0.04 pos=W/2+0.05,0.62,0.38 mirror=x
 cyl r=0.004 h=0.9 pos=0.82,0.88,0.95
 # Cab interior and driver (seen through the glass)
-use vehicles/interior.mbcad W=1.60 bl=0.48 wz=0.50 bz=-0.76 ry=0.88
+use vehicles/interior.mbcad W=1.60 bl=0.48 wz=0.50 bz=-0.76 ry=0.88 driver=driver

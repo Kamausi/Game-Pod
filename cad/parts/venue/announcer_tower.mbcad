@@ -42,9 +42,23 @@ box size=0.05,0.05,3.58 pos=-1.77,dk+1.05,0
 box size=0.05,0.05,3.58 pos=-1.77,dk+0.55,0
 box size=0.05,0.05,2.9 pos=1.77,dk+1.05,0.33
 box size=0.05,0.05,2.9 pos=1.77,dk+0.55,0.33
-# Booth shell
+# Booth shell: hollow walls with openings behind the windows (so the crew shows through)
 color body_r body_g body_b
-box size=3.0,2.5,3.0 pos=0,dk+1.25,0
+box size=3.0,2.5,0.06 pos=0,dk+1.25,-1.47
+box size=3.0,1.07,0.06 pos=0,dk+0.535,1.47
+box size=3.0,0.13,0.06 pos=0,dk+2.435,1.47
+box size=0.10,1.30,0.06 pos=1.45,dk+1.72,1.47 mirror=x
+box size=0.06,1.17,3.0 pos=-1.47,dk+0.585,0
+box size=0.06,0.23,3.0 pos=-1.47,dk+2.385,0
+box size=0.06,1.10,0.35 pos=-1.47,dk+1.72,-1.325
+box size=0.06,1.10,0.25 pos=-1.47,dk+1.72,1.375
+box size=0.06,1.17,3.0 pos=1.47,dk+0.585,0
+box size=0.06,0.23,3.0 pos=1.47,dk+2.385,0
+box size=0.06,1.10,1.70 pos=1.47,dk+1.72,-0.65
+box size=0.06,1.10,0.20 pos=1.47,dk+1.72,1.40
+box size=3.0,0.06,3.0 pos=0,dk+2.47,0
+color body_r*0.75 body_g*0.72 body_b*0.68
+box size=2.88,0.02,2.88 pos=0,dk+0.01,0
 color trim_r trim_g trim_b
 box size=3.04,0.22,3.04 pos=0,dk+0.95,0
 box size=3.04,0.1,3.04 pos=0,dk+0.05,0
@@ -107,3 +121,63 @@ box size=0.05,0.95,0.05 pos=2.73,0.475,3.0
 box size=0.05,0.95,0.05 pos=1.87,0.475,3.0
 box size=0.05,1.05,0.05 pos=2.73,dk+0.52,-1.82
 box size=0.05,0.05,0.62 pos=2.73,dk+1.05,-1.51
+# ---- Inside the booth (seen through the window wall) ----
+# Control desk along the window: monitors, mixer, timing computer, mics on boom arms
+material matte
+color #2a2622
+box size=2.7,0.08,0.70 pos=0,dk+0.95,1.05
+box size=2.7,0.85,0.05 pos=0,dk+0.52,1.38
+color #111111
+material plastic
+for k = -1, 1
+  box size=0.50,0.32,0.04 pos=k*0.85,dk+1.20,1.20 rot=-12,0,0 bevel=0.01
+end
+color #3aa0ff
+material lens
+for k = -1, 1
+  box size=0.44,0.26,0.01 pos=k*0.85,dk+1.20,1.18 rot=-12,0,0
+end
+color #1a1a1a
+material plastic
+box size=0.60,0.06,0.35 pos=-0.35,dk+1.02,0.95 rot=8,0,0
+color #e8b020
+material lens
+for k = 0, 7
+  box size=0.025,0.012,0.05 pos=-0.60+k*0.07,dk+1.06,0.92 rot=8,0,0
+end
+color #2a2a2a
+material steel
+cyl r=0.008 h=0.45 pos=-0.85,dk+1.20,0.90 rot=40,0,0 seg=5
+cyl r=0.008 h=0.45 pos=0.85,dk+1.20,0.90 rot=40,0,0 seg=5
+color #111111
+material plastic
+sphere r=0.035 pos=-0.85,dk+1.36,1.05 scale=1,1,1.6 seg=6
+sphere r=0.035 pos=0.85,dk+1.36,1.05 scale=1,1,1.6 seg=6
+# Announcer (hands on hips, white shirt, cap) and race director (hi-vis) at the window
+use props/spectator.mbcad pos=-0.85,dk+0.03,0.45 rot=0,0,0 shirt_r=0.92 shirt_g=0.92 shirt_b=0.90 vest=0 pose=2 hat=1 hat_r=0.12 hat_g=0.2 hat_b=0.5 skin=0.5
+use props/spectator.mbcad pos=0.85,dk+0.03,0.40 rot=0,-20,0 shirt_r=0.95 shirt_g=0.55 shirt_b=0.10 vest=0 pose=0 hat=1 hat_r=0.95 hat_g=0.55 hat_b=0.10 skin=0
+# Warm interior light panel in the ceiling
+color #fff2d0
+material lens
+box size=1.2,0.02,0.4 pos=0,dk+2.45,0.3
+# ---- Roof dressing: LIVE sign, flag poles with pennants, AC unit ----
+color #111111
+material paint
+box size=1.6,0.45,0.08 pos=0,dk+2.98,1.55 bevel=0.02
+color #e01818
+material lens
+text str=LIVE size=0.15 t=0.05 depth=0.02 pos=0,dk+2.98,1.60
+color #6d7378
+material steel
+box size=0.05,0.4,0.05 pos=0.6,dk+2.75,1.55 mirror=x
+for s = -1, 1, 2
+  cyl r=0.02 h=1.8 pos=s*1.6,dk+3.5,-1.6 seg=6
+end
+color #c41a1a
+material matte
+extrude depth=0.01 pts=0,0,0.9,-0.25,0,-0.5 rot=0,90,0 pos=-1.6,dk+4.35,-1.6
+color #1a4fa8
+extrude depth=0.01 pts=0,0,0.9,-0.25,0,-0.5 rot=0,90,0 pos=1.6,dk+4.35,-1.6
+color #c8c8c4
+material plastic
+box size=0.8,0.40,0.6 pos=0.7,dk+2.88,-0.9 bevel=0.04

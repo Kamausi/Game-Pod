@@ -1,0 +1,93 @@
+# Mud-pit start gantry: two lattice towers carrying a box truss across all four lanes, with a
+# drag-strip "christmas tree" hanging over each lane (three ambers, green, red), lane numbers on
+# the truss, a START banner, PA horn, and cable runs. Spans X (lanes across), faces +Z (toward
+# the trucks in staging). Origin at ground centre under the truss.
+param span = 32
+param clear = 5.6          # underside of the truss
+set hx = span/2
+set ty = clear+0.45        # truss centre
+# ---- Towers: four legs with cross bracing, footing pads ----
+material steel
+color #2b2d30
+for s = -1, 1, 2
+  for c = -1, 1, 2
+    for d = -1, 1, 2
+      box size=0.10,ty+0.6,0.10 pos=s*hx+c*0.35,(ty+0.6)/2,d*0.35
+    end
+  end
+  for k = 0, 5
+    box size=0.05,1.02,0.05 pos=s*hx+0.35,0.5+k*1.0,0 rot=45,0,0
+    box size=0.05,1.02,0.05 pos=s*hx-0.35,0.5+k*1.0,0 rot=-45,0,0
+    box size=1.02,0.05,0.05 pos=s*hx,0.5+k*1.0,0.35 rot=0,0,45
+    box size=1.02,0.05,0.05 pos=s*hx,0.5+k*1.0,-0.35 rot=0,0,-45
+  end
+  color #8e8a82
+  material matte
+  box size=1.2,0.15,1.2 pos=s*hx,0.075,0
+  material steel
+  color #2b2d30
+end
+# ---- Box truss across the lanes: four chords and zig-zag webs ----
+for y = -1, 1, 2
+  for z = -1, 1, 2
+    cyl r=0.045 h=span+0.8 axis=x pos=0,ty+y*0.38,z*0.38 seg=8
+  end
+end
+for k = 0, 39
+  set x = -hx+0.4+k*(span-0.8)/39
+  box size=0.035,0.80,0.035 pos=x,ty,0.38 rot=0,0,32-64*mod(k,2)
+  box size=0.035,0.80,0.035 pos=x,ty,-0.38 rot=0,0,32-64*mod(k,2)
+end
+# ---- A start tree over each lane: hanger, black housing, three ambers, green, red ----
+for l = 0, 3
+  set lx = -9.75+l*6.5
+  color #2b2d30
+  material steel
+  box size=0.05,0.55,0.05 pos=lx,clear-0.25,0
+  color #111111
+  material matte
+  box size=0.34,1.25,0.22 pos=lx,clear-1.15,0.05 bevel=0.03
+  color #1c1c1c
+  for k = 0, 4
+    box size=0.30,0.05,0.12 pos=lx,clear-0.62-k*0.23,0.20 rot=-30,0,0
+  end
+  material lens
+  color #ffb020
+  for k = 0, 2
+    cyl r=0.075 h=0.03 axis=z pos=lx,clear-0.68-k*0.23,0.17 seg=12
+  end
+  color #20e050
+  cyl r=0.075 h=0.03 axis=z pos=lx,clear-1.37,0.17 seg=12
+  color #e01818
+  cyl r=0.075 h=0.03 axis=z pos=lx,clear-1.60,0.17 seg=12
+  # lane number board on the truss face
+  color #f2f0ea
+  material paint
+  box size=0.9,0.62,0.04 pos=lx,ty,0.44 bevel=0.02
+  color #111111
+  text str=1 size=0.30 t=0.08 depth=0.012 pos=lx,ty,0.465 scale=max(0,1-abs(l-0)),max(0,1-abs(l-0)),1
+  text str=2 size=0.30 t=0.08 depth=0.012 pos=lx,ty,0.465 scale=max(0,1-abs(l-1)),max(0,1-abs(l-1)),1
+  text str=3 size=0.30 t=0.08 depth=0.012 pos=lx,ty,0.465 scale=max(0,1-abs(l-2)),max(0,1-abs(l-2)),1
+  text str=4 size=0.30 t=0.08 depth=0.012 pos=lx,ty,0.465 scale=max(0,1-abs(l-3)),max(0,1-abs(l-3)),1
+end
+# ---- START banner on the truss between lanes 2 and 3, sponsor flags on the towers ----
+color #e8b020
+material matte
+box size=3.6,0.70,0.02 pos=0,ty,0.45
+color #111111
+text str=START size=0.22 t=0.065 depth=0.012 pos=0,ty,0.47
+for s = -1, 1, 2
+  color #c41a1a
+  extrude depth=0.01 pts=0,0,1.4,-0.3,0,-0.6 rot=0,90,0 pos=s*hx,ty+1.6,0.40
+  color #2b2d30
+  material steel
+  cyl r=0.025 h=1.2 pos=s*hx,ty+1.2,0.40 seg=6
+  material matte
+end
+# ---- PA horn and cable run ----
+color #d8d8d2
+material plastic
+cyl r=0.20 r2=0.06 h=0.45 axis=z pos=-hx+1.2,ty+0.75,0.20 rot=15,0,0 seg=12
+color #111111
+material rubber
+cyl r=0.03 h=span axis=x pos=0,ty-0.46,-0.30 seg=6

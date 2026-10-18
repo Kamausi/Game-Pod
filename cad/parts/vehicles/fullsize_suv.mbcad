@@ -2,6 +2,7 @@
 # square-body sheet metal, round headlights in square chrome bezels, contrasting white
 # hardtop with big quarter glass, swing-out spare tyre carrier, roof light bar, rock sliders.
 # Body frame: origin at frame height, +Z forward, +X left. Front axle z=1.2105, rear z=-1.4795.
+param driver = 1          # 0 for parked rigs: empty cab
 param paint_r = 0.15
 param paint_g = 0.30
 param paint_b = 0.52
@@ -124,4 +125,4 @@ color #e6eef2
 material lens
 box size=1.28,0.06,0.02 pos=0,1.13,0.035
 # Cab interior and driver (seen through the glass)
-use vehicles/interior.mbcad W=1.80 bl=0.56 wz=0.45 bz=-0.75 ry=0.95
+use vehicles/interior.mbcad W=1.80 bl=0.56 wz=0.45 bz=-0.75 ry=0.95 driver=driver

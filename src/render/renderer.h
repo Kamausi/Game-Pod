@@ -61,7 +61,7 @@ public:
 private:
     void uploadTerrain(Terrain& t, bool full);
     void drawTerrain(bool water, const Mat4& vp);
-    void drawStatic(GLuint prog);
+    void drawStatic(GLuint prog, int glassMode = 0);   // glassMode: 0 all, 1 skip see-through glass, 2 that glass only
     void drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass, bool transparent = false);
     void buildFence(World& w);
     void ensureTargets();
@@ -89,7 +89,7 @@ private:
     std::map<std::string, GpuMesh> meshes;
     struct Batch {
         GpuMesh mesh, lodMesh;              // lodMesh: built with lod=1, drawn beyond the LOD distance
-        bool hasLod = false;
+        bool hasLod = false, seeThrough = false;
         int count = 0, visible = 0, visibleFar = 0;
         std::vector<float> inst;          // 20 floats per instance (matrix + tint)
         std::vector<Vec3> centers;

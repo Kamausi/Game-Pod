@@ -513,7 +513,7 @@ void main(){
   if(uGlass == 2){
     // Tinted see-through glass: more opaque at grazing angles and where mud films it.
     float NoV = abs(dot(n, normalize(uCamPos - vWorld)));
-    outA = clamp(0.50 + 0.45*pow(1.0 - NoV, 3.0) + 0.6*m, 0.0, 0.97)*uAlpha;
+    outA = clamp(0.30 + 0.62*pow(1.0 - NoV, 3.0) + 0.6*m, 0.0, 0.97)*uAlpha;
   }
   frag = vec4(finalize(c, vWorld), outA);
 }
@@ -1288,6 +1288,8 @@ void Renderer::loadWorld(World& w) {
         if (!r.error.empty()) { std::printf("[cad] %s\n", r.error.c_str()); continue; }
         Batch b;
         b.mesh = uploadMesh(r.mesh);
+        // Glass drawn see-through (blended, last) for parts with something behind it.
+        b.seeThrough = g.second[0]->part.rfind("vehicles/", 0) == 0 || g.second[0]->part.find("announcer_tower") != std::string::npos;
         std::vector<float> inst;
         for (auto* p : g.second) {
             Mat4 m = Mat4::trs(p->pos, Quat::axisAngle({0, 1, 0}, p->yaw), {p->scale, p->scale, p->scale});
@@ -1406,17 +1408,21 @@ void Renderer::cullStatic(const Mat4& vp, Vec3 eye, float maxDist) {
     }
 }
 
-void Renderer::drawStatic(GLuint prog) {
+void Renderer::drawStatic(GLuint prog, int glassMode) {
     Mat4 I = Mat4::identity();
     glUniformMatrix4fv(glGetUniformLocation(prog, "uModel"), 1, GL_FALSE, I.m);
     glUniform1f(glGetUniformLocation(prog, "uDirtU"), 0.f);
     glUniform2f(glGetUniformLocation(prog, "uDirtRange"), -0.45f, 1.0f);
     glUniform1f(glGetUniformLocation(prog, "uSeed"), 7.f);
     glUniform1f(glGetUniformLocation(prog, "uAlpha"), 1.f);
+    GLint locGlass = glGetUniformLocation(prog, "uGlass");
     for (auto& b : batches) {
+        if (glassMode == 2 && !b.seeThrough) continue;
+        if (locGlass >= 0) glUniform1i(locGlass, glassMode == 0 ? 0 : (b.seeThrough ? glassMode : 0));
         if (b.visible) drawMesh(b.mesh, b.visible);
-        if (b.visibleFar) drawMesh(b.lodMesh, b.visibleFar);
+        if (b.visibleFar && glassMode != 2) drawMesh(b.lodMesh, b.visibleFar);
     }
+    if (locGlass >= 0) glUniform1i(locGlass, 0);
 }
 
 void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass, bool transparent) {
@@ -1644,7 +1650,7 @@ void Renderer::render(World& w, const RenderFrame& f) {
     setCommon(progMesh);
     glUniformMatrix4fv(glGetUniformLocation(progMesh, "uVP"), 1, GL_FALSE, viewProj.m);
     cullStatic(viewProj, f.camPos, quality >= 2 ? 260.f : (quality == 1 ? 200.f : 150.f));
-    drawStatic(progMesh);
+    drawStatic(progMesh, 1);
     drawDynamic(w, f, progMesh, false);
 
     // Fence (alpha-tested, double-sided)
@@ -1683,6 +1689,7 @@ void Renderer::render(World& w, const RenderFrame& f) {
     glUniformMatrix4fv(glGetUniformLocation(progMesh, "uVP"), 1, GL_FALSE, viewProj.m);
     glDepthMask(GL_FALSE);
     drawDynamic(w, f, progMesh, false, true);
+    drawStatic(progMesh, 2);   // see-through glass on parked vehicles and the announcer booth
     glDepthMask(GL_TRUE);
     if (np) {
         glDepthMask(GL_FALSE);

@@ -1,6 +1,7 @@
 # Mega truck: pickup cab perched on a tube chassis over 54" ag-style tyres, blown big-block
 # through the hood, zoomie headers, 4-link bars and coilovers, roll cage.
 # Body frame: +Z fwd, +X left. Front axle z=1.776, rear z=-1.924, track 2.4, wheel centres y=-0.55.
+param driver = 1          # 0 for parked rigs: empty cab
 param paint_r = 0.10
 param paint_g = 0.10
 param paint_b = 0.11
@@ -116,4 +117,4 @@ for k = 0, 3
   box size=1.24,0.03,0.05 pos=0,0.74+k*0.075,2.685
 end
 # Cab interior and driver (seen through the glass)
-use vehicles/interior.mbcad W=1.84 bl=1.26 wz=0.62 bz=-0.86 ry=1.78
+use vehicles/interior.mbcad W=1.84 bl=1.26 wz=0.62 bz=-0.86 ry=1.78 driver=driver
