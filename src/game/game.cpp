@@ -306,6 +306,9 @@ float Game::spawnWheelFx(const Vehicle& vc, float dt) {
         float vol = w.ejectVolume;
         w.ejectVolume = 0;
         if (!w.contact) continue;
+        TerrainSample gs = world.terrain.sample(w.contactPos.x, w.contactPos.z);
+        bool hard = gs.soil == uint8_t(Soil::Gravel) && gs.moisture < 0.45f;
+        if (hard) vol = 0;   // pads and roads don't sling clods
         float wr = std::fabs(w.omega * w.radius);
         float dirS = signf(w.omega);
         Vec3 back = w.fwdDir * -dirS;
@@ -336,6 +339,15 @@ float Game::spawnWheelFx(const Vehicle& vc, float dt) {
                 particles.emit(PType::Water, w.contactPos + U * 0.2f, vel, R.range(0.04f, 0.08f), 1.4f, {0.5f, 0.46f, 0.38f});
             }
             if (R.uniform() < 0.25f) particles.emit(PType::Mist, w.contactPos + U * 0.3f, v.vel * 0.3f + U, 0.3f, 1.4f, {0.75f, 0.72f, 0.66f});
+        }
+        // Dust: dry dirt, gravel and worn grass kick up a tan cloud behind a moving truck.
+        float ground = std::max(vl, wr);
+        if (gs.moisture < 0.34f && gs.waterDepth < 0.01f && gs.grass < 0.6f && ground > 3.f &&
+            R.uniform() < clampf((ground - 3.f) * 0.05f, 0.f, 0.6f) * (1.f - gs.grass)) {
+            Vec3 vel = back * R.range(0.4f, 1.5f) + U * R.range(0.3f, 1.0f) + side * R.bipolar() * 0.6f + v.vel * 0.15f;
+            float tone = R.range(0.9f, 1.08f);
+            particles.emit(PType::Mist, w.contactPos + U * 0.15f, vel, R.range(0.3f, 0.55f), R.range(1.8f, 3.2f),
+                           Vec3{0.66f, 0.59f, 0.46f} * tone);
         }
         // Tire smoke: rubber spinning on hard, dry ground (pad, gravel, hardpan).
         if (w.mudW < 0.1f && w.waterDepth < 0.01f && std::fabs(w.slipSpeed) > 6.f && R.uniform() < clampf((std::fabs(w.slipSpeed) - 6.f) * 0.08f, 0.f, 0.9f)) {

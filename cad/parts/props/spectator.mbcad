@@ -1,17 +1,57 @@
-# Spectator along the fence (photo 3): puffer vest, jeans.
+# Spectator / crew / staff figure: boots, jeans (or work pants), tapered torso with an
+# optional puffer vest, shoulders, bent arms with hands, neck, head with ears, hair or a cap.
+# Faces +Z. Origin between the feet.
 param shirt_r = 0.55
 param shirt_g = 0.58
 param shirt_b = 0.62
 param vest = 1
-color #3b4a63
-cyl r=0.09 h=0.82 pos=0.10,0.41,0 seg=8 mirror=x
+param skin = 0.5
+param pants = 0
+param hat = 0
+param hat_r = 0.12
+param hat_g = 0.14
+param hat_b = 0.18
+set SR = 0.62+0.3*skin
+set SG = 0.44+0.28*skin
+set SB = 0.32+0.24*skin
+# Boots
+color #2a2219
+material matte
+box size=0.11,0.09,0.26 pos=0.10,0.045,0.03 mirror=x
+# Legs (slightly apart), hips
+color 0.23+0.25*pants 0.29+0.13*pants 0.40-0.10*pants
+cyl r=0.075 r2=0.065 h=0.42 pos=0.10,0.29,0 seg=8 mirror=x
+cyl r=0.085 r2=0.075 h=0.42 pos=0.10,0.68,0 seg=8 mirror=x
+box size=0.34,0.16,0.22 pos=0,0.92,0
+# Belt
+color #1a1612
+box size=0.35,0.04,0.23 pos=0,1.00,0
+# Torso and shoulders
 color shirt_r shirt_g shirt_b
-cyl r=0.20 r2=0.17 h=0.62 pos=0,1.12,0 seg=10
+material plastic
+cyl r=0.175 r2=0.20 h=0.46 pos=0,1.24,0 seg=8 scale=1,1,0.7
+sphere r=0.08 pos=0.19,1.44,0 seg=8 mirror=x
+# Puffer vest over the shirt
 color #1b1d22
-cyl r=0.215*vest r2=0.185*vest h=0.50 pos=0,1.12,0 seg=10
+cyl r=0.20*vest r2=0.215*vest h=0.42*vest pos=0,1.25,0 seg=8 scale=1,1,0.74
+box size=0.30*vest,0.012,0.005 pos=0,1.18,0.155 
+box size=0.30*vest,0.012,0.005 pos=0,1.30,0.155
+# Arms: upper arm down, forearm angled forward, hands
 color shirt_r shirt_g shirt_b
-cyl r=0.06 h=0.6 pos=0.25,1.10,0 rot=0,0,8 seg=6 mirror=x
-color #d7b49a
-sphere r=0.11 pos=0,1.58,0 seg=10
-color #2b2b2b
-sphere r=0.115 pos=0,1.63,-0.01 scale=1,0.6,1 seg=10
+cyl r=0.055 r2=0.05 h=0.30 pos=0.22,1.28,0.0 rot=0,0,6 seg=8 mirror=x
+cyl r=0.048 r2=0.042 h=0.27 pos=0.235,1.02,0.035 rot=16,0,4 seg=8 mirror=x
+color SR SG SB
+material matte
+sphere r=0.045 pos=0.24,0.88,0.07 seg=8 mirror=x
+# Neck, head, ears, nose
+cyl r=0.05 h=0.08 pos=0,1.50,0 seg=8
+sphere r=0.105 pos=0,1.61,0.0 scale=0.92,1.08,1 seg=9
+sphere r=0.025 pos=0.095,1.61,-0.005 seg=6 mirror=x
+sphere r=0.018 pos=0,1.60,0.10 seg=6
+# Hair (no hat) or a ball cap with a brim
+color #3a2a1e
+sphere r=0.108*(1-hat) pos=0,1.655,-0.012 scale=0.97,0.62,1.02 seg=9
+color hat_r hat_g hat_b
+material plastic
+sphere r=0.112*hat pos=0,1.665,-0.005 scale=1,0.55,1 seg=9
+box size=0.17*hat,0.012,0.11*hat pos=0,1.675,0.13 rot=-8,0,0

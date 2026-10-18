@@ -53,7 +53,7 @@ server (zero npm dependencies, Node ≥ 18).
 | **AI rivals** | Solo events field up to 3 rivals with distinct builds (bog car, diesel crew cab on paddles, UTV, built Comanches) running the same terramechanics: pure-pursuit steering, brake-distance speed planning, and a human stuck strategy — air down, rock it, give up or call the dozer. |
 | **Contact** | Truck-vs-truck collisions (2D OBB separating-axis test + restitution/friction impulses), knockable barrels, leaning fence posts, venue boundary. |
 | **Ghost** | Your personal-best Mud Bog / Hill & Hole run is recorded at 20 Hz and replayed as a translucent ghost. |
-| **Post FX** | 4x MSAA offscreen target, mud splats and refracting water drops on the camera lens from nearby roost, vignette and late-afternoon grade. |
+| **Post FX** | 4x MSAA offscreen target, quarter-res bloom (bright pass + separable gaussian, stronger at night), light unsharp mask, mud splats and refracting water drops on the camera lens from nearby roost, vignette, warm grade with a gentle S-curve. Dust trails on dry dirt and gravel, tire smoke on hard ground. |
 | **Dev panel** | Dear ImGui overlay (**F1** or **`**): live terramechanics/vehicle multipliers, per-wheel telemetry table + plots, wet/dry the pit, sun position, audio mix. |
 | **Input** | W3C Gamepad API (Xbox/PlayStation standard mapping) with rumble, full menu navigation by pad; keyboard + mouse. |
 

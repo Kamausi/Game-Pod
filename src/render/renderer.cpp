@@ -680,9 +680,36 @@ const char* kPostVS = R"(
 out vec2 vUV;
 void main(){ vec2 p = vec2((gl_VertexID<<1)&2, gl_VertexID&2); vUV = p; gl_Position = vec4(p*2.0-1.0, 0.0, 1.0); }
 )";
+// Bloom: mode 0 = bright pass + downsample from the scene, 1 = separable 9-tap gaussian.
+const char* kBloomFS = R"(
+in vec2 vUV;
+uniform sampler2D uSrc;
+uniform int uMode;
+uniform vec2 uTexel, uDir;
+out vec4 frag;
+void main(){
+  if(uMode == 0){
+    vec3 c = vec3(0.0);
+    for(int y = -1; y <= 1; y += 2) for(int x = -1; x <= 1; x += 2) c += texture(uSrc, vUV + vec2(x, y)*uTexel).rgb;
+    c *= 0.25;
+    float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    frag = vec4(c*smoothstep(0.62, 0.95, l), 1.0);
+    return;
+  }
+  const float w[5] = float[5](0.227, 0.194, 0.122, 0.054, 0.016);
+  vec3 c = texture(uSrc, vUV).rgb*w[0];
+  for(int i = 1; i < 5; i++){
+    vec2 o = uDir*uTexel*float(i)*1.4;
+    c += (texture(uSrc, vUV + o).rgb + texture(uSrc, vUV - o).rgb)*w[i];
+  }
+  frag = vec4(c, 1.0);
+}
+)";
 const char* kPostFS = R"(
 in vec2 vUV;
 uniform sampler2D uScene;
+uniform sampler2D uBloom;
+uniform float uBloomK;
 uniform vec4 uSplats[16];
 uniform int uSplatN;
 uniform vec2 uRes;
@@ -703,13 +730,25 @@ void main(){
     if(s.w > 0.0){ mud = max(mud, m*s.w); shade += (1.0 - smoothstep(edge, edge*1.25, dist))*s.w*0.25; }
     else refr += normalize(d + 1e-5)*m*(-s.w)*(dist/max(edge,1e-4))*s.z*0.5;
   }
-  vec3 col = texture(uScene, clamp(uv - refr, 0.001, 0.999)).rgb;
+  vec2 suv = clamp(uv - refr, 0.001, 0.999);
+  vec3 col = texture(uScene, suv).rgb;
+  // Light unsharp mask to win back detail the MSAA resolve softens.
+  vec2 px = 1.0/uRes;
+  vec3 blur = (texture(uScene, suv + vec2(px.x, 0.0)).rgb + texture(uScene, suv - vec2(px.x, 0.0)).rgb +
+               texture(uScene, suv + vec2(0.0, px.y)).rgb + texture(uScene, suv - vec2(0.0, px.y)).rgb)*0.25;
+  col = max(col + (col - blur)*0.35, 0.0);
+  // Bloom: screen-blend so highlights glow without blowing out.
+  vec3 b = texture(uBloom, suv).rgb*uBloomK;
+  col = 1.0 - (1.0 - col)*(1.0 - b);
   col *= 1.0 - clamp(shade, 0.0, 0.35);
   vec3 mudCol = vec3(0.24, 0.18, 0.12)*(0.75 + 0.5*h21(floor(uv*uRes/2.5)));
   col = mix(col, mudCol, clamp(mud, 0.0, 0.94));
   vec2 q = uv - 0.5;
   col *= 1.0 - dot(q, q)*0.6;                      // vignette
   col = mix(col, col*vec3(1.05, 1.0, 0.93), 0.6);  // warm late-afternoon grade
+  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col = mix(vec3(luma), col, 1.08);                 // a touch more saturation
+  col = mix(col, col*col*(3.0 - 2.0*col), 0.18);    // gentle S-curve contrast
   frag = vec4(col, 1.0);
 }
 )";
@@ -748,6 +787,7 @@ bool Renderer::init(int w, int h) {
     progParticle = compileProgram("particle", src(kParticleVS), src(kParticleFS));
     progFence = compileProgram("fence", src(kFenceVS), src(kFenceFS));
     progPost = compileProgram("post", std::string(kHeader) + kPostVS, std::string(kHeader) + kPostFS);
+    progBloom = compileProgram("bloom", std::string(kHeader) + kPostVS, std::string(kHeader) + kBloomFS);
     progGrass = compileProgram("grass", src(kGrassVS), src(kGrassFS));
     {
         // One tuft: fourteen thin single-triangle blades spread over the cell, leaning outward.
@@ -922,6 +962,19 @@ void Renderer::ensureTargets() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resolveTex, 0);
+    bloomW = std::max(1, width / 4);
+    bloomH = std::max(1, height / 4);
+    for (int i = 0; i < 2; i++) {
+        if (!bloomTex[i]) { glGenTextures(1, &bloomTex[i]); glGenFramebuffers(1, &bloomFbo[i]); }
+        glBindTexture(GL_TEXTURE_2D, bloomTex[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, bloomW, bloomH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindFramebuffer(GL_FRAMEBUFFER, bloomFbo[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bloomTex[i], 0);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -929,11 +982,38 @@ void Renderer::postPass(const RenderFrame& f) {
     glBindFramebuffer(GL_READ_FRAMEBUFFER, msFbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
     glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, width, height);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+    glBindVertexArray(postVao);
+    // Bloom chain at quarter resolution: bright pass, then horizontal + vertical blur.
+    glViewport(0, 0, bloomW, bloomH);
+    glUseProgram(progBloom);
+    glActiveTexture(GL_TEXTURE0);
+    glUniform1i(glGetUniformLocation(progBloom, "uSrc"), 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, bloomFbo[0]);
+    glBindTexture(GL_TEXTURE_2D, resolveTex);
+    glUniform1i(glGetUniformLocation(progBloom, "uMode"), 0);
+    glUniform2f(glGetUniformLocation(progBloom, "uTexel"), 1.f / float(width), 1.f / float(height));
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glUniform1i(glGetUniformLocation(progBloom, "uMode"), 1);
+    glUniform2f(glGetUniformLocation(progBloom, "uTexel"), 1.f / float(bloomW), 1.f / float(bloomH));
+    for (int pass = 0; pass < 2; pass++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, bloomFbo[1]);
+        glBindTexture(GL_TEXTURE_2D, bloomTex[0]);
+        glUniform2f(glGetUniformLocation(progBloom, "uDir"), 1.f, 0.f);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindFramebuffer(GL_FRAMEBUFFER, bloomFbo[0]);
+        glBindTexture(GL_TEXTURE_2D, bloomTex[1]);
+        glUniform2f(glGetUniformLocation(progBloom, "uDir"), 0.f, 1.f);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, width, height);
     glUseProgram(progPost);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, bloomTex[0]);
+    glUniform1i(glGetUniformLocation(progPost, "uBloom"), 1);
+    glUniform1f(glGetUniformLocation(progPost, "uBloomK"), 0.45f + 0.6f * night);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, resolveTex);
     glUniform1i(glGetUniformLocation(progPost, "uScene"), 0);

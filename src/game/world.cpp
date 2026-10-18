@@ -491,11 +491,24 @@ void World::generate(uint32_t seed) {
     }
     barrelsInitial = barrels;
 
+    // People share a small wardrobe so identical figures batch into one instanced mesh.
+    auto outfit = [](Rng& r, bool vestAllowed) {
+        static const float shirts[][3] = {{0.75f, 0.12f, 0.1f}, {0.12f, 0.25f, 0.55f}, {0.15f, 0.42f, 0.2f}, {0.85f, 0.85f, 0.82f},
+                                          {0.2f, 0.2f, 0.22f}, {0.55f, 0.35f, 0.2f}, {0.85f, 0.6f, 0.15f}, {0.45f, 0.25f, 0.5f},
+                                          {0.35f, 0.55f, 0.7f}, {0.6f, 0.15f, 0.35f}};
+        static const float hats[][3] = {{0.12f, 0.14f, 0.18f}, {0.7f, 0.12f, 0.1f}, {0.3f, 0.4f, 0.22f}, {0.85f, 0.8f, 0.7f}};
+        const float* c = shirts[r.next() % 10];
+        const float* h = hats[r.next() % 4];
+        CadParams pr{{"shirt_r", c[0]}, {"shirt_g", c[1]}, {"shirt_b", c[2]}, {"vest", vestAllowed && r.uniform() < 0.35f ? 1.f : 0.f},
+                     {"skin", float(r.next() % 3) * 0.5f}, {"pants", r.uniform() < 0.25f ? 1.f : 0.f}, {"hat", r.uniform() < 0.45f ? 1.f : 0.f},
+                     {"hat_r", h[0]}, {"hat_g", h[1]}, {"hat_b", h[2]}};
+        if (pr["hat"] == 0.f) pr["hat_r"] = pr["hat_g"] = pr["hat_b"] = 0.f;
+        return pr;
+    };
     // ---- Spectators along the north fence (photo 3) ----
     for (int s = 0; s < 46; s++) {
         float x = rng.range(-34, 34), z = pitZ + fz + rng.range(1.6f, 5.5f);
-        CadParams pr{{"shirt_r", rng.range(0.15f, 0.8f)}, {"shirt_g", rng.range(0.15f, 0.7f)},
-                     {"shirt_b", rng.range(0.2f, 0.8f)}, {"vest", rng.uniform() < 0.4f ? 1.f : 0.f}};
+        CadParams pr = outfit(rng, true);
         addProp("props/spectator.mbcad", x, z, PI + rng.range(-0.5f, 0.5f), rng.range(0.92f, 1.08f), pr);
     }
 
@@ -542,9 +555,9 @@ void World::generate(uint32_t seed) {
         };
         auto with = [](CadParams a, const CadParams& b) { for (auto& kv : b) a[kv.first] = kv.second; return a; };
         auto person = [&](float x, float z, float yaw, bool vest, float y = -1e9f) {
-            CadParams pr{{"shirt_r", gr.range(0.15f, 0.8f)}, {"shirt_g", gr.range(0.15f, 0.7f)}, {"shirt_b", gr.range(0.2f, 0.8f)},
-                         {"vest", vest ? 1.f : (gr.uniform() < 0.3f ? 1.f : 0.f)}};
-            if (vest) { pr["shirt_r"] = 0.95f; pr["shirt_g"] = 0.55f; pr["shirt_b"] = 0.1f; pr["vest"] = 0.f; }   // hi-vis staff
+            CadParams pr = outfit(gr, true);
+            if (vest) { pr["shirt_r"] = 0.95f; pr["shirt_g"] = 0.55f; pr["shirt_b"] = 0.1f; pr["vest"] = 0.f; pr["hat"] = 1.f;   // hi-vis staff
+                        pr["hat_r"] = 0.95f; pr["hat_g"] = 0.55f; pr["hat_b"] = 0.1f; }
             props.push_back({"props/spectator.mbcad", pr, {x, y > -1e8f ? y : ground(x, z), z}, yaw, gr.range(0.94f, 1.06f)});
         };
         // Footprint collider for a building (half extents in the part's own frame).

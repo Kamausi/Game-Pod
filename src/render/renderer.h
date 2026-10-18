@@ -65,6 +65,8 @@ private:
     void ensureTargets();
     void postPass(const RenderFrame& f);
     GLuint progPost = 0, msFbo = 0, msColor = 0, msDepth = 0, resolveFbo = 0, resolveTex = 0, postVao = 0;
+    GLuint progBloom = 0, bloomFbo[2] = {0, 0}, bloomTex[2] = {0, 0};   // quarter-res ping-pong
+    int bloomW = 0, bloomH = 0;
     int targetW = 0, targetH = 0;
 
     GLuint progTerrain = 0, progMesh = 0, progShadow = 0, progSky = 0, progParticle = 0, progFence = 0;
