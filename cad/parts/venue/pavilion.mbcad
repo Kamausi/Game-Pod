@@ -24,100 +24,72 @@ box size=0.16,0.2,7.8 pos=1.93,eh+0.1,0 mirror=x
 box size=0.14,1.3,0.14 pos=5.8,eh+0.85,0 mirror=x
 box size=0.14,1.3,0.14 pos=1.93,eh+0.85,0 mirror=x
 box size=12.3,0.22,0.14 pos=0,eh+1.45,0
-# Rafters suggested by struts on each frame
-box size=0.12,0.14,4.4 pos=5.8,eh+0.78,1.95 rot=18.4,0,0 mirror=x
-box size=0.12,0.14,4.4 pos=5.8,eh+0.78,-1.95 rot=-18.4,0,0 mirror=x
-box size=0.12,0.14,4.4 pos=1.93,eh+0.78,1.95 rot=18.4,0,0 mirror=x
-box size=0.12,0.14,4.4 pos=1.93,eh+0.78,-1.95 rot=-18.4,0,0 mirror=x
-# Metal roof shell (thin gable), ribs, ridge cap
+# Rafters at every metre, both slopes, plus purlins
+for x = -6, 6
+  box size=0.08,0.14,4.6 pos=x,eh+0.58,2.15 rot=19.6,0,0
+  box size=0.08,0.14,4.6 pos=x,eh+0.58,-2.15 rot=-19.6,0,0
+end
+for k = 0, 2
+  box size=12.4,0.08,0.08 pos=0,eh-0.1+1.6*(1-(3.45-k*1.27)/4.5)-0.045,3.45-k*1.27 mirror=z   # just under the skin
+end
+# Corrugated metal roof shell, ribs every 35 cm, ridge cap
 material paint
 color roof_r roof_g roof_b
 extrude depth=13.0 pos=0,0,0 pts=4.5,eh-0.1,4.5,eh,0,eh+1.6,-4.5,eh,-4.5,eh-0.1,0,eh+1.5
-color roof_r*0.8 roof_g*0.8 roof_b*0.8
-box size=0.05,0.04,4.75 pos=4.2,eh+0.82,2.25 rot=19.6,0,0 mirror=x
-box size=0.05,0.04,4.75 pos=4.2,eh+0.82,-2.25 rot=-19.6,0,0 mirror=x
-box size=0.05,0.04,4.75 pos=1.4,eh+0.82,2.25 rot=19.6,0,0 mirror=x
-box size=0.05,0.04,4.75 pos=1.4,eh+0.82,-2.25 rot=-19.6,0,0 mirror=x
+color roof_r*0.78 roof_g*0.78 roof_b*0.78
+for x = -6.3, 6.3, 0.35
+  box size=0.04,0.035,4.78 pos=x,eh+0.83,2.25 rot=19.6,0,0
+  box size=0.04,0.035,4.78 pos=x,eh+0.83,-2.25 rot=-19.6,0,0
+end
 material steel
 color #8d9297
 box size=13.05,0.08,0.4 pos=0,eh+1.6,0
-# Picnic tables (top, benches, splayed legs, bench rails)
+# Fascia boards, gutters and downspouts
+material paint
+color #e8e4da
+box size=13.0,0.22,0.04 pos=0,eh-0.04,4.52 mirror=z
+box size=0.04,0.22,9.0 pos=6.52,eh-0.04,0 mirror=x
+color #b9bcbf
+material steel
+box size=13.0,0.10,0.12 pos=0,eh-0.10,4.60 mirror=z
+box size=0.07,eh-0.1,0.07 pos=6.45,(eh-0.1)/2,4.60 mirror=x
+box size=0.07,eh-0.1,0.07 pos=6.45,(eh-0.1)/2,-4.60 mirror=x
+box size=0.10,0.06,0.40 pos=6.45,0.10,4.75 mirror=x
+box size=0.10,0.06,0.40 pos=6.45,0.10,-4.75 mirror=x
+# Festoon string lights along both eaves: wire under the beam, bulbs on drop cords in swags
+color #2a2a2a
 material matte
-set tx = -3.9
-set tz = 1.7
-color #8b6a44
-box size=1.8,0.05,0.76 pos=tx,0.86,tz
-box size=1.8,0.05,0.28 pos=tx,0.56,tz+0.62
-box size=1.8,0.05,0.28 pos=tx,0.56,tz-0.62
-color #6e5434
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.06,0.06,1.5 pos=tx+0.7,0.5,tz
-box size=0.06,0.06,1.5 pos=tx-0.7,0.5,tz
-set tx = 0
-set tz = 1.7
-color #8b6a44
-box size=1.8,0.05,0.76 pos=tx,0.86,tz
-box size=1.8,0.05,0.28 pos=tx,0.56,tz+0.62
-box size=1.8,0.05,0.28 pos=tx,0.56,tz-0.62
-color #6e5434
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.06,0.06,1.5 pos=tx+0.7,0.5,tz
-box size=0.06,0.06,1.5 pos=tx-0.7,0.5,tz
-set tx = 3.9
-set tz = 1.7
-color #8b6a44
-box size=1.8,0.05,0.76 pos=tx,0.86,tz
-box size=1.8,0.05,0.28 pos=tx,0.56,tz+0.62
-box size=1.8,0.05,0.28 pos=tx,0.56,tz-0.62
-color #6e5434
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.06,0.06,1.5 pos=tx+0.7,0.5,tz
-box size=0.06,0.06,1.5 pos=tx-0.7,0.5,tz
-set tx = -3.9
-set tz = -1.7
-color #8b6a44
-box size=1.8,0.05,0.76 pos=tx,0.86,tz
-box size=1.8,0.05,0.28 pos=tx,0.56,tz+0.62
-box size=1.8,0.05,0.28 pos=tx,0.56,tz-0.62
-color #6e5434
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.06,0.06,1.5 pos=tx+0.7,0.5,tz
-box size=0.06,0.06,1.5 pos=tx-0.7,0.5,tz
-set tx = 0
-set tz = -1.7
-color #8b6a44
-box size=1.8,0.05,0.76 pos=tx,0.86,tz
-box size=1.8,0.05,0.28 pos=tx,0.56,tz+0.62
-box size=1.8,0.05,0.28 pos=tx,0.56,tz-0.62
-color #6e5434
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.06,0.06,1.5 pos=tx+0.7,0.5,tz
-box size=0.06,0.06,1.5 pos=tx-0.7,0.5,tz
-set tx = 3.9
-set tz = -1.7
-color #8b6a44
-box size=1.8,0.05,0.76 pos=tx,0.86,tz
-box size=1.8,0.05,0.28 pos=tx,0.56,tz+0.62
-box size=1.8,0.05,0.28 pos=tx,0.56,tz-0.62
-color #6e5434
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz+0.24 rot=-24,0,0
-box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz-0.24 rot=24,0,0
-box size=0.06,0.06,1.5 pos=tx+0.7,0.5,tz
-box size=0.06,0.06,1.5 pos=tx-0.7,0.5,tz
+box size=11.2,0.012,0.012 pos=0,eh-0.26,3.70 mirror=z
+for x = -5.5, 5.5, 0.25
+  box size=0.006,0.02+0.16*abs(sin(x*180)),0.006 pos=x,eh-0.27-0.08*abs(sin(x*180)),3.70 mirror=z
+end
+color #ffe6a8
+material lens
+for x = -5.5, 5.5, 0.25
+  sphere r=0.04 pos=x,eh-0.32-0.16*abs(sin(x*180)),3.70 mirror=z seg=6
+end
+# Picnic tables (top, benches, splayed legs, bench rails), 3 x 2 grid
+material matte
+for i = -1, 1
+  for j = -1, 1, 2
+    set tx = i*3.9
+    set tz = j*1.7
+    color #8b6a44
+    box size=1.8,0.05,0.76 pos=tx,0.86,tz
+    box size=1.8,0.05,0.28 pos=tx,0.56,tz+0.62
+    box size=1.8,0.05,0.28 pos=tx,0.56,tz-0.62
+    color #6e5434
+    box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz+0.24 rot=-24,0,0
+    box size=0.07,0.82,0.08 pos=tx+0.7,0.5,tz-0.24 rot=24,0,0
+    box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz+0.24 rot=-24,0,0
+    box size=0.07,0.82,0.08 pos=tx-0.7,0.5,tz-0.24 rot=24,0,0
+    box size=0.06,0.06,1.5 pos=tx+0.7,0.5,tz
+    box size=0.06,0.06,1.5 pos=tx-0.7,0.5,tz
+  end
+end
+# Trash cans by the end posts
+color #2f5a3a
+material paint
+cyl r=0.28 h=0.9 pos=6.0,0.57,3.3 seg=12 mirror=x
+color #1d1d1d
+cyl r=0.30 h=0.06 pos=6.0,1.04,3.3 seg=12 mirror=x

@@ -31,3 +31,32 @@ material steel
 color #a0a0a0
 box size=0.02,0.10,0.02 pos=1.24,0.05,0.9 mirror=x
 box size=0.02,0.10,0.02 pos=1.24,0.05,-0.9 mirror=x
+# Fly vestibule over the door: a sloped awning flap staked out in front
+material matte
+color color_r*0.5 color_g*0.5 color_b*0.5
+extrude depth=0.95 pts=0.95,1.02,1.55,0.05,1.60,0.05,1.00,1.06
+# Mesh side windows (dark, with a lighter frame)
+color color_r*0.75 color_g*0.75 color_b*0.75
+box size=0.012,0.36,0.62 pos=1.13,0.58,0 rot=0,0,-22 mirror=x
+color #1c2024
+box size=0.014,0.30,0.54 pos=1.135,0.58,0 rot=0,0,-22 mirror=x
+# The two crossing pole arcs, visible as dark ribs over the fly
+color #262626
+for k = 0, 8
+  set a = k*22.5
+  box size=0.025,0.025,0.30 pos=1.2*0.707*cos(a),1.32*sin(a),1.05*0.707*cos(a) rot=0,45,90-a
+  box size=0.025,0.025,0.30 pos=-1.2*0.707*cos(a),1.32*sin(a),1.05*0.707*cos(a) rot=0,-45,a-90
+end
+# Guy lines from the fly corners out to stakes
+color #e8e2c8
+cyl r=0.006 h=0.95 pos=1.55,0.40,0.80 rot=-30,0,-55 seg=4 mirror=x
+cyl r=0.006 h=0.95 pos=1.55,0.40,-0.80 rot=30,0,-55 seg=4 mirror=x
+color #a0a0a0
+material steel
+box size=0.02,0.12,0.02 pos=1.90,0.05,1.0 mirror=x
+box size=0.02,0.12,0.02 pos=1.90,0.05,-1.0 mirror=x
+box size=0.02,0.12,0.02 pos=0,0.05,1.62
+# Doormat
+color #5a4a3a
+material matte
+box size=0.70,0.01,0.45 pos=0,0.012,1.30

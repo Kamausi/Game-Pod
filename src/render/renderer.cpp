@@ -740,17 +740,21 @@ void main(){
     if(N.z < 0.0) N = -N;
     float dist = -P.z;
     float rad = clamp(0.35 + dist*0.012, 0.35, 1.2);
-    float a0 = h21(gl_FragCoord.xy)*6.2832, occ = 0.0;
+    // 4x4 interleaved rotations; the post pass blurs over exactly that footprint so it averages out.
+    ivec2 ip = ivec2(gl_FragCoord.xy) & 3;
+    const float bayer[16] = float[16](0.0,8.0,2.0,10.0, 12.0,4.0,14.0,6.0, 3.0,11.0,1.0,9.0, 15.0,7.0,13.0,5.0);
+    float a0 = (bayer[ip.y*4 + ip.x] + 0.5)/16.0*6.2832, occ = 0.0;
     vec3 T = normalize(abs(N.y) < 0.9 ? cross(N, vec3(0,1,0)) : cross(N, vec3(1,0,0))), B = cross(N, T);
     for(int i = 0; i < 10; i++){
       float fi = float(i) + 0.5;
       float a = a0 + fi*2.39996, r = sqrt(fi/10.0);
-      vec3 s = P + (T*cos(a)*r + B*sin(a)*r + N*(0.25 + 0.75*fract(fi*0.618)))*rad*r;
+      vec3 s = P + N*(0.02 + dist*0.002) + (T*cos(a)*r + B*sin(a)*r + N*(0.25 + 0.75*fract(fi*0.618)))*rad*r;
       vec2 suv = (s.xy/(-s.z))/uTanH*0.5 + 0.5;
       if(suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) continue;
       float sd = lin(texture(uDepth, suv).r);
       float diff = (-s.z) - sd;
-      occ += smoothstep(0.06, 0.14, diff)*smoothstep(rad*2.5, rad*0.5, diff);   // ignore blade-thin occluders
+      // Thresholds grow with distance (depth precision) and ignore blade-thin occluders.
+      occ += smoothstep(0.06 + dist*0.008, 0.14 + dist*0.016, diff)*smoothstep(rad*2.5, rad*0.5, diff);
     }
     ao = pow(1.0 - occ/10.0, 1.4);
     ao = mix(1.0, ao, smoothstep(140.0, 60.0, dist));
@@ -785,6 +789,7 @@ uniform sampler2D uAo;
 uniform sampler2D uDepth;
 uniform vec3 uShaftCol;
 uniform int uDebug;   // 1 = show AO, 2 = show sun shafts
+uniform int uAoOn;
 out vec4 frag;
 float h21(vec2 p){ p = fract(p*vec2(233.34, 851.73)); p += dot(p, p+23.45); return fract(p.x*p.y); }
 void main(){
@@ -811,12 +816,17 @@ void main(){
   col = max(col + (col - blur)*0.35, 0.0);
   // Ambient occlusion: depth-aware 3x3 upsample of the half-res term so it doesn't bleed across edges.
   {
-    float dc = texture(uDepth, suv).r, sum = 0.0, wsum = 0.0;
-    vec2 aot = 2.0/uRes;
-    for(int y = -1; y <= 1; y++) for(int x = -1; x <= 1; x++){
-      vec2 o = vec2(x, y)*aot;
-      float wgt = 1.0/(1.0 + abs(texture(uDepth, suv + o).r - dc)*4000.0);
-      sum += texture(uAo, suv + o).r*wgt; wsum += wgt;
+    float sum = 1.0, wsum = 1.0;
+    if(uAoOn == 1){
+      // Depth-aware 4x4 blur in half-res texels: matches the AO pass's 4x4 rotation pattern.
+      float dc = texture(uDepth, suv).r;
+      vec2 aot = 2.0/uRes;
+      sum = 0.0; wsum = 0.0;
+      for(int y = 0; y < 4; y++) for(int x = 0; x < 4; x++){
+        vec2 o = (vec2(x, y) - 1.5)*aot;
+        float wgt = 1.0/(1.0 + abs(texture(uDepth, suv + o).r - dc)*4000.0);
+        sum += texture(uAo, suv + o).r*wgt; wsum += wgt;
+      }
     }
     col *= mix(1.0, sum/wsum, 0.85);
     col += uShaftCol*texture(uAo, suv).g;
@@ -1173,6 +1183,7 @@ void Renderer::postPass(const RenderFrame& f) {
     glActiveTexture(GL_TEXTURE0);
     glUniform3f(glGetUniformLocation(progPost, "uShaftCol"), shaftCol.x, shaftCol.y, shaftCol.z);
     glUniform1i(glGetUniformLocation(progPost, "uDebug"), debugView);
+    glUniform1i(glGetUniformLocation(progPost, "uAoOn"), quality >= 2 ? 1 : 0);
     glBindVertexArray(postVao);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glEnable(GL_DEPTH_TEST);
