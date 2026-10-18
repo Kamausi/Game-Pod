@@ -503,6 +503,10 @@ void World::generate(uint32_t seed) {
                      {"skin", float(r.next() % 3) * 0.5f}, {"pants", r.uniform() < 0.25f ? 1.f : 0.f}, {"hat", r.uniform() < 0.45f ? 1.f : 0.f},
                      {"hat_r", h[0]}, {"hat_g", h[1]}, {"hat_b", h[2]}};
         if (pr["hat"] == 0.f) pr["hat_r"] = pr["hat_g"] = pr["hat_b"] = 0.f;
+        // Body language: most stand arms-down, some hands on hips, a few cheering; tees when it's warm enough.
+        float pq = r.uniform();
+        pr["pose"] = pq < 0.6f ? 0.f : (pq < 0.82f ? 2.f : 1.f);
+        pr["tee"] = pr["vest"] == 0.f && r.uniform() < 0.4f ? 1.f : 0.f;
         return pr;
     };
     // ---- Spectators along the north fence (photo 3) ----
@@ -557,7 +561,7 @@ void World::generate(uint32_t seed) {
         auto person = [&](float x, float z, float yaw, bool vest, float y = -1e9f) {
             CadParams pr = outfit(gr, true);
             if (vest) { pr["shirt_r"] = 0.95f; pr["shirt_g"] = 0.55f; pr["shirt_b"] = 0.1f; pr["vest"] = 0.f; pr["hat"] = 1.f;   // hi-vis staff
-                        pr["hat_r"] = 0.95f; pr["hat_g"] = 0.55f; pr["hat_b"] = 0.1f; }
+                        pr["hat_r"] = 0.95f; pr["hat_g"] = 0.55f; pr["hat_b"] = 0.1f; if (pr["pose"] == 1.f) pr["pose"] = 2.f; }
             props.push_back({"props/spectator.mbcad", pr, {x, y > -1e8f ? y : ground(x, z), z}, yaw, gr.range(0.94f, 1.06f)});
         };
         // Footprint collider for a building (half extents in the part's own frame).

@@ -1,5 +1,7 @@
-# Spectator / crew / staff figure: boots, jeans (or work pants), tapered torso with an
-# optional puffer vest, shoulders, bent arms with hands, neck, head with ears, hair or a cap.
+# Spectator / crew / staff figure: work boots, jeans (or tan work pants) with knees and cuffs,
+# belt, a shaped torso (shirt or tee, optional quilted puffer vest), jointed arms in one of
+# three poses, hands, neck, a face (jaw, nose, eyes, brows, ears), hair or a ball cap.
+# pose: 0 arms down, 1 cheering (right arm up), 2 hands on hips. tee: 1 = short sleeves.
 # Faces +Z. Origin between the feet.
 param shirt_r = 0.55
 param shirt_g = 0.58
@@ -11,47 +13,112 @@ param hat = 0
 param hat_r = 0.12
 param hat_g = 0.14
 param hat_b = 0.18
+param pose = 0
+param tee = 0
 set SR = 0.62+0.3*skin
 set SG = 0.44+0.28*skin
 set SB = 0.32+0.24*skin
-# Boots
-color #2a2219
+set P1 = max(0,1-abs(pose-1))
+set P2 = max(0,1-abs(pose-2))
+# arm angles from straight down (degrees, + = outward): left and right upper arm / forearm
+set aL1 = 7+26*P2
+set aL2 = 4-40*P2
+set aR1 = 7+150*P1+26*P2
+set aR2 = 4+166*P1-40*P2
+set SX = 0.205
+set SY = 1.41
+
+# ---- Boots ----
+color #2b2219
 material matte
-box size=0.11,0.09,0.26 pos=0.10,0.045,0.03 mirror=x
-# Legs (slightly apart), hips
-color 0.23+0.25*pants 0.29+0.13*pants 0.40-0.10*pants
-cyl r=0.075 r2=0.065 h=0.42 pos=0.10,0.29,0 seg=8 mirror=x
-cyl r=0.085 r2=0.075 h=0.42 pos=0.10,0.68,0 seg=8 mirror=x
-box size=0.34,0.16,0.22 pos=0,0.92,0
-# Belt
-color #1a1612
-box size=0.35,0.04,0.23 pos=0,1.00,0
-# Torso and shoulders
+box size=0.115,0.10,0.24 pos=0.10,0.05,0.02 mirror=x
+sphere r=0.058 pos=0.10,0.05,0.135 scale=1,0.85,1 seg=6 mirror=x
+color #17120d
+box size=0.12,0.025,0.28 pos=0.10,0.012,0.035 mirror=x
+# ---- Legs: thighs, knees, shins, cuffs ----
+color 0.22+0.30*pants 0.28+0.17*pants 0.40-0.12*pants
+cyl r=0.082 r2=0.072 h=0.40 pos=0.098,0.70,0 seg=8 mirror=x
+sphere r=0.072 pos=0.098,0.50,0.008 seg=6 mirror=x
+cyl r=0.068 r2=0.060 h=0.38 pos=0.098,0.30,0 seg=8 mirror=x
+cyl r=0.066 h=0.04 pos=0.098,0.115,0 seg=8 mirror=x
+# Seat / hips
+lathe seg=10 scale=1,1,0.72 pts=0,0.84,0.165,0.84,0.18,0.92,0.17,1.00,0,1.00
+# Belt and buckle
+color #1b1510
+lathe seg=10 scale=1,1,0.72 pts=0,0.985,0.176,0.985,0.176,1.03,0,1.03
+color #b8b2a2
+material steel
+box size=0.06,0.04,0.01 pos=0,1.007,0.128
+
+# ---- Torso: waist to shoulders ----
 color shirt_r shirt_g shirt_b
 material plastic
-cyl r=0.175 r2=0.20 h=0.46 pos=0,1.24,0 seg=8 scale=1,1,0.7
-sphere r=0.08 pos=0.19,1.44,0 seg=8 mirror=x
-# Puffer vest over the shirt
+lathe seg=10 scale=1,1,0.66 pts=0,1.0,0.165,1.0,0.172,1.10,0.19,1.26,0.205,1.36,0.19,1.43,0.12,1.475,0,1.48
+# shoulders
+sphere r=0.075 pos=SX,SY,0 seg=8 mirror=x
+# collar
+color shirt_r*0.85 shirt_g*0.85 shirt_b*0.85
+cyl r=0.065 r2=0.06 h=0.04 pos=0,1.485,0.005 seg=8
+# ---- Quilted puffer vest (vest=0 shrinks it away) ----
 color #1b1d22
-cyl r=0.20*vest r2=0.215*vest h=0.42*vest pos=0,1.25,0 seg=8 scale=1,1,0.74
-box size=0.30*vest,0.012,0.005 pos=0,1.18,0.155 
-box size=0.30*vest,0.012,0.005 pos=0,1.30,0.155
-# Arms: upper arm down, forearm angled forward, hands
+lathe seg=10 scale=vest,vest,0.70*vest pts=0,1.02,0.185,1.02,0.20,1.14,0.212,1.28,0.208,1.40,0.13,1.45,0,1.45
+color #121418
+for q = 0, 1
+  lathe seg=10 scale=vest,vest,0.71*vest pts=0.19+q*0.006,1.14+q*0.13,0.20+q*0.004,1.145+q*0.13,0.20+q*0.004,1.155+q*0.13,0.19+q*0.006,1.16+q*0.13
+end
+color #8a8f96
+material steel
+box size=0.008*vest,0.40*vest,0.006 pos=0,1.235,0.14
+
+# ---- Arms (sleeves, cuffs, hands) ----
+material plastic
 color shirt_r shirt_g shirt_b
-cyl r=0.055 r2=0.05 h=0.30 pos=0.22,1.28,0.0 rot=0,0,6 seg=8 mirror=x
-cyl r=0.048 r2=0.042 h=0.27 pos=0.235,1.02,0.035 rot=16,0,4 seg=8 mirror=x
+# left (+X side is the figure's left)
+cyl r=0.056 r2=0.05 h=0.30 pos=SX+0.15*sin(aL1),SY-0.15*cos(aL1),0 rot=0,0,aL1 seg=8
+# right (-X)
+cyl r=0.056 r2=0.05 h=0.30 pos=-SX-0.15*sin(aR1),SY-0.15*cos(aR1),0 rot=0,0,-aR1 seg=8
+sphere r=0.05 pos=SX+0.30*sin(aL1),SY-0.30*cos(aL1),0 seg=7
+sphere r=0.05 pos=-SX-0.30*sin(aR1),SY-0.30*cos(aR1),0 seg=7
+# forearms: shirt sleeves, or bare skin for a tee
+color shirt_r*(1-tee)+SR*tee shirt_g*(1-tee)+SG*tee shirt_b*(1-tee)+SB*tee
+cyl r=0.047 r2=0.04 h=0.26 pos=SX+0.30*sin(aL1)+0.13*sin(aL2),SY-0.30*cos(aL1)-0.13*cos(aL2),0.02 rot=0,0,aL2 seg=8
+cyl r=0.047 r2=0.04 h=0.26 pos=-SX-0.30*sin(aR1)-0.13*sin(aR2),SY-0.30*cos(aR1)-0.13*cos(aR2),0.02 rot=0,0,-aR2 seg=8
+# tee sleeve hem on the upper arm
+color shirt_r*0.9 shirt_g*0.9 shirt_b*0.9
+cyl r=0.06*tee h=0.03 pos=SX+0.24*sin(aL1),SY-0.24*cos(aL1),0 rot=0,0,aL1 seg=8
+cyl r=0.06*tee h=0.03 pos=-SX-0.24*sin(aR1),SY-0.24*cos(aR1),0 rot=0,0,-aR1 seg=8
+# hands (mitts with a thumb)
 color SR SG SB
 material matte
-sphere r=0.045 pos=0.24,0.88,0.07 seg=8 mirror=x
-# Neck, head, ears, nose
-cyl r=0.05 h=0.08 pos=0,1.50,0 seg=8
-sphere r=0.105 pos=0,1.61,0.0 scale=0.92,1.08,1 seg=9
-sphere r=0.025 pos=0.095,1.61,-0.005 seg=6 mirror=x
-sphere r=0.018 pos=0,1.60,0.10 seg=6
-# Hair (no hat) or a ball cap with a brim
+sphere r=0.046 pos=SX+0.30*sin(aL1)+0.29*sin(aL2),SY-0.30*cos(aL1)-0.29*cos(aL2),0.025 scale=0.8,1.15,0.95 seg=7
+sphere r=0.046 pos=-SX-0.30*sin(aR1)-0.29*sin(aR2),SY-0.30*cos(aR1)-0.29*cos(aR2),0.025 scale=0.8,1.15,0.95 seg=7
+sphere r=0.018 pos=SX+0.30*sin(aL1)+0.27*sin(aL2),SY-0.30*cos(aL1)-0.27*cos(aL2),0.06 seg=5
+sphere r=0.018 pos=-SX-0.30*sin(aR1)-0.27*sin(aR2),SY-0.30*cos(aR1)-0.27*cos(aR2),0.06 seg=5
+
+# ---- Neck and head ----
+cyl r=0.048 r2=0.045 h=0.09 pos=0,1.52,0 seg=8
+# skull and jaw
+sphere r=0.102 pos=0,1.635,-0.005 scale=0.92,1.06,1 seg=8
+sphere r=0.078 pos=0,1.585,0.025 scale=1,0.85,1 seg=8
+# ears, nose
+sphere r=0.024 pos=0.093,1.625,-0.008 scale=0.5,1,0.8 seg=6 mirror=x
+sphere r=0.019 pos=0,1.615,0.105 scale=0.9,1.2,1 seg=6
+# eyes, brows, mouth
+color #1a1410
+sphere r=0.011 pos=0.034,1.648,0.091 seg=5 mirror=x
 color #3a2a1e
-sphere r=0.108*(1-hat) pos=0,1.655,-0.012 scale=0.97,0.62,1.02 seg=9
+box size=0.04,0.009,0.012 pos=0.035,1.672,0.092 rot=0,0,-6 mirror=x
+color SR*0.7 SG*0.55 SB*0.55
+box size=0.042,0.007,0.01 pos=0,1.568,0.094
+
+# ---- Hair (no hat) or a ball cap with a curved brim ----
+color #3a2a1e
+sphere r=0.108*(1-hat) pos=0,1.67,-0.014 scale=0.97,0.66,1.03 seg=8
+box size=0.016*(1-hat),0.05*(1-hat),0.03 pos=0.092,1.635,0.025 mirror=x
+sphere r=0.09*(1-hat) pos=0,1.62,-0.05 scale=1.05,0.9,0.85 seg=8
 color hat_r hat_g hat_b
 material plastic
-sphere r=0.112*hat pos=0,1.665,-0.005 scale=1,0.55,1 seg=9
-box size=0.17*hat,0.012,0.11*hat pos=0,1.675,0.13 rot=-8,0,0
+sphere r=0.113*hat pos=0,1.675,-0.008 scale=1,0.62,1.02 seg=8
+extrude depth=0.19*hat pts=0.09,1.676,0.21,1.660,0.215,1.652,0.09,1.668
+color hat_r*0.75 hat_g*0.75 hat_b*0.75
+sphere r=0.012*hat pos=0,1.745,-0.008 seg=5
