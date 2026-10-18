@@ -148,3 +148,5 @@ cyl r=0.007 h=1.60 pos=-0.62,1.20,-0.78 seg=4
 color #f06010
 material matte
 extrude depth=0.004 pts=0,0,0.30,-0.07,0,-0.18 rot=0,90,0 pos=-0.62,2.0,-0.78
+# Driver in the left seat
+use vehicles/driver.mbcad dx=0.33 sy=0.31 sz=-0.15 bz=-0.66 wy=0.66 wzz=0.12 ry=1.40 suit_r=0.12 suit_g=0.30 suit_b=0.75

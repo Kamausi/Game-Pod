@@ -1,0 +1,10 @@
+# Shock / coilover body: anodized can with a remote reservoir and spring perch, 0.36 m long from
+# the origin along +Z (the upper mount). The shaft part slides out of its far end.
+color #c8a020
+material steel
+cyl r=0.03 h=0.04 axis=x seg=8
+cyl r=0.032 h=0.34 axis=z pos=0,0,0.19 seg=10
+color #1a1a1a
+cyl r=0.05 h=0.02 axis=z pos=0,0,0.07 seg=12
+color #c8a020
+cyl r=0.022 h=0.16 axis=z pos=0.05,0,0.12 seg=8

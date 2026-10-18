@@ -91,3 +91,5 @@ box size=2.02,0.24,0.18 pos=0,0.0,2.99 bevel=0.02
 box size=1.96,0.22,0.16 pos=0,0.0,-3.16 bevel=0.02
 box size=0.08,0.08,2.30 pos=W/2+0.01,-0.18,0.10 bevel=0.03 mirror=x
 box size=0.12,0.16,5.0 pos=0.55,-0.21,-0.30 mirror=x
+# Cab interior and driver (seen through the glass)
+use vehicles/interior.mbcad W=1.84 bl=0.60 wz=1.20 bz=-1.08 ry=1.03

@@ -27,6 +27,151 @@ void VehicleVisual::build(Renderer& r, const VehicleConfig& c) {
                                           {"depth", c.tread == Tread::AllTerrain ? 0.018f : 0.028f},
                                           {"tread", float(int(c.tread))},
                                           {"beadlock", c.beadlock ? 1.f : 0.f}});
+    bool big = c.tireIn >= 50, small = c.body == "utv" || c.body == "atv";
+    axleTube = r.mesh("gear/axle_tube.mbcad", {{"r", big ? 0.07f : 0.045f}});
+    pumpkin = r.mesh("gear/pumpkin.mbcad", {{"s", big ? 1.5f : 1.f}});
+    knuckle[0] = r.mesh("gear/knuckle.mbcad", {{"side", 1.f}});
+    knuckle[1] = r.mesh("gear/knuckle.mbcad", {{"side", -1.f}});
+    rod = r.mesh("gear/rod.mbcad", {{"r", big ? 0.04f : (small ? 0.016f : 0.025f)}});
+    rodThin = r.mesh("gear/rod.mbcad", {{"r", small ? 0.011f : 0.016f}});
+    cvShaft = r.mesh("gear/rod.mbcad", {{"r", 0.014f}, {"tone", 0.6f}});
+    yoke = r.mesh("gear/yoke.mbcad");
+    float col = c.body == "megatruck" ? 1.f : (c.body == "bogcar76" || c.body == "squarebody" ? 2.f : 0.f);
+    coil = r.mesh("gear/coil.mbcad", {{"r", big ? 0.10f : (small ? 0.045f : 0.065f)}, {"col", col}});
+    shockBody = r.mesh("gear/shock_body.mbcad");
+    shockShaft = r.mesh("gear/shock_shaft.mbcad");
+}
+
+namespace {
+// Rotation taking +Z onto direction d (unit).
+Quat zTo(Vec3 d) {
+    Vec3 z{0, 0, 1};
+    float c = dot(z, d);
+    if (c > 0.9999f) return Quat{};
+    if (c < -0.9999f) return Quat::axisAngle({0, 1, 0}, PI);
+    return Quat::axisAngle(cross(z, d), std::acos(clampf(c, -1.f, 1.f)));
+}
+}  // namespace
+
+// Axles, driveshafts, links, coilovers, steering and brakes between the body and the wheels,
+// rebuilt every frame from the live wheel positions so they articulate with the suspension.
+void Game::addRunningGear(RenderFrame& f, const Vehicle& g, const VehicleVisual& vis, Vec3 pos, Quat rot, const Vec3* wc,
+                          float steer, float dirt, float alpha) {
+    if (!vis.rod) return;
+    auto item = [&](const GpuMesh* m, Vec3 p, Quat q, Vec3 s = {1, 1, 1}) {
+        DrawItem it;
+        it.mesh = m;
+        it.model = Mat4::trs(pos + rot.rotate(p), rot * q, s);
+        it.dirt = clampf(dirt * 1.7f + 0.2f, 0.f, 1.f);
+        it.dirtLo = -0.25f;
+        it.dirtHi = 0.25f;
+        it.alpha = alpha;
+        it.seed = 11.f;
+        f.items.push_back(it);
+    };
+    // Stretch a unit-length (+Z) part from a to b (body space).
+    auto span = [&](const GpuMesh* m, Vec3 a, Vec3 b) {
+        Vec3 d = b - a;
+        float L = length(d);
+        if (L < 1e-3f) return;
+        item(m, a, zTo(d / L), {1, 1, L});
+    };
+    // Shock: body from the upper mount toward the lower, shaft from the lower toward the upper,
+    // with the coil stretched between perches.
+    auto shock = [&](Vec3 top, Vec3 bot) {
+        Vec3 d = bot - top;
+        float L = length(d);
+        if (L < 1e-3f) return;
+        Vec3 u = d / L;
+        item(vis.shockBody, top, zTo(u));
+        item(vis.shockShaft, bot, zTo(-u));
+        span(vis.coil, top + u * 0.07f, bot - u * 0.06f);
+    };
+    int fl = -1, fr = -1, rl = -1, rr = -1;
+    for (int i = 0; i < 4; i++) {
+        const WheelState& w = g.wheels[size_t(i)];
+        (w.front ? (w.left ? fl : fr) : (w.left ? rl : rr)) = i;
+    }
+    if (fl < 0 || fr < 0 || rl < 0 || rr < 0) return;
+    float belly = g.body->bellyY;
+    Vec3 tcase{0, belly + 0.02f, 0.5f * (wc[fl].z + wc[rl].z) + 0.1f};
+    float pumpS = g.wheels[size_t(fl)].radius > 0.6f ? 1.5f : 1.f;
+    bool awd = g.body->default4wd;
+    if (g.independent()) {
+        // IFS/IRS: double A-arms, CV half-shafts, coilovers onto the lower arms, front tie rods.
+        for (int i : {fl, fr, rl, rr}) {
+            const WheelState& w = g.wheels[size_t(i)];
+            float sx = w.left ? 1.f : -1.f;
+            Vec3 c = wc[i], hub = c - Vec3{sx * 0.13f, 0, 0};
+            Vec3 lowIn = {sx * 0.20f, c.y - 0.06f, c.z}, upIn = {sx * 0.24f, c.y + 0.16f, c.z};
+            Vec3 lowOut = hub + Vec3{0, -0.07f, 0}, upOut = hub + Vec3{0, 0.10f, 0};
+            for (float dz : {-0.16f, 0.16f}) {
+                span(vis.rod, lowIn + Vec3{0, 0, dz}, lowOut);
+                span(vis.rodThin, upIn + Vec3{0, 0, dz}, upOut);
+            }
+            span(vis.cvShaft, Vec3{sx * 0.12f, c.y, c.z}, hub);
+            item(vis.knuckle[w.left ? 0 : 1], hub, Quat::axisAngle({0, 1, 0}, w.front ? steer : 0.f));
+            Vec3 armMid = (lowIn + lowOut) * 0.5f;
+            shock(Vec3{sx * 0.26f, c.y + 0.50f, c.z - 0.04f}, armMid + Vec3{0, 0.03f, 0});
+            if (w.front) span(vis.rodThin, Vec3{sx * 0.14f, c.y + 0.02f, c.z - 0.12f},
+                              hub + Quat::axisAngle({0, 1, 0}, steer).rotate({0, 0.02f, -0.12f}));
+        }
+        span(vis.rod, Vec3{0.12f, wc[rl].y, wc[rl].z}, Vec3{-0.12f, wc[rr].y, wc[rr].z});   // diff stubs
+        return;
+    }
+    // Solid axles front and rear.
+    for (int end = 0; end < 2; end++) {
+        int l = end == 0 ? fl : rl, r = end == 0 ? fr : rr;
+        bool front = end == 0;
+        Vec3 cl = wc[l], cr = wc[r];
+        Vec3 axis = cl - cr;
+        float span2 = length(axis);
+        if (span2 < 0.2f) continue;
+        Vec3 ax = axis / span2;
+        float inset = g.wheels[size_t(l)].width * 0.5f + 0.06f;
+        Vec3 kl = cl - ax * inset, kr = cr + ax * inset, mid = (kl + kr) * 0.5f;
+        // tube: unit length along X -> rotate X onto the axle direction (roll only)
+        Quat roll = Quat::axisAngle({0, 0, 1}, std::atan2(ax.y, ax.x));
+        item(vis.axleTube, mid, roll, {length(kl - kr), 1, 1});
+        bool driven = !front || awd;
+        Vec3 pumpPos = mid + ax * (front ? -0.12f : 0.f);
+        if (driven) {
+            Vec3 pin = tcase - pumpPos;
+            pin.x = 0;
+            float pl = length(pin);
+            Vec3 pd = pl > 1e-3f ? pin / pl : Vec3{0, 0, front ? -1.f : 1.f};
+            item(vis.pumpkin, pumpPos, zTo(pd));
+            Vec3 yokeA = pumpPos + pd * (0.29f * pumpS), yokeB = tcase + Vec3{front ? 0.08f : 0.f, 0, front ? 0.12f : -0.12f};
+            Vec3 sd = yokeB - yokeA;
+            float sl = length(sd);
+            if (sl > 0.1f) {
+                Vec3 su = sd / sl;
+                item(vis.yoke, yokeA, zTo(su));
+                item(vis.yoke, yokeB, zTo(-su));
+                span(vis.cvShaft, yokeA + su * 0.06f, yokeB - su * 0.06f);
+            }
+        }
+        item(vis.knuckle[0], kl, Quat::axisAngle({0, 1, 0}, front ? steer : 0.f));
+        item(vis.knuckle[1], kr, Quat::axisAngle({0, 1, 0}, front ? steer : 0.f));
+        // Links: two per side running toward the middle of the truck (4-link), panhard-ish track bar.
+        float zIn = front ? -0.85f : 0.85f;
+        for (float s : {1.f, -1.f}) {
+            Vec3 onAxle = mid + ax * (s * (span2 * 0.5f - inset - 0.18f));
+            Vec3 frame = {s * 0.42f, belly + 0.02f, onAxle.z + zIn};
+            span(vis.rod, onAxle + Vec3{0, -0.08f, 0}, frame + Vec3{0, -0.05f, 0});
+            span(vis.rodThin, onAxle + Vec3{0, 0.09f, 0}, frame + Vec3{0, 0.08f, zIn * -0.15f});
+            // Coilover from a frame tower down to the axle, just inside the tire.
+            Vec3 lower = mid + ax * (s * (span2 * 0.5f - inset - 0.10f)) + Vec3{0, 0.05f, front ? 0.10f : -0.10f};
+            Vec3 upper = Vec3{lower.x * 0.85f, g.wheels[size_t(s > 0 ? l : r)].mount.y + 0.10f, lower.z + (front ? 0.06f : -0.06f)};
+            shock(upper, lower);
+        }
+        span(vis.rodThin, kr + Vec3{0, 0.06f, 0}, Vec3{0.38f, belly + 0.05f, mid.z + (front ? 0.08f : -0.08f)});   // track bar
+        if (front) {
+            Quat sq = Quat::axisAngle({0, 1, 0}, steer);
+            span(vis.rod, kl + sq.rotate({0, -0.03f, -0.16f}), kr + sq.rotate({0, -0.03f, -0.16f}));    // tie rod
+            span(vis.rodThin, kl + sq.rotate({0, 0.10f, -0.10f}), Vec3{0.40f, belly + 0.10f, mid.z + 0.30f});   // drag link
+        }
+    }
 }
 
 double Game::serverNow() const { return emscripten_get_now() / 1000.0 + clockOffset; }
@@ -537,6 +682,7 @@ void Game::addVehicleDraws(RenderFrame& f, const Vehicle& g, const VehicleVisual
     body.dirtHi = g.body->dims[1] * 0.75f;
     body.alpha = alpha;
     body.seed = float(uintptr_t(&g) % 97);
+    body.glass = true;
     for (int i = 0; i < 4; i++) {
         const WheelState& w = g.wheels[size_t(i)];
         Vec3 c = w.mount - Vec3{0, g.travel - comp[i], 0};
@@ -544,6 +690,11 @@ void Game::addVehicleDraws(RenderFrame& f, const Vehicle& g, const VehicleVisual
         o[0] = c.x; o[1] = c.y; o[2] = c.z; o[3] = w.radius;
     }
     f.items.push_back(body);
+    {
+        Vec3 wc[4];
+        for (int i = 0; i < 4; i++) wc[i] = g.wheels[size_t(i)].mount - Vec3{0, g.travel - comp[i], 0};
+        addRunningGear(f, g, vis, pos, rot, wc, steer, dirt, alpha);
+    }
     // Soft contact shadow on the ground, fading out as the truck gets air.
     if (alpha >= 0.99f) {
         Vec3 fw = rot.rotate({0, 0, 1});

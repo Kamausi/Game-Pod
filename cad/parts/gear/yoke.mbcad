@@ -1,0 +1,6 @@
+# U-joint yoke and cross for driveshaft ends (unscaled; sits at each end of a shaft, along Z).
+color #2a2a2a
+material steel
+cyl r=0.045 h=0.06 axis=z seg=10
+box size=0.10,0.022,0.03 pos=0,0,0.04
+box size=0.022,0.10,0.03 pos=0,0,0.06

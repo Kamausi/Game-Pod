@@ -1,0 +1,94 @@
+# Cab interior shared by the trucks (seen through the glass): carpeted floor, dash with a gauge
+# cluster and centre stack, steering column and wheel, bucket seats with headrests, centre
+# console with shifter and transfer-case lever, roll-bar hoop behind the seats, rear-view mirror,
+# and a helmeted driver at the wheel (left-hand drive: +X is the driver's side).
+# Placed by each body with: use vehicles/interior.mbcad W=.. bl=.. wz=.. bz=.. ry=..
+param W = 1.60        # inner cab width
+param bl = 0.48       # beltline (bottom of the side glass)
+param wz = 0.50       # windshield base (front of the cab)
+param bz = -0.76      # back wall of the cab
+param ry = 0.92       # underside of the roof
+param driver = 1
+param suit_r = 0.85
+param suit_g = 0.22
+param suit_b = 0.10
+set fy = bl-0.58      # floor
+set sz = bz+0.42      # seat cushion centre
+set sy = bl-0.30      # seat cushion top
+set dx = W*0.24       # seat centre offset from the middle
+set wy = bl+0.07      # steering wheel centre height
+set wzz = wz-0.42     # steering wheel z
+# Floor and transmission tunnel
+color #1d1d1d
+material matte
+box size=W,0.03,wz-bz pos=0,fy,(wz+bz)/2
+box size=0.30,0.16,wz-bz-0.1 pos=0,fy+0.08,(wz+bz)/2+0.05
+# Back wall trim
+color #232323
+box size=W,bl-fy+0.2,0.03 pos=0,(bl+fy)/2+0.1,bz+0.03
+# Dash: top pad, face, gauge cluster, centre stack with a screen and switches
+color #1a1a1a
+box size=W,0.10,0.34 pos=0,bl+0.0,wz-0.17 bevel=0.03
+box size=W-0.04,0.24,0.06 pos=0,bl-0.16,wz-0.33 rot=-12,0,0
+color #0c0c0c
+box size=0.36,0.13,0.03 pos=dx,bl-0.05,wz-0.355 rot=-12,0,0
+color #f0f6ff
+material lens
+cyl r=0.04 h=0.01 axis=z pos=dx-0.08,bl-0.05,wz-0.37 rot=-12,0,0 seg=12
+cyl r=0.04 h=0.01 axis=z pos=dx+0.08,bl-0.05,wz-0.37 rot=-12,0,0 seg=12
+color #3aa0ff
+box size=0.16,0.09,0.01 pos=0,bl-0.10,wz-0.37 rot=-12,0,0
+color #222222
+material plastic
+box size=0.20,0.32,0.08 pos=0,bl-0.30,wz-0.33
+color #c41a1a
+for k = 0, 3
+  box size=0.02,0.025,0.012 pos=-0.06+k*0.04,bl-0.22,wz-0.375
+end
+# Steering column and wheel (driver side)
+color #1e1e1e
+material steel
+cyl r=0.03 h=0.38 pos=dx,bl-0.08,wz-0.24 rot=-62,0,0 seg=8
+color #111111
+material rubber
+lathe seg=18 axis=z pos=dx,wy,wzz rot=-28,0,0 pts=0.165,-0.012,0.185,-0.012,0.185,0.012,0.165,0.012
+color #222222
+material plastic
+cyl r=0.05 h=0.03 axis=z pos=dx,wy,wzz rot=-28,0,0 seg=10
+box size=0.30,0.025,0.02 pos=dx,wy,wzz rot=-28,0,0
+# Bucket seats: cushion with bolsters, reclined back, headrest
+color #262626
+material matte
+for s = -1, 1, 2
+  box size=0.46,0.10,0.48 pos=s*dx,sy,sz bevel=0.03
+  box size=0.07,0.14,0.46 pos=s*dx+0.21,sy+0.05,sz bevel=0.02
+  box size=0.07,0.14,0.46 pos=s*dx-0.21,sy+0.05,sz bevel=0.02
+  box size=0.46,0.62,0.10 pos=s*dx,sy+0.33,bz+0.16 rot=-12,0,0 bevel=0.03
+  box size=0.26,0.14,0.08 pos=s*dx,min(sy+0.62,ry-0.22),bz+0.12 rot=-12,0,0 bevel=0.03
+  box size=0.04,0.40,0.012 pos=s*dx+0.10,sy+0.35,bz+0.215 rot=-12,0,0
+  box size=0.04,0.40,0.012 pos=s*dx-0.10,sy+0.35,bz+0.215 rot=-12,0,0
+end
+# Centre console, shifter, transfer-case lever
+color #1c1c1c
+box size=0.22,0.14,0.50 pos=0,sy,sz+0.05 bevel=0.02
+color #2a2a2a
+material steel
+cyl r=0.01 h=0.26 pos=0,sy+0.18,sz+0.25 rot=12,0,0 seg=6
+cyl r=0.01 h=0.22 pos=0.07,sy+0.15,sz+0.30 rot=18,0,0 seg=6
+color #111111
+material plastic
+sphere r=0.03 pos=0,sy+0.31,sz+0.28 seg=8
+color #e8a020
+sphere r=0.025 pos=0.07,sy+0.26,sz+0.34 seg=8
+# Roll-bar hoop behind the seats
+color #151515
+material steel
+cyl r=0.028 h=ry-fy-0.08 pos=W/2-0.10,(ry+fy)/2-0.04,bz+0.07 seg=8 mirror=x
+cyl r=0.028 h=W-0.20 axis=x pos=0,ry-0.10,bz+0.07 seg=8
+cyl r=0.024 h=1.0 pos=0,(ry+fy)/2,bz+0.07 rot=0,0,48 seg=8
+# Rear-view mirror at the top of the windshield
+color #1a1a1a
+material plastic
+box size=0.22,0.06,0.02 pos=0,ry-0.10,wz-0.40 bevel=0.01
+# Driver
+use vehicles/driver.mbcad dx=dx sy=sy sz=sz bz=bz wy=wy wzz=wzz ry=ry driver=driver suit_r=suit_r suit_g=suit_g suit_b=suit_b

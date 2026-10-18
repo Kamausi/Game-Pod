@@ -22,6 +22,9 @@ enum class AppState : int { Attract = 0, Garage = 1, Playing = 2, Paused = 3 };
 struct VehicleVisual {
     const GpuMesh* body = nullptr;
     const GpuMesh* wheel = nullptr;
+    // Running gear drawn live between the body and the wheels (follows the suspension).
+    const GpuMesh *axleTube = nullptr, *pumpkin = nullptr, *knuckle[2] = {nullptr, nullptr}, *rod = nullptr, *rodThin = nullptr,
+                  *yoke = nullptr, *coil = nullptr, *shockBody = nullptr, *shockShaft = nullptr, *cvShaft = nullptr;
     void build(Renderer& r, const VehicleConfig& c);
 };
 
@@ -89,6 +92,8 @@ private:
     float freeFov = 0.87f;
     bool freeShowPlayer = false;
     float photoYaw = 150, photoDist = 7, photoH = 2.5f;  // turntable in the garage; photo-mode camyaw: stops it
+    void addRunningGear(RenderFrame& f, const Vehicle& g, const VehicleVisual& vis, Vec3 pos, Quat rot, const Vec3* wc,
+                        float steer, float dirt, float alpha);
     void addVehicleDraws(RenderFrame& f, const Vehicle& geom, const VehicleVisual& vis, Vec3 pos, Quat rot,
                          const float* comp, const float* spin, float steer, float dirt, float alpha);
 

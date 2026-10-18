@@ -1,0 +1,17 @@
+# Differential centre section: ribbed housing, bolted cover facing -Z (rear), pinion snout and
+# yoke toward +Z (the game turns it so the pinion points at the driveshaft). s = size scale.
+param s = 1
+color #202020
+material steel
+sphere r=0.15*s scale=1.05,1,0.85 seg=12
+cyl r=0.075*s r2=0.06*s h=0.16*s axis=z pos=0,-0.01*s,0.17*s seg=10
+color #2e2e2e
+cyl r=0.135*s h=0.035*s axis=z pos=0,0,-0.12*s seg=16
+color #8a8a86
+material chrome
+for k = 0, 9
+  cyl r=0.008*s h=0.015*s axis=z pos=0.115*s*sin(k*36),0.115*s*cos(k*36),-0.14*s seg=6
+end
+color #3a3a3a
+material steel
+box size=0.11*s,0.04*s,0.05*s pos=0,0,0.27*s

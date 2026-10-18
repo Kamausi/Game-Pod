@@ -128,3 +128,5 @@ cyl r=0.055 h=0.06 seg=14 pos=0.62,0.20,-0.80 mirror=x
 color #141414
 material matte
 cyl r=0.045 h=0.01 seg=14 pos=0.62,1.505,-0.80 mirror=x
+# Cab interior and driver (seen through the glass)
+use vehicles/interior.mbcad W=1.80 bl=0.545 wz=0.52 bz=-0.60 ry=0.92

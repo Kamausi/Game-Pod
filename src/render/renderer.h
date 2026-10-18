@@ -19,6 +19,7 @@ struct DrawItem {
     float dirtLo = -0.5f, dirtHi = 1.2f;  // local-space Y range the mud line sweeps over
     float alpha = 1;
     float seed = 0;
+    bool glass = false;      // has see-through glass (vehicle bodies): glass drawn blended, last
     bool mirror = false;
     float wheels[16] = {0};  // body items: wheel centers in body space (x, y, z, radius)
     float tireR = 0;         // wheel items: outer tread radius (mud packs below it)

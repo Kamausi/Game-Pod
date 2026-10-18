@@ -1,0 +1,8 @@
+# Shock shaft: chrome rod 0.40 m from the origin (lower mount eye) along +Z, with a lower perch.
+color #d8d8d2
+material chrome
+cyl r=0.012 h=0.40 axis=z pos=0,0,0.20 seg=8
+color #2a2a2a
+material steel
+cyl r=0.03 h=0.04 axis=x seg=8
+cyl r=0.05 h=0.02 axis=z pos=0,0,0.06 seg=12

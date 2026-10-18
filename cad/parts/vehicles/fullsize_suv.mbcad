@@ -123,3 +123,5 @@ box size=0.04,0.08,0.04 pos=0.58,1.08,-0.02 mirror=x
 color #e6eef2
 material lens
 box size=1.28,0.06,0.02 pos=0,1.13,0.035
+# Cab interior and driver (seen through the glass)
+use vehicles/interior.mbcad W=1.80 bl=0.56 wz=0.45 bz=-0.75 ry=0.95

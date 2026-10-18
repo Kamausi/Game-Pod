@@ -1,0 +1,35 @@
+# Seated driver in a race suit and full-face helmet, hands on the wheel. Placed by the interior
+# part (trucks) or directly by open vehicles. dx: seat x, sy: cushion top, sz: cushion centre z,
+# bz: seat-back base z, wy / wzz: steering wheel centre y / z, ry: roof underside (helmet stays under it).
+param dx = 0.38
+param sy = 0.18
+param sz = -0.34
+param bz = -0.76
+param wy = 0.55
+param wzz = 0.08
+param ry = 0.9
+param driver = 1
+param suit_r = 0.85
+param suit_g = 0.22
+param suit_b = 0.10
+# ---- Driver: race suit, gloves on the wheel, full-face helmet with a dark visor ----
+set hy = min(sy+0.64,ry-0.16)   # helmet centre, kept under the roof
+color suit_r suit_g suit_b
+material matte
+box size=0.36*driver,0.12,0.40 pos=dx,sy+0.10,sz+0.06 bevel=0.04
+box size=0.34*driver,hy-sy-0.18,0.20 pos=dx,(sy+hy-0.14)/2+0.02,bz+0.24 rot=-10,0,0 bevel=0.05
+cyl r=0.06*driver h=0.40 pos=dx+0.10,sy+0.06,sz+0.30 rot=80,0,0 seg=8
+cyl r=0.06*driver h=0.40 pos=dx-0.10,sy+0.06,sz+0.30 rot=80,0,0 seg=8
+cyl r=0.045*driver h=0.42 pos=dx+0.16,(hy-0.22+wy)/2,(bz+0.26+wzz)/2 rot=-62,0,8 seg=8
+cyl r=0.045*driver h=0.42 pos=dx-0.16,(hy-0.22+wy)/2,(bz+0.26+wzz)/2 rot=-62,0,-8 seg=8
+color #111111
+sphere r=0.042*driver pos=dx+0.15,wy+0.03,wzz+0.03 seg=6
+sphere r=0.042*driver pos=dx-0.15,wy+0.03,wzz+0.03 seg=6
+color #f2f2ee
+material paint
+sphere r=0.13*driver pos=dx,hy,bz+0.22 scale=0.95,1.05,1.05 seg=10
+color suit_r suit_g suit_b
+box size=0.05*driver,0.02,0.24 pos=dx,hy+0.13,bz+0.22
+color #0a0e14
+material glass
+box size=0.19*driver,0.07,0.02 pos=dx,hy,bz+0.35 rot=-8,0,0 bevel=0.01

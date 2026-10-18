@@ -1,0 +1,8 @@
+# Solid-axle housing tube, unit length along X (the game stretches it between the knuckles),
+# with a weld seam and a truss plate along the top. r = tube radius.
+param r = 0.045
+color #1e1e1e
+material steel
+cyl r=r h=1 axis=x seg=12
+color #2a2a2a
+box size=0.80,0.025,r*1.1 pos=0,r+0.008,0

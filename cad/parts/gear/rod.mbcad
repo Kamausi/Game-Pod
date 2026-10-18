@@ -1,0 +1,7 @@
+# Unit-length bar along +Z from the origin (links, tie rods, A-arm legs, driveshaft tubes): the
+# game stretches it to length. r = radius, tone = 0 black steel, 1 bright (chrome / alloy).
+param r = 0.025
+param tone = 0
+color 0.12+0.6*tone 0.12+0.6*tone 0.12+0.58*tone
+material steel
+cyl r=r h=1 axis=z pos=0,0,0.5 seg=8

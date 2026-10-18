@@ -390,9 +390,12 @@ in vec3 vWorld; in vec3 vN; in vec3 vColor; in vec3 vLocal; in vec3 vLocalN; fla
 uniform float uDirtU; uniform vec2 uDirtRange; uniform float uAlpha; uniform float uSeed; uniform int uMirror;
 uniform vec4 uWheels[4];   // body: wheel centers in body space (x, y, z, radius); w = 0 unused
 uniform float uTireR;      // wheel items: outer tread radius, 0 otherwise
+uniform int uGlass;        // 0 draw everything, 1 skip glass (opaque pass), 2 glass only (blended pass)
 out vec4 frag;
 float mudHeight(vec3 q){ return fbm2(q.xz*7.0 + q.y*5.0 + uSeed) * 0.7 + vnoise(q.zy*23.0 + q.x*9.0)*0.3; }
 void main(){
+  if(uGlass == 1 && vMat == 2) discard;
+  if(uGlass == 2 && vMat != 2) discard;
   float uDirt = max(uDirtU, vInstDirt);
   vec3 alb = pow(clamp(vColor, 0.0, 1.0), vec3(2.2));
   vec3 n = normalize(vN);
@@ -506,7 +509,13 @@ void main(){
     vec3 V1 = normalize(uCamPos - vWorld);
     c += alb*kSun*pow(max(dot(-V1, uSunDir), 0.0), 3.0)*0.55*sh;
   }
-  frag = vec4(finalize(c, vWorld), uAlpha);
+  float outA = uAlpha;
+  if(uGlass == 2){
+    // Tinted see-through glass: more opaque at grazing angles and where mud films it.
+    float NoV = abs(dot(n, normalize(uCamPos - vWorld)));
+    outA = clamp(0.50 + 0.45*pow(1.0 - NoV, 3.0) + 0.6*m, 0.0, 0.97)*uAlpha;
+  }
+  frag = vec4(finalize(c, vWorld), outA);
 }
 )";
 
@@ -1415,7 +1424,9 @@ void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool sha
     GLint locRange = glGetUniformLocation(prog, "uDirtRange"), locAlpha = glGetUniformLocation(prog, "uAlpha");
     GLint locSeed = glGetUniformLocation(prog, "uSeed"), locMirror = glGetUniformLocation(prog, "uMirror");
     GLint locWheels = glGetUniformLocation(prog, "uWheels"), locTire = glGetUniformLocation(prog, "uTireR");
+    GLint locGlass = glGetUniformLocation(prog, "uGlass");
     const float noWheels[16] = {0};
+    glUniform1i(locGlass, 0);
     glUniform1i(locMirror, 0);
     glUniform4fv(locWheels, 4, noWheels);
     glUniform1f(locTire, 0.f);
@@ -1436,6 +1447,14 @@ void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool sha
             itemUniforms(it);
             drawMesh(*it.mesh, 1);
         }
+        // Vehicle glass last, blended over the cab interiors drawn in the opaque pass.
+        glUniform1i(locGlass, 2);
+        for (const DrawItem& it : f.items) {
+            if (!it.mesh || !it.glass || it.alpha < 0.99f) continue;
+            itemUniforms(it);
+            drawMesh(*it.mesh, 1);
+        }
+        glUniform1i(locGlass, 0);
         glUniform1i(locMirror, 0);
         glUniform4fv(locWheels, 4, noWheels);
         glUniform1f(locTire, 0.f);
@@ -1475,8 +1494,10 @@ void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool sha
         if (!it.mesh) continue;
         if (it.alpha < 0.99f) continue;  // drawn in the transparent pass
         itemUniforms(it);
+        glUniform1i(locGlass, (it.glass && !shadowPass) ? 1 : 0);
         drawMesh(*it.mesh, 1);
     }
+    glUniform1i(locGlass, 0);
     glUniform1i(locMirror, 0);
     glUniform4fv(locWheels, 4, noWheels);
     glUniform1f(locTire, 0.f);

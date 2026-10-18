@@ -14,19 +14,7 @@ box size=0.10,0.12,5.4 pos=0.42,-0.05,-0.08 mirror=x
 box size=0.94,0.10,0.10 pos=0,-0.05,2.45
 box size=0.94,0.10,0.10 pos=0,-0.05,-2.55
 box size=0.94,0.10,0.10 pos=0,-0.05,0.4
-# Axle housings, pumpkins
-color #1c1c1c
-cyl r=0.09 h=1.90 axis=x pos=0,AY,FA
-cyl r=0.09 h=1.90 axis=x pos=0,AY,RA
-sphere r=0.22 pos=0,AY,FA scale=1,1,0.8
-sphere r=0.22 pos=0,AY,RA scale=1,1,0.8
-# 4-link bars and coilovers (chassis to axle)
-color #3c3c3c
-box size=0.06,0.06,1.25 pos=0.36,-0.33,FA-0.65 rot=-10,0,0 mirror=x
-box size=0.06,0.06,1.25 pos=0.36,-0.33,RA+0.65 rot=10,0,0 mirror=x
-color #d8a21a
-cyl r=0.07 h=0.70 pos=0.62,-0.18,FA-0.15 rot=0,0,-18 seg=10 mirror=x
-cyl r=0.07 h=0.70 pos=0.62,-0.18,RA+0.15 rot=0,0,-18 seg=10 mirror=x
+# Axles, links and coilovers are drawn live by the game (they follow the suspension).
 # Pickup body sitting high on the chassis (floor y=0.45): one side profile for the front clip,
 # hood, cab and roof, a separate bed with flared sides, fender flares over nothing (tyres outside).
 color paint_r paint_g paint_b
@@ -99,22 +87,6 @@ box size=0.30,0.25,0.40 pos=0,-0.20,0.20
 cyl r=0.05 h=1.50 axis=z pos=0,-0.38,1.00 rot=-10,0,0 seg=10
 cyl r=0.05 h=2.00 axis=z pos=0,-0.38,-0.85 rot=9,0,0 seg=10
 box size=0.18,0.16,0.20 pos=0.30,-0.15,2.20
-cyl r=0.03 h=1.70 axis=x pos=0,AY+0.05,FA+0.22 seg=8
-color #3a3a3a
-for k = -1, 1, 2
-  cyl r=0.06 h=0.55 pos=0.30*k,-0.22,FA+0.05 seg=10
-  cyl r=0.06 h=0.55 pos=0.30*k,-0.22,RA-0.05 seg=10
-end
-color #c8c8c8
-material chrome
-for k = -1, 1, 2
-  cyl r=0.035 h=0.30 pos=0.30*k+0.09,-0.10,FA+0.05 seg=8
-  cyl r=0.035 h=0.30 pos=0.30*k+0.09,-0.10,RA-0.05 seg=8
-end
-color #d03a10
-material matte
-box size=0.05,0.40,0.012 pos=0.20,-0.30,FA+0.25 mirror=x
-box size=0.05,0.40,0.012 pos=0.20,-0.30,RA-0.25 mirror=x
 # ---- Bed: aluminium fuel cell, battery box, strapped nitrous bottles ----
 color #b9bcbf
 material steel
@@ -143,3 +115,5 @@ material chrome
 for k = 0, 3
   box size=1.24,0.03,0.05 pos=0,0.74+k*0.075,2.685
 end
+# Cab interior and driver (seen through the glass)
+use vehicles/interior.mbcad W=1.84 bl=1.26 wz=0.62 bz=-0.86 ry=1.78

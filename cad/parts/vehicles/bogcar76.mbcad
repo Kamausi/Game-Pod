@@ -99,3 +99,5 @@ box size=0.30,0.15,0.01 pos=0,0.30,-2.85
 color #9a9a9a
 material steel
 cyl r=0.04 h=0.14 axis=z pos=0.55,-0.10,-2.90 mirror=x seg=10
+# Cab interior and driver (seen through the glass)
+use vehicles/interior.mbcad W=1.74 bl=0.46 wz=0.62 bz=-1.10 ry=0.93
