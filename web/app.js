@@ -198,7 +198,18 @@ function goFullscreen() {
     if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
   }).catch(() => {});
 }
+// Multiplayer weather: the host's sky (and how soaked the park is) rides along with 'start';
+// solo play always goes back to your own settings.
+function hostWeather() { return { w: +$('s_weather').value, tod: +$('s_tod').value, wet: (hud && hud.wet) || 0 }; }
+function applyWeather(w, tod, wet, snap) {
+  api.action('weather:' + w + (snap ? '!' : ''));
+  api.action('tod:' + tod);
+  if (wet != null) api.action('soak:' + wet);
+}
+let roomWeather = false;
+
 function startSolo(mode) {
+  if (roomWeather && !net.room) { applyWeather(+$('s_weather').value, +$('s_tod').value, 0, true); roomWeather = false; }
   chargeRepairs();
   goFullscreen();
   touch.tiltZero = null;   // re-center tilt steering at the start of every event
@@ -210,7 +221,7 @@ function startSolo(mode) {
   $('canvas').focus();
 }
 $('btnResume').onclick = () => { hideAll(); api.setState(2); };
-$('btnRestart').onclick = () => { if (net.room && net.isHost) { hideAll(); net.send({ t: 'start', mode: lastMode }); } else if (!net.room) startSolo(lastMode); else hideAll(); };
+$('btnRestart').onclick = () => { if (net.room && net.isHost) { hideAll(); net.send({ t: 'start', mode: lastMode, wx: hostWeather() }); } else if (!net.room) startSolo(lastMode); else hideAll(); };
 $('btnTow').onclick = () => { hideAll(); api.setState(2); api.action('tow'); };
 $('btnToGarage').onclick = () => show('garage');
 // Recovery menu: the tow key pauses and offers the guide's escalation, least force first.
@@ -635,7 +646,7 @@ function initLobby() {
   $('btnConnect').onclick = connect;
   $('btnQuick').onclick = () => { ensureConnected(() => net.send({ t: 'quick' })); };
   $('btnJoin').onclick = () => { ensureConnected(() => net.send({ t: 'join', room: $('roomCode').value.trim().toUpperCase() })); };
-  $('btnStart').onclick = () => net.send({ t: 'start', mode: +$('mpMode').value });
+  $('btnStart').onclick = () => net.send({ t: 'start', mode: +$('mpMode').value, wx: hostWeather() });
   $('chatIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value.trim()) { net.send({ t: 'chat', msg: e.target.value.trim() }); e.target.value = ''; } });
 }
 function ensureConnected(fn) { if (net.ws && net.ws.readyState === 1) fn(); else { connect(); net.pending = fn; } }
@@ -706,6 +717,7 @@ function onNet(m) {
       Module._mb_set_ai_count(0);
       loadGhost(-1);
       net.lane = (m.lanes && m.lanes[net.id]) || 0;
+      if (m.weather) { applyWeather(m.weather.w, m.weather.tod, m.weather.wet, true); roomWeather = true; }
       hideAll();
       api.startMode(m.mode, net.lane, m.startAt);
       break;

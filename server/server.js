@@ -252,10 +252,14 @@ function onClient(ws, ip) {
       case 'start': {
         const r = rooms.get(c.room);
         if (!r || r.host !== c.id) return;
-        r.mode = [0, 1, 2, 3, 4].includes(+m.mode) ? +m.mode : 1;
+        r.mode = [0, 1, 2, 3, 4, 5, 6].includes(+m.mode) ? +m.mode : 1;
+        // The host's sky goes to everyone so the whole room races in the same rain / dark.
+        const wx = m.wx || {};
+        const weather = { w: [0, 1, 2].includes(+wx.w) ? +wx.w : 0, tod: [0, 1, 2, 3].includes(+wx.tod) ? +wx.tod : 0,
+          wet: Math.min(1, Math.max(0, Number(wx.wet) || 0)) };
         const lanes = {};
         for (const p of r.players.values()) lanes[p.id] = p.lane;
-        const msg = JSON.stringify({ t: 'start', mode: r.mode, startAt: now() + 4.5, lanes });
+        const msg = JSON.stringify({ t: 'start', mode: r.mode, startAt: now() + 4.5, lanes, weather });
         for (const p of r.players.values()) p.ws.send(msg);
         break;
       }

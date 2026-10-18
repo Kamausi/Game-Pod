@@ -51,6 +51,11 @@ try {
   const st = b.msgs.find((m) => m.t === 'start');
   check(st && st.mode === 1 && st.startAt > Date.now() / 1000, 'host-only synchronized start');
   check(a.msgs.some((m) => m.t === 'pong' && m.c === 1), 'clock sync pong');
+  a.send(JSON.stringify({ t: 'start', mode: 6, wx: { w: 2, tod: 3, wet: 0.6 } }));
+  await sleep(150);
+  const st2 = b.msgs.filter((m) => m.t === 'start').pop();
+  check(st2 && st2.mode === 6, 'burnout (and bounty) modes start in multiplayer');
+  check(st2 && st2.weather && st2.weather.w === 2 && st2.weather.tod === 3 && st2.weather.wet === 0.6, "host's weather is shared with the room");
   a.close(); b.close();
 } catch (e) { failed++; console.error(e); }
 srv.kill();
