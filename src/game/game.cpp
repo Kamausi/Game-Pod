@@ -535,6 +535,20 @@ void Game::updateWeather(float dt) {
     renderer.weather[1] = wet;
     renderer.weather[2] = rainAmt;
     renderer.weather[3] = golden;
+    audio.setRain(rainAmt);
+    // Lightning in heavy rain: a flicker of light now, thunder after the sound's travel time.
+    lightningTimer -= dt;
+    if (rainAmt > 0.6f && lightningTimer <= 0) {
+        Rng& R = particles.rng;
+        lightningTimer = R.range(18.f, 45.f);
+        audio.thunder(R.range(250.f, 2400.f));
+        flashT = 0;
+    }
+    if (flashT >= 0) {
+        flashT += dt;
+        renderer.flash = flashT < 0.06f ? 1.f : (flashT < 0.12f ? 0.15f : (flashT < 0.2f ? 0.7f * (1.f - (flashT - 0.12f) / 0.08f) : 0.f));
+        if (flashT > 0.25f) { flashT = -1; renderer.flash = 0; }
+    }
     // Sun: warm and low at golden hour, dimmed and cooled by cloud.
     Vec3 sun = golden > 0 ? Vec3{3.0f, 2.2f, 1.45f} : (timeOfDay == 1 ? Vec3{3.2f, 3.05f, 2.8f} : Vec3{3.1f, 2.883f, 2.542f});
     float dim = 1.f - 0.72f * cloudCover;

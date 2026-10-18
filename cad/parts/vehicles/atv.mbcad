@@ -19,9 +19,10 @@ cyl r=0.04 h=0.86 axis=x pos=0,-0.12,RA
 # Plastic body: front and rear fenders arching over the tyres, centre tank cover
 color paint_r paint_g paint_b
 material plastic
-extrude depth=0.30 bevel=0.03 pts=0.25,0.10,0.35,0.30,0.70,0.36,1.05,0.30,1.15,0.12,1.05,0.18,0.70,0.26,0.35,0.22 pos=0.49,0,0 mirror=x
-extrude depth=0.30 bevel=0.03 pts=-0.20,0.12,-0.25,0.30,-0.585,0.36,-0.92,0.30,-1.02,0.10,-0.92,0.18,-0.585,0.26,-0.28,0.22 pos=0.49,0,0 mirror=x
-box size=0.62,0.18,0.80 pos=0,0.30,0.55 bevel=0.06
+extrude depth=0.32 bevel=0.05 pts=0.25,0.10,arc(0.715,-0.12,0.50,150,30,10),1.18,0.08,1.12,0.04,arc(0.715,-0.12,0.42,32,148,10) pos=0.49,0,0 mirror=x
+extrude depth=0.32 bevel=0.05 pts=-0.15,0.10,arc(-0.585,-0.12,0.50,30,150,10),-1.04,0.08,-0.99,0.04,arc(-0.585,-0.12,0.42,148,32,10) pos=0.49,0,0 mirror=x
+box size=0.62,0.18,0.80 pos=0,0.30,0.55 bevel=0.08
+extrude depth=0.58 bevel=0.06 pts=0.95,0.30,1.05,0.36,1.12,0.30,1.10,0.18,0.95,0.20
 box size=0.66,0.10,0.55 pos=0,0.30,-0.62 bevel=0.04
 # Seat
 color #161616
@@ -39,6 +40,43 @@ color #3a3a3a
 box size=0.42,0.30,0.06 pos=0,0.63,0.80 bevel=0.01
 color #111111
 box size=0.36,0.24,0.02 pos=0,0.63,0.835
+# Suspension: front A-arms and coil-overs, rear swingarm and shocks, CV boots
+color #1c1c1c
+material steel
+box size=0.32,0.035,0.05 pos=0.30,-0.10,0.66 rot=0,0,4 mirror=x
+box size=0.32,0.035,0.05 pos=0.30,-0.02,0.78 rot=0,0,-6 mirror=x
+box size=0.30,0.035,0.05 pos=0.30,-0.10,-0.52 rot=0,0,4 mirror=x
+box size=0.30,0.035,0.05 pos=0.30,-0.02,-0.66 rot=0,0,-6 mirror=x
+color #c41e1e
+material paint
+cyl r=0.035 h=0.34 pos=0.30,0.08,0.70 rot=0,0,-30 seg=8 mirror=x
+cyl r=0.035 h=0.34 pos=0.30,0.08,-0.60 rot=0,0,-30 seg=8 mirror=x
+color #111111
+material rubber
+cyl r=0.03 h=0.22 axis=x pos=0.36,-0.12,0.715 mirror=x
+cyl r=0.03 h=0.22 axis=x pos=0.36,-0.12,-0.585 mirror=x
+# Exhaust, mud flaps, tail light, headlight pod and bar pad
+color #3a3a3a
+material steel
+cyl r=0.045 h=0.70 axis=z pos=-0.20,0.22,-0.65 seg=10
+color #9a9a9a
+material chrome
+cyl r=0.03 h=0.05 axis=z pos=-0.20,0.22,-1.02 seg=10
+color #121212
+material rubber
+box size=0.22,0.20,0.015 pos=0.49,0.0,-1.03 mirror=x
+color #b01313
+material lens
+box size=0.14,0.05,0.02 pos=0,0.32,-1.025 bevel=0.01
+color #1a1a1a
+material plastic
+box size=0.26,0.12,0.10 pos=0,0.68,0.40 bevel=0.03
+color #e8eef2
+material lens
+box size=0.10,0.05,0.02 pos=0.06,0.68,0.455 bevel=0.01 mirror=x
+color #c41e1e
+material matte
+box size=0.20,0.05,0.06 pos=0,0.71,0.33 bevel=0.02
 # Bars, stem and grips
 color #1a1a1a
 cyl r=0.025 h=0.30 pos=0,0.55,0.38 rot=-20,0,0

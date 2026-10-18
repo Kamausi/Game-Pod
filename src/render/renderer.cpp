@@ -26,6 +26,7 @@ uniform sampler2DShadow uShadow;
 uniform mat4 uLightVP;
 uniform vec3 uSunColor;
 uniform vec4 uWeather;   // x cloud cover, y ground wetness (rain soak), z rain intensity, w golden hour
+uniform float uFlash;    // lightning flash 0..1
 float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
 vec2 hash2(vec2 p){ return vec2(hash(p), hash(p+19.19)); }
 float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
@@ -90,6 +91,7 @@ vec3 skyColor(vec3 d){
   c = mix(c, c*vec3(1.35,0.92,0.62) + vec3(0.12,0.04,0.0), uWeather.w*(1.0 - pow(t, 0.35)));   // golden-hour horizon
   c += (vec3(1.0,0.92,0.75)*pow(s, 900.0)*20.0 + vec3(1.0,0.85,0.6)*pow(s, 6.0)*(0.14 + 0.3*uWeather.w))*(1.0 - uWeather.x);
   c = mix(c, vec3(0.55,0.58,0.63)*(1.0 - 0.32*uWeather.z), uWeather.x*0.85);              // overcast / rain
+  c += vec3(0.75,0.8,0.95)*uFlash*1.6;
   if(d.y < 0.0) c = mix(hor, vec3(0.35,0.33,0.28), clamp(-d.y*4.0, 0.0, 1.0));
   return c;
 }
@@ -138,6 +140,7 @@ vec3 finalize(vec3 c, vec3 wp){
   float f = 1.0 - exp(-d*(0.0022 + 0.007*uWeather.z));
   vec3 fc = skyColor(normalize(vec3(wp.x-uCamPos.x, 0.03, wp.z-uCamPos.z)));
   c = mix(c, fc, f*0.65);
+  c += vec3(0.55,0.6,0.75)*uFlash*0.3;
   c = c*(2.51*c+0.03)/(c*(2.43*c+0.59)+0.14);
   return pow(clamp(c, 0.0, 1.0), vec3(1.0/2.2));
 }
@@ -1204,6 +1207,7 @@ void Renderer::render(World& w, const RenderFrame& f) {
         glUniform1i(glGetUniformLocation(p, "uQuality"), quality);
         glUniform3f(glGetUniformLocation(p, "uSunColor"), sunColor.x, sunColor.y, sunColor.z);
         glUniform4f(glGetUniformLocation(p, "uWeather"), weather[0], weather[1], weather[2], weather[3]);
+        glUniform1f(glGetUniformLocation(p, "uFlash"), flash);
     };
 
     // ---- shadow pass ----

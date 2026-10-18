@@ -80,6 +80,9 @@ public:
     void trigger(SfxType t, Vec3 pos, float strength);
     void backfire(int id);
     void setAmbient(Vec3 dozerPos, float crowdLevel) { dozer = dozerPos; crowd = crowdLevel; }
+    void setRain(float r) { rain = r; }
+    // Thunder from a strike `dist` metres away: arrives after dist/343 s, closer = sharper crack.
+    void thunder(float dist) { thunderDelay = dist / 343.f; thunderDist = dist; thunderT = -1; }
     void render(float* interleavedStereo, int frames);
     float masterVolume = 0.8f, engineVolume = 1.f, sfxVolume = 1.f, ambienceVolume = 0.7f;
     bool muted = false;
@@ -113,6 +116,12 @@ private:
     EngineVoice dozerEngine;
     EngineSpec dozerSpec;
     Biquad crowdBp, crowdBp2, windLp;
+    // Weather
+    float rain = 0;
+    Noise nzR{777};
+    Biquad rainHpL, rainHpR, rainBp, patterBp, thunderLp, thunderLp2, crackHp;
+    float patterEnv = 0, patterPan = 0.5f;
+    float thunderDelay = -1, thunderDist = 1000, thunderT = -1, thunderDur = 6;
     float crowdLfo = 0, wooPh = 0, wooEnv = 0, wooF = 1800;
     DelayLine echoL, echoR;
     OnePole echoLpL, echoLpR;

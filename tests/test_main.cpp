@@ -801,6 +801,33 @@ int main(int argc, char** argv) {
         w.terrain.rainWet = 0;
     });
 
+
+    test("audio: rain bed and delayed thunder are audible, finite and bounded", [] {
+        auto rms = [](AudioEngine& a, float secs, float* peak) {
+            std::vector<float> buf(2048 * 2);
+            double sq = 0; long n = 0;
+            for (int b = 0; b < int(secs * 48000 / 2048); b++) {
+                a.render(buf.data(), 2048);
+                for (float x : buf) { if (!std::isfinite(x)) return -1.0; *peak = std::max(*peak, std::fabs(x)); sq += x * x; n++; }
+            }
+            return std::sqrt(sq / double(n));
+        };
+        AudioEngine a;
+        a.init(48000);
+        a.setListener({0, 2, -7}, {0, 0, 1}, {});
+        a.setAmbient({500, 0, 500}, 0.f);
+        float peak = 0;
+        double quiet = rms(a, 1.f, &peak);
+        a.setRain(1.f);
+        double wet = rms(a, 1.f, &peak);
+        a.thunder(343.f);   // arrives after ~1 s
+        double before = rms(a, 0.8f, &peak), boom = rms(a, 1.5f, &peak);
+        std::printf("    rms: dry %.4f, rain %.4f, rain+thunder %.4f -> %.4f, peak %.2f\n", quiet, wet, before, boom, peak);
+        CHECK(wet > quiet * 2 && wet > 0.005, "rain is audible");
+        CHECK(boom > before * 1.3, "thunder rolls in after the sound's travel time");
+        CHECK(peak <= 1.f && quiet >= 0 && boom >= 0, "finite and limited");
+    });
+
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
 }

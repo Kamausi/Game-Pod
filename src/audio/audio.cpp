@@ -196,6 +196,13 @@ void AudioEngine::init(float sampleRate) {
     crowdBp.bandpass(650, 0.8f, sr);
     crowdBp2.bandpass(1800, 1.2f, sr);
     windLp.lowpass(400, 0.7f, sr);
+    rainHpL.highpass(1600, 0.6f, sr);
+    rainHpR.highpass(1700, 0.6f, sr);
+    rainBp.bandpass(420, 0.5f, sr);
+    patterBp.bandpass(3200, 2.5f, sr);
+    thunderLp.lowpass(110, 0.7f, sr);
+    thunderLp2.lowpass(260, 0.6f, sr);
+    crackHp.highpass(900, 0.7f, sr);
     echoL.init(int(sr * 0.3f));
     echoR.init(int(sr * 0.3f));
     echoLpL.setCutoff(2200, sr);
@@ -394,6 +401,33 @@ void AudioEngine::render(float* out, int frames) {
         float wind = windLp.process(nz.white()) * clampf(ws / 30.f, 0.f, 1.f) * 0.12f * ambienceVolume;
         L += wind;
         R += wind;
+        // Rain: a decorrelated hiss bed, a soft low wash, and individual drops pattering nearby.
+        if (rain > 0.01f) {
+            float bedL = rainHpL.process(nz.white()), bedR = rainHpR.process(nzR.white());
+            float wash = rainBp.process(nz.pink()) * 0.6f;
+            float g = rain * 0.10f * ambienceVolume;
+            if (nzR.uni() < rain * 260.f / sr) { patterEnv = 0.4f + 0.6f * nzR.uni(); patterPan = nzR.uni(); }
+            float drop = patterBp.process(nzR.white() * patterEnv);
+            patterEnv *= decayCoef(0.004f, sr);
+            L += (bedL + wash) * g + drop * (1.f - patterPan) * rain * 0.18f * ambienceVolume;
+            R += (bedR + wash) * g + drop * patterPan * rain * 0.18f * ambienceVolume;
+        }
+        // Thunder: delayed by distance, a crack when close, then a long rolling rumble.
+        if (thunderDelay >= 0) {
+            thunderDelay -= 1.f / sr;
+            if (thunderDelay < 0) { thunderT = 0; thunderDur = 4.f + std::min(4.f, thunderDist / 600.f); }
+        }
+        if (thunderT >= 0) {
+            thunderT += 1.f / sr;
+            float x = thunderT / thunderDur;
+            float env = std::min(1.f, thunderT * 6.f) * std::exp(-3.2f * x) * (0.75f + 0.25f * std::sin(thunderT * 7.f + 3.f * std::sin(thunderT * 2.3f)));
+            float near = clampf(1.f - thunderDist / 1500.f, 0.1f, 1.f);
+            float rumble = (thunderLp.process(nz.white()) * 2.4f + thunderLp2.process(nz.pink()) * 0.9f) * env * (0.4f + 0.5f * near);
+            float crack = thunderT < 0.35f ? crackHp.process(nzR.white()) * std::exp(-thunderT * 14.f) * near * near * 0.5f : 0.f;
+            L += (rumble + crack) * ambienceVolume;
+            R += (rumble * 0.92f + crack) * ambienceVolume;
+            if (thunderT > thunderDur) thunderT = -1;
+        }
         // Slapback off the tree line (~30-40 m away): ~190/230 ms.
         float eL = echoLpL.lp(echoL.read(sr * 0.19f)), eR = echoLpR.lp(echoR.read(sr * 0.23f));
         echoL.write((L + R) * 0.5f + eR * 0.2f);
