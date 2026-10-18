@@ -1,0 +1,31 @@
+# Car-hauler flatbed trailer: steel deck 2.5 x 6 m, tandem axles, fold-down ramps at the
+# back (-Z), coupler toward +Z. Origin at ground centre.
+color #2a2a2c
+material steel
+box size=0.12,0.16,6.0 pos=1.15,0.50,0 mirror=x
+box size=2.30,0.12,0.12 pos=0,0.50,2.9
+color #5a4a3a
+material matte
+box size=2.40,0.05,6.0 pos=0,0.605,0
+color #2a2a2c
+material steel
+box size=0.10,0.10,1.5 pos=0.35,0.48,3.65 rot=0,12,0
+box size=0.10,0.10,1.5 pos=-0.35,0.48,3.65 rot=0,-12,0
+cyl r=0.06 h=0.15 pos=0,0.50,4.40
+cyl r=0.03 h=0.45 pos=0.25,0.25,3.9
+box size=0.30,0.05,1.5 pos=0.75,0.32,-3.55 rot=-20,0,0 mirror=x
+box size=0.12,0.06,0.12 pos=1.18,0.05,0 mirror=x
+color #111111
+material rubber
+cyl r=0.34 h=0.22 axis=x pos=1.05,0.34,0.55 mirror=x
+cyl r=0.34 h=0.22 axis=x pos=1.05,0.34,-0.55 mirror=x
+color #c8c8c8
+material chrome
+cyl r=0.17 h=0.23 axis=x pos=1.05,0.34,0.55 mirror=x
+cyl r=0.17 h=0.23 axis=x pos=1.05,0.34,-0.55 mirror=x
+color #2a2a2c
+material steel
+box size=0.30,0.04,1.6 pos=1.05,0.72,0 mirror=x
+color #b01313
+material lens
+box size=0.12,0.06,0.03 pos=1.10,0.52,-3.01 mirror=x

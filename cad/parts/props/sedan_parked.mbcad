@@ -1,0 +1,31 @@
+# Generic family crossover/sedan for the visitor lot, wheels included.
+# Front faces +Z. Origin at ground centre.
+param paint_r = 0.12
+param paint_g = 0.20
+param paint_b = 0.38
+set FA = 1.42
+set RA = -1.38
+color paint_r paint_g paint_b
+material paint
+extrude depth=1.85 bevel=0.08 pts=-2.35,0.35,-2.40,0.85,-1.90,0.95,1.40,0.92,2.30,0.75,2.40,0.50,2.35,0.32
+extrude depth=1.70 bevel=0.06 pts=1.30,0.92,0.55,1.42,-1.20,1.46,-1.85,0.95
+color #10161c
+material glass
+extrude depth=1.74 pts=1.22,0.95,0.52,1.38,-1.15,1.42,-1.75,0.97
+color #1a1a1a
+material matte
+box size=1.80,0.20,0.06 pos=0,0.42,2.36
+box size=1.80,0.20,0.06 pos=0,0.42,-2.37
+color #e8eef2
+material lens
+box size=0.35,0.10,0.04 pos=0.62,0.70,2.33 bevel=0.01 mirror=x
+color #b01313
+box size=0.40,0.08,0.04 pos=0.55,0.78,-2.38 mirror=x
+color #111111
+material rubber
+cyl r=0.34 h=0.24 axis=x pos=0.80,0.34,FA mirror=x
+cyl r=0.34 h=0.24 axis=x pos=0.80,0.34,RA mirror=x
+color #b8b8b8
+material chrome
+cyl r=0.20 h=0.25 axis=x pos=0.80,0.34,FA mirror=x
+cyl r=0.20 h=0.25 axis=x pos=0.80,0.34,RA mirror=x

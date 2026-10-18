@@ -608,7 +608,7 @@ void World::generate(uint32_t seed) {
         building("venue/dumpster.mbcad", 31.f, -88.f, -PI * 0.5f, {0.9f, 0.65f, 0.6f});
         for (float x : {-20.f, 4.f, 16.f, 30.f}) addProp("venue/trash_barrel.mbcad", x, -60.5f, 0, 1.f, col3(0.1f, 0.3f, 0.6f, "body"));
         addProp("venue/light_tower.mbcad", 34.f, -60.f, 0);
-        addProp("venue/light_tower.mbcad", -44.f, -60.5f, 0);
+        addProp("venue/light_tower.mbcad", -50.f, -62.5f, 0);
 
         // Pit-side: bleachers and the announcer tower on the north bank, results board at the finish,
         // sponsor banners on both fences, light towers on the south bank, a crowd on the bleachers.

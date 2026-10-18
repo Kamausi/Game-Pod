@@ -1,0 +1,47 @@
+# Farm utility tractor with front loader bucket and ROPS: big rear tyres, yellow rims.
+# Front (bucket) faces +Z. Origin at ground centre.
+param body_r = 0.20
+param body_g = 0.45
+param body_b = 0.15
+color body_r body_g body_b
+material paint
+box size=0.80,0.75,1.70 pos=0,1.20,0.55 bevel=0.06
+box size=1.10,0.30,1.00 pos=0,1.05,-0.65 bevel=0.05
+color #2a2a2a
+material steel
+box size=0.60,0.40,1.0 pos=0,0.75,0.40
+box size=0.50,0.08,0.60 pos=0,1.42,-0.75
+cyl r=0.05 h=0.90 pos=0.25,1.95,0.95
+# ROPS and seat
+color #1a1a1a
+box size=0.07,1.50,0.07 pos=0.55,1.95,-1.10 mirror=x
+box size=1.17,0.07,0.07 pos=0,2.68,-1.10
+color #111111
+material matte
+box size=0.45,0.10,0.45 pos=0,1.50,-0.80 bevel=0.03
+box size=0.45,0.45,0.08 pos=0,1.75,-1.02 bevel=0.03
+# Steering wheel
+cyl r=0.18 h=0.03 pos=0,1.75,-0.25 rot=-50,0,0 seg=12
+# Tyres: big rear, small front, yellow rims
+color #121212
+material rubber
+cyl r=0.75 h=0.42 axis=x pos=0.82,0.75,-0.75 seg=20 mirror=x
+cyl r=0.45 h=0.28 axis=x pos=0.70,0.45,0.95 seg=16 mirror=x
+box size=0.44,0.10,0.14 pos=0.82,1.49,-0.75 mirror=x
+box size=0.44,0.10,0.14 pos=0.82,0.01,-0.75 mirror=x
+color #e2b616
+material paint
+cyl r=0.42 h=0.44 axis=x pos=0.82,0.75,-0.75 seg=16 mirror=x
+cyl r=0.25 h=0.30 axis=x pos=0.70,0.45,0.95 seg=12 mirror=x
+# Loader arms and bucket
+color body_r body_g body_b
+box size=0.10,0.14,1.90 pos=0.48,1.10,1.20 rot=18,0,0 mirror=x
+box size=0.10,0.10,0.70 pos=0.48,1.60,0.20 rot=-50,0,0 mirror=x
+color #3a3a3a
+material steel
+box size=1.90,0.70,0.08 pos=0,0.45,2.15 rot=-10,0,0
+box size=1.90,0.06,0.65 pos=0,0.12,1.88
+box size=0.06,0.62,0.62 pos=0.94,0.42,1.88 mirror=x
+color #e8eef2
+material lens
+box size=0.12,0.08,0.03 pos=0.25,1.35,1.41 mirror=x

@@ -1,0 +1,41 @@
+# Enclosed race trailer 2.6 x 7.5 x 3 m: V-nose toward +Z, rear ramp door, side door,
+# tandem axles, accent stripe. Origin at ground centre.
+param body_r = 0.18
+param body_g = 0.18
+param body_b = 0.20
+param stripe_r = 0.85
+param stripe_g = 0.20
+param stripe_b = 0.10
+color body_r body_g body_b
+material paint
+box size=2.60,2.45,6.6 pos=0,1.78,-0.40 bevel=0.06
+extrude depth=2.60 bevel=0.05 pts=2.90,0.55,2.90,3.00,3.60,2.70,3.60,0.85
+color stripe_r stripe_g stripe_b
+box size=2.62,0.25,6.4 pos=0,1.25,-0.40
+box size=2.62,0.06,6.4 pos=0,1.47,-0.40
+color #c4c6c8
+material chrome
+box size=2.62,0.10,6.62 pos=0,0.60,-0.40
+box size=2.52,2.30,0.04 pos=0,1.78,-3.72
+color #1a1a1a
+material matte
+box size=0.04,1.85,0.85 pos=1.31,1.60,1.40
+box size=2.30,0.06,0.06 pos=0,2.95,-3.72
+color #2a2a2c
+material steel
+box size=0.10,0.10,1.4 pos=0.30,0.50,4.15 rot=0,10,0
+box size=0.10,0.10,1.4 pos=-0.30,0.50,4.15 rot=0,-10,0
+cyl r=0.06 h=0.15 pos=0,0.50,4.85
+color #111111
+material rubber
+cyl r=0.34 h=0.22 axis=x pos=1.10,0.34,-0.10 mirror=x
+cyl r=0.34 h=0.22 axis=x pos=1.10,0.34,-0.90 mirror=x
+color #c8c8c8
+material chrome
+cyl r=0.17 h=0.23 axis=x pos=1.10,0.34,-0.10 mirror=x
+cyl r=0.17 h=0.23 axis=x pos=1.10,0.34,-0.90 mirror=x
+color #b01313
+material lens
+box size=0.08,0.22,0.03 pos=1.20,0.90,-3.73 mirror=x
+color #e8a020
+box size=0.06,0.06,0.03 pos=1.28,2.95,-3.73 mirror=x

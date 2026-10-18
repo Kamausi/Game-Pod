@@ -1,0 +1,81 @@
+# Utility ATV mud build with seated rider: twin snorkels behind the bars, radiator relocated
+# up on the front rack, steel racks, front winch. Body frame: +Z fwd, +X left.
+# Front axle z=0.715, rear z=-0.585, track 0.98, wheel centres y=-0.12 (29" tyres, r~0.37).
+param paint_r = 0.15
+param paint_g = 0.35
+param paint_b = 0.16
+param rider_r = 0.75
+param rider_g = 0.15
+param rider_b = 0.10
+set FA = 0.715
+set RA = -0.585
+# Frame, skid plate and footwells (between the wheels)
+color #1d1d1d
+material steel
+box size=0.42,0.16,1.55 pos=0,-0.05,0.05 bevel=0.03
+box size=0.22,0.03,0.40 pos=0.30,0.04,0.05 mirror=x
+cyl r=0.04 h=0.86 axis=x pos=0,-0.12,FA
+cyl r=0.04 h=0.86 axis=x pos=0,-0.12,RA
+# Plastic body: front and rear fenders arching over the tyres, centre tank cover
+color paint_r paint_g paint_b
+material plastic
+extrude depth=0.30 bevel=0.03 pts=0.25,0.10,0.35,0.30,0.70,0.36,1.05,0.30,1.15,0.12,1.05,0.18,0.70,0.26,0.35,0.22 pos=0.49,0,0 mirror=x
+extrude depth=0.30 bevel=0.03 pts=-0.20,0.12,-0.25,0.30,-0.585,0.36,-0.92,0.30,-1.02,0.10,-0.92,0.18,-0.585,0.26,-0.28,0.22 pos=0.49,0,0 mirror=x
+box size=0.62,0.18,0.80 pos=0,0.30,0.55 bevel=0.06
+box size=0.66,0.10,0.55 pos=0,0.30,-0.62 bevel=0.04
+# Seat
+color #161616
+material matte
+box size=0.34,0.10,0.62 pos=0,0.42,-0.22 bevel=0.04
+# Steel racks front and rear
+color #222222
+material steel
+box size=0.80,0.03,0.40 pos=0,0.46,0.86 bevel=0.01
+box size=0.86,0.03,0.42 pos=0,0.42,-0.78 bevel=0.01
+box size=0.03,0.10,0.40 pos=0.40,0.50,0.86 mirror=x
+box size=0.03,0.10,0.42 pos=0.43,0.46,-0.78 mirror=x
+# Relocated radiator on the front rack, fan shroud
+color #3a3a3a
+box size=0.42,0.30,0.06 pos=0,0.63,0.80 bevel=0.01
+color #111111
+box size=0.36,0.24,0.02 pos=0,0.63,0.835
+# Bars, stem and grips
+color #1a1a1a
+cyl r=0.025 h=0.30 pos=0,0.55,0.38 rot=-20,0,0
+cyl r=0.018 h=0.78 axis=x pos=0,0.70,0.33
+color #0e0e0e
+material rubber
+cyl r=0.025 h=0.12 axis=x pos=0.34,0.70,0.33 mirror=x
+# Twin snorkels rising behind the bars
+color #202020
+material plastic
+cyl r=0.035 h=0.75 pos=0.12,0.80,0.18 mirror=x
+cyl r=0.045 h=0.10 axis=z pos=0.12,1.17,0.13 mirror=x
+# Front winch and bumper, headlights
+color #1a1a1a
+material steel
+box size=0.70,0.07,0.08 pos=0,0.08,1.12 bevel=0.02
+cyl r=0.06 h=0.28 axis=x pos=0,0.17,1.08
+color #e8eef2
+material lens
+box size=0.12,0.05,0.03 pos=0.18,0.40,0.96 bevel=0.01 mirror=x
+color #b01313
+box size=0.10,0.04,0.02 pos=0.22,0.34,-0.99 mirror=x
+# Rider: helmet, jacket, gloves on the bars, boots on the footwells
+color #2a3442
+material matte
+box size=0.13,0.14,0.42 pos=0.13,0.50,-0.12 rot=-10,0,0 mirror=x
+box size=0.12,0.40,0.12 pos=0.17,0.30,0.08 rot=20,0,0 mirror=x
+color #141414
+box size=0.11,0.08,0.24 pos=0.20,0.10,0.15 mirror=x
+color rider_r rider_g rider_b
+cyl r=0.17 r2=0.15 h=0.48 pos=0,0.80,-0.18 rot=12,0,0 seg=10
+cyl r=0.045 h=0.42 pos=0.22,0.80,0.06 rot=-62,0,-12 seg=8 mirror=x
+color #111111
+box size=0.07,0.06,0.09 pos=0.32,0.70,0.31 mirror=x
+color #e5e5e5
+material paint
+sphere r=0.14 pos=0,1.16,-0.10 seg=12
+color #101820
+material glass
+box size=0.20,0.07,0.04 pos=0,1.16,0.03 bevel=0.02

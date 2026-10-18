@@ -80,6 +80,7 @@ k_eq, c ×= bearing/cohesion · weaken;   η ×= 0.6 + 0.4·weaken
 | silt | 0.80 | 0.65 | 0.45 | 0.60 | 0.55 | 0.70 |
 | wet sand | 1.70 | 2.20 | 0.25 | 1.55 | 0.15 | 0.05 |
 | peat muck | 0.42 | 0.55 | 0.70 | 0.80 | 0.50 | 0.30 |
+| gravel (roads, pads) | 3.00 | 3.00 | 0.30 | 1.35 | 0.10 | 0 |
 
 Clay gets *worse* the more it is churned (sensitive clays lose strength when remolded), which is why
 the second truck through a clay hole has it harder; sand barely remolds.
