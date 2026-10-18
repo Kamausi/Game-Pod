@@ -27,7 +27,38 @@ color sign_r sign_g sign_b
 box size=4.4,1.1,0.06 pos=0,4.85,-4.3
 color #f2f0ea
 box size=4.4,0.12,0.07 pos=0,4.42,-4.3
-box size=1.6,0.35,0.07 pos=0,4.95,-4.3
+set post_h = 4.97
+for s = -1, 1, 2
+  box size=0.556,0.080,0.03 pos=s*-1.896,0.000+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.556,0.080,0.03 pos=s*-1.556,0.000+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.372,0.080,0.03 pos=s*-1.811,-0.119+post_h,s*0.045-4.3 rot=0,0,s*54.5
+  box size=0.372,0.080,0.03 pos=s*-1.641,-0.119+post_h,s*0.045-4.3 rot=0,0,s*125.5
+  box size=0.522,0.080,0.03 pos=s*-1.403,-0.017+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.522,0.080,0.03 pos=s*-1.062,-0.017+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.420,0.080,0.03 pos=s*-1.233,0.238+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.420,0.080,0.03 pos=s*-1.233,0.000+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.420,0.080,0.03 pos=s*-0.740,0.238+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.420,0.080,0.03 pos=s*-0.740,0.000+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.420,0.080,0.03 pos=s*-0.740,-0.238+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.318,0.080,0.03 pos=s*-0.910,0.119+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.318,0.080,0.03 pos=s*-0.570,-0.119+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.556,0.080,0.03 pos=s*-0.417,0.000+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.556,0.080,0.03 pos=s*-0.077,0.000+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.420,0.080,0.03 pos=s*-0.247,0.000+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.556,0.080,0.03 pos=s*0.570,0.000+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.352,0.080,0.03 pos=s*0.706,0.238+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.352,0.080,0.03 pos=s*0.706,0.000+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.369,0.080,0.03 pos=s*0.714,-0.238+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.250,0.080,0.03 pos=s*0.892,0.119+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.250,0.080,0.03 pos=s*0.909,-0.119+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.522,0.080,0.03 pos=s*1.062,-0.017+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.522,0.080,0.03 pos=s*1.402,-0.017+post_h,s*0.045-4.3 rot=0,0,s*90.0
+  box size=0.420,0.080,0.03 pos=s*1.232,0.238+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.420,0.080,0.03 pos=s*1.232,0.000+post_h,s*0.045-4.3 rot=0,0,s*0.0
+  box size=0.372,0.080,0.03 pos=s*1.641,0.119+post_h,s*0.045-4.3 rot=0,0,s*-54.5
+  box size=0.372,0.080,0.03 pos=s*1.811,0.119+post_h,s*0.045-4.3 rot=0,0,s*-125.5
+  box size=0.318,0.080,0.03 pos=s*1.726,-0.119+post_h,s*0.045-4.3 rot=0,0,s*90.0
+end
 # Pressure-washer stands (one each side, near the -Z end): post, cabinet, gun holster,
 # boom arm and hose reel
 material steel

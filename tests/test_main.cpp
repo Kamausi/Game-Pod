@@ -234,6 +234,8 @@ int main(int argc, char** argv) {
         CHECK(std::fabs(loop.mesh.boundsMax().x - 8.25f) < 1e-4f, "loop var reaches the inclusive end");
         CHECK(!cadBuildSource("for i = 0, 3\nbox size=1,1,1\n", {}, "open").error.empty(), "unterminated for should error");
         CHECK(!cadBuildSource("end\n", {}, "stray").error.empty(), "stray end should error");
+        CHECK(!cadBuildSource("box size=1,1,1 pos=0,0,3.18.0\n", {}, "badnum").error.empty(), "malformed number should error");
+        CHECK(std::fabs(cadEval("1.5e2+2e-1", {}, &err) - 150.2f) < 1e-3f && err.empty(), "exponent literals: %s", err.c_str());
         CadResult hexLoop = cadBuildSource("for i = 0, 1\n  color #ff0000\n  box size=1,1,1 pos=i*2,0,0\nend\n", {}, "hexloop");
         CHECK(hexLoop.error.empty() && !hexLoop.mesh.verts.empty() && hexLoop.mesh.verts[0].r > 0.99f, "indented hex color: %s", hexLoop.error.c_str());
         CadResult w35 = cadBuild("wheels/wheel.mbcad", {{"tire_r", 0.4445f}});

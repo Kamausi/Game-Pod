@@ -99,3 +99,122 @@ box size=1.2,0.06,0.3 pos=0,0.24,-4.56
 box size=0.06,0.25,1.72 pos=0.63,0.7,-4.1 rot=-42,0,0 mirror=x
 box size=0.04,0.04,1.72 pos=0.65,1.6,-4.1 rot=-42,0,0 mirror=x
 box size=0.04,0.95,0.04 pos=0.65,0.75,-4.72 mirror=x
+# ---- Backline and band gear ----
+# Drum riser and kit: kick, snare, toms, floor tom, cymbals on stands, throne
+material matte
+color #1a1a1a
+box size=2.4,0.30,2.0 pos=0,dh+0.15,-1.8
+color #b01818
+material paint
+cyl r=0.28 h=0.40 axis=z pos=0,dh+0.58,-1.20 seg=16
+color #f2f2ee
+material matte
+cyl r=0.27 h=0.01 axis=z pos=0,dh+0.58,-0.995 seg=16
+color #b01818
+material paint
+cyl r=0.12 h=0.14 pos=-0.18,dh+0.95,-1.25 seg=12
+cyl r=0.12 h=0.14 pos=0.18,dh+0.95,-1.25 seg=12
+cyl r=0.17 h=0.38 pos=0.55,dh+0.49,-1.30 seg=12
+color #d8d8d2
+material chrome
+cyl r=0.17 h=0.06 pos=-0.48,dh+0.75,-1.05 seg=12
+for c = -1, 1, 2
+  cyl r=0.012 h=1.0 pos=c*0.70,dh+0.80,-1.40 seg=5
+end
+color #c9a43a
+material steel
+cyl r=0.24 h=0.01 pos=-0.70,dh+1.30,-1.40 rot=0,0,10 seg=14
+cyl r=0.22 h=0.01 pos=0.70,dh+1.30,-1.40 rot=0,0,-10 seg=14
+cyl r=0.17 h=0.01 pos=-0.48,dh+0.95,-1.00 seg=12
+color #111111
+material rubber
+cyl r=0.17 h=0.08 pos=0,dh+0.62,-2.05 seg=10
+# Amp stacks and bass cab on the deck
+material plastic
+color #161616
+box size=0.80,1.30,0.40 pos=-2.6,dh+0.65,-2.4 bevel=0.02
+box size=0.80,0.35,0.40 pos=-2.6,dh+1.48,-2.4 bevel=0.02
+box size=0.80,1.30,0.40 pos=2.6,dh+0.65,-2.4 bevel=0.02
+box size=0.80,0.35,0.40 pos=2.6,dh+1.48,-2.4 bevel=0.02
+color #3a3a3a
+material matte
+box size=0.70,1.15,0.01 pos=-2.6,dh+0.65,-2.195
+box size=0.70,1.15,0.01 pos=2.6,dh+0.65,-2.195
+color #c9a43a
+material steel
+box size=0.66,0.06,0.01 pos=-2.6,dh+1.52,-2.195
+box size=0.66,0.06,0.01 pos=2.6,dh+1.52,-2.195
+# Mic stands down front (three) and a keyboard on an X-stand
+color #2a2a2a
+material steel
+for m = -1, 1
+  cyl r=0.012 h=1.45 pos=m*2.2,dh+0.72,1.9 seg=5
+  cyl r=0.15 h=0.02 pos=m*2.2,dh+0.01,1.9 seg=8
+  cyl r=0.008 h=0.30 pos=m*2.2,dh+1.48,1.98 rot=60,0,0 seg=5
+end
+color #111111
+material plastic
+for m = -1, 1
+  sphere r=0.03 pos=m*2.2,dh+1.55,2.10 scale=1,1,1.6 seg=6
+end
+color #2a2a2a
+material steel
+box size=0.04,0.85,0.04 pos=-3.4,dh+0.40,-0.6 rot=0,0,30
+box size=0.04,0.85,0.04 pos=-3.4,dh+0.40,-0.6 rot=0,0,-30
+color #151515
+material plastic
+box size=1.20,0.10,0.35 pos=-3.4,dh+0.80,-0.6 bevel=0.01
+color #f2f2ee
+material matte
+box size=1.05,0.012,0.14 pos=-3.4,dh+0.856,-0.52
+# Backdrop lettering on the scrim
+color #e8b020
+material matte
+set s = 1
+set post_h = dh+3.1
+box size=0.810,0.110,0.03 pos=s*-3.875,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.810,0.110,0.03 pos=s*-3.375,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.540,0.110,0.03 pos=s*-3.750,0.175+post_h,s*-3.18 rot=0,0,s*-54.5
+box size=0.540,0.110,0.03 pos=s*-3.500,0.175+post_h,s*-3.18 rot=0,0,s*-125.5
+box size=0.760,0.110,0.03 pos=s*-3.150,0.025+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.760,0.110,0.03 pos=s*-2.650,0.025+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.610,0.110,0.03 pos=s*-2.900,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.810,0.110,0.03 pos=s*-2.425,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.460,0.110,0.03 pos=s*-2.250,0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.460,0.110,0.03 pos=s*-2.250,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.560,0.110,0.03 pos=s*-1.925,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.305,0.110,0.03 pos=s*-2.000,0.287+post_h,s*-3.18 rot=0,0,s*-39.8
+box size=0.305,0.110,0.03 pos=s*-2.000,-0.287+post_h,s*-3.18 rot=0,0,s*39.8
+box size=0.810,0.110,0.03 pos=s*-0.975,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.510,0.110,0.03 pos=s*-0.775,0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.510,0.110,0.03 pos=s*-0.775,0.000+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.535,0.110,0.03 pos=s*-0.763,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.360,0.110,0.03 pos=s*-0.500,0.175+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.360,0.110,0.03 pos=s*-0.475,-0.175+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.760,0.110,0.03 pos=s*-0.250,0.025+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.760,0.110,0.03 pos=s*0.250,0.025+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.610,0.110,0.03 pos=s*0.000,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.810,0.110,0.03 pos=s*0.475,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.460,0.110,0.03 pos=s*0.650,0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.460,0.110,0.03 pos=s*0.650,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.560,0.110,0.03 pos=s*0.975,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.305,0.110,0.03 pos=s*0.900,0.287+post_h,s*-3.18 rot=0,0,s*-39.8
+box size=0.305,0.110,0.03 pos=s*0.900,-0.287+post_h,s*-3.18 rot=0,0,s*39.8
+box size=0.810,0.110,0.03 pos=s*1.200,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.460,0.110,0.03 pos=s*1.375,0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.460,0.110,0.03 pos=s*1.375,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.560,0.110,0.03 pos=s*1.700,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.305,0.110,0.03 pos=s*1.625,0.287+post_h,s*-3.18 rot=0,0,s*-39.8
+box size=0.305,0.110,0.03 pos=s*1.625,-0.287+post_h,s*-3.18 rot=0,0,s*39.8
+box size=0.810,0.110,0.03 pos=s*2.175,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.460,0.110,0.03 pos=s*2.175,0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.460,0.110,0.03 pos=s*2.175,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.810,0.110,0.03 pos=s*2.650,0.000+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.610,0.110,0.03 pos=s*2.900,0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.485,0.110,0.03 pos=s*2.837,0.000+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.610,0.110,0.03 pos=s*2.900,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.610,0.110,0.03 pos=s*3.625,0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.610,0.110,0.03 pos=s*3.625,0.000+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.610,0.110,0.03 pos=s*3.625,-0.350+post_h,s*-3.18 rot=0,0,s*0.0
+box size=0.460,0.110,0.03 pos=s*3.375,0.175+post_h,s*-3.18 rot=0,0,s*90.0
+box size=0.460,0.110,0.03 pos=s*3.875,-0.175+post_h,s*-3.18 rot=0,0,s*90.0

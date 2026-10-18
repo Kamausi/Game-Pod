@@ -428,7 +428,11 @@ struct Expr {
             while (i < s.size() && (std::isdigit((unsigned char)s[i]) || s[i] == '.' || s[i] == 'e' ||
                                     ((s[i] == '-' || s[i] == '+') && i > st && (s[i - 1] == 'e'))))
                 i++;
-            return float(std::atof(s.substr(st, i - st).c_str()));
+            std::string tok = s.substr(st, i - st);
+            char* end = nullptr;
+            float v = std::strtof(tok.c_str(), &end);
+            if (end != tok.c_str() + tok.size()) fail("bad number '" + tok + "'");   // e.g. 3.18.0
+            return v;
         }
         if (i < s.size() && (std::isalpha((unsigned char)s[i]) || s[i] == '_' || s[i] == '$')) {
             if (s[i] == '$') i++;

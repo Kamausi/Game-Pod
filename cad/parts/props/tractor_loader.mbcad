@@ -1,47 +1,151 @@
-# Farm utility tractor with front loader bucket and ROPS: big rear tyres, yellow rims.
-# Front (bucket) faces +Z. Origin at ground centre.
+# Farm utility tractor with front loader and ROPS (the park's do-everything machine): tapered
+# louvred hood with grille and headlights, front axle and weights, curved rear fenders with
+# lamps, operator platform (seat, wheel, levers, loader joystick), two-post ROPS with beacon,
+# chevron-lug rear tyres on yellow rims, 3-point hitch, exhaust with rain cap, loader towers,
+# booms with hydraulic cylinders and a curved bucket. Front (bucket) faces +Z. Origin at ground centre.
 param body_r = 0.20
 param body_g = 0.45
 param body_b = 0.15
-color body_r body_g body_b
-material paint
-box size=0.80,0.75,1.70 pos=0,1.20,0.55 bevel=0.06
-box size=1.10,0.30,1.00 pos=0,1.05,-0.65 bevel=0.05
+set RA = -0.75
+set FA = 0.95
+set RR = 0.75
+set FR = 0.45
+
+# ---- Chassis, engine, front axle ----
 color #2a2a2a
 material steel
-box size=0.60,0.40,1.0 pos=0,0.75,0.40
-box size=0.50,0.08,0.60 pos=0,1.42,-0.75
-cyl r=0.05 h=0.90 pos=0.25,1.95,0.95
-# ROPS and seat
-color #1a1a1a
-box size=0.07,1.50,0.07 pos=0.55,1.95,-1.10 mirror=x
-box size=1.17,0.07,0.07 pos=0,2.68,-1.10
+box size=0.56,0.42,2.0 pos=0,0.78,0.25 bevel=0.03
+box size=0.90,0.40,0.70 pos=0,0.95,-0.62 bevel=0.04
+box size=1.25,0.12,0.12 pos=0,FR,FA
+color #1d1d1d
+# front weight stack (suitcase weights) on the nose bracket
+box size=0.66,0.08,0.30 pos=0,0.48,1.60
+for k = -2, 2
+  box size=0.11,0.30,0.30 pos=k*0.125,0.66,1.62 bevel=0.015
+end
+
+# ---- Hood: tapered side profile, louvres, grille, headlights ----
+color body_r body_g body_b
+material paint
+extrude depth=0.78 bevel=0.05 pts=-0.15,0.95,1.48,0.95,1.50,1.42,1.40,1.48,-0.15,1.58
 color #111111
 material matte
-box size=0.45,0.10,0.45 pos=0,1.50,-0.80 bevel=0.03
-box size=0.45,0.45,0.08 pos=0,1.75,-1.02 bevel=0.03
-# Steering wheel
-cyl r=0.18 h=0.03 pos=0,1.75,-0.25 rot=-50,0,0 seg=12
-# Tyres: big rear, small front, yellow rims
-color #121212
-material rubber
-cyl r=0.75 h=0.42 axis=x pos=0.82,0.75,-0.75 seg=20 mirror=x
-cyl r=0.45 h=0.28 axis=x pos=0.70,0.45,0.95 seg=16 mirror=x
-box size=0.44,0.10,0.14 pos=0.82,1.49,-0.75 mirror=x
-box size=0.44,0.10,0.14 pos=0.82,0.01,-0.75 mirror=x
+for k = 0, 5
+  box size=0.785,0.025,0.30 pos=0,1.08+k*0.06,0.90
+end
+box size=0.62,0.40,0.03 pos=0,1.18,1.505
+color body_r*0.8 body_g*0.8 body_b*0.8
+material paint
+for g = 0, 6
+  box size=0.62,0.025,0.035 pos=0,1.03+g*0.055,1.515
+end
+color #f2f0e6
+material lens
+box size=0.14,0.08,0.04 pos=0.22,1.40,1.50 mirror=x
 color #e2b616
 material paint
-cyl r=0.42 h=0.44 axis=x pos=0.82,0.75,-0.75 seg=16 mirror=x
-cyl r=0.25 h=0.30 axis=x pos=0.70,0.45,0.95 seg=12 mirror=x
-# Loader arms and bucket
+box size=0.80,0.04,1.62 pos=0,1.25,0.66
+
+# ---- Rear fenders with lamps, platform, fuel tank, steps ----
 color body_r body_g body_b
-box size=0.10,0.14,1.90 pos=0.48,1.10,1.20 rot=18,0,0 mirror=x
-box size=0.10,0.10,0.70 pos=0.48,1.60,0.20 rot=-50,0,0 mirror=x
+extrude depth=0.50 bevel=0.02 pts=arc(RA,RR,RR+0.10,175,5,10),arc(RA,RR,RR+0.04,5,175,10) pos=0.82,0,0 mirror=x
+box size=0.30,0.05,0.75 pos=0.60,1.50,RA mirror=x
+color #f2f0e6
+material lens
+box size=0.10,0.08,0.05 pos=0.82,1.62,RA+0.42 mirror=x
+color #b01313
+box size=0.08,0.10,0.04 pos=0.82,1.55,RA-0.82 mirror=x
+color #2a2a2a
+material steel
+box size=1.10,0.04,0.70 pos=0,1.18,-0.50
+box size=0.30,0.04,0.20 pos=0.62,0.55,-0.05 mirror=x
+box size=0.30,0.04,0.20 pos=0.62,0.85,-0.05 mirror=x
+color body_r body_g body_b
+material paint
+box size=0.70,0.30,0.30 pos=0,1.10,-0.05 bevel=0.04
+
+# ---- Operator station: seat, steering, levers, loader joystick ----
+color #151515
+material rubber
+box size=0.48,0.10,0.45 pos=0,1.42,-0.80 bevel=0.04
+box size=0.46,0.44,0.10 pos=0,1.68,-1.02 rot=-10,0,0 bevel=0.04
+color #2a2a2a
+material steel
+cyl r=0.025 h=0.50 pos=0,1.42,-0.22 rot=-35,0,0 seg=8
+color #111111
+material rubber
+cyl r=0.19 h=0.035 pos=0,1.64,-0.36 rot=-55,0,0 seg=14
+color #2a2a2a
+material steel
+cyl r=0.012 h=0.32 pos=0.32,1.40,-0.62 rot=10,0,0 seg=6
+cyl r=0.012 h=0.28 pos=0.38,1.36,-0.75 rot=-10,0,0 seg=6
+color #e2b616
+material plastic
+sphere r=0.03 pos=0.32,1.56,-0.60 seg=6
+color #111111
+sphere r=0.035 pos=0.38,1.50,-0.78 seg=6
+
+# ---- ROPS (two-post, folding) and beacon ----
+color #1a1a1a
+material steel
+box size=0.07,1.50,0.07 pos=0.55,1.95,-1.12 mirror=x
+box size=1.17,0.07,0.07 pos=0,2.68,-1.12
+box size=0.12,0.05,0.10 pos=0.55,2.10,-1.12 mirror=x
+color #f08a10
+material lens
+cyl r=0.05 h=0.10 pos=0.40,2.77,-1.12 seg=10
+
+# ---- Exhaust stack with rain cap ----
+color #2a2a2a
+material steel
+cyl r=0.045 h=0.85 pos=0.28,1.95,0.95 seg=10
+color #1a1a1a
+box size=0.10,0.01,0.10 pos=0.28,2.38,0.98 rot=-25,0,0
+
+# ---- 3-point hitch and drawbar ----
+color #2a2a2a
+box size=0.06,0.08,0.60 pos=0.30,0.70,-1.35 rot=-15,0,0 mirror=x
+box size=0.08,0.40,0.08 pos=0,1.10,-1.25
+box size=0.12,0.06,0.45 pos=0,0.55,-1.40
+
+# ---- Tyres: chevron-lug rears, ribbed fronts, yellow rims ----
+color #121212
+material rubber
+cyl r=RR-0.04 h=0.42 axis=x pos=0.82,RR,RA seg=20 mirror=x
+for k = 0, 19
+  box size=0.20,0.06,0.10 pos=0.92,RR+(RR-0.02)*sin(k*18),RA+(RR-0.02)*cos(k*18) rot=90-k*18,25,0 mirror=x
+  box size=0.20,0.06,0.10 pos=0.72,RR+(RR-0.02)*sin(k*18+9),RA+(RR-0.02)*cos(k*18+9) rot=99-k*18,-25,0 mirror=x
+end
+cyl r=FR h=0.28 axis=x pos=0.70,FR,FA seg=16 mirror=x
+color #e2b616
+material paint
+cyl r=0.42 h=0.44 axis=x pos=0.82,RR,RA seg=16 mirror=x
+cyl r=0.25 h=0.30 axis=x pos=0.70,FR,FA seg=12 mirror=x
+color #c49a10
+cyl r=0.14 h=0.48 axis=x pos=0.82,RR,RA seg=10 mirror=x
+cyl r=0.09 h=0.32 axis=x pos=0.70,FR,FA seg=10 mirror=x
+
+# ---- Loader: towers, booms, crossbar, cylinders, bucket ----
+color body_r body_g body_b
+material paint
+box size=0.10,0.65,0.25 pos=0.48,1.30,0.15 mirror=x
+box size=0.10,0.14,1.30 pos=0.50,1.42,0.80 rot=12,0,0 mirror=x
+box size=0.10,0.14,0.75 pos=0.50,0.95,1.62 rot=60,0,0 mirror=x
+box size=1.00,0.10,0.10 pos=0,1.22,1.25
+# lift cylinders: barrel and chrome rod
+color body_r*0.8 body_g*0.8 body_b*0.8
+cyl r=0.04 h=0.55 pos=0.42,1.05,0.55 rot=60,0,0 mirror=x seg=10
+color #d8d8d2
+material chrome
+cyl r=0.022 h=0.40 pos=0.42,0.86,0.92 rot=60,0,0 mirror=x seg=8
+# bucket: curved back and floor extruded across the width, side plates, cutting edge
 color #3a3a3a
 material steel
-box size=1.90,0.70,0.08 pos=0,0.45,2.15 rot=-10,0,0
-box size=1.90,0.06,0.65 pos=0,0.12,1.88
-box size=0.06,0.62,0.62 pos=0.94,0.42,1.88 mirror=x
-color #e8eef2
-material lens
-box size=0.12,0.08,0.03 pos=0.25,1.35,1.41 mirror=x
+extrude depth=1.90 pts=1.80,0.06,2.35,0.06,2.36,0.10,1.86,0.12,1.80,0.50,1.92,0.78,1.86,0.80,1.72,0.52
+box size=0.05,0.70,0.60 pos=0.95,0.40,2.06 mirror=x
+color #8a8478
+box size=1.90,0.04,0.10 pos=0,0.04,2.32
+# mud caked in the bucket and on the tyres
+color #5a4630
+material mud
+box size=1.80,0.10,0.40 pos=0,0.15,2.02
