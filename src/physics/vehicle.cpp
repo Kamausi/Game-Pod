@@ -433,7 +433,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         // Vegetation wear and tire tracks.
         if (ts.grass > 0.02f && (ss > 2.f || std::fabs(vLat) > 2.f))
             terrain.scuff(cp, b * 0.6f, 0.25f * dt * std::max(ss, std::fabs(vLat)), 0.f);
-        if (std::fabs(vLong) > 0.3f && (m > 0.35f || ts.grass < 0.6f)) terrain.scuff(cp, b * 0.45f, 0.f, dt * 1.2f);
+        if (std::fabs(vLong) > 0.3f && (m > 0.35f || ts.grass < 0.6f)) terrain.scuff(cp, b * 0.45f, 0.f, dt * 1.2f, std::atan2(f.z, f.x));
 
         // Tread packing: sticky clay loads the lugs; wheel speed flings it out.
         float ag = w.omega * w.omega * rr / G;

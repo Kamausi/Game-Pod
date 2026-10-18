@@ -15,7 +15,7 @@
 //   tire  r=0.44 w=0.32 rim=0.19 lugs=18 depth=0.03 tread=mt
 //   rim   r=0.19 w=0.25 spokes=5
 //   use   wheels/steel.mbcad pos=... rot=... scale=... key=value ...
-//   material paint|glass|chrome|rubber|lens|matte|steel|mud|plastic   # sticky, like color
+//   material paint|glass|chrome|rubber|lens|matte|steel|mud|leaf|plastic   # sticky, like color
 // box and extrude take bevel=r (rounded edges, smooth normals). Inside pts=, arc(zc,yc,r,a0,a1,n)
 // expands to n+1 points on a circular arc (degrees, 0 = +z, 90 = +y): wheel arches, rounded noses.
 // Expressions support + - * / ^ ( ), unary minus, and sin cos sqrt min max abs.
@@ -28,7 +28,7 @@
 namespace mb {
 
 // Surface materials, carried per vertex so one mesh can mix paint, glass, chrome and rubber.
-enum CadMaterial : int { MatPlastic = 0, MatPaint, MatGlass, MatChrome, MatRubber, MatLens, MatMatte, MatSteel, MatMud };
+enum CadMaterial : int { MatPlastic = 0, MatPaint, MatGlass, MatChrome, MatRubber, MatLens, MatMatte, MatSteel, MatMud, MatLeaf };
 int cadMaterialId(const std::string& name);  // -1 if unknown
 
 struct CadVertex {

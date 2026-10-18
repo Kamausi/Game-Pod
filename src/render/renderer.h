@@ -62,7 +62,7 @@ private:
     int targetW = 0, targetH = 0;
 
     GLuint progTerrain = 0, progMesh = 0, progShadow = 0, progSky = 0, progParticle = 0, progFence = 0;
-    GLuint texHeight = 0, texState = 0, shadowTex = 0, shadowFbo = 0;
+    GLuint texHeight = 0, texState = 0, texTrackDir = 0, shadowTex = 0, shadowFbo = 0;
     GLuint chunkVao = 0, chunkVbo = 0, chunkIbo = 0, skyVao = 0;
     struct Lod { GLuint offset; GLsizei count; };
     Lod lods[3];
@@ -70,6 +70,8 @@ private:
     std::vector<bool> chunkWater;
     GLuint particleVao = 0, particleQuad = 0, particleInst = 0;
     GLuint fenceVao = 0, fenceVbo = 0;
+    GLuint progGrass = 0, grassVao = 0, grassVbo = 0;
+    GLsizei grassVerts = 0;
     GLsizei fenceVerts = 0;
     std::map<std::string, GpuMesh> meshes;
     struct Batch { GpuMesh mesh; int count = 0; };
@@ -79,7 +81,7 @@ private:
     Mat4 lightVP;
     Vec3 sunDir;
     std::vector<float> scratch;
-    std::vector<uint8_t> scratch8;
+    std::vector<uint8_t> scratch8, scratchDir;
 };
 
 }  // namespace mb

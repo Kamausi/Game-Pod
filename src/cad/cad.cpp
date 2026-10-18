@@ -10,8 +10,8 @@ namespace mb {
 static std::string g_root = "cad/parts";
 
 int cadMaterialId(const std::string& n) {
-    static const char* names[] = {"plastic", "paint", "glass", "chrome", "rubber", "lens", "matte", "steel", "mud"};
-    for (int i = 0; i < 9; i++)
+    static const char* names[] = {"plastic", "paint", "glass", "chrome", "rubber", "lens", "matte", "steel", "mud", "leaf"};
+    for (int i = 0; i < 10; i++)
         if (n == names[i]) return i;
     return -1;
 }

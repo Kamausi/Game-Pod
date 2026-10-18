@@ -1,8 +1,29 @@
-# Dark conifer in the tree line behind the bus (photo 1).
+# Dark conifer in the tree line behind the bus (photo 1): drooping whorled tiers.
 param h = 7
 color #4d3c2a
-cyl r=0.15 h=1.2 pos=0,0.6,0 seg=6
-color #23402a
-cyl r=1.9 r2=0.1 h=h*0.75 pos=0,1.0+h*0.375,0 seg=9
-color #2c4c31
-cyl r=1.4 r2=0.05 h=h*0.5 pos=0,h*0.55+0.6,0 seg=9
+material matte
+cyl r=0.16 r2=0.06 h=h pos=0,h/2,0 seg=6
+material leaf
+color #203a26
+cyl r=2.35 r2=0.08 h=1.50 pos=0,h*0.120+0.75,0 seg=11
+cyl r=2.30 r2=1.65 h=0.16 pos=0,h*0.120-0.06,0 seg=11
+color #284a2e
+cyl r=2.02 r2=0.08 h=1.40 pos=0,h*0.240+0.70,0 seg=11
+cyl r=1.98 r2=1.41 h=0.16 pos=0,h*0.240-0.06,0 seg=11
+color #1d3523
+cyl r=1.68 r2=0.08 h=1.30 pos=0,h*0.360+0.65,0 seg=11
+cyl r=1.65 r2=1.18 h=0.16 pos=0,h*0.360-0.06,0 seg=11
+color #203a26
+cyl r=1.35 r2=0.08 h=1.20 pos=0,h*0.480+0.60,0 seg=11
+cyl r=1.32 r2=0.94 h=0.16 pos=0,h*0.480-0.06,0 seg=11
+color #284a2e
+cyl r=1.02 r2=0.08 h=1.10 pos=0,h*0.600+0.55,0 seg=11
+cyl r=1.00 r2=0.71 h=0.16 pos=0,h*0.600-0.06,0 seg=11
+color #1d3523
+cyl r=0.68 r2=0.08 h=1.00 pos=0,h*0.720+0.50,0 seg=11
+cyl r=0.67 r2=0.48 h=0.16 pos=0,h*0.720-0.06,0 seg=11
+color #203a26
+cyl r=0.35 r2=0.08 h=0.90 pos=0,h*0.840+0.45,0 seg=11
+cyl r=0.34 r2=0.24 h=0.16 pos=0,h*0.840-0.06,0 seg=11
+color #22402a
+cyl r=0.25 r2=0.01 h=1.1 pos=0,h*0.92+0.3,0 seg=7

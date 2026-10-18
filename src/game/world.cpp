@@ -218,11 +218,28 @@ void World::generate(uint32_t seed) {
 
     // ---- Parked rigs, dozer, bus, brush ----
     auto boxCol = [&](Vec3 c, Vec3 half, float yaw) { colliders.push_back({{c.x, ground(c.x, c.z) + half.y, c.z}, half, yaw}); };
-    addProp("vehicles/silverado.mbcad", -54, pitZ + fz + 9, 0.35f, 1, {{"hood_open", 1.f}});
+    // Parked rig on its own wheels at ride height: body origin = wheel center - axleY.
+    auto addParked = [&](const std::string& part, float x, float z, float yaw, float fa, float ra, float track, float axleY,
+                         float tireR, float dirt, CadParams pr = {}) {
+        float c = std::cos(yaw), s = std::sin(yaw);
+        auto world = [&](float lx, float lz) { return Vec2{x + lx * c + lz * s, z - lx * s + lz * c}; };
+        float gy = 1e9f;
+        CadParams wp{{"tire_r", tireR}, {"tire_w", 0.3175f}, {"lugs", 18}};
+        for (int i = 0; i < 4; i++) {
+            float lx = (i & 1) ? -track * 0.5f : track * 0.5f, lz = (i & 2) ? ra : fa;
+            Vec2 w = world(lx, lz);
+            float g = ground(w.x, w.y);
+            gy = std::min(gy, g);
+            PropInstance wi{"wheels/wheel.mbcad", wp, {w.x, g + tireR, w.y}, yaw + ((i & 1) ? PI : 0.f), 1.f, std::min(1.f, dirt * 1.3f)};
+            props.push_back(wi);
+        }
+        props.push_back({part, pr, {x, gy + tireR - axleY, z}, yaw, 1.f, dirt});
+    };
+    addParked("vehicles/silverado.mbcad", -54, pitZ + fz + 9, 0.35f, 1.56f, -2.34f, 1.73f, -0.46f, 0.4826f, 0.85f, {{"hood_open", 1.f}});
     boxCol({-54, 0, pitZ + fz + 9}, {1.0f, 0.9f, 3.0f}, 0.35f);
-    addProp("vehicles/utv.mbcad", -46, pitZ + fz + 7.5f, -0.5f);
+    addParked("vehicles/utv.mbcad", -46, pitZ + fz + 7.5f, -0.5f, 1.03f, -1.26f, 1.63f, -0.3f, 0.4064f, 0.6f);
     boxCol({-46, 0, pitZ + fz + 7.5f}, {0.8f, 0.8f, 1.7f}, -0.5f);
-    addProp("vehicles/bogcar76.mbcad", -22, pitZ + fz - 2.2f, PI * 0.5f + 0.15f);
+    addParked("vehicles/bogcar76.mbcad", -22, pitZ + fz - 2.2f, PI * 0.5f + 0.15f, 1.36f, -1.73f, 1.62f, -0.36f, 0.419f, 0.45f);
     boxCol({-22, 0, pitZ + fz - 2.2f}, {1.0f, 0.7f, 2.9f}, PI * 0.5f + 0.15f);
     addProp("props/dozer450.mbcad", dozerPos.x, dozerPos.z, -2.3f);
     boxCol(dozerPos, {1.2f, 1.3f, 1.9f}, -2.3f);
@@ -254,7 +271,11 @@ void World::generate(uint32_t seed) {
         bool spruce = rng.uniform() < (cluster ? 0.35f : 0.12f);
         float sc = rng.range(0.75f, 1.25f);
         if (spruce) addProp("vegetation/spruce.mbcad", x, z, rng.range(0, 6.28f), sc);
-        else addProp("vegetation/poplar.mbcad", x, z, rng.range(0, 6.28f), sc, {{"yellow", rng.range(0.55f, 1.f)}, {"h", rng.range(7, 12)}});
+        else {
+            // Quantized variants so trees share instanced batches.
+            float yel = std::round(rng.range(0.55f, 1.f) * 4.f) / 4.f, ht = std::round(rng.range(7, 12) / 2.5f) * 2.5f;
+            addProp("vegetation/poplar.mbcad", x, z, rng.range(0, 6.28f), sc, {{"yellow", yel}, {"h", ht}});
+        }
         colliders.push_back({{x, ground(x, z) + 2, z}, {0.25f, 2, 0.25f}, 0});
     }
     for (int s = 0; s < 420; s++) {

@@ -1,10 +1,54 @@
-# Aspen / poplar in October: tall thin grey trunk, sparse yellow crown (all photos).
+# Aspen / poplar in October: tall slender pale trunk, sparse yellow crown of leaf clusters (all photos).
 param h = 9
 param yellow = 0.85
-color #8f8a7a
-cyl r=0.12 r2=0.05 h=h pos=0,h/2,0 seg=7
+color #b9b4a4
+material matte
+cyl r=0.13 r2=0.045 h=h pos=0,h/2,0 seg=8
+color #3e3a33
+# dark lenticel bands and knots on the bark
+cyl r=0.125 h=0.05 pos=0,h*0.18,0 seg=8
+cyl r=0.11 h=0.04 pos=0,h*0.33,0 seg=8
+cyl r=0.095 h=0.05 pos=0,h*0.47,0 seg=8
+color #8d8676
+# upswept branches
+cyl r=0.035 r2=0.012 h=1.10 pos=0.385,h*0.45+0.33,0.000 rot=0.0,0,-38.0 seg=5
+cyl r=0.035 r2=0.012 h=1.02 pos=-0.263,h*0.51+0.31,0.241 rot=31.1,0,33.9 seg=5
+cyl r=0.035 r2=0.012 h=0.94 pos=0.029,h*0.57+0.28,-0.328 rot=-53.8,0,-4.7 seg=5
+cyl r=0.035 r2=0.012 h=0.86 pos=0.183,h*0.63+0.26,0.239 rot=30.1,0,-23.1 seg=5
+cyl r=0.035 r2=0.012 h=0.78 pos=-0.269,h*0.69+0.23,-0.047 rot=-8.0,0,45.3 seg=5
+cyl r=0.035 r2=0.012 h=0.70 pos=0.207,h*0.75+0.21,-0.132 rot=-29.0,0,-45.5 seg=5
+cyl r=0.035 r2=0.012 h=0.62 pos=-0.056,h*0.81+0.19,0.210 rot=36.7,0,9.8 seg=5
+material leaf
+# crown: leaf clusters scattered through a tall ellipsoid
 color 0.80*yellow+0.35*(1-yellow) 0.66*yellow+0.48*(1-yellow) 0.15
-sphere r=1.1 pos=0,h*0.62,0 scale=1,2.2,1 seg=8
-sphere r=0.9 pos=0.4,h*0.82,0.2 scale=1,1.8,1 seg=8
-color 0.68*yellow+0.30*(1-yellow) 0.55*yellow+0.45*(1-yellow) 0.12
-sphere r=0.8 pos=-0.4,h*0.5,-0.2 scale=1,1.6,1 seg=8
+sphere r=0.56 pos=-0.94,h*0.676,-0.37 scale=1,1.45,1 seg=7
+color 0.72*yellow+0.30*(1-yellow) 0.58*yellow+0.44*(1-yellow) 0.12
+sphere r=0.61 pos=0.28,h*0.744,0.64 scale=1,1.60,1 seg=7
+color 0.88*yellow+0.40*(1-yellow) 0.74*yellow+0.52*(1-yellow) 0.20
+sphere r=0.66 pos=-0.07,h*0.497,0.19 scale=1,1.55,1 seg=7
+color 0.80*yellow+0.35*(1-yellow) 0.66*yellow+0.48*(1-yellow) 0.15
+sphere r=0.62 pos=0.56,h*0.471,-0.06 scale=1,1.51,1 seg=7
+color 0.72*yellow+0.30*(1-yellow) 0.58*yellow+0.44*(1-yellow) 0.12
+sphere r=0.44 pos=0.58,h*0.529,0.05 scale=1,1.30,1 seg=7
+color 0.88*yellow+0.40*(1-yellow) 0.74*yellow+0.52*(1-yellow) 0.20
+sphere r=0.55 pos=0.62,h*0.571,0.12 scale=1,1.62,1 seg=7
+color 0.80*yellow+0.35*(1-yellow) 0.66*yellow+0.48*(1-yellow) 0.15
+sphere r=0.62 pos=-0.46,h*0.710,-0.56 scale=1,1.43,1 seg=7
+color 0.72*yellow+0.30*(1-yellow) 0.58*yellow+0.44*(1-yellow) 0.12
+sphere r=0.67 pos=0.96,h*0.589,-0.01 scale=1,1.55,1 seg=7
+color 0.88*yellow+0.40*(1-yellow) 0.74*yellow+0.52*(1-yellow) 0.20
+sphere r=0.44 pos=0.07,h*0.608,0.53 scale=1,1.58,1 seg=7
+color 0.80*yellow+0.35*(1-yellow) 0.66*yellow+0.48*(1-yellow) 0.15
+sphere r=0.71 pos=0.37,h*0.650,-0.53 scale=1,1.62,1 seg=7
+color 0.72*yellow+0.30*(1-yellow) 0.58*yellow+0.44*(1-yellow) 0.12
+sphere r=0.56 pos=0.11,h*0.450,0.44 scale=1,1.69,1 seg=7
+color 0.88*yellow+0.40*(1-yellow) 0.74*yellow+0.52*(1-yellow) 0.20
+sphere r=0.65 pos=0.74,h*0.649,0.37 scale=1,1.33,1 seg=7
+color 0.80*yellow+0.35*(1-yellow) 0.66*yellow+0.48*(1-yellow) 0.15
+sphere r=0.65 pos=-0.33,h*0.494,0.57 scale=1,1.26,1 seg=7
+color 0.72*yellow+0.30*(1-yellow) 0.58*yellow+0.44*(1-yellow) 0.12
+sphere r=0.66 pos=0.18,h*0.573,0.14 scale=1,1.29,1 seg=7
+color 0.88*yellow+0.40*(1-yellow) 0.74*yellow+0.52*(1-yellow) 0.20
+sphere r=0.64 pos=-0.41,h*0.730,0.14 scale=1,1.27,1 seg=7
+color 0.80*yellow+0.35*(1-yellow) 0.66*yellow+0.48*(1-yellow) 0.15
+sphere r=0.48 pos=0.44,h*0.772,0.40 scale=1,1.33,1 seg=7

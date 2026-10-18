@@ -17,6 +17,7 @@ struct PropInstance {
     Vec3 pos;
     float yaw = 0;
     float scale = 1;
+    float dirt = 0;  // baked-on mud (0..1), drawn by the same shader as the players' trucks
 };
 
 struct Barrel {

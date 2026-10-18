@@ -42,14 +42,41 @@ vec2 voronoi(vec2 p){
     if(dot(mr-r,mr-r) > 1e-5) be = min(be, dot(0.5*(mr+r), normalize(r-mr))); }
   return vec2(sqrt(md), be);
 }
+// Fair-weather cumulus on a plane 600 m up. The sky samples it along the view ray and the
+// ground along the sun ray, so the shadows sweeping the field match the clouds overhead.
+const float kCloudH = 600.0;
+float cloudDensity(vec2 q){
+  q = q*0.0016 + vec2(uTime*0.004, uTime*0.0015);
+  float f = 0.5*vnoise(q) + 0.25*vnoise(q*2.03 + 1.7) + 0.125*vnoise(q*4.1 + 3.3) + 0.0625*vnoise(q*8.3);
+  return smoothstep(0.42, 0.66, f/0.9375);
+}
+float cloudShadow(vec3 wp){
+  if(uQuality == 0) return 1.0;
+  vec2 q = wp.xz + uSunDir.xz/max(uSunDir.y, 0.1)*(kCloudH - wp.y);
+  return 1.0 - 0.62*cloudDensity(q);
+}
 float shadowAt(vec3 wp, vec3 n){
+  float cs = cloudShadow(wp);
   vec4 lp = uLightVP*vec4(wp + n*0.06, 1.0);
   vec3 c = lp.xyz/lp.w*0.5+0.5;
-  if(c.x<0.0||c.x>1.0||c.y<0.0||c.y>1.0||c.z>1.0) return 1.0;
+  if(c.x<0.0||c.x>1.0||c.y<0.0||c.y>1.0||c.z>1.0) return cs;
   c.z -= 0.0012;
   float s = 0.0; vec2 t = vec2(1.0/2048.0);
   for(int x=-1;x<=1;x++) for(int y=-1;y<=1;y++) s += texture(uShadow, vec3(c.xy+vec2(x,y)*t*1.5, c.z));
-  return s/9.0;
+  return s/9.0*cs;
+}
+// Clouds over the sky gradient for view direction d (from the camera).
+vec3 withClouds(vec3 c, vec3 d){
+  if(d.y <= 0.0) return c;
+  vec2 q = uCamPos.xz + d.xz/max(d.y, 0.02)*(kCloudH - uCamPos.y);
+  float den = cloudDensity(q);
+  if(den <= 0.0) return c;
+  float toward = cloudDensity(q + uSunDir.xz*55.0);              // self-shadowing toward the sun
+  float lit = clamp(1.0 - (toward - den)*1.6 - den*0.35, 0.0, 1.0);
+  vec3 col = mix(vec3(0.50,0.53,0.60), vec3(1.05,1.01,0.95), lit);
+  col += vec3(1.0,0.9,0.7)*pow(max(dot(d, uSunDir), 0.0), 12.0)*0.5*(1.0 - den);   // silver lining
+  float fade = smoothstep(0.015, 0.16, d.y);
+  return mix(c, col, den*fade*0.95);
 }
 vec3 skyColor(vec3 d){
   float t = clamp(d.y, 0.0, 1.0);
@@ -68,6 +95,13 @@ vec3 envColor(vec3 d, float rough){
   vec3 sky = skyColor(normalize(vec3(d.x, max(d.y, 0.0) + rough*0.35, d.z)));
   sky = mix(sky, vec3(0.42,0.55,0.80), rough*0.7);
   return mix(ground, sky, smoothstep(-band, band, d.y));
+}
+// Field palette shared by the terrain and the grass blades so they blend seamlessly.
+vec3 grassColor(vec2 p){
+  float n1 = fbm(p*0.18), n2 = fbm(p*0.9+7.0);
+  vec3 gA = vec3(0.25,0.33,0.14), gB = vec3(0.47,0.45,0.27), gold = vec3(0.60,0.53,0.22);
+  vec3 c = mix(gA, gB, smoothstep(0.35, 0.7, n1));
+  return mix(c, gold, smoothstep(0.72, 0.86, n2)*0.45);
 }
 float D_GGX(float NoH, float a){ float a2 = a*a; float d = NoH*NoH*(a2-1.0)+1.0; return a2/(3.14159*d*d); }
 float V_Smith(float NoV, float NoL, float a){ float k = a*0.5; return 0.25/((NoV*(1.0-k)+k)*(NoL*(1.0-k)+k)); }
@@ -108,11 +142,12 @@ layout(location=0) in vec3 aGrid;
 uniform ivec2 uChunk;
 uniform sampler2D uHeight;
 uniform sampler2D uState;
+uniform sampler2D uTrackDir;
 uniform vec2 uOrigin;
 uniform float uCell;
 uniform mat4 uVP;
 uniform int uWaterPass;
-out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth; out vec2 vTrackGrad;
+out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth; out vec2 vTrackGrad; out vec2 vTrackDir;
 float H(ivec2 c){ c = clamp(c, ivec2(0), ivec2(767)); return texelFetch(uHeight, c, 0).r; }
 float T(ivec2 c){ c = clamp(c, ivec2(0), ivec2(767)); return texelFetch(uState, c, 0).a; }
 void main(){
@@ -122,6 +157,9 @@ void main(){
   vN = normalize(vec3(H(c-ivec2(1,0)) - H(c+ivec2(1,0)), 2.0*uCell, H(c-ivec2(0,1)) - H(c+ivec2(0,1))));
   vState = texelFetch(uState, c, 0);
   vTrackGrad = vec2(T(c+ivec2(1,0)) - T(c-ivec2(1,0)), T(c+ivec2(0,1)) - T(c-ivec2(0,1)));
+  // Tire heading as a doubled angle so opposite directions interpolate cleanly; untracked cells add nothing.
+  float ang = texelFetch(uTrackDir, c, 0).r * 6.2831853;
+  vTrackDir = vec2(cos(ang), sin(ang))*step(0.03, vState.a);
   float y = h - aGrid.y*0.6;
   vDepth = hw.g - h;
   if(uWaterPass == 1){ y = hw.g > -900.0 ? hw.g : h - 0.05; vDepth = hw.g > -900.0 ? hw.g - h : -1.0; }
@@ -131,7 +169,7 @@ void main(){
 )";
 
 const char* kTerrainFS = R"(
-in vec3 vWorld; in vec3 vN; in vec4 vState; in float vDepth; in vec2 vTrackGrad;
+in vec3 vWorld; in vec3 vN; in vec4 vState; in float vDepth; in vec2 vTrackGrad; in vec2 vTrackDir;
 uniform int uWaterPass;
 uniform vec4 uOcc[8];   // vehicle contact occlusion: x, z, yaw, length (0 = unused)
 out vec4 frag;
@@ -165,7 +203,9 @@ void main(){
     vec3 wn = normalize(vec3(g.x*0.7, 1.0, g.y*0.7));
     vec3 V = normalize(uCamPos - vWorld);
     float fres = 0.02 + 0.98*pow(1.0 - max(dot(wn, V), 0.0), 5.0);
-    vec3 refl = envColor(reflect(-V, wn), 0.22);
+    vec3 rd = reflect(-V, wn);
+    vec3 refl = envColor(rd, 0.22);
+    if(uQuality > 0) refl = mix(refl, withClouds(refl, rd), 0.7);
     // Suspended clay makes bog water an opaque milky brown; sediment swirls drift slowly.
     float silt = fbm(p*0.45 + vec2(t*0.02, -t*0.015));
     vec3 body = pow(vec3(0.40,0.31,0.20)*(0.8 + 0.35*silt), vec3(2.2));
@@ -184,9 +224,7 @@ void main(){
   }
   float moist = vState.r, mud = vState.g, grass = vState.b, track = vState.a;
   float n1 = fbm(p*0.18), n2 = fbm(p*0.9+7.0), n3 = vnoise(p*6.0);
-  vec3 gA = vec3(0.25,0.33,0.14), gB = vec3(0.47,0.45,0.27), gold = vec3(0.60,0.53,0.22);
-  vec3 grassC = mix(gA, gB, smoothstep(0.35, 0.7, n1));
-  grassC = mix(grassC, gold, smoothstep(0.72, 0.86, n2)*0.45);
+  vec3 grassC = grassColor(p);
   float blades = vnoise(p*23.0)*vnoise(p*7.0 + 2.0);
   grassC *= 0.82 + 0.22*n3 + 0.18*blades;
 
@@ -197,6 +235,7 @@ void main(){
   float berm = clamp(length(vTrackGrad)*1.4, 0.0, 1.0);
   float slick = track*(1.0 - berm);
 
+  float film = smoothstep(0.9, 0.98, moist)*smoothstep(0.7, 0.8, fbm(p*0.5 + 11.0))*(1.0 - grass);
   // --- relief normal (finite differences of the procedural height) ---
   vec3 nd = n;
   if(uQuality > 0 && churn > 0.02){
@@ -204,6 +243,22 @@ void main(){
     float e = 0.02;
     float h0 = mudRelief(p, churn), hx = mudRelief(p + vec2(e, 0.0), churn), hz = mudRelief(p + vec2(0.0, e), churn);
     nd = normalize(n + vec3(-(hx - h0)/e, 0.0, -(hz - h0)/e)*amp);
+  }
+  // --- tread imprint: staggered lug bars pressed across the rut floor along the tire's heading ---
+  float coher = length(vTrackDir);
+  float tread = 0.0;
+  if(uQuality > 0 && coher > 0.25 && slick > 0.05){
+    float th = 0.5*atan(vTrackDir.y, vTrackDir.x);
+    vec2 dir = vec2(cos(th), sin(th)), lat = vec2(-dir.y, dir.x);
+    float along = dot(p, dir)/0.105, side = dot(p, lat)/0.16;
+    float stagger = step(0.5, fract(side))*0.5;
+    float ph = fract(along + stagger + side*0.18);            // slight chevron skew
+    float bar = smoothstep(0.08, 0.18, ph) - smoothstep(0.48, 0.58, ph);
+    float w = smoothstep(0.25, 0.7, coher)*smoothstep(0.05, 0.5, slick)*(1.0 - film);
+    tread = bar*w;
+    // Bar walls tilt the normal along the heading (rising edge faces back, falling edge forward).
+    float slope = step(0.08, ph)*step(ph, 0.18) - step(0.48, ph)*step(ph, 0.58);
+    nd = normalize(nd - vec3(dir.x, 0.0, dir.y)*slope*0.45*w);
   }
 
   vec3 dirt = vec3(0.47,0.40,0.30)*(0.9+0.2*n3);
@@ -226,6 +281,7 @@ void main(){
   }
   vec3 alb = mix(soil, grassC, smoothstep(0.1, 0.8, grass));
   alb *= 1.0 - 0.28*slick*(1.0 - grass);
+  alb *= 1.0 - 0.22*tread;
   alb = pow(alb, vec3(2.2));
 
   // Wet mud is glossy; pressed ruts and standing films are glossier still.
@@ -233,7 +289,6 @@ void main(){
   float rough = mix(0.92, 0.55, wetness*(1.0 - grass));
   rough = mix(rough, 0.38, slick*wetness);
   rough = mix(rough, 0.75, clod*berm);
-  float film = smoothstep(0.9, 0.98, moist)*smoothstep(0.7, 0.8, fbm(p*0.5 + 11.0))*(1.0 - grass);
   rough = mix(rough, 0.2, film);
   nd = normalize(mix(nd, n, film*0.7));
   alb *= 1.0 - film*0.45;
@@ -250,24 +305,26 @@ layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; layout(loca
 layout(location=3) in vec4 iM0; layout(location=4) in vec4 iM1; layout(location=5) in vec4 iM2; layout(location=6) in vec4 iM3;
 layout(location=7) in vec4 iTint; layout(location=8) in float aMat;
 uniform mat4 uModel; uniform mat4 uVP;
-out vec3 vWorld; out vec3 vN; out vec3 vColor; out vec3 vLocal; out vec3 vLocalN; flat out int vMat;
+out vec3 vWorld; out vec3 vN; out vec3 vColor; out vec3 vLocal; out vec3 vLocalN; flat out int vMat; out float vInstDirt;
 void main(){
   mat4 M = uModel*mat4(iM0, iM1, iM2, iM3);
   vec4 w = M*vec4(aPos, 1.0);
   vWorld = w.xyz; vN = mat3(M)*aNormal; vColor = aColor*iTint.rgb; vLocal = aPos; vLocalN = aNormal;
   vMat = int(aMat + 0.5);
+  vInstDirt = iTint.a;   // per-instance mud for static props (parked rigs)
   gl_Position = uVP*w;
 }
 )";
 
 const char* kMeshFS = R"(
-in vec3 vWorld; in vec3 vN; in vec3 vColor; in vec3 vLocal; in vec3 vLocalN; flat in int vMat;
-uniform float uDirt; uniform vec2 uDirtRange; uniform float uAlpha; uniform float uSeed; uniform int uMirror;
+in vec3 vWorld; in vec3 vN; in vec3 vColor; in vec3 vLocal; in vec3 vLocalN; flat in int vMat; in float vInstDirt;
+uniform float uDirtU; uniform vec2 uDirtRange; uniform float uAlpha; uniform float uSeed; uniform int uMirror;
 uniform vec4 uWheels[4];   // body: wheel centers in body space (x, y, z, radius); w = 0 unused
 uniform float uTireR;      // wheel items: outer tread radius, 0 otherwise
 out vec4 frag;
 float mudHeight(vec3 q){ return fbm2(q.xz*7.0 + q.y*5.0 + uSeed) * 0.7 + vnoise(q.zy*23.0 + q.x*9.0)*0.3; }
 void main(){
+  float uDirt = max(uDirtU, vInstDirt);
   vec3 alb = pow(clamp(vColor, 0.0, 1.0), vec3(2.2));
   vec3 n = normalize(vN);
   if(gl_FrontFacing == (uMirror == 1)) n = -n;
@@ -281,6 +338,17 @@ void main(){
   else if(vMat == 6){ rough = 0.92; }                                          // matte
   else if(vMat == 7){ rough = 0.42; metal = 0.85; }                            // steel
   else if(vMat == 8){ rough = 0.7; }                                           // baked-on mud
+  float leafT = 0.0;
+  if(vMat == 9){                                                               // foliage
+    rough = 0.72;
+    vec3 V0 = normalize(uCamPos - vWorld);
+    float lf = vnoise(vWorld.xz*6.0 + vWorld.y*4.3) *0.6 + vnoise(vWorld.xy*13.0 + vWorld.z*7.0)*0.4;
+    // Ragged leafy outline: eat away grazing parts of each cluster with noise.
+    float edge = 1.0 - abs(dot(n, V0));
+    if(lf < (edge - 0.55)*1.9) discard;
+    alb *= 0.62 + 0.7*lf;
+    leafT = 1.0;
+  }
   float ao = 0.62 + 0.38*smoothstep(-0.9, 0.5, n.y);
 
   // ---- mud: splash coat + spray fans thrown up behind each tire + specks, drips, packed tread ----
@@ -361,7 +429,79 @@ void main(){
                kSun*D_GGX(max(dot(n, H), 0.0), 0.06*0.06)*V_Smith(NoV, NoL, 0.0036)*Fc*NoL*sh*3.14159);
   }
   c += alb*glow;
+  if(leafT > 0.0){
+    // Light through thin leaves when looking toward the sun.
+    vec3 V1 = normalize(uCamPos - vWorld);
+    c += alb*kSun*pow(max(dot(-V1, uSunDir), 0.0), 3.0)*0.55*sh;
+  }
   frag = vec4(finalize(c, vWorld), uAlpha);
+}
+)";
+
+const char* kGrassVS = R"(
+layout(location=0) in vec4 aBlade;   // xyz local position, w = height fraction (0 root .. 1 tip)
+uniform sampler2D uHeight;
+uniform sampler2D uState;
+uniform vec2 uOrigin;
+uniform float uCell;
+uniform mat4 uVP;
+uniform vec2 uGridOrigin;
+uniform float uSpacing;
+uniform int uGrid;
+uniform float uRadius;
+uniform vec4 uOcc[8];
+out vec3 vWorld; out float vT; out vec3 vTint; out vec3 vN;
+void main(){
+  ivec2 g = ivec2(gl_InstanceID % uGrid, gl_InstanceID / uGrid);
+  vec2 cellW = uGridOrigin + vec2(g)*uSpacing;
+  vec2 id = floor(cellW/uSpacing + 0.5);
+  vec2 rnd = hash2(id*0.731);
+  vec2 wxz = cellW + (rnd - 0.5)*uSpacing;
+  ivec2 tc = clamp(ivec2((wxz - uOrigin)/uCell + 0.5), ivec2(0), ivec2(767));
+  vec2 hw = texelFetch(uHeight, tc, 0).rg;
+  vec4 st = texelFetch(uState, tc, 0);
+  float cover = smoothstep(0.3, 0.75, st.b)*(1.0 - st.a);       // bare where worn or rutted
+  cover *= 0.35 + 0.65*smoothstep(0.25, 0.65, vnoise(wxz*0.8 + 5.0));  // clumpy, uneven sward
+  if(hw.g > hw.r - 0.02) cover = 0.0;                           // under water
+  float dist = length(wxz - uCamPos.xz);
+  float sc = cover*(0.65 + 0.7*hash(id + 3.1))*(1.0 - smoothstep(uRadius*0.6, uRadius, dist));
+  // Pressed flat under vehicles.
+  for(int i = 0; i < 8; i++){
+    vec4 o = uOcc[i];
+    if(o.w <= 0.0) continue;
+    vec2 d = wxz - o.xy; float c = cos(o.z), s = sin(o.z);
+    vec2 l = vec2(c*d.x - s*d.y, s*d.x + c*d.y)/vec2(o.w*0.26, o.w*0.6);
+    sc *= mix(0.25, 1.0, smoothstep(0.7, 1.1, length(l)));
+  }
+  float yaw = hash(id + 7.7)*6.2831853;
+  float cy = cos(yaw), sy = sin(yaw);
+  vec3 lp = aBlade.xyz*vec3(1.0, sc, 1.0);
+  lp = vec3(cy*lp.x - sy*lp.z, lp.y, sy*lp.x + cy*lp.z);
+  // Wind: gusts travel across the field; tips bend most.
+  float gust = vnoise(wxz*0.15 + vec2(uTime*0.6, uTime*0.25));
+  float sway = (0.04 + 0.12*gust)*(0.6 + 0.4*sin(uTime*2.3 + rnd.x*6.28));
+  lp.xz += vec2(0.8, 0.45)*sway*aBlade.w*aBlade.w*sc*2.0;
+  vec3 w = vec3(wxz.x, hw.r, wxz.y) + lp;
+  vWorld = w; vT = aBlade.w;
+  vTint = grassColor(wxz)*(0.85 + 0.3*hash(id + 1.3));
+  vN = normalize(vec3(-sy, 0.6, cy));
+  gl_Position = sc < 0.04 ? vec4(2.0, 2.0, 2.0, 1.0) : uVP*vec4(w, 1.0);
+}
+)";
+const char* kGrassFS = R"(
+in vec3 vWorld; in float vT; in vec3 vTint; in vec3 vN;
+out vec4 frag;
+void main(){
+  // Darker, greener roots; sun-bleached tips. Blades are thin, so they glow when backlit.
+  vec3 alb = pow(mix(vTint*vec3(0.42,0.48,0.36), vTint*vec3(1.1,1.04,0.86), vT), vec3(2.2));
+  vec3 n = normalize(vN); if(!gl_FrontFacing) n = -n;
+  vec3 V = normalize(uCamPos - vWorld);
+  float sh = shadowAt(vWorld, vec3(0.0, 1.0, 0.0));
+  float ndl = abs(dot(n, uSunDir))*0.6 + 0.4*max(uSunDir.y, 0.0);
+  float trans = pow(max(dot(-V, uSunDir), 0.0), 4.0)*0.6;
+  vec3 amb = vec3(0.36,0.42,0.50)*0.65*(0.45 + 0.55*vT);
+  vec3 c = alb*(kSun*(ndl + trans)*sh + amb);
+  frag = vec4(finalize(c, vWorld), 1.0);
 }
 )";
 
@@ -379,7 +519,7 @@ in vec2 vNdc; uniform mat4 uInvVP; out vec4 frag;
 void main(){
   vec4 a = uInvVP*vec4(vNdc, -1.0, 1.0), b = uInvVP*vec4(vNdc, 1.0, 1.0);
   vec3 d = normalize(b.xyz/b.w - a.xyz/a.w);
-  vec3 c = skyColor(d);
+  vec3 c = withClouds(skyColor(d), d);
   c = c*(2.51*c+0.03)/(c*(2.43*c+0.59)+0.14);
   frag = vec4(pow(clamp(c,0.0,1.0), vec3(1.0/2.2)), 1.0);
 }
@@ -531,6 +671,31 @@ bool Renderer::init(int w, int h) {
     progParticle = compileProgram("particle", src(kParticleVS), src(kParticleFS));
     progFence = compileProgram("fence", src(kFenceVS), src(kFenceFS));
     progPost = compileProgram("post", std::string(kHeader) + kPostVS, std::string(kHeader) + kPostFS);
+    progGrass = compileProgram("grass", src(kGrassVS), src(kGrassFS));
+    {
+        // One tuft: fourteen thin single-triangle blades spread over the cell, leaning outward.
+        std::vector<float> gv;
+        Rng r(77);
+        for (int b = 0; b < 14; b++) {
+            float a = r.range(0.f, 2 * PI), h = r.range(0.10f, 0.30f), wd = r.range(0.008f, 0.014f);
+            float lean = r.range(0.02f, 0.10f), ox = r.range(-0.2f, 0.2f), oz = r.range(-0.2f, 0.2f);
+            Vec3 side{std::cos(a), 0, std::sin(a)}, out{-side.z, 0, side.x};
+            auto v = [&](float s, float t) {
+                Vec3 p = Vec3{ox, 0, oz} + side * (s * wd * (1.f - t)) + out * (lean * t) + Vec3{0, h * t, 0};
+                gv.insert(gv.end(), {p.x, p.y, p.z, t});
+            };
+            v(-1, 0); v(1, 0); v(0, 1);
+        }
+        grassVerts = GLsizei(gv.size() / 4);
+        glGenVertexArrays(1, &grassVao);
+        glBindVertexArray(grassVao);
+        glGenBuffers(1, &grassVbo);
+        glBindBuffer(GL_ARRAY_BUFFER, grassVbo);
+        glBufferData(GL_ARRAY_BUFFER, GLsizeiptr(gv.size() * 4), gv.data(), GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 16, nullptr);
+        glBindVertexArray(0);
+    }
     glGenVertexArrays(1, &postVao);
     glGenVertexArrays(1, &skyVao);
 
@@ -713,7 +878,7 @@ const GpuMesh* Renderer::mesh(const std::string& part, const CadParams& params) 
     CadResult r = cadBuild(part, params);
     if (!r.error.empty()) std::printf("[cad] %s\n", r.error.c_str());
     GpuMesh g = uploadMesh(r.mesh);
-    float ident[20] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1};
+    float ident[20] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0};
     setInstances(g, ident, 1, false);
     return &(meshes[key] = g);
 }
@@ -729,6 +894,7 @@ void Renderer::uploadTerrain(Terrain& t, bool full) {
     int w = x1 - x0 + 1, h = z1 - z0 + 1;
     scratch.resize(size_t(w) * h * 2);
     scratch8.resize(size_t(w) * h * 4);
+    scratchDir.resize(size_t(w) * h);
     for (int j = 0; j < h; j++)
         for (int i = 0; i < w; i++) {
             int k = t.idx(x0 + i, z0 + j), o = j * w + i;
@@ -738,6 +904,7 @@ void Renderer::uploadTerrain(Terrain& t, bool full) {
             scratch8[o * 4 + 1] = uint8_t(clampf((t.h[k] - t.base[k]) / 1.5f, 0, 1) * 255);
             scratch8[o * 4 + 2] = t.grass[k];
             scratch8[o * 4 + 3] = t.track[k];
+            scratchDir[size_t(o)] = t.trackDir[k];
         }
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     if (full) {
@@ -750,11 +917,18 @@ void Renderer::uploadTerrain(Terrain& t, bool full) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, scratch8.data());
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        if (!texTrackDir) glGenTextures(1, &texTrackDir);
+        glBindTexture(GL_TEXTURE_2D, texTrackDir);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, scratchDir.data());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     } else {
         glBindTexture(GL_TEXTURE_2D, texHeight);
         glTexSubImage2D(GL_TEXTURE_2D, 0, x0, z0, w, h, GL_RG, GL_FLOAT, scratch.data());
         glBindTexture(GL_TEXTURE_2D, texState);
         glTexSubImage2D(GL_TEXTURE_2D, 0, x0, z0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, scratch8.data());
+        glBindTexture(GL_TEXTURE_2D, texTrackDir);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, x0, z0, w, h, GL_RED, GL_UNSIGNED_BYTE, scratchDir.data());
     }
 }
 
@@ -777,7 +951,7 @@ void Renderer::loadWorld(World& w) {
         std::string key = p.part;
         char buf[48];
         for (auto& kv : p.params) { std::snprintf(buf, sizeof buf, ";%s=%.2f", kv.first.c_str(), kv.second); key += buf; }
-        groups[key].push_back(&p);
+        groups[key].push_back(&p);  // mud amount rides in the instance tint, so it doesn't split batches
     }
     for (auto& g : groups) {
         CadResult r = cadBuild(g.second[0]->part, g.second[0]->params);
@@ -788,7 +962,7 @@ void Renderer::loadWorld(World& w) {
         for (auto* p : g.second) {
             Mat4 m = Mat4::trs(p->pos, Quat::axisAngle({0, 1, 0}, p->yaw), {p->scale, p->scale, p->scale});
             inst.insert(inst.end(), m.m, m.m + 16);
-            inst.insert(inst.end(), {1, 1, 1, 1});
+            inst.insert(inst.end(), {1, 1, 1, p->dirt});
         }
         setInstances(b.mesh, inst.data(), int(g.second.size()), false);
         b.count = int(g.second.size());
@@ -856,13 +1030,15 @@ void Renderer::drawTerrain(bool water, const Mat4& vp) {
 void Renderer::drawStatic(GLuint prog) {
     Mat4 I = Mat4::identity();
     glUniformMatrix4fv(glGetUniformLocation(prog, "uModel"), 1, GL_FALSE, I.m);
-    glUniform1f(glGetUniformLocation(prog, "uDirt"), 0.f);
+    glUniform1f(glGetUniformLocation(prog, "uDirtU"), 0.f);
+    glUniform2f(glGetUniformLocation(prog, "uDirtRange"), -0.45f, 1.0f);
+    glUniform1f(glGetUniformLocation(prog, "uSeed"), 7.f);
     glUniform1f(glGetUniformLocation(prog, "uAlpha"), 1.f);
     for (auto& b : batches) drawMesh(b.mesh, b.count);
 }
 
 void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass, bool transparent) {
-    GLint locModel = glGetUniformLocation(prog, "uModel"), locDirt = glGetUniformLocation(prog, "uDirt");
+    GLint locModel = glGetUniformLocation(prog, "uModel"), locDirt = glGetUniformLocation(prog, "uDirtU");
     GLint locRange = glGetUniformLocation(prog, "uDirtRange"), locAlpha = glGetUniformLocation(prog, "uAlpha");
     GLint locSeed = glGetUniformLocation(prog, "uSeed"), locMirror = glGetUniformLocation(prog, "uMirror");
     GLint locWheels = glGetUniformLocation(prog, "uWheels"), locTire = glGetUniformLocation(prog, "uTireR");
@@ -905,7 +1081,7 @@ void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool sha
             Mat4 m = Mat4::trs(b.pos, Quat::axisAngle({0, 1, 0}, b.yaw)) *
                      Mat4::trs({0, 0.29f * std::sin(b.tilt), 0}, Quat::axisAngle({1, 0, 0}, b.tilt) * Quat::axisAngle({0, 1, 0}, b.spin));
             scratch.insert(scratch.end(), m.m, m.m + 16);
-            scratch.insert(scratch.end(), {1, 1, 1, 1});
+            scratch.insert(scratch.end(), {1, 1, 1, 0});
             n++;
         }
         if (n) { setInstances(barrelInst[v], scratch.data(), n, true); drawMesh(barrelInst[v], n); }
@@ -917,7 +1093,7 @@ void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool sha
         Quat q = p.lean > 0.001f ? Quat::axisAngle(axis, p.lean) : Quat{};
         Mat4 m = Mat4::trs(p.base, q);
         scratch.insert(scratch.end(), m.m, m.m + 16);
-        scratch.insert(scratch.end(), {1, 1, 1, 1});
+        scratch.insert(scratch.end(), {1, 1, 1, 0});
     }
     glUniform1f(locDirt, 0.f);
     if (!w.posts.empty()) { setInstances(postInst, scratch.data(), int(w.posts.size()), true); drawMesh(postInst, int(w.posts.size())); }
@@ -994,6 +1170,9 @@ void Renderer::render(World& w, const RenderFrame& f) {
     glBindTexture(GL_TEXTURE_2D, texHeight);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, texState);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, texTrackDir);
+    glActiveTexture(GL_TEXTURE0);
 
     // Sky
     setCommon(progSky);
@@ -1008,6 +1187,7 @@ void Renderer::render(World& w, const RenderFrame& f) {
     setCommon(progTerrain);
     glUniform1i(glGetUniformLocation(progTerrain, "uHeight"), 0);
     glUniform1i(glGetUniformLocation(progTerrain, "uState"), 1);
+    glUniform1i(glGetUniformLocation(progTerrain, "uTrackDir"), 4);
     glUniform2f(glGetUniformLocation(progTerrain, "uOrigin"), w.terrain.originX(), w.terrain.originZ());
     glUniform1f(glGetUniformLocation(progTerrain, "uCell"), Terrain::CELL);
     {
@@ -1017,6 +1197,33 @@ void Renderer::render(World& w, const RenderFrame& f) {
         glUniform4fv(glGetUniformLocation(progTerrain, "uOcc"), 8, occ);
     }
     drawTerrain(false, viewProj);
+
+    // Grass tufts around the camera (instanced, positioned from the heightfield in the shader)
+    if (quality >= 1) {
+        const int G = quality >= 2 ? 84 : 56;
+        const float spacing = 0.36f;
+        setCommon(progGrass);
+        glUniform1i(glGetUniformLocation(progGrass, "uHeight"), 0);
+        glUniform1i(glGetUniformLocation(progGrass, "uState"), 1);
+        glUniform2f(glGetUniformLocation(progGrass, "uOrigin"), w.terrain.originX(), w.terrain.originZ());
+        glUniform1f(glGetUniformLocation(progGrass, "uCell"), Terrain::CELL);
+        glUniformMatrix4fv(glGetUniformLocation(progGrass, "uVP"), 1, GL_FALSE, viewProj.m);
+        // Grid centred a little ahead of the camera, snapped so tufts never swim.
+        Vec3 ahead = f.camPos + fwd * (G * spacing * 0.3f);
+        float gx = std::floor(ahead.x / spacing) * spacing - G * spacing * 0.5f;
+        float gz = std::floor(ahead.z / spacing) * spacing - G * spacing * 0.5f;
+        glUniform2f(glGetUniformLocation(progGrass, "uGridOrigin"), gx, gz);
+        glUniform1f(glGetUniformLocation(progGrass, "uSpacing"), spacing);
+        glUniform1i(glGetUniformLocation(progGrass, "uGrid"), G);
+        glUniform1f(glGetUniformLocation(progGrass, "uRadius"), G * spacing * 0.5f);
+        float occ[32] = {0};
+        size_t n = std::min<size_t>(32, f.occluders.size());
+        std::copy(f.occluders.begin(), f.occluders.begin() + long(n), occ);
+        glUniform4fv(glGetUniformLocation(progGrass, "uOcc"), 8, occ);
+        glDisable(GL_CULL_FACE);
+        glBindVertexArray(grassVao);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, grassVerts, G * G);
+    }
 
     // Meshes
     setCommon(progMesh);

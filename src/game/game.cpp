@@ -138,6 +138,18 @@ void Game::action(const std::string& a) {
         camTarget = player.pos + Vec3{0, 0.5f, 0};
         camPos = camTarget + Vec3{std::sin(camYaw) * 7.f, 2.2f, std::cos(camYaw) * 7.f};
     }
+    else if (a.rfind("ruts:", 0) == 0) {  // photo mode: ruts:x,z,headingDeg,length - press a pair of tire ruts
+        float x = 0, z = 0, hd = 0, len = 8;
+        std::sscanf(a.c_str() + 5, "%f,%f,%f,%f", &x, &z, &hd, &len);
+        Vec3 f{std::sin(hd * DEG), 0, std::cos(hd * DEG)}, l{f.z, 0, -f.x};
+        for (float t = 0; t < len; t += 0.1f)
+            for (int side = -1; side <= 1; side += 2) {
+                Vec3 c = Vec3{x, 0, z} + f * t + l * (0.74f * float(side));
+                c.y = world.terrain.heightAt(c.x, c.z);
+                world.terrain.digPatch(c, f, 0.2f, 0.17f, 0.012f);
+                world.terrain.scuff(c, 0.16f, 0.3f, 0.5f, std::atan2(f.z, f.x));
+            }
+    }
     else if (a.rfind("photo:", 0) == 0) {  // photo mode orbit: photo:yawDeg,dist,height (photo:off to release)
         photoCam = a != "photo:off";
         if (photoCam) std::sscanf(a.c_str() + 6, "%f,%f,%f", &photoYaw, &photoDist, &photoH);

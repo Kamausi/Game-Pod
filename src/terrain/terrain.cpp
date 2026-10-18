@@ -13,6 +13,7 @@ Terrain::Terrain() {
     comp.assign(n, 0.05f);
     grass.assign(n, 255);
     track.assign(n, 0);
+    trackDir.assign(n, 0);
 }
 
 static inline void bilinearSetup(const Terrain& t, float x, float z, int& i, int& j, float& fx, float& fz) {
@@ -178,7 +179,13 @@ void Terrain::deposit(float x, float z, float volume, float radius) {
         }
 }
 
-void Terrain::scuff(Vec3 center, float radius, float grassLoss, float trackAdd) {
+void Terrain::scuff(Vec3 center, float radius, float grassLoss, float trackAdd, float heading) {
+    int hd = -1;
+    if (heading < 1e8f) {
+        float a = std::fmod(heading, PI);
+        if (a < 0) a += PI;
+        hd = int(a / PI * 255.f + 0.5f) & 255;
+    }
     PatchIter b = patchBounds(*this, center, radius);
     for (int j = b.j0; j <= b.j1; j++)
         for (int i = b.i0; i <= b.i1; i++) {
@@ -188,8 +195,10 @@ void Terrain::scuff(Vec3 center, float radius, float grassLoss, float trackAdd) 
             int g = int(grass[k]) - int(grassLoss * 255.f + 0.5f);
             int t = int(track[k]) + int(trackAdd * 255.f + 0.5f);
             uint8_t ng = uint8_t(std::max(0, g)), nt = uint8_t(std::min(255, t));
-            if (ng != grass[k] || nt != track[k]) {
+            bool turn = hd >= 0 && trackAdd > 0 && trackDir[k] != uint8_t(hd);
+            if (ng != grass[k] || nt != track[k] || turn) {
                 grass[k] = ng; track[k] = nt;
+                if (turn) trackDir[k] = uint8_t(hd);
                 dirty.add(i, j);
             }
         }

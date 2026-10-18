@@ -56,7 +56,9 @@ public:
     // Deposit a volume of mud as a soft splat.
     void deposit(float x, float z, float volume, float radius);
     // Wear vegetation / add tire track marks.
-    void scuff(Vec3 center, float radius, float grassLoss, float trackAdd);
+    // heading (radians, world XZ) records the tire's direction so the renderer can press tread
+    // bars across the rut; the default leaves it unchanged.
+    void scuff(Vec3 center, float radius, float grassLoss, float trackAdd, float heading = 1e9f);
     // Mud re-flow / re-liquefaction near a point (soupy mud fills ruts back in).
     void relax(Vec3 center, float radius, float dt);
     // Bulldoze/grade a region flat to a target height (the dozer).
@@ -66,6 +68,7 @@ public:
 
     std::vector<float> h, base, water, moist, comp;
     std::vector<uint8_t> grass, track;
+    std::vector<uint8_t> trackDir;  // tire heading mod pi, 0..255
 };
 
 }  // namespace mb
