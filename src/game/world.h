@@ -99,6 +99,9 @@ public:
     Vec3 parkingMin{-48, 0, -90}, parkingMax{-12, 0, -70};
     Vec3 villageMin{5, 0, -90}, villageMax{33, 0, -62};
     Vec3 shutdownMin{47, 0, -44}, shutdownMax{78, 0, -16};
+    Vec3 burnoutCenter{62, 0, -6};   // concrete burnout pad (14 x 8 m), crowd on the south side
+    float burnoutHalfX = 7, burnoutHalfZ = 4;
+    bool onBurnoutPad(Vec3 p) const { return std::fabs(p.x - burnoutCenter.x) < burnoutHalfX && std::fabs(p.z - burnoutCenter.z) < burnoutHalfZ; }
     // Bounty hole east of the venue: one long, bottomless clay trench with a prize on it.
     float bountyX0 = 88, bountyX1 = 120, bountyZ = -50, bountyHalfW = 7;
     Vec3 bountyCenter() const { return {0.5f * (bountyX0 + bountyX1), 0, bountyZ}; }

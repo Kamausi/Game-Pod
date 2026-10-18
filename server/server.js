@@ -31,6 +31,7 @@ const BOARDS = {
   king_time: { lower: false, min: 0, max: 120.5 },
   bounty_time: { lower: true, min: 2.0, max: 600 },
   bounty_distance: { lower: false, min: 0, max: 32.01 },
+  burnout_score: { lower: false, min: 0, max: 1e6 },
 };
 let boards = {};
 try { boards = JSON.parse(fs.readFileSync(BOARD_FILE, 'utf8')); } catch { boards = {}; }

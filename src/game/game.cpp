@@ -102,7 +102,7 @@ void Game::startMode(ModeId m, int lane, double startAt) {
     aiReleased = false;
     runTrace.clear();
     traceTimer = 0;
-    if (m != ModeId::FreeRoam && m != ModeId::Bounty && aiCount > 0 && remotes.empty()) {
+    if (m != ModeId::FreeRoam && m != ModeId::Bounty && m != ModeId::Burnout && aiCount > 0 && remotes.empty()) {
         ais = makeRivals(aiCount, uint32_t(serverNow() * 7.0));
         for (size_t i = 0; i < ais.size(); i++) {
             AiDriver& a = ais[i];
@@ -137,6 +137,9 @@ void Game::startMode(ModeId m, int lane, double startAt) {
     } else if (m == ModeId::Circuit) {
         announceLine("Hill & Hole, three laps: " + player.cfg.name + " in the " + who(player.cfg));
         for (auto& a : ais) announceLine(a.name + " in '" + a.rig + "'");
+    } else if (m == ModeId::Burnout) {
+        announceLine("Burnout contest! " + player.cfg.name + " on the pad - light 'em up!");
+        announceLine("Hold the gas AND the brake: line lock holds the fronts. 2H only!");
     } else if (m == ModeId::FreeRoam) {
         announceLine("Open pits are open! Paddock, staging, the bounty hole east, camping through the east gap");
     }
@@ -333,6 +336,12 @@ float Game::spawnWheelFx(const Vehicle& vc, float dt) {
                 particles.emit(PType::Water, w.contactPos + U * 0.2f, vel, R.range(0.04f, 0.08f), 1.4f, {0.5f, 0.46f, 0.38f});
             }
             if (R.uniform() < 0.25f) particles.emit(PType::Mist, w.contactPos + U * 0.3f, v.vel * 0.3f + U, 0.3f, 1.4f, {0.75f, 0.72f, 0.66f});
+        }
+        // Tire smoke: rubber spinning on hard, dry ground (pad, gravel, hardpan).
+        if (w.mudW < 0.1f && w.waterDepth < 0.01f && std::fabs(w.slipSpeed) > 6.f && R.uniform() < clampf((std::fabs(w.slipSpeed) - 6.f) * 0.08f, 0.f, 0.9f)) {
+            Vec3 vel = back * R.range(0.5f, 2.f) + U * R.range(0.4f, 1.2f) + side * R.bipolar() * 0.8f + v.vel * 0.3f;
+            particles.emit(PType::Smoke, w.contactPos + U * 0.25f + back * (w.radius * 0.5f), vel, R.range(0.35f, 0.6f), R.range(2.f, 3.5f),
+                           {0.86f, 0.86f, 0.84f});
         }
         if (w.mudW < 0.2f && std::fabs(w.slipSpeed) > 3.f && R.uniform() < 0.5f)
             particles.emit(PType::Grass, w.contactPos + U * 0.1f, back * 4.f + U * 2.f, 0.03f, 1.f, {0.35f, 0.42f, 0.18f});
@@ -898,6 +907,7 @@ void Game::updateCoach(float dt) {
     else if (pack > 0.65f && spd < 6.f) coach = "Tread packed with mud - a burst of wheel speed cleans the lugs";
     else if (tractionBackTimer > 0) coach = "Traction back - keep the momentum";
     else if (v.brakeWet > 0.35f) coach = "Wet brakes - drag them lightly to dry them";
+    else if (mode.id == ModeId::Burnout && mode.phase == Phase::Running && v.fourWD) coach = "Burnouts want 2H (G) - in 4WD the fronts fight the line lock";
 }
 
 // Venue life: the PA announcer, rival milestones, and the wash bay on the return road.

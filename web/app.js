@@ -19,6 +19,9 @@ const BOARDS = {
   circuit_lap: { label: 'Hill & Hole — Best Lap', lower: true, fmt: fmtTime },
   freestyle_score: { label: 'Mud Slinger — Score', lower: false, fmt: (v) => `${Math.round(v).toLocaleString()} pts` },
   king_time: { label: 'King of the Pit — Crown Time', lower: false, fmt: fmtTime },
+  bounty_time: { label: 'Bounty Hole — Fastest Claim', lower: true, fmt: fmtTime },
+  bounty_distance: { label: 'Bounty Hole — Farthest', lower: false, fmt: (v) => `${Math.round(v * 3.281)} ft` },
+  burnout_score: { label: 'Burnout — Smoke Points', lower: false, fmt: (v) => `${Math.round(v).toLocaleString()} pts` },
 };
 function fmtTime(t) { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(2).padStart(5, '0')}`; }
 
@@ -462,6 +465,7 @@ function updateHud() {
     case 2: timer = fmtTime(hud.elapsed + hud.penalty); sub = `Lap ${Math.min(hud.lap + 1, hud.laps)}/${hud.laps}${hud.bestLap > 0 ? ' · best ' + fmtTime(hud.bestLap) : ''}`; break;
     case 3: timer = fmtTime(Math.max(0, hud.limit - hud.elapsed)); sub = `${Math.round(hud.score).toLocaleString()} pts · x${hud.combo.toFixed(1)}`; break;
     case 4: timer = fmtTime(Math.max(0, hud.limit - hud.elapsed)); sub = `Crown ${fmtTime(hud.king)}`; break;
+    case 6: timer = fmtTime(Math.max(0, hud.limit - hud.elapsed)); sub = `${Math.round(hud.score).toLocaleString()} smoke pts · x${hud.combo.toFixed(1)} · GAS+BRAKE = line lock`; break;
     case 5: timer = fmtTime(hud.elapsed); sub = `$${hud.pot.toLocaleString()} bounty · ${Math.round(hud.distance * 3.281)} ft / 105 ft`; break;
     default: timer = ''; sub = 'Open pits · T = recovery';
   }

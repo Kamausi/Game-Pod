@@ -240,6 +240,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
     steerApplied = approach(steerApplied, in.steer * maxSteer, 7.f, dt);
 
     float drivePedal = in.throttle, brakePedal = in.brake;
+    lineLock = in.throttle > 0.5f && in.brake > 0.5f && gear >= 1 && spd < 4.f;
     if (!manual) {
         if (gear >= 1 && vf < 0.6f && in.brake > 0.15f && in.throttle < 0.05f) { gear = -1; events.shifts++; }
         else if (gear == -1 && vf > -0.6f && in.throttle > 0.15f && in.brake < 0.05f) { gear = 1; events.shifts++; }
@@ -415,7 +416,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
             w.driveTorque = Td;
             w.omega += Td / Iw * dt;
             w.omega *= std::exp(-0.4f * dt);
-            float Tb = brakePedal * (w.front ? 3400.f : 2400.f) * (1.f - 0.55f * brakeWet) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
+            float Tb = ((lineLock && !w.front) ? 0.f : brakePedal * (w.front ? 3400.f : 2400.f)) * (1.f - 0.55f * brakeWet) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
             float d = Tb / Iw * dt;
             w.omega = std::fabs(w.omega) <= d ? 0.f : w.omega - signf(w.omega) * d;
             w.spin += w.omega * dt;
@@ -554,7 +555,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         float churnK = 0.45f * g_tuning.churn * (cfg.tread == Tread::Paddle ? 1.6f : 1.f) * mudW * std::min(wall + defl + 0.1f, 2.f * rr);
         float Tchurn = churnK * w.omega * std::fabs(w.omega);
         w.omega += dt * (Td - Fx * rr - Tchurn) / (Iw + dt * (rr * dFdw + 2.f * churnK * std::fabs(w.omega)));
-        float Tb = brakePedal * (w.front ? 3400.f : 2400.f) * (1.f - 0.55f * brakeWet) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
+        float Tb = ((lineLock && !w.front) ? 0.f : brakePedal * (w.front ? 3400.f : 2400.f)) * (1.f - 0.55f * brakeWet) + ((in.handbrake && !w.front) ? 3200.f : 0.f);
         // Brake traction control: brake a wheel spinning away from its axle partner so the open
         // diff sends torque across (field guide 5). Useless once the axle is locked.
         if (cfg.btc && driven && drivePedal > 0.2f && !locked(w.front)) {

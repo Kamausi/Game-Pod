@@ -351,6 +351,19 @@ void World::generate(uint32_t seed) {
                 // Spectator bank along the south fence is worn by foot traffic.
                 if (std::fabs(x) < 40.f && z > -10.f && z < -3.f) worn(0.7f, 0.3f);
             }
+            // Burnout pad: graded dead flat, hard standing.
+            {
+                float bp = inRect({burnoutCenter.x - burnoutHalfX, 0, burnoutCenter.z - burnoutHalfZ},
+                                  {burnoutCenter.x + burnoutHalfX, 0, burnoutCenter.z + burnoutHalfZ}, 3.f);
+                if (bp > 0) {
+                    float hb = natural(burnoutCenter.x, burnoutCenter.z);
+                    h = lerpf(h, hb, bp);
+                    base = lerpf(base, hb - 0.02f, bp);
+                    gravel(bp);
+                    moist = lerpf(moist, 0.1f, bp);
+                    comp = lerpf(comp, 0.6f, bp);
+                }
+            }
             // Bounty hole: graded approach, a 20 m bottomless clay trench, spoil and a viewing bank.
             {
                 float bc = 0.5f * (bountyX0 + bountyX1);
@@ -725,6 +738,20 @@ void World::generate(uint32_t seed) {
             addProp("venue/banner.mbcad", -30.f, 27.5f, PI, 1.f, {{"len", 10}, {"a_r", 0.1f}, {"a_g", 0.1f}, {"a_b", 0.1f}, {"b_r", 0.85f}, {"b_g", 0.7f}, {"b_b", 0.2f}});
         }
 
+        // Burnout pad: slab, tire-stack barriers, a small bleacher and crowd on the south side.
+        {
+            Vec3 c = burnoutCenter;
+            addProp("venue/burnout_pad.mbcad", c.x, c.z, 0);
+            props.back().pos.y = ground(c.x, c.z) - 0.02f;
+            for (float x = -8.f; x <= 8.f; x += 2.f) {
+                addProp("venue/tire_stack.mbcad", c.x + x, c.z - burnoutHalfZ - 1.3f, 0);
+                addProp("venue/tire_stack.mbcad", c.x + x, c.z + burnoutHalfZ + 1.3f, 0);
+            }
+            building("venue/bleachers.mbcad", c.x, c.z + burnoutHalfZ + 5.f, PI, {6.f, 1.2f, 2.f}, {{"len", 12}});
+            for (int i = 0; i < 14; i++) person(c.x + gr.range(-6.f, 6.f), c.z + burnoutHalfZ + gr.range(2.5f, 3.2f), PI + gr.range(-0.3f, 0.3f), false);
+            addProp("venue/sign.mbcad", c.x - burnoutHalfX - 2.f, c.z + 1.f, -PI * 0.5f, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"w", 1.8f}});
+            person(c.x - burnoutHalfX - 1.f, c.z - 2.f, PI * 0.5f, true);
+        }
         // Bounty hole: prize board, viewing bank with bleachers and crowd, flags, hay bales.
         {
             Vec3 bc = bountyCenter();
@@ -1045,6 +1072,7 @@ bool World::builtUp(float x, float z) const {
     if (x > 30 && x < 86 && std::fabs(z + 56.f) < 5.f) return true;    // path to the bounty hole
     if (z > -6 && z < 6 && x > 78 && x < 100) return true;             // path to the campground
     if (x > -40 && x < -10 && z > 16 && z < 30) return true;           // show-and-shine lawn
+    if (std::fabs(x - burnoutCenter.x) < burnoutHalfX + 6 && std::fabs(z - burnoutCenter.z) < burnoutHalfZ + 9) return true;
     return false;
 }
 

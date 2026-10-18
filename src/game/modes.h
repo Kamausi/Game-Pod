@@ -6,6 +6,8 @@
 //   King of Pit - 120 s, hold the center puddle while moving; most crown time wins.
 //   Bounty Hole - one shot at the named trench east of the venue. Clear it and take the pot; every
 //                 failed attempt (dozer tow, out of bounds) grows it. Scored on time or distance.
+//   Burnout     - 30 s on the concrete pad: line-lock the fronts, smoke the rears. Points for
+//                 sustained rear wheel speed while the truck stays put; drive off the pad and it's over.
 //   Free Roam   - no clock (open pits / open riding).
 #pragma once
 #include <string>
@@ -14,7 +16,7 @@
 
 namespace mb {
 
-enum class ModeId : int { FreeRoam = 0, MudBog = 1, Circuit = 2, Freestyle = 3, King = 4, Bounty = 5 };
+enum class ModeId : int { FreeRoam = 0, MudBog = 1, Circuit = 2, Freestyle = 3, King = 4, Bounty = 5, Burnout = 6 };
 enum class Phase : int { Idle, Countdown, Running, Finished };
 
 struct ModeResult {

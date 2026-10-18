@@ -836,6 +836,34 @@ int main(int argc, char** argv) {
         CHECK(peak <= 1.f && quiet >= 0 && boom >= 0, "finite and limited");
     });
 
+
+    test("burnout: line lock holds the fronts, the rears smoke, points add up", [] {
+        static World w;
+        w.generate(1976);
+        for (const char* cfgs : {"body=comanche;engine=v8_350;awd=0", "body=squarebody;engine=v8_454;awd=1"}) {
+            ModeRunner m;
+            Vehicle v;
+            v.configure(VehicleConfig::parse(cfgs));
+            m.start(ModeId::Burnout, w, v, 0, 0);
+            v.setTransfer(0);   // 2H
+            m.update(0.01f, 1.0, w, v, 0, 0, 0);
+            VehicleInput in;
+            in.throttle = 1; in.brake = 1;
+            Vec3 p0 = v.pos;
+            float maxSlip = 0;
+            for (int f = 0; f < 60 * 10 && m.phase == Phase::Running; f++) {
+                for (int s = 0; s < 4; s++) v.step(w.terrain, in, Vehicle::DT);
+                m.update(1.f / 60, 2.0 + f / 60.0, w, v, 0, 0, 0);
+                maxSlip = std::max(maxSlip, std::fabs(v.wheels[2].omega * v.wheels[2].radius));
+            }
+            float moved = length(Vec3{v.pos.x - p0.x, 0, v.pos.z - p0.z});
+            std::printf("    %s: rear tread %.0f m/s, moved %.1f m, %.0f pts, front omega %.1f\n", cfgs, maxSlip, moved, m.score, v.wheels[0].omega);
+            CHECK(v.lineLock || m.phase != Phase::Running, "line lock engaged");
+            CHECK(maxSlip > 12.f && moved < 3.f, "rears spin while the truck stays put");
+            CHECK(m.score > 200.f, "smoke points");
+        }
+    });
+
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
 }

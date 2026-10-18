@@ -118,7 +118,8 @@ public:
     bool beltBurnt = false;
     bool flooded = false, engineBroken = false;   // hydrolock: dead until dry; cranking it underwater bends a rod
     float floodDry = 0, floodCrank = 0;
-    float brakeWet = 0;          // brakes soaked by a water crossing 0..1
+    float brakeWet = 0;
+    bool lineLock = false;       // throttle + brake at a standstill: front brakes only (burnouts)          // brakes soaked by a water crossing 0..1
     bool isCvt() const { return body && (body->id == "utv" || body->id == "atv"); }
     bool independent() const { return isCvt(); }   // IFS/IRS arms instead of solid axles
 

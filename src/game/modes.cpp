@@ -12,6 +12,7 @@ const char* modeName(ModeId id) {
         case ModeId::Freestyle: return "Mud Slinger";
         case ModeId::King: return "King of the Pit";
         case ModeId::Bounty: return "Bounty Hole";
+        case ModeId::Burnout: return "Burnout Contest";
     }
     return "?";
 }
@@ -38,6 +39,9 @@ Vec3 ModeRunner::spawnFor(const World& w, int lane, float& yaw) const {
         case ModeId::Bounty:
             yaw = PI * 0.5f;
             return {w.bountyX0 - 8.f, 0, w.bountyZ + ((lane % 2) ? 2.6f : -2.6f) * (lane > 0 ? 1.f : 0.f)};
+        case ModeId::Burnout:
+            yaw = PI * 0.5f;
+            return w.burnoutCenter + Vec3{-1.5f, 0, (lane % 2) ? 1.6f : 0.f};
         case ModeId::Freestyle:
         case ModeId::King:
             yaw = PI * 0.5f;
@@ -70,7 +74,7 @@ void ModeRunner::start(ModeId m, World& w, Vehicle& v, int ln, double at) {
     resultCount = 0;
     claimed = false;
     payout = claimedPot = 0;
-    timeLimit = m == ModeId::Freestyle ? 90.f : (m == ModeId::King ? 120.f : 0.f);
+    timeLimit = m == ModeId::Freestyle ? 90.f : (m == ModeId::King ? 120.f : (m == ModeId::Burnout ? 30.f : 0.f));
     resetToSpawn(w, v);
     if (m != ModeId::FreeRoam) v.gear = 0;  // rev it on the line
     flash(m == ModeId::Bounty ? "Bounty Hole - $" + std::to_string(bountyPot) + " on the line" : std::string(modeName(m)), 2.5f);
@@ -90,6 +94,7 @@ void ModeRunner::finish(const std::string& msg) {
         case ModeId::Freestyle: payout = int(score * 0.05f); break;
         case ModeId::King: payout = int(kingTime * 12.f); break;
         case ModeId::Bounty: payout = claimed ? claimedPot : int(distance * 3.281f * 2.f); break;
+        case ModeId::Burnout: payout = int(score * 0.2f); break;
         default: payout = 0; break;
     }
     switch (id) {
@@ -103,6 +108,7 @@ void ModeRunner::finish(const std::string& msg) {
             break;
         case ModeId::Freestyle: add("freestyle_score", score, false, std::to_string(int(score)) + " pts"); break;
         case ModeId::King: add("king_time", kingTime, false, fmtTime(kingTime) + " crowned"); break;
+        case ModeId::Burnout: add("burnout_score", score, false, std::to_string(int(score)) + " smoke points"); break;
         case ModeId::Bounty:
             if (claimed) add("bounty_time", elapsed, true, "Bounty claimed in " + fmtTime(elapsed));
             add("bounty_distance", distance, false, std::to_string(int(distance * 3.281f)) + " ft into the hole");
@@ -225,6 +231,21 @@ void ModeRunner::update(float dt, double now, World& w, Vehicle& v, float ejecte
                 bountyPot += 250;
                 finish("Out of bounds! Pot grows to $" + std::to_string(bountyPot));
             } else if (stuck && progressTimer > 8.f && messageTimer <= 0) flash("The hole's got you - rock it, or T for the dozer", 3.f);
+            break;
+        }
+        case ModeId::Burnout: {
+            // Rear tread speed over ground speed: what makes smoke.
+            float rear = 0;
+            for (const auto& wh : v.wheels) if (!wh.front && wh.contact) rear += std::fabs(wh.omega * wh.radius) * 0.5f;
+            float slip = rear - v.speed();
+            bool good = w.onBurnoutPad(v.pos) && v.speed() < 2.5f && slip > 10.f;
+            if (good) {
+                comboTimer = 0.6f;
+                combo = std::min(3.f, combo + dt * 0.25f);
+                score += dt * (slip - 10.f) * 10.f * combo;
+            } else if ((comboTimer -= dt) <= 0) combo = 1;
+            if (!w.onBurnoutPad(v.pos)) finish("Off the pad! " + std::to_string(int(score)) + " pts");
+            else if (elapsed >= timeLimit) finish("Time! " + std::to_string(int(score)) + " smoke points");
             break;
         }
         case ModeId::King: {
