@@ -14,19 +14,25 @@ cyl r=0.025 r2=0.01 h=0.5 pos=-0.22,h*0.09,0.12 rot=20,0,65 seg=4
 material leaf
 # dense inner core (keeps the tree from looking see-through between sprays)
 color #1b3121
-cyl r=1.45 r2=0.06 h=h*0.86 pos=0,h*0.55,0 seg=9
-# whorls of branch sprays: 9 tiers, 6 sprays each, drooping, shrinking toward the top
-for t = 0, 8
-  set R = 2.45*(1-t/9.6)+0.25
-  set Y = h*(0.13+t*0.093)
-  for k = 0, 5
-    set a = k*60+t*37
-    # outer sprays catch lighter new growth at the tips
-    color 0.13+0.04*sin(t*71+k*43) 0.25+0.06*sin(t*29+k*61) 0.15+0.02*sin(k*53)
-    sphere r=R*0.42*nl pos=R*0.52*sin(a),Y-R*0.12,R*0.52*cos(a) scale=0.38,0.34,1 rot=24,a,0 seg=5
-    # a shorter, darker spray between each pair, tucked higher and further in
-    color 0.09 0.18+0.03*sin(t*41+k*17) 0.11
-    sphere r=R*0.3*nl pos=R*0.36*sin(a+30),Y+0.05,R*0.36*cos(a+30) scale=0.45,0.38,1 rot=18,a+30,0 seg=5
+cyl r=1.25 r2=0.06 h=h*0.86 pos=0,h*0.55,0 seg=9
+# whorls of branches: 10 tiers of 8 flat, drooping fronds that overlap into a skirt, each with an
+# upturned lighter tip and a darker underlayer; tiers rotate against each other so the outline
+# stays ragged. Flat fronds (not tubes) read as needled boughs once the foliage shader frays them.
+for t = 0, 9
+  set R = 2.4*(1-t/10.5)+0.22
+  set Y = h*(0.17+t*0.081)
+  for k = 0, 7
+    set a = k*45+t*23+9*sin(t*71+k*37)
+    set L = R*(0.88+0.18*abs(sin(t*53+k*29)))
+    # underlayer: darker, a little shorter and lower
+    color 0.08 0.16+0.03*sin(t*41+k*17) 0.10
+    sphere r=L*0.46*nl pos=L*0.46*sin(a),Y-L*0.20,L*0.46*cos(a) scale=0.62,0.20,1 rot=26,a,0 seg=4
+    # main frond, drooping
+    color 0.12+0.03*sin(t*71+k*43) 0.23+0.05*sin(t*29+k*61) 0.14+0.02*sin(k*53)
+    sphere r=L*0.50*nl pos=L*0.50*sin(a),Y-L*0.12,L*0.50*cos(a) scale=0.55,0.15,1 rot=20,a,0 seg=5
+    # upturned tip with lighter new growth
+    color 0.17+0.03*sin(k*31) 0.31+0.04*sin(t*19+k*7) 0.17
+    sphere r=L*0.20*nl pos=L*0.92*sin(a),Y-L*0.33,L*0.92*cos(a) scale=0.7,0.25,1 rot=-6,a,0 seg=4
   end
 end
 # far tiers (lod=1): one drooping cone per whorl
@@ -34,7 +40,7 @@ for t = 0, 8
   set R = 2.45*(1-t/9.6)+0.25
   set Y = h*(0.13+t*0.093)
   color 0.12+0.02*sin(t*71) 0.23+0.03*sin(t*29) 0.14
-  cyl r=R*0.86*lod r2=0.1*lod h=1.1 pos=0,Y+0.25,0 seg=8
+  cyl r=R*1.08*lod r2=0.1*lod h=1.3 pos=0,Y+0.05,0 seg=8
 end
 # leader
 color #24452b
