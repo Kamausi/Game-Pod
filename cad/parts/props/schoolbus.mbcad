@@ -1,25 +1,192 @@
-# Abandoned conventional school bus swallowed by brush (photos 1-2): faded yellow
-# roof cap with lettering board, rusted white body, shattered windows, blue hood.
+# Abandoned conventional school bus swallowed by brush (photos 1-2): faded yellow body with
+# rust streaks, black rub rails, a row of side windows (some smashed out), a dented blue hood
+# swapped from another truck, "SCHOOL BUS" boards front and rear, stop arm, rear emergency
+# door, dual rear wheels sunk into the mud. Origin at ground centre, +Z toward the hood.
+set Z0 = -4.90          # rear of the body
+set Z1 = 3.20           # front of the body (windshield)
+set L = Z1-Z0
+set ZC = (Z0+Z1)/2
+set FB = 0.55           # floor / sill height (sunk a little)
+set WA = 3.95           # front axle
+set RA = -2.35          # rear axle
+set TR = 0.50           # tire radius
+set AY = 0.36           # axle height (tires sunk ~14 cm)
+
+# ---- Body shell: rounded-roof cross-section extruded the length of the bus ----
 material paint
-color #c9a13a
-box size=2.35,0.25,8.2 pos=0,2.55,-0.6
-color #b5a98a
-box size=2.40,1.20,8.2 pos=0,1.85,-0.6
+color #c79a2e
+extrude depth=L bevel=0.04 rot=0,90,0 pos=0,0,ZC pts=1.2,FB,1.2,2.55,1.15,2.76,0.95,2.91,0.5,2.99,-0.5,2.99,-0.95,2.91,-1.15,2.76,-1.2,2.55,-1.2,FB
+# Faded, chalky roof cap
+color #d8c79a
+extrude depth=L-0.06 rot=0,90,0 pos=0,0.012,ZC pts=1.0,2.88,0.95,2.915,0.5,3.0,-0.5,3.0,-0.95,2.915,-1.0,2.88
+# Rear and front end caps (flat panels) with a slight inset
+color #c2952c
+box size=2.36,2.30,0.04 pos=0,1.72,Z0-0.01 bevel=0.02
+box size=2.36,0.70,0.04 pos=0,0.92,Z1+0.01
+
+# ---- Side window band: pillars between dark panes; a few panes smashed out ----
+color #10141a
 material glass
-color #2b2b28
-box size=2.42,0.62,7.6 pos=0,2.05,-0.9
+for i = 0, 8
+  box size=2.43,0.62,0.66 pos=0,2.08,Z0+0.62+i*0.80
+end
+color #050505
+material matte
+# smashed panes (open holes) on both sides
+box size=2.44,0.56,0.60 pos=0,2.08,Z0+0.62+2*0.80
+box size=2.44,0.56,0.60 pos=0,2.08,Z0+0.62+5*0.80
+box size=2.44,0.30,0.60 pos=0,1.95,Z0+0.62+7*0.80
+# Window header and sill trim
+color #b78d2a
 material paint
-color #d8d2c0
-box size=2.42,0.10,7.6 pos=0,2.42,-0.9
-color #2a3c7a
-# Hood (dented, blue) and grille
-box size=1.6,0.75,1.4 pos=0,1.05,4.0 rot=-6,0,0
-color #8d6b2e
-box size=1.5,0.7,0.1 pos=0,0.85,4.7
-color #c9a13a
-box size=1.8,0.40,0.08 pos=0,2.48,3.53
-color #111111
-box size=1.5,0.22,0.04 pos=0,2.48,3.58
+box size=2.44,0.06,L-0.6 pos=0,2.42,ZC-0.05
+box size=2.44,0.06,L-0.6 pos=0,1.74,ZC-0.05
+
+# ---- Black rub rails and the beltline ----
+color #151515
+material matte
+box size=2.45,0.07,L-0.1 pos=0,1.60,ZC
+box size=2.45,0.07,L-0.1 pos=0,1.18,ZC
+box size=2.45,0.07,L-0.1 pos=0,0.78,ZC
+
+# ---- Rust and grime: streaks running down from every window, patches low down ----
+color #6a4426
 material mud
-color #6b5a3e
-box size=2.5,0.55,8.6 pos=0,0.75,-0.5
+for i = 0, 8
+  box size=2.44,0.50+0.25*abs(sin(i*67)),0.06 pos=0,1.48-0.12*abs(sin(i*67)),Z0+0.45+i*0.80
+  box size=2.44,0.32,0.03 pos=0,1.52,Z0+0.82+i*0.80
+end
+color #5a3a22
+box size=2.44,0.34,1.40 pos=0,1.00,Z0+1.4
+box size=2.44,0.40,0.90 pos=0,0.98,-0.40
+box size=2.44,0.26,1.10 pos=0,1.05,2.10
+# Mud skirt with a ragged top edge
+color #5e4a33
+for i = 0, 13
+  box size=2.46,0.26+0.22*abs(sin(i*53)),0.62 pos=0,FB+0.10+0.11*abs(sin(i*53)),Z0+0.30+i*0.58
+end
+
+# ---- Front: windshield, entry door, boards and lights ----
+color #12171c
+material glass
+box size=1.06,0.70,0.05 pos=0.55,2.33,Z1+0.03 rot=-6,0,0 mirror=x
+color #151515
+material matte
+box size=0.08,0.76,0.07 pos=0,2.33,Z1+0.04 rot=-6,0,0
+# Entry door (right side, +X is left so the door sits at -X): two glass leaves
+color #12171c
+material glass
+box size=0.04,1.70,0.36 pos=-1.215,1.62,Z1-0.30
+box size=0.04,1.70,0.36 pos=-1.215,1.62,Z1-0.68
+color #151515
+material matte
+box size=0.05,1.74,0.04 pos=-1.22,1.62,Z1-0.49
+# "SCHOOL BUS" board over the windshield: yellow plate, black letter blocks
+color #e2b53a
+material paint
+box size=1.80,0.30,0.06 pos=0,2.83,Z1+0.05 bevel=0.01
+color #111111
+material matte
+for c = 0, 9
+  box size=0.11,0.17,0.02 pos=-0.80+c*0.178,2.83,Z1+0.085
+end
+# Roof warning lamps (amber outer, red inner) front and rear
+color #d07a12
+material lens
+box size=0.16,0.14,0.06 pos=0.82,2.83,Z1+0.06 mirror=x bevel=0.01
+color #a01010
+box size=0.16,0.14,0.06 pos=0.62,2.62,Z1+0.06 mirror=x bevel=0.01
+color #d07a12
+box size=0.16,0.14,0.06 pos=0.82,2.70,Z0-0.06 mirror=x bevel=0.01
+color #a01010
+box size=0.18,0.18,0.06 pos=0.82,0.98,Z0-0.06 mirror=x bevel=0.01
+
+# ---- Hood, fenders and grille (conventional nose) ----
+color #2a3c7a
+material paint
+extrude depth=1.70 bevel=0.04 pts=Z1,0.78,4.95,0.78,4.97,1.48,4.80,1.66,Z1,1.80
+# Dent: a crumpled darker patch on the hood top
+color #22305f
+box size=0.62,0.04,0.55 pos=0.25,1.73,4.10 rot=-8,0,4
+# Black fenders over the front wheels
+color #161616
+material matte
+extrude depth=0.26 bevel=0.02 pts=arc(WA,AY,TR+0.10,170,10,12),arc(WA,AY,TR+0.02,10,170,12) pos=0.98,0,0 mirror=x
+box size=0.26,0.08,1.10 pos=0.98,1.04,WA mirror=x
+# Grille: dull steel bars in a black surround, round headlamps
+color #0e0e0e
+box size=1.10,0.62,0.04 pos=0,1.14,4.975
+color #6c6a64
+material steel
+for g = 0, 8
+  box size=0.95,0.025,0.03 pos=0,0.88+g*0.065,4.99
+end
+color #8d8a84
+material chrome
+cyl r=0.12 h=0.05 axis=z pos=0.70,1.28,4.92 mirror=x seg=16
+color #e8e2c8
+material lens
+cyl r=0.095 h=0.03 axis=z pos=0.70,1.28,4.95 mirror=x seg=16
+# Front bumper (black, bent) and tow eyes
+color #141414
+material steel
+box size=2.30,0.24,0.16 pos=0,0.72,5.08 rot=0,3,0 bevel=0.02
+cyl r=0.05 h=0.20 axis=x pos=0.55,0.62,5.12 mirror=x seg=10
+
+# ---- Stop arm (driver's side = +X), crossing arm, mirrors ----
+color #b01515
+material paint
+cyl r=0.24 h=0.03 axis=x pos=1.27,1.85,Z1-1.10 seg=8 rot=22.5,0,0
+color #f2f2ee
+material matte
+box size=0.035,0.06,0.30 pos=1.29,1.85,Z1-1.10
+color #2a2a2a
+material steel
+box size=0.05,0.05,0.30 pos=1.24,1.85,Z1-0.88
+box size=0.05,0.40,0.05 pos=1.30,2.40,Z1+0.20 mirror=x
+box size=0.30,0.05,0.05 pos=1.18,2.60,Z1+0.20 mirror=x
+color #1a1a1a
+box size=0.10,0.36,0.22 pos=1.36,2.32,Z1+0.24 mirror=x bevel=0.02
+# Crossing arm folded along the front bumper
+color #e2b53a
+material paint
+box size=1.10,0.035,0.035 pos=0.55,0.76,5.17
+
+# ---- Rear: emergency door with window, tail lights, rear board ----
+color #b18826
+box size=0.92,1.86,0.03 pos=0,1.48,Z0-0.035
+color #10141a
+material glass
+box size=0.70,0.58,0.02 pos=0,2.18,Z0-0.055
+color #151515
+material matte
+box size=0.04,1.86,0.04 pos=0.46,1.48,Z0-0.05 mirror=x
+box size=0.14,0.05,0.05 pos=0.30,1.55,Z0-0.06
+color #e2b53a
+material paint
+box size=1.60,0.26,0.05 pos=0,2.62,Z0-0.05 bevel=0.01
+color #111111
+material matte
+for c = 0, 9
+  box size=0.10,0.15,0.02 pos=-0.72+c*0.16,2.62,Z0-0.085
+end
+box size=2.30,0.18,0.14 pos=0,0.70,Z0-0.10 bevel=0.02
+
+# ---- Wheels: singles up front, duals at the rear, all sunk into the mud ----
+color #151515
+material rubber
+cyl r=TR h=0.30 axis=x pos=1.02,AY,WA mirror=x seg=22
+cyl r=TR h=0.26 axis=x pos=0.86,AY,RA mirror=x seg=22
+cyl r=TR h=0.26 axis=x pos=1.13,AY,RA mirror=x seg=22
+color #6e6a62
+material steel
+cyl r=0.28 h=0.04 axis=x pos=1.17,AY,WA mirror=x seg=16
+cyl r=0.28 h=0.04 axis=x pos=1.27,AY,RA mirror=x seg=16
+color #3a3734
+for s = 0, 7
+  cyl r=0.025 h=0.03 axis=x pos=1.29,AY+0.18*sin(s*45),RA+0.18*cos(s*45) mirror=x seg=6
+end
+# Black wheel wells cut into the skirt
+color #0a0a0a
+material matte
+box size=2.43,0.62,1.40 pos=0,0.62,RA

@@ -1,25 +1,180 @@
 # Crawler dozer (photo 4: yellow, ROPS canopy, straight blade) - the pit groomer and
-# the tow-out service for stuck trucks.
+# the tow-out service for stuck trucks. Small 450-class machine: oval undercarriage with
+# grousered track shoes wrapped round the rear sprocket and front idler, road rollers,
+# louvred hood, exhaust stack, ROPS canopy over an open station, straight blade on push arms.
+# Origin at ground centre, +Z forward (blade end).
+set TX = 0.72          # track centre line (x)
+set TW = 0.38          # shoe width
+set TY = 0.30          # sprocket / idler centre height
+set TR = 0.27          # sprocket / idler radius (to the shoe centre)
+set ZF = 1.00          # idler (front)
+set ZR = -1.05         # sprocket (rear)
+set P = 0.155          # shoe pitch
+
+# ---- Undercarriage ----
 material steel
-color #1a1a1a
-box size=0.36,0.55,2.30 pos=0.72,0.28,0 mirror=x
-color #2e2e2e
-cyl r=0.27 h=0.36 axis=x pos=0.72,0.28,1.05 mirror=x
-cyl r=0.27 h=0.36 axis=x pos=0.72,0.28,-1.05 mirror=x
+color #1c1c1b
+# Track shoes: top and bottom runs
+for i = 0, 12
+  box size=TW,0.045,P-0.02 pos=TX,TY+TR,ZR+0.08+i*P mirror=x
+  box size=TW,0.045,P-0.02 pos=TX,TY-TR,ZR+0.08+i*P mirror=x
+  # grouser bars on the ground run
+  box size=TW,0.035,0.022 pos=TX,TY-TR-0.035,ZR+0.08+i*P mirror=x
+end
+# Wraps round the idler (front) and sprocket (rear)
+for k = 1, 5
+  set a = 90-k*30
+  box size=TW,0.045,P-0.02 pos=TX,TY+TR*sin(a),ZF+TR*cos(a) rot=90-a,0,0 mirror=x
+  box size=TW,0.045,P-0.02 pos=TX,TY+TR*sin(a),ZR-TR*cos(a) rot=a-90,0,0 mirror=x
+end
+# Track frame (roller frame) between the runs
+color #262624
+box size=0.20,0.22,2.05 pos=TX,TY,-0.02 mirror=x bevel=0.02
+# Idler wheel, drive sprocket with teeth, road rollers, carrier roller
+color #3a3a37
+cyl r=0.22 h=0.18 axis=x pos=TX,TY,ZF mirror=x seg=20
+cyl r=0.23 h=0.20 axis=x pos=TX,TY,ZR mirror=x seg=20
+color #4a4945
+for t = 0, 11
+  box size=0.06,0.07,0.07 pos=TX,TY+0.235*sin(t*30),ZR+0.235*cos(t*30) rot=-t*30,0,0 mirror=x
+end
+color #2f2f2c
+for r = 0, 4
+  cyl r=0.085 h=0.24 axis=x pos=TX,TY-0.17,ZR+0.42+r*0.30 mirror=x seg=12
+end
+cyl r=0.06 h=0.16 axis=x pos=TX,TY+0.19,-0.02 mirror=x seg=10
+# Hub caps
+color #e2b616
+material paint
+cyl r=0.09 h=0.03 axis=x pos=TX+0.115,TY,ZF mirror=x seg=14
+cyl r=0.11 h=0.03 axis=x pos=TX+0.115,TY,ZR mirror=x seg=14
+
+# ---- Main frame, engine hood and fuel tank ----
 material paint
 color #e2b616
-box size=1.10,0.80,1.70 pos=0,0.95,0.25
-box size=1.00,0.50,0.70 pos=0,0.85,-0.85
+# Chassis tub between the tracks
+box size=1.06,0.42,2.30 pos=0,0.48,-0.05 bevel=0.03
+# Engine hood: tapers toward the nose
+extrude depth=1.00 bevel=0.03 pts=1.38,0.66,1.38,1.30,1.24,1.36,0.06,1.38,0.06,0.66
+# Hood side louvres
+color #1d1d1b
+material matte
+for l = 0, 6
+  box size=1.01,0.035,0.05 pos=0,0.98+l*0.045,1.10
+end
+# Radiator grille with heavy guard bars at the nose
+box size=0.86,0.58,0.03 pos=0,1.00,1.395
+color #e2b616
+material paint
+for g = -3, 3
+  box size=0.035,0.62,0.05 pos=g*0.12,1.00,1.41
+end
+box size=0.96,0.06,0.07 pos=0,1.33,1.41 bevel=0.01
+box size=0.96,0.06,0.07 pos=0,0.68,1.41 bevel=0.01
+# Black hood stripe and model plate
+color #111111
+material matte
+box size=1.002,0.06,1.20 pos=0,1.22,0.72
+color #f0f0ea
+box size=0.005,0.06,0.22 pos=0.502,1.22,0.95 mirror=x
+# Rear deck: fuel tank and battery box behind the seat
+material paint
+color #e2b616
+box size=1.12,0.62,0.62 pos=0,0.95,-0.92 bevel=0.04
+color #2a2a28
+cyl r=0.06 h=0.06 pos=0.30,1.29,-0.92 seg=10
+# Rear drawbar / hitch
+color #1e1e1c
+material steel
+box size=0.42,0.16,0.20 pos=0,0.42,-1.32 bevel=0.02
+cyl r=0.04 h=0.24 pos=0,0.42,-1.38 seg=10
+
+# ---- Operator station ----
+color #232323
+material matte
+# Floor plate and dash
+box size=1.02,0.04,0.66 pos=0,0.92,-0.28
+box size=0.80,0.30,0.10 pos=0,1.12,0.06 bevel=0.02
+# Seat: cushion, back, arm rests
+color #1a1a1a
+material rubber
+box size=0.48,0.10,0.42 pos=0,1.18,-0.38 bevel=0.04
+box size=0.46,0.48,0.10 pos=0,1.44,-0.58 rot=-8,0,0 bevel=0.04
+box size=0.06,0.06,0.30 pos=0.27,1.32,-0.38 mirror=x bevel=0.02
+# Steering levers and blade joystick
+color #2b2b2b
+material steel
+cyl r=0.012 h=0.36 pos=0.13,1.30,-0.04 rot=-12,0,0 mirror=x seg=8
+color #c41a1a
+material plastic
+sphere r=0.03 pos=0.13,1.48,-0.08 mirror=x
+color #2b2b2b
+material steel
+cyl r=0.012 h=0.28 pos=0.36,1.26,-0.20 seg=8
+color #111111
+material rubber
+sphere r=0.035 pos=0.36,1.41,-0.20
+
+# ---- ROPS canopy ----
+material paint
+color #e2b616
+box size=0.08,1.42,0.08 pos=0.54,1.62,-0.14 mirror=x bevel=0.012
+box size=0.08,1.42,0.08 pos=0.54,1.62,-1.12 mirror=x bevel=0.012
+box size=0.08,0.08,1.06 pos=0.54,2.30,-0.63 mirror=x bevel=0.012
+box size=1.16,0.08,0.08 pos=0,2.30,-0.14 bevel=0.012
+box size=1.16,0.08,0.08 pos=0,2.30,-1.12 bevel=0.012
+# Diagonal braces at the rear posts
+box size=0.05,0.62,0.05 pos=0.54,1.20,-0.95 rot=-30,0,0 mirror=x
+# Canopy roof with a rolled edge
+box size=1.26,0.06,1.14 pos=0,2.37,-0.63 bevel=0.02
 color #1e1e1e
-box size=0.70,0.05,0.70 pos=0,1.38,-0.60
+material matte
+box size=1.10,0.012,0.98 pos=0,2.405,-0.63
+# Work lights on the canopy
+color #2b2b2b
+box size=0.12,0.09,0.07 pos=0.42,2.45,-0.10 bevel=0.01 mirror=x
+color #fffbe6
+material lens
+box size=0.10,0.07,0.012 pos=0.42,2.45,-0.065 mirror=x
+# Amber beacon
+color #f08a10
+cyl r=0.05 h=0.09 pos=-0.40,2.46,-1.02 seg=12
+
+# ---- Exhaust ----
+color #2a2a28
+material steel
+cyl r=0.045 h=0.70 pos=0.30,1.70,0.92 seg=12
+cyl r=0.05 h=0.06 pos=0.30,2.07,0.92 r2=0.06 seg=12
 color #e2b616
-box size=0.07,1.30,0.07 pos=0.55,1.95,-0.15 mirror=x
-box size=0.07,1.30,0.07 pos=0.55,1.95,-1.05 mirror=x
-box size=1.25,0.06,1.05 pos=0,2.62,-0.60
-color #3a3a3a
-cyl r=0.05 h=0.9 pos=0.25,1.75,0.65
+material paint
+box size=0.12,0.08,0.10 pos=0.30,1.36,0.92 bevel=0.01
+
+# ---- Blade, push arms and lift cylinders ----
 color #e2b616
-box size=2.20,0.75,0.12 pos=0,0.42,1.75 rot=10,0,0
-box size=0.10,0.12,0.90 pos=0.60,0.60,1.25 mirror=x rot=-8,0,0
-color #7a6a3a
-box size=2.20,0.08,0.10 pos=0,0.06,1.83
+material paint
+# Curved moldboard: profile in Y/Z extruded across the width
+extrude depth=2.24 bevel=0.02 pts=1.66,0.04,1.78,0.04,1.80,0.30,1.86,0.62,1.92,0.86,1.82,0.88,1.73,0.66,1.68,0.36
+# Blade end bits
+box size=0.06,0.80,0.24 pos=1.11,0.46,1.78 mirror=x bevel=0.01
+# Push arms from the track frames to the blade
+box size=0.10,0.14,1.18 pos=0.84,0.44,1.20 rot=-4,0,0 mirror=x bevel=0.02
+# Cutting edge (worn steel)
+color #8a8478
+material steel
+box size=2.22,0.08,0.10 pos=0,0.05,1.75
+# Lift cylinders: barrel + chrome rod from the hood sides down to the blade
+color #e2b616
+material paint
+cyl r=0.055 h=0.50 pos=0.42,1.18,1.48 rot=52,0,0 mirror=x seg=12
+color #d8d8d2
+material chrome
+cyl r=0.03 h=0.36 pos=0.42,0.86,1.70 rot=52,0,0 mirror=x seg=10
+# Hydraulic lines along the push arms
+color #121212
+material rubber
+cyl r=0.014 h=1.0 axis=z pos=0.76,0.56,1.15 mirror=x seg=6
+# Mud caked on the undercarriage and blade bottom
+color #5e4c34
+material mud
+box size=0.42,0.10,2.20 pos=TX,0.06,-0.02 mirror=x
+box size=2.20,0.14,0.14 pos=0,0.14,1.70

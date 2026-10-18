@@ -540,7 +540,7 @@ void World::generate(uint32_t seed) {
     addProp("props/dozer450.mbcad", dozerPos.x, dozerPos.z, -2.3f);
     boxCol(dozerPos, {1.2f, 1.3f, 1.9f}, -2.3f);
     addProp("props/schoolbus.mbcad", busPos.x, busPos.z, 2.45f);
-    boxCol(busPos, {1.3f, 1.6f, 4.8f}, 2.45f);
+    boxCol(busPos, {1.3f, 1.6f, 5.15f}, 2.45f);
     addProp("vegetation/brushpile.mbcad", busPos.x + 6, busPos.z + 4, 0.4f, 1.6f);
     addProp("vegetation/brushpile.mbcad", busPos.x + 2, busPos.z + 8, 2.0f, 1.3f);
     for (int s = 0; s < 14; s++)

@@ -634,6 +634,46 @@ struct Interp {
             if (!(ls >> op)) continue;
             std::string rest;
             std::getline(ls, rest);
+            if (op == "end") { err = name + ":" + std::to_string(lineNo) + ": 'end' without 'for'"; break; }
+            if (op == "for") {
+                // for i = a, b [, step] ... end   (inclusive; nestable; i is visible to expressions)
+                auto eq = rest.find('=');
+                if (eq == std::string::npos) { err = name + ":" + std::to_string(lineNo) + ": for needs 'var = a, b'"; break; }
+                std::string var = rest.substr(0, eq);
+                var.erase(std::remove_if(var.begin(), var.end(), ::isspace), var.end());
+                std::vector<std::string> parts;
+                {
+                    std::stringstream rs(rest.substr(eq + 1));
+                    std::string tok;
+                    while (std::getline(rs, tok, ',')) parts.push_back(tok);
+                }
+                if (parts.size() < 2) { err = name + ":" + std::to_string(lineNo) + ": for needs 'var = a, b'"; break; }
+                float a0 = cadEval(parts[0], vars, &err), a1 = cadEval(parts[1], vars, &err);
+                float step = parts.size() > 2 ? cadEval(parts[2], vars, &err) : 1.f;
+                // Gather the body up to the matching 'end'.
+                std::string body, bl;
+                int depth = 1, startLine = lineNo;
+                while (std::getline(ss, bl)) {
+                    lineNo++;
+                    std::stringstream bs(bl.substr(0, bl.find('#') == std::string::npos || bl.compare(0, 5, "color") == 0 ? bl.size() : bl.find('#')));
+                    std::string bop;
+                    bs >> bop;
+                    if (bop == "for") depth++;
+                    else if (bop == "end" && --depth == 0) break;
+                    body += bl + "\n";
+                }
+                if (depth != 0) { err = name + ":" + std::to_string(startLine) + ": 'for' without 'end'"; break; }
+                if (step == 0.f || std::fabs((a1 - a0) / step) > 4096.f) { err = name + ":" + std::to_string(startLine) + ": bad for range"; break; }
+                bool had = vars.count(var) > 0;
+                float saved = had ? vars[var] : 0.f;
+                for (float v = a0; step > 0 ? v <= a1 + 1e-4f : v >= a1 - 1e-4f; v += step) {
+                    vars[var] = v;
+                    run(body, name + ":" + std::to_string(startLine));
+                    if (!err.empty()) break;
+                }
+                if (had) vars[var] = saved; else vars.erase(var);
+                continue;
+            }
             if (op == "param" || op == "set") {
                 auto eq = rest.find('=');
                 std::string k, v;

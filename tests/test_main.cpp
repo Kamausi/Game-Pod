@@ -228,6 +228,12 @@ int main(int argc, char** argv) {
         CHECK(std::fabs(cadEval("2*(3+4)-max(1,5)/5", {}, &err) - 13.f) < 1e-5f && err.empty(), "expr eval: %s", err.c_str());
         CadResult bad = cadBuildSource("box size=1,1\n", {}, "bad");
         CHECK(!bad.error.empty(), "malformed size should error");
+        CadResult one = cadBuildSource("box size=1,1,1\n", {}, "one");
+        CadResult loop = cadBuildSource("for i = 0, 4\n  for j = 0, 1\n    box size=0.5,0.5,0.5 pos=i*2,j*2,0\n  end\nend\n", {}, "loop");
+        CHECK(loop.error.empty() && loop.mesh.verts.size() == one.mesh.verts.size()*10, "for loops: %s (%zu verts)", loop.error.c_str(), loop.mesh.verts.size());
+        CHECK(std::fabs(loop.mesh.boundsMax().x - 8.25f) < 1e-4f, "loop var reaches the inclusive end");
+        CHECK(!cadBuildSource("for i = 0, 3\nbox size=1,1,1\n", {}, "open").error.empty(), "unterminated for should error");
+        CHECK(!cadBuildSource("end\n", {}, "stray").error.empty(), "stray end should error");
         CadResult w35 = cadBuild("wheels/wheel.mbcad", {{"tire_r", 0.4445f}});
         Vec3 mx = w35.mesh.boundsMax();
         CHECK(std::fabs(mx.y - 0.4445f) < 0.04f, "35in tire radius %.3f", mx.y);
