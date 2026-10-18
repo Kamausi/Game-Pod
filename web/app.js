@@ -368,13 +368,16 @@ function updateHud() {
     case 2: timer = fmtTime(hud.elapsed + hud.penalty); sub = `Lap ${Math.min(hud.lap + 1, hud.laps)}/${hud.laps}${hud.bestLap > 0 ? ' · best ' + fmtTime(hud.bestLap) : ''}`; break;
     case 3: timer = fmtTime(Math.max(0, hud.limit - hud.elapsed)); sub = `${Math.round(hud.score).toLocaleString()} pts · x${hud.combo.toFixed(1)}`; break;
     case 4: timer = fmtTime(Math.max(0, hud.limit - hud.elapsed)); sub = `Crown ${fmtTime(hud.king)}`; break;
-    default: timer = ''; sub = 'Free roam · T = recovery';
+    case 5: timer = fmtTime(hud.elapsed); sub = `$${hud.pot.toLocaleString()} bounty · ${Math.round(hud.distance * 3.281)} ft / 105 ft`; break;
+    default: timer = ''; sub = 'Open pits · T = recovery';
   }
   $('hudTimer').textContent = timer;
   $('hudSub').textContent = sub;
   const cd = hud.phase === 1 ? Math.ceil(hud.countdown) : 0;
   $('countdown').textContent = hud.phase === 1 && cd > 0 && cd <= 5 ? cd : '';
   $('hudMsg').textContent = hud.message || '';
+  $('announce').textContent = hud.announce ? `📢 ${hud.announce}` : '';
+  $('announce').style.display = hud.announce ? 'block' : 'none';
   $('coach').textContent = hud.coach || '';
   $('coach').style.display = hud.coach ? 'block' : 'none';
   $('stuckHint').style.display = hud.stuck && !hud.coach ? 'block' : 'none';

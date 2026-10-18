@@ -1,0 +1,41 @@
+# White plastic folding table (registration / tech inspection) with a cash box,
+# paperwork and a clipboard. 1.8 m long along X, origin at ground centre.
+# Top
+material plastic
+color #ecebe6
+box size=1.83,0.045,0.76 pos=0,0.715,0 bevel=0.015
+color #d4d3cd
+box size=1.79,0.04,0.02 pos=0,0.675,0.36 mirror=z
+# Folding legs: two tube U-frames with feet and fold braces
+material steel
+color #8d9094
+cyl r=0.014 h=0.69 pos=0.76,0.345,0.30 seg=6 mirror=x
+cyl r=0.014 h=0.69 pos=0.76,0.345,-0.30 seg=6 mirror=x
+cyl r=0.012 h=0.60 axis=z pos=0.76,0.12,0 seg=6 mirror=x
+cyl r=0.010 h=0.44 axis=x pos=0.55,0.52,0 rot=0,0,25 seg=6 mirror=x
+material rubber
+color #2a2a2a
+cyl r=0.02 h=0.02 pos=0.76,0.01,0.30 seg=6 mirror=x
+cyl r=0.02 h=0.02 pos=0.76,0.01,-0.30 seg=6 mirror=x
+# Cash box with handle
+material paint
+color #2f4f3e
+box size=0.30,0.10,0.22 pos=0.45,0.79,-0.05 bevel=0.01
+material chrome
+color #c8c8c8
+box size=0.12,0.012,0.02 pos=0.45,0.847,-0.05
+# Paper stacks and a clipboard with a pen
+material matte
+color #f7f7f2
+box size=0.22,0.02,0.28 pos=-0.10,0.748,0.05 rot=0,8,0
+box size=0.22,0.008,0.28 pos=-0.38,0.742,0.10 rot=0,-12,0
+color #8a6a45
+box size=0.23,0.008,0.32 pos=-0.65,0.742,0.02 rot=0,5,0
+color #f7f7f2
+box size=0.21,0.004,0.27 pos=-0.65,0.748,0.03 rot=0,5,0
+material chrome
+color #b0b0b0
+box size=0.08,0.012,0.03 pos=-0.66,0.752,-0.12 rot=0,5,0
+material plastic
+color #1f3fa0
+cyl r=0.005 h=0.14 axis=x pos=-0.15,0.762,0.25 rot=0,20,0 seg=6

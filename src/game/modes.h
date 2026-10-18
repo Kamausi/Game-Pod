@@ -4,7 +4,9 @@
 //   Hill & Hole - 3-lap circuit through the two-track, whoops, water hole and spoil mound.
 //   Mud Slinger - 90 s freestyle in the bowl: roost volume, airtime, splashes, combo multiplier.
 //   King of Pit - 120 s, hold the center puddle while moving; most crown time wins.
-//   Free Roam   - no clock.
+//   Bounty Hole - one shot at the named trench east of the venue. Clear it and take the pot; every
+//                 failed attempt (dozer tow, out of bounds) grows it. Scored on time or distance.
+//   Free Roam   - no clock (open pits / open riding).
 #pragma once
 #include <string>
 #include "../physics/vehicle.h"
@@ -12,7 +14,7 @@
 
 namespace mb {
 
-enum class ModeId : int { FreeRoam = 0, MudBog = 1, Circuit = 2, Freestyle = 3, King = 4 };
+enum class ModeId : int { FreeRoam = 0, MudBog = 1, Circuit = 2, Freestyle = 3, King = 4, Bounty = 5 };
 enum class Phase : int { Idle, Countdown, Running, Finished };
 
 struct ModeResult {
@@ -42,8 +44,10 @@ public:
     float lapStart = 0, bestLap = 0, lastLap = 0, penalty = 0;
     float kingTime = 0;
     float stuckTimer = 0, progressTimer = 0, bestProgress = -1e9f;
-    bool stuck = false;
+    bool stuck = false, claimed = false;
     int lane = 0;
+    int bountyPot = 1500;          // grows $250 with every failed attempt, resets when claimed
+    bool judged() const { return (id == ModeId::MudBog || id == ModeId::Bounty) && phase == Phase::Running; }
     std::string message;
     float messageTimer = 0;
     ModeResult results[2];

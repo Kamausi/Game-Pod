@@ -40,6 +40,21 @@ void World::generate(uint32_t seed) {
         chuteTop = hillCenter + dir * 5.f;
         chuteBottom = hillCenter + dir * (hillRadius + 4.f);
     }
+    entranceRoad = {{0, 0, -124}, {0, 0, -91.5f}, {0, 0, -58}};
+    returnRoad = {{68, 0, -24}, {56, 0, -40}, {44, 0, -58}, {-56, 0, -58}, {-62, 0, -64}};
+    campRoad = {{82, 0, 0}, {100, 0, 2}, {114, 0, 2}, {114, 0, 34}};
+    auto polyDist = [](const std::vector<Vec3>& P, float x, float z, float* along = nullptr) {
+        float best = 1e9f, acc = 0, bestAlong = 0;
+        for (size_t s = 0; s + 1 < P.size(); s++) {
+            float t;
+            float d = distToSegment({x, z}, {P[s].x, P[s].z}, {P[s + 1].x, P[s + 1].z}, &t);
+            float L = length(Vec2{P[s + 1].x - P[s].x, P[s + 1].z - P[s].z});
+            if (d < best) { best = d; bestAlong = acc + t * L; }
+            acc += L;
+        }
+        if (along) *along = bestAlong;
+        return best;
+    };
     auto natural = [&](float x, float z) { return (fbm(x * 0.011f + 3.1f, z * 0.011f - 7.4f, 4, seed) - 0.5f) * 1.8f; };
     const float hPit = natural(0, pitZ), hBowl = natural(bowlCenter.x, bowlCenter.z);
     const float hPond = natural(pondCenter.x, pondCenter.z);
@@ -75,6 +90,7 @@ void World::generate(uint32_t seed) {
             float base = h - 0.07f;
             float water = Terrain::NO_WATER;
             uint8_t soil = uint8_t(Soil::Loam);
+            T.track[k] = 0;
 
             // Staging + pit apron graded flat.
             float dzP = std::fabs(z - pitZ);
@@ -275,13 +291,117 @@ void World::generate(uint32_t seed) {
                 }
             }
 
+            // ---------------- venue grounds ----------------
+            float comp = moist > 0.6f ? 0.01f : 0.08f;
+            auto inRect = [&](Vec3 lo, Vec3 hi, float m) {   // 1 inside, fading over m metres
+                float dx = std::max(lo.x - x, x - hi.x), dz = std::max(lo.z - z, z - hi.z);
+                return 1.f - smoothstep(0.f, m, std::max(dx, dz));
+            };
+            auto gravel = [&](float t) {
+                if (t <= 0) return;
+                grass = lerpf(grass, 0.f, t);
+                moist = lerpf(moist, 0.16f + 0.06f * n2, t);
+                comp = lerpf(comp, 0.4f, t);
+                if (t > 0.45f) soil = uint8_t(Soil::Gravel);
+            };
+            auto worn = [&](float t, float g) {   // trampled grass / packed dirt
+                grass = lerpf(grass, g * (0.7f + 0.6f * n2), t);
+                comp = lerpf(comp, 0.25f, t);
+            };
+            {
+                float along;
+                float dE = polyDist(entranceRoad, x, z);
+                gravel(1.f - smoothstep(2.6f, 3.6f, dE));
+                float dR = polyDist(returnRoad, x, z, &along);
+                if (dR < 4.5f) {
+                    gravel(1.f - smoothstep(2.6f, 3.8f, dR));
+                    // Mud dragged off the course: wet, dark tracks for the first stretch past the exit.
+                    float carry = (1.f - smoothstep(10.f, 45.f, along)) * (1.f - smoothstep(1.5f, 3.f, dR));
+                    moist = std::max(moist, (0.45f + 0.25f * n1) * carry);
+                    T.track[k] = uint8_t(std::max(float(T.track[k]), 160.f * carry * (0.6f + 0.4f * n2)));
+                }
+                gravel(1.f - smoothstep(2.0f, 3.0f, polyDist(campRoad, x, z)));
+                // Gate apron, wash bay apron, staging/tech apron edges.
+                gravel(inRect({-9, 0, -96}, {9, 0, -86}, 2.f));
+                gravel(inRect({washCenter.x - washHalfX - 2, 0, washCenter.z - washHalfZ - 2},
+                              {washCenter.x + washHalfX + 2, 0, washCenter.z + washHalfZ + 2}, 1.5f));
+                // Paddock: packed dirt with gravel lanes between the trailer rows.
+                float pad = inRect(paddockMin, paddockMax, 3.f);
+                worn(pad, 0.32f);
+                if (pad > 0.5f && (std::fabs(z + 71.f) < 2.5f || std::fabs(z + 81.f) < 2.5f)) gravel(pad);
+                // Visitor parking: mowed field with worn wheel tracks along the rows.
+                float park = inRect(parkingMin, parkingMax, 2.f);
+                worn(park, 0.55f);
+                if (park > 0.5f && std::fabs(std::fmod(z + 200.f, 8.f) - 4.f) < 1.4f) worn(park, 0.2f);
+                // Village: trampled grass, gravel around the food trucks.
+                float vil = inRect(villageMin, villageMax, 2.f);
+                worn(vil, 0.38f);
+                gravel(inRect({6, 0, -86}, {13, 0, -64}, 1.f));
+                // Shutdown area past the finish: churned, mud-tracked dirt.
+                float sd = inRect(shutdownMin, shutdownMax, 3.f);
+                if (sd > 0) {
+                    worn(sd, 0.1f);
+                    moist = std::max(moist, 0.5f * sd * (0.5f + 0.5f * n1));
+                    T.track[k] = uint8_t(std::max(float(T.track[k]), 120.f * sd * n2));
+                }
+                // Footpaths: village to the bleachers, parking to the village, the campground path.
+                float fp = std::min({distToSegment({x, z}, {18, -64}, {18, -55}), distToSegment({x, z}, {-12, -72}, {5, -72}),
+                                     distToSegment({x, z}, {-6, -55}, {6, -55}), distToSegment({x, z}, {30, -55}, {82, -56})});
+                worn(1.f - smoothstep(0.6f, 1.4f, fp), 0.15f);
+                // Spectator bank along the south fence is worn by foot traffic.
+                if (std::fabs(x) < 40.f && z > -10.f && z < -3.f) worn(0.7f, 0.3f);
+            }
+            // Bounty hole: graded approach, a 20 m bottomless clay trench, spoil and a viewing bank.
+            {
+                float bc = 0.5f * (bountyX0 + bountyX1);
+                float site = inRect({bountyX0 - 14, 0, bountyZ - 18}, {bountyX1 + 4, 0, bountyZ + 10}, 6.f);
+                if (site > 0) {
+                    float hb = natural(bc, bountyZ);
+                    h = lerpf(h, hb + (n2 - 0.5f) * 0.05f, site);
+                    base = lerpf(base, hb - 0.08f, site);
+                    float dz = std::fabs(z - bountyZ);
+                    float tx = smoothstep(bountyX0, bountyX0 + 5, x) * (1.f - smoothstep(bountyX1 - 5, bountyX1, x));
+                    float tz = 1.f - smoothstep(bountyHalfW - 2.f, bountyHalfW, dz);
+                    float t = tx * tz * site;
+                    if (t > 0) {
+                        float along = (x - bountyX0) / (bountyX1 - bountyX0);
+                        float floor = hb - 0.55f - 0.65f * std::sin(along * PI) - 0.25f * gauss(sq(x - bc - 3) + sq(dz), 4.f) + (n1 - 0.5f) * 0.2f;
+                        h = lerpf(h, floor, t);
+                        base = lerpf(base, hb - 2.6f + (n2 - 0.5f) * 0.3f, t);
+                        moist = lerpf(moist, 0.92f + 0.08f * n1, t);
+                        grass *= 1.f - std::min(1.f, 2.f * t);
+                        if (t > 0.3f) soil = uint8_t(Soil::Clay);
+                        if (t > 0.55f) water = hb - 0.42f;
+                        comp = 0.01f;
+                    }
+                    // Spoil berms either side; the north one is the crowd's viewing bank.
+                    float bx = smoothstep(bountyX0 - 2, bountyX0 + 3, x) * (1.f - smoothstep(bountyX1 - 3, bountyX1 + 2, x));
+                    float berm = 0.9f * std::exp(-sq(dz - bountyHalfW - 2.5f) / 2.5f) * bx;
+                    h += berm; base += berm * 0.9f;
+                    if (z < bountyZ) worn(std::exp(-sq(dz - bountyHalfW - 7.f) / 8.f) * bx, 0.25f);
+                    worn((1.f - tz) * tx * site * std::exp(-sq(dz - bountyHalfW - 1.f)), 0.1f);
+                    // Approach lane from the venue: graded dirt.
+                    if (x < bountyX0 && dz < 4.f) worn(site * (1.f - smoothstep(2.5f, 4.f, dz)), 0.2f);
+                }
+            }
+            // Campground: graded field, worn sites.
+            {
+                float cg = inRect(campMin, campMax, 6.f);
+                if (cg > 0) {
+                    float hc = natural(0.5f * (campMin.x + campMax.x), 0.5f * (campMin.z + campMax.z));
+                    h = lerpf(h, hc + (h - hc) * 0.25f, cg);
+                    base = lerpf(base, h - 0.08f, cg);
+                    moist = lerpf(moist, 0.24f, cg);
+                    worn(cg * 0.6f, 0.5f);
+                }
+            }
+
             T.h[k] = h;
             T.base[k] = std::min(base, h - 0.02f);
             T.moist[k] = clampf(moist, 0.f, 1.f);
             T.grass[k] = uint8_t(clampf(grass, 0.f, 1.f) * 255.f);
             T.water[k] = water;
-            T.comp[k] = moist > 0.6f ? 0.01f : 0.08f;
-            T.track[k] = 0;
+            T.comp[k] = comp;
             T.soil[k] = soil;
         }
 
@@ -401,8 +521,264 @@ void World::generate(uint32_t seed) {
         addProp("vegetation/sumac.mbcad", busPos.x + rng.range(-6, 14), busPos.z + rng.range(-4, 12), rng.range(0, 6.28f),
                 rng.range(0.8f, 1.5f), {{"red", rng.uniform() < 0.5f ? 1.f : 0.25f}});
 
+    // ---- Venue grounds: gate, village, paddock, staging, bleachers, shutdown, bounty, camp ----
+    {
+        Rng gr(seed * 977u + 3u);
+        auto col3 = [](float r, float g, float b, const char* p) {
+            return CadParams{{std::string(p) + "_r", r}, {std::string(p) + "_g", g}, {std::string(p) + "_b", b}};
+        };
+        auto with = [](CadParams a, const CadParams& b) { for (auto& kv : b) a[kv.first] = kv.second; return a; };
+        auto person = [&](float x, float z, float yaw, bool vest, float y = -1e9f) {
+            CadParams pr{{"shirt_r", gr.range(0.15f, 0.8f)}, {"shirt_g", gr.range(0.15f, 0.7f)}, {"shirt_b", gr.range(0.2f, 0.8f)},
+                         {"vest", vest ? 1.f : (gr.uniform() < 0.3f ? 1.f : 0.f)}};
+            if (vest) { pr["shirt_r"] = 0.95f; pr["shirt_g"] = 0.55f; pr["shirt_b"] = 0.1f; pr["vest"] = 0.f; }   // hi-vis staff
+            props.push_back({"props/spectator.mbcad", pr, {x, y > -1e8f ? y : ground(x, z), z}, yaw, gr.range(0.94f, 1.06f)});
+        };
+        // Footprint collider for a building (half extents in the part's own frame).
+        auto building = [&](const std::string& part, float x, float z, float yaw, Vec3 half, CadParams pr = {}) {
+            addProp(part, x, z, yaw, 1.f, pr);
+            if (half.x > 0) boxCol({x, 0, z}, half, yaw);
+        };
+        auto car = [&](float x, float z, float yaw) {
+            static const float paints[][3] = {{0.75f, 0.75f, 0.76f}, {0.1f, 0.1f, 0.11f}, {0.55f, 0.08f, 0.07f}, {0.9f, 0.9f, 0.9f},
+                                              {0.12f, 0.2f, 0.38f}, {0.3f, 0.32f, 0.3f}, {0.45f, 0.36f, 0.25f}, {0.15f, 0.3f, 0.18f}};
+            const float* c = paints[gr.next() % 8];
+            bool truck = gr.uniform() < 0.55f;
+            building(truck ? "props/pickup_parked.mbcad" : "props/sedan_parked.mbcad", x, z, yaw,
+                     truck ? Vec3{1.0f, 0.9f, 2.9f} : Vec3{0.92f, 0.75f, 2.4f}, col3(c[0], c[1], c[2], "paint"));
+            props.back().dirt = gr.range(0.05f, 0.35f);
+        };
+
+        // Gate and entrance: arch over the road, ticket booth, welcome-center trailer, gate staff.
+        addProp("venue/gate_arch.mbcad", gatePos.x, gatePos.z, PI);
+        boxCol({gatePos.x - 4.5f, 0, gatePos.z}, {0.3f, 2.8f, 0.3f}, 0);
+        boxCol({gatePos.x + 4.5f, 0, gatePos.z}, {0.3f, 2.8f, 0.3f}, 0);
+        building("venue/ticket_booth.mbcad", 6.f, -87.f, -PI * 0.5f, {1.2f, 1.4f, 1.2f});
+        person(4.2f, -86.f, -PI * 0.5f, true);
+        person(-3.8f, -89.f, PI * 0.5f, true);
+        building("venue/office_trailer.mbcad", -9.f, -82.f, PI * 0.5f, {4.6f, 1.6f, 1.9f}, col3(0.9f, 0.89f, 0.84f, "color"));
+        addProp("venue/sign.mbcad", 4.5f, -95.f, PI, 1.f, {{"panel_r", 0.85f}, {"panel_g", 0.4f}, {"panel_b", 0.08f}});
+        addProp("venue/flag_pole.mbcad", -6.f, -93.f, 0, 1.f, col3(0.95f, 0.5f, 0.05f, "color"));
+        addProp("venue/flag_pole.mbcad", 6.f, -93.f, 0, 1.f, col3(0.1f, 0.3f, 0.75f, "color"));
+
+        // Visitor parking: rows of everyday pickups and cars, nose-in from the wheel tracks.
+        for (float z = parkingMin.z + 3.f; z < parkingMax.z - 1.f; z += 8.f)
+            for (float x = parkingMin.x + 2.f; x < parkingMax.x - 1.f; x += 3.2f) {
+                if (gr.uniform() < 0.22f) continue;
+                for (int side = -1; side <= 1; side += 2)
+                    if (gr.uniform() < 0.8f) car(x + gr.range(-0.2f, 0.2f), z + side * 2.9f, (side < 0 ? 0.f : PI) + gr.range(-0.08f, 0.08f));
+            }
+        // Shops along the return road: pro shop/parts store, washroom block, first aid.
+        building("venue/metal_building.mbcad", -42.f, -66.5f, 0, {5.f, 2.f, 4.f},
+                 with(with(col3(0.55f, 0.12f, 0.1f, "wall"), col3(0.25f, 0.26f, 0.27f, "roof")), {{"w", 10}, {"l", 8}}));
+        addProp("venue/sign.mbcad", -42.f, -61.5f, 0, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.1f}, {"panel_b", 0.12f}, {"w", 2.4f}});
+        building("venue/metal_building.mbcad", -28.f, -66.f, 0, {4.f, 1.8f, 3.f},
+                 with(with(col3(0.82f, 0.8f, 0.72f, "wall"), col3(0.18f, 0.32f, 0.2f, "roof")), {{"w", 8}, {"l", 6}, {"h", 3.f}}));
+        building("venue/canopy.mbcad", -19.f, -66.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.92f}, {"color_g", 0.92f}, {"color_b", 0.92f}, {"walls", 1}});
+        addProp("venue/sign.mbcad", -19.f, -63.5f, 0, 1.f, {{"panel_r", 0.85f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"w", 1.0f}, {"h", 0.6f}});
+        person(-18.f, -64.5f, 0, true);
+        for (int i = 0; i < 4; i++) building("venue/portajohn.mbcad", -33.5f + i * 1.3f, -71.5f, 0, {0.55f, 1.1f, 0.55f},
+                                              col3(0.1f, 0.35f, 0.6f, "body"));
+        addProp("venue/handwash.mbcad", -28.f, -71.5f, 0);
+
+        // Village: food-truck row facing the walkway, pavilion, stage and lawn, concession, merch.
+        const float trucks[][3] = {{0.85f, 0.2f, 0.12f}, {0.95f, 0.85f, 0.3f}, {0.2f, 0.45f, 0.65f}, {0.9f, 0.9f, 0.88f}};
+        for (int i = 0; i < 4; i++) {
+            float z = -84.f + i * 5.5f;
+            building("venue/food_truck.mbcad", 10.f, z, PI * 0.5f, {3.0f, 1.5f, 1.25f}, col3(trucks[i][0], trucks[i][1], trucks[i][2], "body"));
+            person(12.4f, z + gr.range(-1.f, 1.f), -PI * 0.5f, false);   // in the queue
+            if (gr.uniform() < 0.6f) person(13.6f, z + gr.range(-1.f, 1.f), -PI * 0.5f, false);
+        }
+        addProp("venue/generator.mbcad", 7.5f, -88.f, 0);
+        addProp("venue/water_tank.mbcad", 7.f, -64.5f, 0);
+        building("venue/stage.mbcad", 22.f, -86.5f, 0, {5.f, 1.2f, 3.4f});
+        building("venue/pavilion.mbcad", 22.f, -70.f, 0, {0.f, 0.f, 0.f});
+        for (int i = 0; i < 4; i++) boxCol({22.f + (i % 2 ? 5.7f : -5.7f), 0, -70.f + (i < 2 ? 3.7f : -3.7f)}, {0.15f, 1.5f, 0.15f}, 0);
+        for (int i = 0; i < 9; i++) person(gr.range(16.f, 28.f), gr.range(-81.f, -77.f), PI + gr.range(-0.4f, 0.4f), false);   // lawn crowd
+        for (int i = 0; i < 6; i++) person(gr.range(17.f, 27.f), gr.range(-73.f, -67.f), gr.range(0.f, 6.28f), false);
+        building("venue/metal_building.mbcad", 27.f, -64.f, 0, {3.5f, 1.6f, 2.5f},
+                 with(with(col3(0.85f, 0.75f, 0.45f, "wall"), col3(0.5f, 0.12f, 0.1f, "roof")), {{"w", 7}, {"l", 5}, {"h", 2.8f}}));
+        building("venue/canopy.mbcad", 15.f, -64.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.1f}, {"color_g", 0.12f}, {"color_b", 0.14f}});
+        building("venue/canopy.mbcad", 19.f, -64.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.95f}, {"color_g", 0.5f}, {"color_b", 0.05f}});
+        addProp("venue/folding_table.mbcad", 15.f, -63.f, 0);
+        addProp("venue/folding_table.mbcad", 19.f, -63.f, 0);
+        for (int i = 0; i < 4; i++) building("venue/portajohn.mbcad", 31.f, -82.f + i * 1.3f, -PI * 0.5f, {0.55f, 1.1f, 0.55f},
+                                              col3(0.15f, 0.5f, 0.25f, "body"));
+        addProp("venue/handwash.mbcad", 31.f, -76.f, -PI * 0.5f);
+        building("venue/dumpster.mbcad", 31.f, -88.f, -PI * 0.5f, {0.9f, 0.65f, 0.6f});
+        for (float x : {-20.f, 4.f, 16.f, 30.f}) addProp("venue/trash_barrel.mbcad", x, -60.5f, 0, 1.f, col3(0.1f, 0.3f, 0.6f, "body"));
+        addProp("venue/light_tower.mbcad", 34.f, -60.f, 0);
+        addProp("venue/light_tower.mbcad", -44.f, -60.5f, 0);
+
+        // Pit-side: bleachers and the announcer tower on the north bank, results board at the finish,
+        // sponsor banners on both fences, light towers on the south bank, a crowd on the bleachers.
+        for (float cx : {-15.f, 15.f}) {
+            building("venue/bleachers.mbcad", cx, -52.5f, 0, {6.f, 1.2f, 2.f}, {{"len", 12}});
+            for (int row = 0; row < 5; row++)
+                for (int i = 0; i < 7; i++)
+                    if (gr.uniform() < 0.55f) person(cx - 5.4f + i * 1.8f + gr.range(-0.4f, 0.4f), -51.f - row * 0.75f, gr.range(-0.3f, 0.3f), false,
+                                                     ground(cx, -52.5f) + 0.45f + row * 0.48f - 0.45f);
+        }
+        building("venue/announcer_tower.mbcad", 0.f, -53.f, 0, {1.6f, 3.f, 1.6f});
+        building("venue/results_board.mbcad", 30.f, -53.f, 0, {2.f, 2.5f, 0.3f});
+        building("venue/results_board.mbcad", -62.f, -14.f, PI * 0.75f, {2.f, 2.5f, 0.3f});
+        float fz2 = pitHalfW + 6.5f;
+        for (float x = pitX0 - 2; x < pitX1; x += 13.f) {
+            CadParams b1 = with(col3(0.95f, 0.75f, 0.1f, "a"), col3(0.08f, 0.08f, 0.08f, "b"));
+            CadParams b2 = with(col3(0.85f, 0.12f, 0.1f, "a"), col3(0.95f, 0.95f, 0.95f, "b"));
+            CadParams b3 = with(col3(0.1f, 0.35f, 0.75f, "a"), col3(0.95f, 0.8f, 0.2f, "b"));
+            const CadParams* opts[] = {&b1, &b2, &b3};
+            addProp("venue/banner.mbcad", x, pitZ - fz2 - 0.6f, PI, 1.f, *opts[gr.next() % 3]);
+            addProp("venue/banner.mbcad", x + 6.f, pitZ + fz2 + 0.6f, 0, 1.f, *opts[gr.next() % 3]);
+        }
+        addProp("venue/light_tower.mbcad", -42.f, -4.f, PI);
+        addProp("venue/light_tower.mbcad", 42.f, -4.f, PI);
+        for (float x : {-38.f, 38.f}) { addProp("venue/trash_barrel.mbcad", x, -4.5f, 0, 1.f, col3(0.1f, 0.3f, 0.6f, "body")); }
+
+        // Staging: cone lanes behind the start line, an official calling the next truck forward,
+        // tech inspection canopy and registration on the paddock side.
+        for (int l = 0; l <= lanes; l++) {
+            float zl = pitZ - pitHalfW + l * (2 * pitHalfW / lanes);
+            for (float x = pitX0 - 30.f; x <= pitX0 - 18.f; x += 4.f) addProp("venue/cone.mbcad", x, zl, gr.range(0, 6.28f));
+        }
+        person(pitX0 - 9.f, pitZ - pitHalfW - 2.f, PI * 0.5f + 0.6f, true);
+        person(pitX0 - 9.f, pitZ + pitHalfW + 2.f, PI * 0.5f - 0.6f, true);
+        building("venue/canopy.mbcad", -66.f, -48.f, PI * 0.5f, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.1f}, {"color_g", 0.3f}, {"color_b", 0.7f}, {"walls", 1}});
+        addProp("venue/folding_table.mbcad", -65.f, -48.f, PI * 0.5f);
+        person(-64.5f, -47.f, PI * 0.5f, true);
+        addProp("venue/sign.mbcad", -66.f, -45.f, PI * 0.5f, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.3f}, {"panel_b", 0.7f}, {"w", 1.4f}});
+        for (int i = 0; i < 4; i++) addProp("venue/cone.mbcad", -62.f + (i % 2) * 5.f, -51.f + (i / 2) * 6.f, 0);
+        building("venue/canopy.mbcad", -52.f, -64.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.95f}, {"color_g", 0.5f}, {"color_b", 0.05f}});
+        addProp("venue/folding_table.mbcad", -52.f, -63.f, 0);
+        person(-52.f, -64.f, 0, true);
+        addProp("venue/sign.mbcad", -48.5f, -62.5f, 0, 1.f, {{"panel_r", 0.95f}, {"panel_g", 0.5f}, {"panel_b", 0.05f}, {"w", 1.4f}});
+
+        // Recovery holding: loader tractor and the crew's tow truck by the pit's start corner.
+        building("props/tractor_loader.mbcad", -50.f, -46.f, PI * 0.5f, {1.0f, 1.3f, 2.2f}, col3(0.2f, 0.45f, 0.15f, "body"));
+        person(-47.5f, -44.5f, PI, true);
+
+        // Shutdown area past the finish: cones funnel to the return road, sign, a flagger.
+        for (int i = 0; i < 7; i++) {
+            addProp("venue/cone.mbcad", 50.f + i * 4.f, -17.5f, 0);
+            addProp("venue/cone.mbcad", 50.f + i * 4.f, -42.5f + std::max(0, i - 3) * 1.5f, 0);
+        }
+        addProp("venue/sign.mbcad", 74.f, -30.f, -PI * 0.5f, 1.f, {{"panel_r", 0.85f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"arrow", 1}});
+        addProp("venue/sign.mbcad", 60.f, -44.f, -PI * 0.25f, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.4f}, {"panel_b", 0.15f}, {"arrow", 1}});
+        person(52.f, -18.5f, -PI * 0.5f, true);
+        for (int i = 0; i < 6; i++) addProp("venue/hay_bale.mbcad", 79.f, -38.f + i * 3.6f, PI * 0.5f, 1.f, {{"round", 0}});
+
+        // Wash bay on the return road, with a hose tank and a crew washing.
+        building("venue/washbay.mbcad", washCenter.x, washCenter.z, PI * 0.5f, {0.f, 0.f, 0.f}, {{"sign_r", 0.1f}, {"sign_g", 0.35f}, {"sign_b", 0.75f}});
+        addProp("venue/water_tank.mbcad", washCenter.x + 6.5f, washCenter.z - 4.5f, 0);
+        person(washCenter.x - 2.f, washCenter.z - 3.8f, 0, false);
+
+        // Paddock: rows of tow rigs and trailers, canopies, pit clutter, crews working.
+        int slot = 0, ownSpot = 0;
+        for (float z : {-86.f, -76.f, -66.f})
+            for (float x = paddockMin.x + 5.f; x < paddockMax.x - 4.f; x += 8.f, slot++) {
+                if (std::fabs(x - garageSpot.x) < 6.f && std::fabs(z - garageSpot.z) < 7.f) {   // your own pit spot
+                    if (ownSpot++) continue;
+                    addProp("venue/canopy.mbcad", garageSpot.x - 1.5f, garageSpot.z - 4.6f, 0, 1.f, {{"color_r", 0.95f}, {"color_g", 0.55f}, {"color_b", 0.08f}, {"walls", 1}});
+                    addProp("venue/pit_clutter.mbcad", garageSpot.x + 3.2f, garageSpot.z - 4.f, 0.3f);
+                    continue;
+                }
+                float yaw = PI;   // trucks nose to the north lane, trailers behind them
+                const float paints[][3] = {{0.9f, 0.9f, 0.9f}, {0.1f, 0.1f, 0.12f}, {0.6f, 0.08f, 0.06f}, {0.2f, 0.25f, 0.4f}, {0.75f, 0.75f, 0.72f}};
+                const float* pc = paints[gr.next() % 5];
+                building("props/dually_hauler.mbcad", x, z - 4.f, yaw, {1.2f, 1.0f, 3.3f}, col3(pc[0], pc[1], pc[2], "paint"));
+                bool enclosed = gr.uniform() < 0.45f;
+                if (enclosed) building("props/trailer_enclosed.mbcad", x, z + 4.2f, yaw, {1.3f, 1.5f, 3.8f},
+                                       with(col3(0.18f, 0.18f, 0.2f, "body"), col3(pc[0], pc[1], pc[2], "stripe")));
+                else building("props/trailer_flatbed.mbcad", x, z + 4.2f, yaw, {1.25f, 0.4f, 3.2f});
+                // A competition rig unloaded beside it, under a canopy, with its crew.
+                static const char* rigs[] = {"vehicles/squarebody.mbcad", "vehicles/fullsize_suv.mbcad", "vehicles/comanche.mbcad", "vehicles/bogcar76.mbcad"};
+                static const float fa[] = {1.311f, 1.2105f, 1.29f, 1.36f}, ra[] = {-1.669f, -1.4795f, -1.58f, -1.73f},
+                                   tr[] = {1.65f, 1.66f, 1.47f, 1.62f}, ay[] = {-0.42f, -0.42f, -0.42f, -0.36f};
+                int r = int(gr.next() % 4);
+                if (!enclosed || gr.uniform() < 0.5f) {
+                    const float* rc = paints[gr.next() % 5];
+                    float rx = x + 3.6f, rz = z + 1.f;
+                    addParked(rigs[r], rx, rz, PI + gr.range(-0.2f, 0.2f), fa[r], ra[r], tr[r], ay[r] - 0.1f, 0.4445f, gr.range(0.3f, 0.9f),
+                              col3(rc[0], rc[1], rc[2], "paint"));
+                    boxCol({rx, 0, rz}, {1.0f, 0.9f, 2.4f}, PI);
+                }
+                if (gr.uniform() < 0.7f) addProp("venue/canopy.mbcad", x - 3.4f, z + 1.f, 0, 1.f, col3(gr.uniform(), gr.uniform(), gr.uniform(), "color"));
+                addProp("venue/pit_clutter.mbcad", x - 3.4f, z + 1.f, gr.range(0, 6.28f), 1.f, col3(0.8f, 0.1f, 0.08f, "tool"));
+                int crew = 1 + int(gr.next() % 3);
+                for (int c = 0; c < crew; c++) person(x + gr.range(-4.5f, 4.5f), z + gr.range(-1.f, 2.5f), gr.range(0, 6.28f), false);
+            }
+        addProp("venue/light_tower.mbcad", -90.f, -60.f, PI * 0.25f);
+        building("venue/dumpster.mbcad", -92.f, -72.f, PI * 0.5f, {0.9f, 0.65f, 0.6f});
+        addProp("venue/generator.mbcad", -60.f, -88.f, 0);
+
+        // Show-and-shine on the lawn west of the pond: clean rigs, hoods up, a few admirers.
+        {
+            static const char* rigs[] = {"vehicles/squarebody.mbcad", "vehicles/fullsize_suv.mbcad", "vehicles/comanche.mbcad"};
+            static const float fa[] = {1.311f, 1.2105f, 1.29f}, ra[] = {-1.669f, -1.4795f, -1.58f}, tr[] = {1.65f, 1.66f, 1.47f};
+            const float paints[][3] = {{0.75f, 0.1f, 0.08f}, {0.95f, 0.75f, 0.1f}, {0.1f, 0.35f, 0.6f}};
+            for (int i = 0; i < 3; i++) {
+                float x = -36.f + i * 6.f, z = 22.f;
+                addParked(rigs[i], x, z, PI * 0.15f, fa[i], ra[i], tr[i], -0.52f, 0.4445f, 0.f, col3(paints[i][0], paints[i][1], paints[i][2], "paint"));
+                boxCol({x, 0, z}, {1.0f, 0.9f, 2.4f}, PI * 0.15f);
+                person(x + 2.2f, z + 1.f, -PI * 0.5f, false);
+            }
+            addProp("venue/banner.mbcad", -30.f, 27.5f, PI, 1.f, {{"len", 10}, {"a_r", 0.1f}, {"a_g", 0.1f}, {"a_b", 0.1f}, {"b_r", 0.85f}, {"b_g", 0.7f}, {"b_b", 0.2f}});
+        }
+
+        // Bounty hole: prize board, viewing bank with bleachers and crowd, flags, hay bales.
+        {
+            Vec3 bc = bountyCenter();
+            building("venue/bleachers.mbcad", bc.x, bountyZ - bountyHalfW - 7.f, 0, {6.f, 1.2f, 2.f}, {{"len", 12}});
+            for (int i = 0; i < 18; i++) person(bc.x + gr.range(-13.f, 13.f), bountyZ - bountyHalfW - gr.range(4.5f, 5.5f), gr.range(-0.3f, 0.3f), false);
+            for (int i = 0; i < 6; i++) person(bc.x - 8.f + i * 2.f, bountyZ - bountyHalfW - 6.6f, 0, false, ground(bc.x, bountyZ - bountyHalfW - 7.f) + 0.45f);
+            building("venue/results_board.mbcad", bountyX0 - 4.f, bountyZ - bountyHalfW - 5.f, PI * 0.15f, {2.f, 2.5f, 0.3f});
+            addProp("venue/sign.mbcad", bountyX0 - 6.f, bountyZ + 5.f, PI * 0.5f, 1.f, {{"panel_r", 0.85f}, {"panel_g", 0.65f}, {"panel_b", 0.1f}, {"w", 2.2f}, {"h", 1.1f}});
+            for (float x = bountyX0; x <= bountyX1; x += 8.f) {
+                addProp("venue/flag_pole.mbcad", x, bountyZ - bountyHalfW - 3.5f, 0, 1.f, col3(gr.uniform(), gr.uniform() * 0.6f, 0.1f, "color"));
+                addProp("venue/hay_bale.mbcad", x + 2.f, bountyZ + bountyHalfW + 3.5f, gr.range(0, 6.28f), 1.f, {{"round", 1}});
+            }
+            addProp("venue/banner.mbcad", bc.x, bountyZ - bountyHalfW - 4.2f, 0, 1.f, {{"len", 8}, {"a_r", 0.85f}, {"a_g", 0.65f}, {"a_b", 0.1f}, {"b_r", 0.1f}, {"b_g", 0.1f}, {"b_b", 0.1f}});
+            addProp("venue/light_tower.mbcad", bountyX1 + 4.f, bountyZ - 10.f, -PI * 0.6f);
+            building("props/tractor_loader.mbcad", bountyX1 + 5.f, bountyZ + 4.f, -PI * 0.5f, {1.0f, 1.3f, 2.2f}, col3(0.85f, 0.55f, 0.08f, "body"));
+        }
+
+        // Campground: tents, RVs and campers with tow vehicles, tables, fire rings, a bathhouse.
+        {
+            building("venue/metal_building.mbcad", 106.f, 30.f, PI, {4.f, 1.8f, 3.f},
+                     with(with(col3(0.62f, 0.5f, 0.36f, "wall"), col3(0.22f, 0.24f, 0.25f, "roof")), {{"w", 8}, {"l", 6}, {"h", 3.f}}));
+            addProp("venue/sign.mbcad", 98.f, 6.f, PI * 0.5f, 1.f, {{"panel_r", 0.4f}, {"panel_g", 0.25f}, {"panel_b", 0.12f}});
+            addProp("venue/sign.mbcad", 120.f, 36.f, PI, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.3f}, {"panel_b", 0.6f}, {"w", 1.0f}});   // RV dump station
+            int site = 0;
+            for (float z = 8.f; z < 34.f; z += 9.f)
+                for (int side = -1; side <= 1; side += 2, site++) {
+                    float x = 114.f + side * 8.f;
+                    float yaw = side < 0 ? PI * 0.5f : -PI * 0.5f;   // fronts toward the camp road
+                    int kind = int(gr.next() % 3);
+                    const float stripes[][3] = {{0.6f, 0.15f, 0.1f}, {0.15f, 0.3f, 0.55f}, {0.35f, 0.3f, 0.2f}};
+                    const float* sc = stripes[gr.next() % 3];
+                    if (kind == 0) building("props/rv_motorhome.mbcad", x + side * 1.f, z, yaw + PI * 0.5f, {1.3f, 1.7f, 4.6f}, col3(sc[0], sc[1], sc[2], "stripe"));
+                    else if (kind == 1) {
+                        building("props/camper_trailer.mbcad", x + side * 1.f, z, yaw + PI * 0.5f, {1.25f, 1.5f, 3.6f}, col3(sc[0], sc[1], sc[2], "stripe"));
+                        const float* pc = trucks[gr.next() % 4];
+                        building("props/pickup_parked.mbcad", x + side * 1.f, z - 7.5f, yaw + PI * 0.5f, {1.0f, 0.9f, 2.9f}, col3(pc[0], pc[1], pc[2], "paint"));
+                    } else {
+                        addProp("venue/dome_tent.mbcad", x + side * 2.f, z - 1.5f, yaw, 1.f, col3(gr.uniform(), gr.uniform(), gr.uniform(), "color"));
+                        addProp("venue/dome_tent.mbcad", x + side * 2.5f, z + 2.f, yaw + 0.3f, 1.f, col3(gr.uniform(), gr.uniform(), gr.uniform(), "color"));
+                        car(x + side * 5.f, z, yaw + PI * 0.5f);
+                    }
+                    addProp("venue/picnic_table.mbcad", x - side * 3.5f, z + 2.5f, gr.range(0, 6.28f));
+                    addProp("venue/fire_ring.mbcad", x - side * 3.5f, z - 2.f, 0);
+                    addProp("venue/rv_hookup.mbcad", x - side * 4.8f, z + 4.f, yaw);
+                    if (gr.uniform() < 0.6f) person(x - side * 3.f, z, gr.range(0, 6.28f), false);
+                }
+            addProp("venue/trash_barrel.mbcad", 110.f, 4.f, 0, 1.f, col3(0.1f, 0.3f, 0.15f, "body"));
+            addProp("venue/handwash.mbcad", 102.f, 30.f, PI);
+        }
+    }
+
     // ---- Tree line (poplar/aspen in October, a few spruce) ----
     auto clearOfCourse = [&](float x, float z, float margin) {
+        if (builtUp(x, z)) return false;
         if (std::fabs(z - pitZ) < pitHalfW + 12 && std::fabs(x) < 60) return false;
         if (length(Vec2{x - bowlCenter.x, z - bowlCenter.z}) < bowlRadius + 8 + margin) return false;
         if (length(Vec2{x - pondCenter.x, z - pondCenter.z}) < pondRadius + 3) return false;
@@ -453,6 +829,7 @@ void World::generate(uint32_t seed) {
             if (ex * ex + ez * ez < 1.3f) return false;
             if (length(Vec2{x - swampCenter.x, z - swampCenter.z}) < swampRadius + 2.f) return false;
             if (std::fabs(x) < 8.f || std::fabs(z) < 8.f) return false;   // keep the way out open
+            if (builtUp(x, z)) return false;
             return true;
         };
         for (int s = 0; s < 9000; s++) {
@@ -502,6 +879,7 @@ void World::buildOverview() {
             float bare = 1.f - t.grass;
             r = lerpf(r, 118, bare * 0.7f); g = lerpf(g, 100, bare * 0.7f); b = lerpf(b, 70, bare * 0.7f);
             r = lerpf(r, 72, mud); g = lerpf(g, 52, mud); b = lerpf(b, 34, mud);
+            if (t.soil == uint8_t(Soil::Gravel)) { r = 150; g = 146; b = 136; }
             if (t.waterDepth > 0.03f) { r = 88; g = 104; b = 128; }
             size_t o = (size_t(j) * M + i) * 4;
             overview[o] = uint8_t(clampf(r * shade, 0, 255));
@@ -514,6 +892,19 @@ void World::buildOverview() {
         if (i < 0 || j < 0 || i >= M || j >= M) continue;
         size_t o = (size_t(j) * M + i) * 4;
         overview[o] = 38; overview[o + 1] = 56; overview[o + 2] = 30;
+    }
+    // Buildings and parked vehicles as their collider footprints (light grey roofs).
+    for (const BoxCollider& c : colliders) {
+        if (c.half.x < 0.5f) continue;
+        float cs = std::cos(c.yaw), sn = std::sin(c.yaw);
+        for (float a = -c.half.x; a <= c.half.x; a += 0.7f)
+            for (float b = -c.half.z; b <= c.half.z; b += 0.7f) {
+                float x = c.center.x + a * cs + b * sn, z = c.center.z - a * sn + b * cs;
+                int i = int((x - terrain.originX()) / S * M), j = int((z - terrain.originZ()) / S * M);
+                if (i < 0 || j < 0 || i >= M || j >= M) continue;
+                size_t o = (size_t(j) * M + i) * 4;
+                overview[o] = 196; overview[o + 1] = 192; overview[o + 2] = 184;
+            }
     }
 }
 
@@ -623,6 +1014,19 @@ void World::collideStatic(Vehicle& v, float dt) {
             }
         }
     }
+}
+
+bool World::builtUp(float x, float z) const {
+    auto in = [&](Vec3 lo, Vec3 hi, float m) { return x > lo.x - m && x < hi.x + m && z > lo.z - m && z < hi.z + m; };
+    if (in(paddockMin, paddockMax, 3) || in(parkingMin, parkingMax, 3) || in(villageMin, villageMax, 3) || in(shutdownMin, shutdownMax, 2)) return true;
+    if (in(campMin, campMax, 6)) return true;
+    if (in({bountyX0 - 16, 0, bountyZ - 20}, {bountyX1 + 6, 0, bountyZ + 12}, 0)) return true;
+    if (in({-12, 0, -130}, {12, 0, -56}, 0)) return true;              // gate + entrance road
+    if (in({-60, 0, -62}, {48, 0, -50}, 0)) return true;               // return road, bleachers
+    if (x > 30 && x < 86 && std::fabs(z + 56.f) < 5.f) return true;    // path to the bounty hole
+    if (z > -6 && z < 6 && x > 78 && x < 100) return true;             // path to the campground
+    if (x > -40 && x < -10 && z > 16 && z < 30) return true;           // show-and-shine lawn
+    return false;
 }
 
 }  // namespace mb

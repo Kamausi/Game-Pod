@@ -67,7 +67,7 @@ public:
     std::vector<Vec3> circuit;      // closed loop of checkpoints
     Vec3 pondCenter{0, 0, 32};
     float pondRadius = 9;
-    Vec3 bowlCenter{60, 0, -66};
+    Vec3 bowlCenter{64, 0, -68};
     float bowlRadius = 17;
     float kingRadius = 6;
     Vec3 garageSpot{-70, 0, -62};
@@ -86,6 +86,25 @@ public:
     float creekHalfW = 4.f;
     Vec3 swampCenter{-120, 0, 104};   // black peat muck: the "bottomless" hole
     float swampRadius = 17.f;
+
+    // Venue grounds (north = -z): gate and entrance road from the north edge, visitor parking and
+    // the village (food, shops, stage) north of the pit, bleachers and announcer on the pit's north
+    // side, paddock/trailer parking in the north-west, staging at the pit's west end, shutdown area
+    // past the finish, and a return road behind the bleachers back to the paddock via the wash bay.
+    std::vector<Vec3> entranceRoad, returnRoad, campRoad;
+    Vec3 gatePos{0, 0, -91.5f};
+    Vec3 washCenter{-40, 0, -58};   // wash bay pad (drive on, stop: pressure washer)
+    float washHalfX = 4.5f, washHalfZ = 3.0f;
+    Vec3 paddockMin{-94, 0, -90}, paddockMax{-56, 0, -62};
+    Vec3 parkingMin{-48, 0, -90}, parkingMax{-12, 0, -70};
+    Vec3 villageMin{5, 0, -90}, villageMax{33, 0, -62};
+    Vec3 shutdownMin{47, 0, -44}, shutdownMax{78, 0, -16};
+    // Bounty hole east of the venue: one long, bottomless clay trench with a prize on it.
+    float bountyX0 = 88, bountyX1 = 120, bountyZ = -50, bountyHalfW = 7;
+    Vec3 bountyCenter() const { return {0.5f * (bountyX0 + bountyX1), 0, bountyZ}; }
+    // Weekend campground through the east tree-line gap.
+    Vec3 campMin{98, 0, -4}, campMax{130, 0, 38};
+    bool builtUp(float x, float z) const;   // grounds where no brush/trees grow
     // Overview image for the minimap (RGBA, overviewN^2, north = -z up).
     std::vector<uint8_t> overview;
     int overviewN = 256;

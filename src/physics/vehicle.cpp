@@ -57,7 +57,7 @@ void Vehicle::configure(const VehicleConfig& c) {
     rideAxleY = body->axleY - c.liftIn * IN;
     const float sag = travel * 0.38f;
     // Unsprung corner: tire + wheel + brake + half a solid axle (independent arms on the UTV).
-    const float unsprung = tireMass + (body->id == "utv" ? 14.f : 42.f);
+    const float unsprung = tireMass + (independent() ? 14.f : 42.f);
     sprungMass = mass - 4.f * unsprung;
     springK = (sprungMass * G * 0.25f) / sag;
     damperC = 2.f * 0.42f * std::sqrt(springK * sprungMass * 0.25f);
@@ -651,7 +651,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
     g_bellyScratch.push_back({{0, body->bellyY + 0.25f, bl * 0.5f}, 0.8f});
     g_bellyScratch.push_back({{0, body->bellyY + 0.25f, -bl * 0.5f}, 0.8f});
     std::vector<Vec3> worldPts;
-    if (body->id != "utv") {  // solid-axle differential pumpkins hang below the wheel centers
+    if (!independent()) {  // solid-axle differential pumpkins hang below the wheel centers
         for (int ax = 0; ax < 2; ax++) {
             Vec3 c = (wheels[ax * 2].worldCenter + wheels[ax * 2 + 1].worldCenter) * 0.5f - U * 0.17f;
             worldPts.push_back(c);

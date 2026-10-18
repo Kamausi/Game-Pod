@@ -29,6 +29,8 @@ const BOARDS = {
   circuit_lap: { lower: true, min: 20, max: 1200 },
   freestyle_score: { lower: false, min: 0, max: 2e6 },
   king_time: { lower: false, min: 0, max: 120.5 },
+  bounty_time: { lower: true, min: 2.0, max: 600 },
+  bounty_distance: { lower: false, min: 0, max: 32.01 },
 };
 let boards = {};
 try { boards = JSON.parse(fs.readFileSync(BOARD_FILE, 'utf8')); } catch { boards = {}; }

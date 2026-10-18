@@ -1,0 +1,23 @@
+# 55-gallon steel drum used as a trash barrel: painted body with rolling hoops,
+# black liner lip, domed plastic lid with a grab handle. Origin at ground centre.
+param body_r = 0.12
+param body_g = 0.30
+param body_b = 0.55
+material paint
+color body_r body_g body_b
+cyl r=0.29 h=0.88 pos=0,0.44,0 seg=12
+color body_r*1.25 body_g*1.25 body_b*1.25
+cyl r=0.298 h=0.025 pos=0,0.29,0 seg=12
+cyl r=0.298 h=0.025 pos=0,0.58,0 seg=12
+cyl r=0.30 h=0.02 pos=0,0.87,0 seg=12
+# Bag lip folded over the rim
+material plastic
+color #111111
+cyl r=0.296 h=0.06 pos=0,0.86,0 seg=12
+# Lid: skirt + low dome + handle
+color #2a2a2a
+cyl r=0.315 h=0.05 pos=0,0.905,0 seg=12
+lathe pts=0.315,0.93,0.25,0.96,0.12,0.98,0,0.985 seg=12
+color #1c1c1c
+box size=0.22,0.035,0.04 pos=0,1.0,0 bevel=0.01
+box size=0.03,0.03,0.04 pos=0.10,0.985,0 mirror=x

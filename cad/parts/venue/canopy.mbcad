@@ -1,0 +1,43 @@
+# 3x3 m pop-up event canopy for the paddock / vendor row: four thin steel legs, a
+# peaked fabric roof with a hanging valance, optional back wall on -Z.
+# Origin at ground centre, front faces +Z.
+param color_r = 0.78
+param color_g = 0.10
+param color_b = 0.08
+param walls = 0
+set E = 2.0                        # eave height (top of legs)
+set P = 2.9                        # peak height
+# Legs, foot plates and the scissor-truss eave rails
+material steel
+color #b8bcc0
+box size=0.04,E,0.04 pos=1.46,E/2,1.46 mirror=x
+box size=0.04,E,0.04 pos=1.46,E/2,-1.46 mirror=x
+color #5a5d60
+box size=0.12,0.01,0.12 pos=1.46,0.005,1.46 mirror=x
+box size=0.12,0.01,0.12 pos=1.46,0.005,-1.46 mirror=x
+color #9ea2a6
+box size=2.92,0.03,0.025 pos=0,E-0.04,1.46 mirror=z
+box size=0.025,0.03,2.92 pos=1.46,E-0.04,0 mirror=x
+box size=0.02,0.30,0.02 pos=0,E-0.18,1.46 rot=0,0,45 mirror=z
+box size=0.02,0.30,0.02 pos=1.46,E-0.18,0 rot=45,0,0 mirror=x
+# Peaked roof: a 4-sided lathe turned 45 deg so its ridges hit the leg corners
+material matte
+color color_r color_g color_b
+lathe pts=2.15,E,0,P seg=4 rot=0,45,0
+color color_r*0.7 color_g*0.7 color_b*0.7
+lathe pts=0,P-0.02,2.12,E-0.02 seg=4 rot=0,45,0
+# Valance skirt hanging from the eave
+color color_r*0.92 color_g*0.92 color_b*0.92
+box size=3.04,0.24,0.012 pos=0,E-0.10,1.52 mirror=z
+box size=0.012,0.24,3.04 pos=1.52,E-0.10,0 mirror=x
+color #f2f2f2
+box size=3.05,0.02,0.014 pos=0,E-0.21,1.52 mirror=z
+box size=0.014,0.02,3.05 pos=1.52,E-0.21,0 mirror=x
+# Peak cap
+color #303030
+material plastic
+cyl r=0.06 h=0.06 pos=0,P-0.01,0 seg=8
+# Optional back wall panel (walls=1)
+material matte
+color color_r*0.85 color_g*0.85 color_b*0.85
+box size=2.9*walls,(E-0.22)*walls,0.012 pos=0,0.02+(E-0.22)/2,-1.47

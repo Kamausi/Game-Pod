@@ -1,0 +1,101 @@
+# Outdoor concert stage: 10 m (X) x 7 m deck at 1.2 m on a scaffold base with a black front
+# skirt, four box-truss towers carrying a roof grid and a shallow arched roof, black back
+# scrim, ground-stacked PA on both sides, par cans on the front truss, rear access stair.
+# Front (audience side) faces +Z. Origin at ground centre of the deck footprint.
+param roof_r = 0.12
+param roof_g = 0.12
+param roof_b = 0.13
+param skirt_r = 0.08
+param skirt_g = 0.08
+param skirt_b = 0.09
+set dh = 1.2
+set tx = 5.3
+set tz = 3.3
+set th = 6.6
+# Deck base (scaffold block), deck surface and nosing
+material matte
+color #3a3a3a
+box size=10,dh-0.08,7 pos=0,(dh-0.08)/2,0
+color #4a3f33
+box size=10,0.08,7 pos=0,dh-0.04,0
+material steel
+color #6a6f75
+box size=10.04,0.06,0.06 pos=0,dh-0.03,3.52
+# Front and side skirts
+material matte
+color skirt_r skirt_g skirt_b
+box size=10.06,dh-0.1,0.04 pos=0,(dh-0.1)/2,3.52
+box size=0.04,dh-0.1,7.02 pos=5.02,(dh-0.1)/2,0 mirror=x
+# Truss towers (four chords each) with base plates
+material steel
+color #b9bec4
+box size=0.6,0.04,0.6 pos=tx,0.02,tz mirror=x
+box size=0.6,0.04,0.6 pos=tx,0.02,-tz mirror=x
+cyl r=0.025 h=th pos=tx-0.15,th/2,tz-0.15 seg=6 mirror=x
+cyl r=0.025 h=th pos=tx+0.15,th/2,tz-0.15 seg=6 mirror=x
+cyl r=0.025 h=th pos=tx-0.15,th/2,tz+0.15 seg=6 mirror=x
+cyl r=0.025 h=th pos=tx+0.15,th/2,tz+0.15 seg=6 mirror=x
+cyl r=0.025 h=th pos=tx-0.15,th/2,-tz-0.15 seg=6 mirror=x
+cyl r=0.025 h=th pos=tx+0.15,th/2,-tz-0.15 seg=6 mirror=x
+cyl r=0.025 h=th pos=tx-0.15,th/2,-tz+0.15 seg=6 mirror=x
+cyl r=0.025 h=th pos=tx+0.15,th/2,-tz+0.15 seg=6 mirror=x
+# Tower lacing suggested by rungs
+box size=0.32,0.03,0.32 pos=tx,1.5,tz mirror=x
+box size=0.32,0.03,0.32 pos=tx,3.0,tz mirror=x
+box size=0.32,0.03,0.32 pos=tx,4.5,tz mirror=x
+box size=0.32,0.03,0.32 pos=tx,1.5,-tz mirror=x
+box size=0.32,0.03,0.32 pos=tx,3.0,-tz mirror=x
+box size=0.32,0.03,0.32 pos=tx,4.5,-tz mirror=x
+# Roof grid: front/back trusses along X, side trusses along Z (top + bottom chords)
+box size=2*tx+0.3,0.05,0.3 pos=0,th,tz mirror=z
+box size=2*tx+0.3,0.05,0.3 pos=0,th-0.35,tz mirror=z
+box size=0.3,0.05,2*tz pos=tx,th,0 mirror=x
+box size=0.3,0.05,2*tz pos=tx,th-0.35,0 mirror=x
+box size=0.04,0.35,0.04 pos=2.6,th-0.17,tz+0.15 mirror=x
+box size=0.04,0.35,0.04 pos=0,th-0.17,tz+0.15
+# Arched roof
+material matte
+color roof_r roof_g roof_b
+extrude depth=2*tx+0.8 pos=0,0,0 pts=3.9,th+0.05,0,th+0.75,-3.9,th+0.05,-3.9,th-0.03,0,th+0.67,3.9,th-0.03
+# Back scrim and side wing scrims
+color #141414
+box size=2*tx-0.3,th-dh-0.4,0.04 pos=0,dh+(th-dh-0.4)/2,-tz
+box size=0.04,th-dh-0.6,2.2 pos=tx-0.2,dh+(th-dh-0.6)/2,-tz+1.1 mirror=x
+# Par cans on the front truss
+color #1c1c1c
+cyl r=0.1 h=0.28 axis=z pos=1.0,th-0.55,tz+0.05 seg=8 mirror=x
+cyl r=0.1 h=0.28 axis=z pos=2.6,th-0.55,tz+0.05 seg=8 mirror=x
+cyl r=0.1 h=0.28 axis=z pos=4.2,th-0.55,tz+0.05 seg=8 mirror=x
+material lens
+color #ffd9a0
+cyl r=0.085 h=0.02 axis=z pos=1.0,th-0.55,tz+0.19 seg=8 mirror=x
+color #9fd0ff
+cyl r=0.085 h=0.02 axis=z pos=2.6,th-0.55,tz+0.19 seg=8 mirror=x
+color #ff9a7a
+cyl r=0.085 h=0.02 axis=z pos=4.2,th-0.55,tz+0.19 seg=8 mirror=x
+# Ground-stacked PA, both sides (subs, tops, grilles)
+material plastic
+color #1a1a1a
+box size=1.0,0.7,0.85 pos=6.2,0.35,2.6 mirror=x
+box size=1.0,0.7,0.85 pos=6.2,1.05,2.6 mirror=x
+box size=0.8,0.55,0.65 pos=6.2,1.68,2.65 mirror=x
+box size=0.8,0.55,0.65 pos=6.2,2.23,2.65 mirror=x
+material matte
+color #2b2b2b
+box size=0.9,0.6,0.02 pos=6.2,0.35,3.03 mirror=x
+box size=0.9,0.6,0.02 pos=6.2,1.05,3.03 mirror=x
+box size=0.7,1.0,0.02 pos=6.2,1.95,2.98 mirror=x
+# Monitor wedges at the deck front
+material plastic
+color #1a1a1a
+wedge size=0.6,0.35,0.5 pos=1.2,dh+0.175,2.9 rot=0,180,0 mirror=x
+# Rear access stair (down toward -Z) with handrails
+material steel
+color #6a6f75
+box size=1.2,0.06,0.3 pos=0,0.96,-3.72
+box size=1.2,0.06,0.3 pos=0,0.72,-4.0
+box size=1.2,0.06,0.3 pos=0,0.48,-4.28
+box size=1.2,0.06,0.3 pos=0,0.24,-4.56
+box size=0.06,0.25,1.72 pos=0.63,0.7,-4.1 rot=-42,0,0 mirror=x
+box size=0.04,0.04,1.72 pos=0.65,1.6,-4.1 rot=-42,0,0 mirror=x
+box size=0.04,0.95,0.04 pos=0.65,0.75,-4.72 mirror=x

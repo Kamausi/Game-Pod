@@ -10,6 +10,7 @@ const char* modeName(ModeId id) {
         case ModeId::Circuit: return "Hill & Hole";
         case ModeId::Freestyle: return "Mud Slinger";
         case ModeId::King: return "King of the Pit";
+        case ModeId::Bounty: return "Bounty Hole";
     }
     return "?";
 }
@@ -33,6 +34,9 @@ Vec3 ModeRunner::spawnFor(const World& w, int lane, float& yaw) const {
             Vec3 side{d.z, 0, -d.x};
             return a - d * (6.f + 7.f * (lane / 2)) + side * ((lane % 2) ? 1.6f : -1.6f);
         }
+        case ModeId::Bounty:
+            yaw = PI * 0.5f;
+            return {w.bountyX0 - 8.f, 0, w.bountyZ + ((lane % 2) ? 2.6f : -2.6f) * (lane > 0 ? 1.f : 0.f)};
         case ModeId::Freestyle:
         case ModeId::King:
             yaw = PI * 0.5f;
@@ -63,10 +67,11 @@ void ModeRunner::start(ModeId m, World& w, Vehicle& v, int ln, double at) {
     bestProgress = -1e9f;
     stuck = false;
     resultCount = 0;
+    claimed = false;
     timeLimit = m == ModeId::Freestyle ? 90.f : (m == ModeId::King ? 120.f : 0.f);
     resetToSpawn(w, v);
     if (m != ModeId::FreeRoam) v.gear = 0;  // rev it on the line
-    flash(modeName(m), 2.f);
+    flash(m == ModeId::Bounty ? "Bounty Hole - $" + std::to_string(bountyPot) + " on the line" : std::string(modeName(m)), 2.5f);
 }
 
 void ModeRunner::finish(const std::string& msg) {
@@ -87,12 +92,21 @@ void ModeRunner::finish(const std::string& msg) {
             break;
         case ModeId::Freestyle: add("freestyle_score", score, false, std::to_string(int(score)) + " pts"); break;
         case ModeId::King: add("king_time", kingTime, false, fmtTime(kingTime) + " crowned"); break;
+        case ModeId::Bounty:
+            if (claimed) add("bounty_time", elapsed, true, "Bounty claimed in " + fmtTime(elapsed));
+            add("bounty_distance", distance, false, std::to_string(int(distance * 3.281f)) + " ft into the hole");
+            break;
         default: break;
     }
     flash(msg, 6.f);
 }
 
 void ModeRunner::requestTow(World& w, Vehicle& v) {
+    if (phase == Phase::Running && id == ModeId::Bounty && v.pos.x > w.bountyX0 - 2.f) {
+        bountyPot += 250;
+        finish("Dozer tow - the hole wins. Pot grows to $" + std::to_string(bountyPot));
+        return;
+    }
     if (phase == Phase::Running && id == ModeId::MudBog && v.pos.x > w.pitX0) {
         finish("Towed out by the dozer - " + std::to_string(int(distance * 3.281f)) + " ft");
         return;
@@ -182,6 +196,23 @@ void ModeRunner::update(float dt, double now, World& w, Vehicle& v, float ejecte
             else if ((comboTimer -= dt) <= 0) combo = 1;
             score += pts * combo;
             if (elapsed >= timeLimit) finish("Time! " + std::to_string(int(score)) + " pts");
+            break;
+        }
+        case ModeId::Bounty: {
+            float len = w.bountyX1 - w.bountyX0;
+            distance = clampf(v.pos.x - w.bountyX0, 0.f, len);
+            score = float(bountyPot);
+            if (v.pos.x > bestProgress + 0.3f) { bestProgress = v.pos.x; progressTimer = 0; }
+            else progressTimer += dt;
+            if (v.pos.x >= w.bountyX1) {
+                claimed = true;
+                int won = bountyPot;
+                bountyPot = 1500;
+                finish("BOUNTY CLAIMED! $" + std::to_string(won) + " in " + fmtTime(elapsed));
+            } else if (std::fabs(v.pos.z - w.bountyZ) > w.bountyHalfW + 3.f && v.pos.x > w.bountyX0) {
+                bountyPot += 250;
+                finish("Out of bounds! Pot grows to $" + std::to_string(bountyPot));
+            } else if (stuck && progressTimer > 8.f && messageTimer <= 0) flash("The hole's got you - rock it, or T for the dozer", 3.f);
             break;
         }
         case ModeId::King: {

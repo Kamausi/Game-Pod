@@ -46,7 +46,8 @@
     <button data-nav class="card" data-mode="2"><b>Hill &amp; Hole</b><small>3 laps of the two-track: whoops, water hole, the spoil mound by the old bus.</small></button>
     <button data-nav class="card" data-mode="3"><b>Mud Slinger</b><small>90 s freestyle in the bowl. Roost, air and splashes build your combo.</small></button>
     <button data-nav class="card" data-mode="4"><b>King of the Pit</b><small>120 s. Hold the center puddle while moving. Most crown time wins.</small></button>
-    <button data-nav class="card" data-mode="0"><b>Free Roam</b><small>No clock. Find the deep spots. Rock it, air down, lock it.</small></button>
+    <button data-nav class="card" data-mode="5"><b>Bounty Hole</b><small>One shot at the bottomless clay trench east of the venue. Clear it and take the pot &mdash; every failed attempt makes it bigger.</small></button>
+    <button data-nav class="card" data-mode="0"><b>Open Pits</b><small>Free roam the whole park: paddock, staging, wash bay, village, campground, the trails. No clock.</small></button>
   </div>
   <button data-nav class="back" data-go="menu">&larr; Back</button>
 </div>
@@ -58,8 +59,8 @@
     <label>Driver <input data-nav id="g_name" maxlength="16" value="Buddy"></label>
     <label>Body <select data-nav id="g_body"></select></label>
     <label>Engine <select data-nav id="g_engine"></select></label>
-    <label>Tires <span class="val" id="v_tire"></span><input data-nav type="range" id="g_tire" min="31" max="44" step="1"></label>
-    <label>Width <span class="val" id="v_width"></span><input data-nav type="range" id="g_width" min="10.5" max="18.5" step="0.5"></label>
+    <label>Tires <span class="val" id="v_tire"></span><input data-nav type="range" id="g_tire" min="29" max="66" step="1"></label>
+    <label>Width <span class="val" id="v_width"></span><input data-nav type="range" id="g_width" min="9.5" max="24" step="0.5"></label>
     <label>Tread
       <select data-nav id="g_tread"><option value="at">All-Terrain</option><option value="mt">Mud-Terrain</option><option value="paddle">Paddles</option></select></label>
     <label>Lift <span class="val" id="v_lift"></span><input data-nav type="range" id="g_lift" min="0" max="10" step="0.5"></label>
@@ -94,7 +95,7 @@
   </div>
   <div id="roomInfo" class="room"></div>
   <div id="hostControls" class="hidden">
-    <select data-nav id="mpMode"><option value="1">Mud Bog (4 lanes)</option><option value="2">Hill &amp; Hole</option><option value="3">Mud Slinger</option><option value="4">King of the Pit</option><option value="0">Free Roam</option></select>
+    <select data-nav id="mpMode"><option value="1">Mud Bog (4 lanes)</option><option value="2">Hill &amp; Hole</option><option value="3">Mud Slinger</option><option value="4">King of the Pit</option><option value="5">Bounty Hole</option><option value="0">Open Pits</option></select>
     <button data-nav id="btnStart">Start Event</button>
   </div>
   <div class="chat"><div id="chatLog"></div><input data-nav id="chatIn" placeholder="Say something muddy&hellip;" maxlength="120"></div>
@@ -236,6 +237,7 @@
   </div>
   <div id="countdown"></div>
   <div id="hudMsg"></div>
+  <div id="announce"></div>
   <div id="stuckHint">STUCK &mdash; stop spinning &bull; rock it &bull; air down &bull; lock it &bull; <b>T / View</b> = recovery</div>
   <div id="coach"></div>
   <canvas id="minimap" width="180" height="180"></canvas>

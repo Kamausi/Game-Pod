@@ -93,6 +93,8 @@ th { color: var(--dim); font-weight: 600; text-transform: uppercase; font-size: 
 #lampTcase.lo { background: var(--fence); color: #111; }
 .lamps span.bad, #lampWarn { background: #b3261e; color: #fff; }
 #miniSoil b { font-size: 14px; text-transform: capitalize; }
+#announce { position: absolute; top: calc(118px * var(--ui)); left: 50%; transform: translateX(-50%); max-width: 70%; padding: 4px 12px; border-radius: 4px;
+  background: rgba(20, 14, 8, .72); color: #f3e7c9; font-size: calc(15px * var(--ui)); text-align: center; display: none; }
 #coach { position: absolute; bottom: 150px; width: 100%; text-align: center; font-size: 18px; color: #fff; text-shadow: 0 2px 4px #000; display: none; padding: 0 12px; box-sizing: border-box; }
 #coach::before { content: "\25B8  "; color: var(--pj1); }
 .specsheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px 12px; margin-top: 10px; font-size: 13px; }

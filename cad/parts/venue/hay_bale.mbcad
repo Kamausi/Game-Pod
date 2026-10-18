@@ -1,0 +1,22 @@
+# Hay bale used as crash padding / bleacher seating. round=1: big round bale lying
+# on its side (axis X, 1.5 m dia); round=0: small square bale. Origin at ground centre.
+param round = 0
+set Q = 1-round
+material matte
+# Round bale: body, net-wrap bands, darker spiralled end faces
+color #c7a65a
+cyl r=0.75*round h=1.20*round axis=x pos=0,0.75*round,0 seg=12
+color #b39348
+cyl r=0.755*round h=0.04*round axis=x pos=0.30*round,0.756*round,0 seg=12 mirror=x
+color #a8873e
+cyl r=0.60*round h=1.205*round axis=x pos=0,0.75*round,0 seg=12
+color #977733
+cyl r=0.38*round h=1.21*round axis=x pos=0,0.75*round,0 seg=10
+cyl r=0.15*round h=1.215*round axis=x pos=0,0.75*round,0 seg=8
+# Square bale: body, cut-straw ends, two twine strings
+color #cfae63
+box size=0.92*Q,0.38*Q,0.46*Q pos=0,0.19*Q,0 bevel=0.03*Q
+color #b8964c
+box size=0.925*Q,0.33*Q,0.41*Q pos=0,0.19*Q,0
+color #e0d6b0
+box size=0.015*Q,0.385*Q,0.465*Q pos=0.22*Q,0.1925*Q,0 mirror=x

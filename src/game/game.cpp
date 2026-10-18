@@ -22,11 +22,11 @@ void VehicleVisual::build(Renderer& r, const VehicleConfig& c) {
     float tr = c.tireIn * 0.0254f * 0.5f;
     wheel = r.mesh("wheels/wheel.mbcad", {{"tire_r", tr},
                                           {"tire_w", c.widthIn * 0.0254f},
-                                          {"rim_r", c.tireIn >= 38 ? 0.2159f : 0.1905f},
+                                          {"rim_r", c.tireIn >= 50 ? 0.3048f : (c.body == "atv" ? 0.1651f : (c.tireIn >= 38 ? 0.2159f : 0.1905f))},
                                           {"lugs", float(lugCount(c.tread))},
                                           {"depth", c.tread == Tread::AllTerrain ? 0.018f : 0.028f},
                                           {"tread", float(int(c.tread))},
-                                          {"beadlock", c.tireIn >= 38 ? 1.f : 0.f}});
+                                          {"beadlock", c.beadlock ? 1.f : 0.f}});
 }
 
 double Game::serverNow() const { return emscripten_get_now() / 1000.0 + clockOffset; }
@@ -102,7 +102,7 @@ void Game::startMode(ModeId m, int lane, double startAt) {
     aiReleased = false;
     runTrace.clear();
     traceTimer = 0;
-    if (m != ModeId::FreeRoam && aiCount > 0 && remotes.empty()) {
+    if (m != ModeId::FreeRoam && m != ModeId::Bounty && aiCount > 0 && remotes.empty()) {
         ais = makeRivals(aiCount, uint32_t(serverNow() * 7.0));
         for (size_t i = 0; i < ais.size(); i++) {
             AiDriver& a = ais[i];
@@ -121,6 +121,25 @@ void Game::startMode(ModeId m, int lane, double startAt) {
     }
     player.dirt *= 0.5f;
     camYaw = camPitch = 0;
+    announceQ.clear();
+    announce.clear();
+    announceT = 0;
+    aiState.assign(ais.size(), 0);
+    auto who = [&](const VehicleConfig& c) {
+        return std::string(findBody(c.body).name) + ", " + specSheet(c).cls + " class";
+    };
+    if (m == ModeId::MudBog) {
+        announceLine("Lane " + std::to_string(lane % world.lanes + 1) + ": " + player.cfg.name + " in the " + who(player.cfg));
+        for (auto& a : ais) announceLine("Lane " + std::to_string(a.lane % world.lanes + 1) + ": " + a.name + " in '" + a.rig + "' - " + who(a.cfg));
+    } else if (m == ModeId::Bounty) {
+        announceLine("Bounty Hole: $" + std::to_string(mode.bountyPot) + " on the line - clear the trench and it's yours");
+        announceLine("Next up: " + player.cfg.name + " in the " + who(player.cfg));
+    } else if (m == ModeId::Circuit) {
+        announceLine("Hill & Hole, three laps: " + player.cfg.name + " in the " + who(player.cfg));
+        for (auto& a : ais) announceLine(a.name + " in '" + a.rig + "'");
+    } else if (m == ModeId::FreeRoam) {
+        announceLine("Open pits are open! Paddock, staging, the bounty hole east, camping through the east gap");
+    }
     setState(AppState::Playing);
 }
 
@@ -140,7 +159,7 @@ void Game::action(const std::string& a) {
         say(recovery.scout(world, player), 6.f);
     } else if (a == "shovel" || a == "boards" || a == "winch") {
         recoverMenu = false;
-        if (competitionRun() && mode.id == ModeId::MudBog) { say("No self-recovery in a judged pull - call the dozer (it ends the run)"); return; }
+        if (mode.judged()) { say("No self-recovery in a judged pull - call the dozer (it ends the run)"); return; }
         if (a == "shovel") say(recovery.startShovel(player), 3.f);
         else if (a == "boards") say(recovery.placeBoards(world, player), 3.f);
         else say(recovery.toggleWinch(world, player), 3.f);
@@ -177,7 +196,7 @@ void Game::action(const std::string& a) {
         if (!player.fourWD) player.lockFront = false;
         say(next == 0 ? "2H - rear drive" : (next == 1 ? "4H - part-time 4WD: don't turn hard on grippy ground" : "4L - low range: torque x2.72, crawl and don't spin"), 2.f);
     } else if (a == "reset") {
-        if (mode.id == ModeId::MudBog && mode.phase == Phase::Running) mode.requestTow(world, player);
+        if (mode.judged()) mode.requestTow(world, player);
         else {
             Vec3 f = player.forward();
             float yaw = std::atan2(f.x, f.z);
@@ -727,6 +746,7 @@ void Game::frame(double nowMs) {
     if (ev.beltBurnt) say("CVT BELT BURNT - use low range in the mud. Belt is slipping", 4.5f);
     say(recovery.update(world, player, dt), 3.f);
     updateCoach(dt);
+    updateVenue(dt);
     for (size_t k = 0; k < wev.barrelHits.size(); k++) audio.trigger(SfxType::Barrel, wev.barrelHits[k], wev.barrelStrength[k]);
     for (auto& p : wev.fenceHits) audio.trigger(SfxType::Fence, p, 0.8f);
     if (wev.barrelsKnocked && length(player.pos - world.crowdCenter) < 70.f) audio.trigger(SfxType::Cheer, player.pos, 0.25f);
@@ -748,6 +768,7 @@ void Game::frame(double nowMs) {
     if (mode.phase == Phase::Finished && g_lastPhase != Phase::Finished) {
         g_finishSerial++;
         if (mode.id == ModeId::MudBog && mode.distance > 79.f) audio.trigger(SfxType::Cheer, player.pos, 1.f);
+        if (mode.id == ModeId::Bounty && mode.claimed) audio.trigger(SfxType::Cheer, player.pos, 1.f);
     }
     g_lastPhase = mode.phase;
 
@@ -787,6 +808,39 @@ void Game::updateCoach(float dt) {
     else if (v.brakeWet > 0.35f) coach = "Wet brakes - drag them lightly to dry them";
 }
 
+// Venue life: the PA announcer, rival milestones, and the wash bay on the return road.
+void Game::updateVenue(float dt) {
+    for (size_t i = 0; i < ais.size() && i < aiState.size(); i++) {
+        const AiDriver& a = ais[i];
+        int st = a.finished ? 1 : (a.gaveUp ? 2 : 0);
+        if (st == aiState[i]) continue;
+        aiState[i] = st;
+        if (mode.id == ModeId::MudBog) {
+            if (st == 1) announceLine("'" + a.rig + "' makes a FULL PASS! Listen to that crowd!");
+            else announceLine("'" + a.rig + "' is done at " + std::to_string(int(a.distance * 3.281f)) + " ft - bring the dozer");
+        } else if (st == 1) announceLine(a.name + " takes the checkered flag in '" + a.rig + "'");
+    }
+    announceT -= dt;
+    if (announceT <= 0) {
+        if (!announceQ.empty()) { announce = announceQ.front(); announceQ.pop_front(); announceT = 3.6f; }
+        else { announce.clear(); announceT = 0.5f; }
+    }
+    // Wash bay: drive onto the pad and stop; the crew pressure-washes the truck.
+    Vec3 d = player.pos - world.washCenter;
+    bool onPad = state == AppState::Playing && std::fabs(d.x) < world.washHalfX && std::fabs(d.z) < world.washHalfZ + 1.f && player.speed() < 1.5f;
+    float muck = player.dirt + player.radiatorClog;
+    for (auto& w : player.wheels) muck += w.cake + w.pack;
+    if (onPad && muck > 0.02f) {
+        if (washT <= 0) say("Wash bay: hold still - pressure washing", 2.5f);
+        washT += dt;
+        player.dirt = std::max(0.f, player.dirt - dt * 0.3f);
+        player.radiatorClog = std::max(0.f, player.radiatorClog - dt * 0.3f);
+        player.brakeWet = 1.f;   // they'll be soaked after this
+        for (auto& w : player.wheels) { w.cake = std::max(0.f, w.cake - dt * 0.4f); w.pack = std::max(0.f, w.pack - dt * 0.5f); }
+        if (player.dirt <= 0 && player.radiatorClog <= 0) say("Clean! Wheels balanced, radiator flushed. Mind the wet brakes", 3.f);
+    } else if (!onPad) washT = 0;
+}
+
 std::string Game::standingsJson() {
     struct Row { std::string name, text; float key; bool you; };
     std::vector<Row> rows;
@@ -808,7 +862,7 @@ std::string Game::standingsJson() {
     float pLap = float(mode.lap) + float((mode.nextCp - 1 + n) % n) / float(n);
     add(player.cfg.name, true, mode.distance, pfin && (mode.id != ModeId::MudBog || mode.distance > 79.9f),
         mode.elapsed + mode.penalty, pLap, mode.id == ModeId::King ? mode.kingTime : mode.score);
-    for (auto& a : ais) add(a.name, false, a.distance, a.finished, a.finishTime, a.score, a.id_score());
+    for (auto& a : ais) add(a.name + " · " + a.rig, false, a.distance, a.finished, a.finishTime, a.score, a.id_score());
     for (auto& kv : remotes)
         if (kv.second.valid) add(kv.second.net.name, false, kv.second.cur.distance, false, 0, kv.second.cur.score, kv.second.cur.score);
     std::stable_sort(rows.begin(), rows.end(), [](const Row& x, const Row& y) { return x.key > y.key; });
@@ -859,6 +913,8 @@ const char* Game::hud() {
     int soil = 0;
     for (int k = 1; k < int(Soil::Count); k++) if (soilCount[k] > soilCount[soil]) soil = k;
     const char* soilName = soilMods(uint8_t(soil)).name;
+    std::string announceSafe;
+    for (char c : announce) if (c != '"' && c != '\\' && c >= 32) announceSafe += c;
     int winchState = !player.cfg.winch ? 0 : (recovery.winch.broken ? 3 : (recovery.winch.active ? 2 : 1));
     std::snprintf(buf, sizeof buf,
                   "{\"state\":%d,\"mph\":%.1f,\"rpm\":%.0f,\"redline\":%.0f,\"gear\":%d,\"manual\":%s,\"low\":%s,\"awd\":%s,"
@@ -870,7 +926,7 @@ const char* Game::hud() {
                   "\"pause\":%s,\"pad\":%s,\"padName\":\"%s\",\"engine\":\"%s\",\"dirt\":%.2f,\"lane\":%d,\"standings\":%s,\"ghost\":%s,"
                   "\"coach\":\"%s\",\"soil\":\"%s\",\"tcase\":%d,\"diffF\":\"%s\",\"diffR\":\"%s\",\"belt\":%.0f,\"cvt\":%s,"
                   "\"windup\":%.2f,\"winch\":%d,\"winchKn\":%.1f,\"winchHeat\":%.2f,\"boards\":%d,\"dig\":%.1f,"
-                  "\"flooded\":%s,\"broken\":%s,\"recover\":%s,\"brakeWet\":%.2f,\"bead\":%s,\"shaft\":%s}",
+                  "\"flooded\":%s,\"broken\":%s,\"recover\":%s,\"brakeWet\":%.2f,\"bead\":%s,\"shaft\":%s,\"announce\":\"%s\",\"pot\":%d}",
                   int(state), player.speed() * 2.237f, player.engineRpm, e.redlineRpm, player.gear, player.manual ? "true" : "false",
                   player.lowRange ? "true" : "false", player.fourWD ? "true" : "false", player.lockFront ? "true" : "false",
                   player.lockRear ? "true" : "false", player.psi, player.engineTemp, player.radiatorClog, player.boost,
@@ -884,7 +940,7 @@ const char* Game::hud() {
                   diffName(player.diffF), diffName(player.diffR), player.beltTemp, player.isCvt() ? "true" : "false", player.windup,
                   winchState, recovery.winch.force / 1000.f, recovery.winch.heat, recovery.boardsCarried, std::max(0.f, recovery.digTimer),
                   player.flooded ? "true" : "false", player.engineBroken ? "true" : "false", recoverMenu ? "true" : "false",
-                  player.brakeWet, debead ? "true" : "false", player.frontShaftBroken ? "true" : "false");
+                  player.brakeWet, debead ? "true" : "false", player.frontShaftBroken ? "true" : "false", announceSafe.c_str(), mode.bountyPot);
     hudJson = buf;
     g_pauseRequested = false;
     return hudJson.c_str();

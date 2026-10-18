@@ -1,0 +1,42 @@
+# Aluminium spectator bleachers: 5 rows stepping up toward -Z (spectators face +Z, the
+# track), galvanised stepped side frames, plank seats and footboards, back and side guard
+# rails. len = length along X. Origin at ground centre of the footprint.
+param len = 12
+set fx = len/2-0.35
+set ix = len/6
+# Stepped side frames (galvanised plate brackets) at four stations
+material steel
+color #8a9096
+extrude depth=0.08 pos=fx,0,0 mirror=x pts=2.050,0.000,2.050,0.250,1.750,0.330,1.700,0.405,1.400,0.405,1.400,0.340,0.900,0.340,0.900,0.785,0.600,0.785,0.600,0.720,0.100,0.720,0.100,1.165,-0.200,1.165,-0.200,1.100,-0.700,1.100,-0.700,1.545,-1.000,1.545,-1.000,1.480,-1.500,1.480,-1.500,1.925,-1.800,1.925,-1.950,1.925,-1.950,1.200,1.600,0.000
+extrude depth=0.08 pos=ix,0,0 mirror=x pts=2.050,0.000,2.050,0.250,1.750,0.330,1.700,0.405,1.400,0.405,1.400,0.340,0.900,0.340,0.900,0.785,0.600,0.785,0.600,0.720,0.100,0.720,0.100,1.165,-0.200,1.165,-0.200,1.100,-0.700,1.100,-0.700,1.545,-1.000,1.545,-1.000,1.480,-1.500,1.480,-1.500,1.925,-1.800,1.925,-1.950,1.925,-1.950,1.200,1.600,0.000
+# Ground sills and back posts
+color #6f757b
+box size=0.1,0.06,4.1 pos=fx,0.03,0.05 mirror=x
+box size=0.1,0.06,4.1 pos=ix,0.03,0.05 mirror=x
+box size=0.08,2.95,0.08 pos=fx,1.475,-2.0 mirror=x
+box size=0.08,2.95,0.08 pos=ix,1.475,-2.0 mirror=x
+# Seat planks (bright aluminium)
+color #c9ced3
+box size=len,0.05,0.30 pos=0,0.430,1.550
+box size=len,0.05,0.30 pos=0,0.810,0.750
+box size=len,0.05,0.30 pos=0,1.190,-0.050
+box size=len,0.05,0.30 pos=0,1.570,-0.850
+box size=len,0.05,0.30 pos=0,1.950,-1.650
+# Footboards (mill finish, slightly darker) and back riser board
+color #aeb3b8
+box size=len,0.04,0.46 pos=0,0.360,1.150
+box size=len,0.04,0.46 pos=0,0.740,0.350
+box size=len,0.04,0.46 pos=0,1.120,-0.450
+box size=len,0.04,0.46 pos=0,1.500,-1.250
+box size=len,0.30,0.03 pos=0,1.78,-1.84
+# Back guard rail
+color #9aa0a6
+box size=len+0.1,0.06,0.06 pos=0,2.92,-2.0
+box size=len+0.1,0.05,0.05 pos=0,2.45,-2.0
+box size=len+0.1,0.05,0.05 pos=0,2.15,-2.0
+# Side guard rails (both ends)
+box size=0.06,0.06,3.82 pos=len/2+0.04,2.14,-0.2 rot=23.5,0,0 mirror=x
+box size=0.05,0.05,3.82 pos=len/2+0.04,1.70,-0.2 rot=23.5,0,0 mirror=x
+box size=0.06,1.0,0.06 pos=len/2+0.04,0.9,1.55 mirror=x
+box size=0.06,1.0,0.06 pos=len/2+0.04,1.65,-0.2 mirror=x
+box size=0.06,1.0,0.06 pos=len/2+0.04,2.42,-1.95 mirror=x

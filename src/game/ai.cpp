@@ -6,23 +6,30 @@ namespace mb {
 std::vector<AiDriver> makeRivals(int count, uint32_t seed) {
     struct Preset {
         const char* name;
+        const char* rig;
         const char* cfg;
         float skill;
     };
     static const Preset presets[] = {
-        {"Dale", "body=bogcar76;engine=v8_454;tire=33;width=12.5;tread=mt;lift=3;axle=4.56;lockF=0;lockR=1;awd=0;psi=16;paint=e0e0dc", 0.62f},
-        {"Tammy", "body=silverado;engine=duramax;tire=38;width=14.5;tread=paddle;lift=6;axle=5.38;lockF=1;lockR=1;awd=1;snorkel=1;psi=12;paint=9e8b6a", 0.8f},
-        {"Skeeter", "body=utv;engine=twin_1000t;tire=32;width=11.5;tread=mt;lift=2;axle=4.88;lockF=1;lockR=1;awd=1;psi=10;paint=e8e8e4", 0.74f},
-        {"Bubba", "body=comanche;engine=v8_350;tire=37;width=13.5;tread=mt;lift=5;axle=4.88;lockF=0;lockR=1;awd=1;psi=14;paint=6a2a1e", 0.68f},
-        {"Rhonda", "body=comanche;engine=ls53_sc;tire=40;width=15.5;tread=paddle;lift=7;axle=5.38;lockF=1;lockR=1;awd=1;snorkel=1;psi=9;paint=1d4e8a", 0.86f},
+        {"Dale", "Smokin' Sedan", "body=bogcar76;engine=v8_454;tire=33;width=12.5;tread=mt;lift=3;axle=4.56;lockF=0;lockR=1;awd=0;psi=16;paint=e0e0dc", 0.62f},
+        {"Tammy", "Gumbo Gobbler", "body=silverado;engine=duramax;tire=38;width=14.5;tread=paddle;lift=6;axle=5.38;lockF=1;lockR=1;awd=1;snorkel=1;psi=12;paint=9e8b6a", 0.8f},
+        {"Skeeter", "Lil' Stinger", "body=utv;engine=twin_1000t;tire=32;width=11.5;tread=mt;lift=2;axle=4.88;lockF=1;lockR=1;awd=1;psi=10;paint=e8e8e4", 0.74f},
+        {"Bubba", "Brown Thunder", "body=comanche;engine=v8_350;tire=37;width=13.5;tread=mt;lift=5;axle=4.88;lockF=0;lockR=1;awd=1;psi=14;paint=6a2a1e", 0.68f},
+        {"Rhonda", "Blue Bayou", "body=comanche;engine=ls53_sc;tire=40;width=15.5;tread=paddle;lift=7;axle=5.38;lockF=1;lockR=1;awd=1;snorkel=1;psi=9;paint=1d4e8a", 0.86f},
+        {"Junior", "Farm Fresh", "body=squarebody;engine=v8_454;tire=38;width=14.5;tread=mt;lift=6;axle=5.13;diffF=lsd;diffR=locker;lockR=1;awd=1;psi=12;paint=8a1f14", 0.72f},
+        {"Darlene", "Half-Cab Hellcat", "body=fullsize_suv;engine=v8_350;tire=37;width=13.5;tread=mt;lift=5;axle=4.88;diffF=locker;diffR=locker;lockF=1;lockR=1;awd=1;snorkel=1;psi=11;paint=1e4a7a", 0.76f},
+        {"Cletus", "Swamp Rat", "body=atv;engine=twin_1000t;tire=30;width=10;tread=paddle;lift=2;axle=4.56;diffF=locker;diffR=spool;lockF=1;awd=1;snorkel=1;psi=7;bead=1;paint=2a5a2a", 0.7f},
+        {"Big Earl", "The Undertaker", "body=megatruck;engine=ls53_sc;tire=54;width=22;tread=paddle;lift=4;axle=5.38;diffF=spool;diffR=spool;awd=1;snorkel=1;psi=8;bead=1;paint=161618", 0.84f},
     };
+    const int N = int(sizeof presets / sizeof presets[0]);
     Rng rng(seed + 31);
     std::vector<AiDriver> out;
-    int start = int(rng.next() % 5);
+    int start = int(rng.next() % unsigned(N));
     for (int i = 0; i < count; i++) {
-        const Preset& p = presets[(start + i) % 5];
+        const Preset& p = presets[(start + i * 2) % N];
         AiDriver a;
         a.name = p.name;
+        a.rig = p.rig;
         a.cfg = VehicleConfig::parse(std::string("name=") + p.name + ";" + p.cfg);
         a.skill = clampf(p.skill + rng.range(-0.06f, 0.06f), 0.4f, 0.95f);
         a.v.configure(a.cfg);
@@ -144,9 +151,12 @@ void aiProgress(AiDriver& ai, ModeId mode, const World& w, float dt, float elaps
                 // Lost the line (or stuck in the water hole): the dozer drags them to the checkpoint.
                 Vec3 dir = normalize(Vec3{nx.x - cp.x, 0, nx.z - cp.z});
                 Vec3 p{cp.x, 0, cp.z};
+                // Drop them on dry ground past a water checkpoint, not in it (a swamped intake is fatal).
+                for (int k = 0; k < 20 && w.terrain.sample(p.x, p.z).waterDepth > 0.02f; k++) p = p + dir * 1.5f;
                 p.y = w.terrain.heightAt(p.x, p.z) - v.rideAxleY + v.wheels[0].radius + 0.3f;
                 v.reset(p, std::atan2(dir.x, dir.z));
                 v.placeOnGround(w.terrain);
+                v.repair();   // their crew sorts out whatever broke
                 ai.tows++;
                 passed = true;
             }

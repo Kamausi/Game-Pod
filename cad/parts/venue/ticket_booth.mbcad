@@ -1,0 +1,56 @@
+# Small timber ticket booth on skids: painted board walls, sliding service window facing +Z,
+# shed roof sloping to the back, little awning over the window, side door on +X.
+param body_r = 0.62
+param body_g = 0.16
+param body_b = 0.12
+param trim_r = 0.92
+param trim_g = 0.90
+param trim_b = 0.84
+material matte
+# Skids
+color #4a3c2a
+box size=0.14,0.14,2.4 pos=0.95,0.07,0 mirror=x
+# Walls
+material paint
+color body_r body_g body_b
+box size=2.2,2.25,2.2 pos=0,1.265,0
+# Board battens (vertical) on front and sides
+color body_r*0.8 body_g*0.8 body_b*0.8
+box size=0.05,2.25,0.03 pos=0.55,1.265,1.11 mirror=x
+box size=0.03,2.25,0.05 pos=1.11,1.265,-0.55 mirror=x
+box size=0.03,2.25,0.05 pos=1.11,1.265,0.55 mirror=x
+# Corner trim
+color trim_r trim_g trim_b
+box size=0.1,2.25,0.1 pos=1.08,1.265,1.08 mirror=x
+box size=0.1,2.25,0.1 pos=1.08,1.265,-1.08 mirror=x
+# Service window: frame, sliding glass panes (one open), counter shelf
+box size=1.5,0.08,0.06 pos=0,2.03,1.12
+box size=1.5,0.08,0.06 pos=0,1.07,1.12
+box size=0.08,1.0,0.06 pos=0.75,1.55,1.12 mirror=x
+material glass
+color #24302e
+box size=0.72,0.9,0.03 pos=-0.34,1.55,1.13
+color #101414
+box size=0.7,0.9,0.02 pos=0.36,1.55,1.105
+material paint
+color trim_r*0.85 trim_g*0.85 trim_b*0.85
+box size=1.6,0.05,0.4 pos=0,1.08,1.3
+box size=0.06,0.25,0.06 pos=0.6,0.94,1.22 rot=40,0,0 mirror=x
+# Side door on +X with knob
+color trim_r trim_g trim_b
+box size=0.04,1.95,0.84 pos=1.12,1.12,-0.2
+material chrome
+color #c8c8c8
+sphere r=0.035 pos=1.16,1.12,-0.52 seg=8
+# Shed roof (higher at the front) with fascia
+material steel
+color #6d7378
+box size=2.6,0.07,2.75 pos=0,2.55,0.05 rot=-6,0,0
+material paint
+color trim_r trim_g trim_b
+box size=2.62,0.14,0.04 pos=0,2.64,1.44
+# Awning over the window (striped)
+color #e8e4da
+box size=1.9,0.04,0.6 pos=0,2.2,1.38 rot=22,0,0
+color body_r body_g body_b
+box size=1.9,0.12,0.03 pos=0,2.05,1.66

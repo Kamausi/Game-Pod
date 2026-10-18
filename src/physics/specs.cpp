@@ -70,6 +70,22 @@ static std::vector<BodySpec> buildBodies() {
     b.push_back({"utv", "Sport UTV", "vehicles/utv.mbcad", 650, 2.29f, 1.63f, -0.3f, 0.0f,
                  {1.6f, 1.2f, 3.4f}, 0.9f, 0.55f, -0.2f, -0.1f, 0.38f, 32, "twin_1000t", true, 0.45f,
                  {0.92f, 0.92f, 0.9f}});
+    // Late-70s square-body short-bed pickup: the classic farm-truck-turned-bogger. 117.5" wb.
+    b.push_back({"squarebody", "'79 Square-Body Pickup", "vehicles/squarebody.mbcad", 1500, 2.98f, 1.65f, -0.42f, 0.05f,
+                 {2.0f, 1.25f, 4.9f}, 1.2f, 0.32f, 1.35f, -0.2f, 0.26f, 35, "v8_350", true, 0.56f,
+                 {0.62f, 0.18f, 0.12f}});
+    // Late-70s full-size two-door 4x4 SUV with the removable top. 106.5" wb.
+    b.push_back({"fullsize_suv", "'78 Full-Size 2-Door 4x4", "vehicles/fullsize_suv.mbcad", 1550, 2.69f, 1.66f, -0.42f, 0.05f,
+                 {2.0f, 1.4f, 4.6f}, 1.3f, 0.32f, 1.2f, -0.2f, 0.26f, 35, "v8_350", true, 0.55f,
+                 {0.15f, 0.30f, 0.52f}});
+    // Utility ATV mud build with snorkels and a relocated radiator (rider included in the mass).
+    b.push_back({"atv", "Mud Quad (ATV)", "vehicles/atv.mbcad", 280, 1.30f, 0.98f, -0.12f, 0.15f,
+                 {1.2f, 1.1f, 2.2f}, 0.8f, 0.95f, -0.1f, -0.05f, 0.22f, 29, "twin_1000t", true, 0.45f,
+                 {0.15f, 0.35f, 0.16f}});
+    // Mega truck: pickup cab on a tube chassis over 54" ag-style tires, blown big-block.
+    b.push_back({"megatruck", "Mega Truck", "vehicles/megatruck.mbcad", 3200, 3.7f, 2.4f, -0.55f, 0.2f,
+                 {2.6f, 1.8f, 6.0f}, 1.8f, 1.35f, 1.3f, -0.25f, 0.5f, 54, "ls53_sc", true, 0.52f,
+                 {0.10f, 0.10f, 0.11f}});
     return b;
 }
 
@@ -142,8 +158,8 @@ VehicleConfig VehicleConfig::parse(const std::string& s) {
         if (k == "name") c.name = v.substr(0, 20);
         else if (k == "body") c.body = findBody(v).id;
         else if (k == "engine") c.engine = findEngine(v).id;
-        else if (k == "tire") c.tireIn = clampf(f, 29, 44);
-        else if (k == "width") c.widthIn = clampf(f, 9.5f, 18.5f);
+        else if (k == "tire") c.tireIn = clampf(f, 29, 66);
+        else if (k == "width") c.widthIn = clampf(f, 9.5f, 24.f);
         else if (k == "tread") c.tread = v == "at" ? Tread::AllTerrain : (v == "paddle" ? Tread::Paddle : Tread::MudTerrain);
         else if (k == "lift") c.liftIn = clampf(f, 0, 10);
         else if (k == "axle") c.axleRatio = clampf(f, 3.55f, 6.5f);
@@ -175,9 +191,9 @@ SpecSheet specSheet(const VehicleConfig& c) {
     s.crawlRatio = g.ratios[0] * g.lowRange * c.axleRatio;
     // Bigger tires = taller effective gearing: ratio x stock tire / new tire. Restore it with stock x new / stock.
     // Factory baseline: 3.73s on ~30" tires (27" on the bog car and the UTV, 4.56 for the UTV's final drive).
-    bool utv = b.id == "utv";
+    bool utv = b.id == "utv" || b.id == "atv";
     float stockAxle = utv ? 4.56f : 3.73f;
-    float factoryTire = utv || b.id == "bogcar76" ? 27.f : 30.f;
+    float factoryTire = utv || b.id == "bogcar76" ? 27.f : (b.id == "megatruck" ? 46.f : 30.f);
     s.effRatio = c.axleRatio * factoryTire / c.tireIn;
     float want = stockAxle * c.tireIn / factoryTire;
     const float std_[] = {3.73f, 4.10f, 4.30f, 4.56f, 4.88f, 5.13f, 5.38f, 5.86f, 6.17f, 6.50f, 7.17f};
@@ -194,7 +210,7 @@ SpecSheet specSheet(const VehicleConfig& c) {
     float hp = 1;
     for (size_t i = 0; i < e.rpmPts.size(); i++) hp = std::max(hp, e.torquePts[i] * e.rpmPts[i] / 7121.f);
     s.lbPerHp = mass * 2.2046f / hp;
-    bool pro = c.tireIn >= 44 || c.tread == Tread::Paddle || (hp > 600 && c.tireIn >= 40);
+    bool pro = c.tireIn >= 44 || b.id == "megatruck" || c.tread == Tread::Paddle || (hp > 600 && c.tireIn >= 40);
     bool stock = c.tireIn <= b.defaultTireIn + 2.f && c.liftIn <= 4.f && c.diffR != Diff::Spool && hp < 420;
     s.cls = pro ? "Pro" : (stock ? "Stock" : "Modified");
     return s;

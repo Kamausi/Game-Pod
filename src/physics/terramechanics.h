@@ -116,7 +116,7 @@ struct MudModel {
 // Soil types (field-guide section 2): the calibrated slurry above is "loam"; the others scale it.
 // Particle-size names (clay, silt, sand) plus organic muck. remold = strength lost when the cell
 // has been churned by traffic ("the first truck made it, the fifth sinks").
-enum class Soil : uint8_t { Loam = 0, Clay, Silt, Sand, Peat, Count };
+enum class Soil : uint8_t { Loam = 0, Clay, Silt, Sand, Peat, Gravel, Count };
 struct SoilMods {
     const char* name;
     float bearing, viscosity, cohesion, friction, sticky, remold;
@@ -128,6 +128,7 @@ inline constexpr SoilMods kSoils[] = {
     {"silt", 0.80f, 0.65f, 0.45f, 0.60f, 0.55f, 0.70f, 1.10f, 1.06f, 1.00f},
     {"wet sand", 1.70f, 2.20f, 0.25f, 1.55f, 0.15f, 0.05f, 1.30f, 1.18f, 0.92f},
     {"peat muck", 0.42f, 0.55f, 0.70f, 0.80f, 0.50f, 0.30f, 0.52f, 0.46f, 0.40f},
+    {"gravel", 3.00f, 3.00f, 0.30f, 1.35f, 0.10f, 0.0f, 0.92f, 0.92f, 0.95f},   // roads, gate, service pads
 };
 inline const SoilMods& soilMods(uint8_t s) { return kSoils[s < uint8_t(Soil::Count) ? s : 0]; }
 

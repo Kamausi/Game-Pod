@@ -1,5 +1,6 @@
 // Game orchestration: fixed-step simulation, camera, effects, audio feed, net replicas, HUD.
 #pragma once
+#include <deque>
 #include <map>
 #include <string>
 #include "../audio/audio.h"
@@ -113,6 +114,13 @@ private:
     void updateLens(float dt);
     float relaxTimer = 0;
     float diggingTimer = 0, tractionBackTimer = 0;
+    // PA announcer: lines queued by events, shown one at a time on the HUD.
+    std::deque<std::string> announceQ;
+    std::string announce;
+    float announceT = 0, washT = 0;
+    std::vector<int> aiState;   // last announced state per rival (0 running, 1 finished, 2 gave up)
+    void announceLine(const std::string& s) { if (announceQ.size() < 8) announceQ.push_back(s); }
+    void updateVenue(float dt);
     void say(const std::string& m, float t = 2.5f) { if (!m.empty()) { mode.message = m; mode.messageTimer = t; } }
     void updateCoach(float dt);
     bool competitionRun() const;

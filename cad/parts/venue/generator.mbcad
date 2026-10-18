@@ -1,0 +1,53 @@
+# Portable gas generator on a tubular wheeled frame (paddock power).
+# ~0.7 x 0.5 x 0.6 m, long axis X, control panel faces +Z. Origin at ground centre.
+param body_r = 0.95
+param body_g = 0.72
+param body_b = 0.08
+# Frame: black steel tube
+material steel
+color #1e1e1e
+box size=0.70,0.03,0.03 pos=0,0.08,0.235 mirror=z
+box size=0.70,0.03,0.03 pos=0,0.58,0.235 mirror=z
+box size=0.03,0.53,0.03 pos=0.335,0.33,0.235 mirror=x
+box size=0.03,0.53,0.03 pos=0.335,0.33,-0.235 mirror=x
+box size=0.03,0.03,0.50 pos=0.335,0.58,0 mirror=x
+# Fold-out handle at +X
+box size=0.22,0.025,0.025 pos=0.45,0.58,0.235 mirror=z
+cyl r=0.016 h=0.50 axis=z pos=0.56,0.58,0 seg=8
+material rubber
+color #2a2a2a
+cyl r=0.02 h=0.40 axis=z pos=0.565,0.58,0 seg=8
+# Wheels at -X, rubber feet at +X
+cyl r=0.10 h=0.07 axis=z pos=-0.30,0.10,0.28 seg=10 mirror=z
+color #3b3b3b
+box size=0.05,0.05,0.05 pos=0.30,0.04,0.22 mirror=z
+material steel
+color #bdbdbd
+cyl r=0.045 h=0.075 axis=z pos=-0.30,0.10,0.28 seg=8 mirror=z
+# Engine block and recoil starter
+color #4a4a4a
+box size=0.30,0.26,0.32 pos=-0.12,0.24,0
+color #2c2c2c
+cyl r=0.08 h=0.04 axis=x pos=-0.29,0.27,0.0 seg=10
+# Alternator housing + fuel tank in body colour
+material paint
+color body_r body_g body_b
+box size=0.30,0.26,0.36 pos=0.15,0.25,0
+box size=0.56,0.15,0.36 pos=0,0.47,0 bevel=0.04
+color #b51d18
+cyl r=0.04 h=0.03 pos=0.0,0.56,0 seg=10
+# Control panel on +Z: outlets, breaker, switch
+material plastic
+color #262626
+box size=0.26,0.16,0.01 pos=0.15,0.26,0.185
+color #d9d9d9
+box size=0.05,0.06,0.008 pos=0.08,0.27,0.19
+box size=0.05,0.06,0.008 pos=0.18,0.27,0.19
+color #c0392b
+box size=0.03,0.04,0.01 pos=0.25,0.30,0.19
+# Muffler with heat shield on -Z
+material steel
+color #6e6e6e
+box size=0.20,0.10,0.06 pos=-0.10,0.30,-0.19
+color #3a3a3a
+cyl r=0.012 h=0.04 axis=x pos=-0.22,0.30,-0.19 seg=6

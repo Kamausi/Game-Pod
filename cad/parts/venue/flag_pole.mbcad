@@ -1,0 +1,42 @@
+# ~4 m sponsor feather flag: cross base, glass-fibre pole whose tip bends over,
+# fabric banner built from angled box panels so it reads as wind-curved.
+# Banner flies toward +X, faces +Z. Origin at ground centre (pole foot).
+param color_r = 0.10
+param color_g = 0.45
+param color_b = 0.85
+set T = 15                         # chevron angle of the wind-filled banner
+# Cross base with water weight
+material steel
+color #2a2a2a
+box size=0.80,0.04,0.06 pos=0,0.02,0
+box size=0.06,0.04,0.80 pos=0,0.02,0
+material plastic
+color #1e1e1e
+cyl r=0.16 h=0.10 pos=0,0.09,0 seg=10
+# Pole: straight section then three bent tip segments
+color #d8d8d8
+cyl r=0.018 h=3.2 pos=0,1.70,0 seg=6
+cyl r=0.015 h=0.40 pos=0.068,3.388,0 rot=0,0,-20 seg=6
+cyl r=0.013 h=0.40 pos=0.290,3.705,0 rot=0,0,-50 seg=6
+cyl r=0.011 h=0.30 pos=0.590,3.859,0 rot=0,0,-80 seg=6
+# Pole sleeve
+material matte
+color #f2f2f2
+cyl r=0.03 h=2.35 pos=0,2.025,0 seg=6
+# Banner panels: each band is two boxes angled into a shallow chevron
+color color_r color_g color_b
+box size=0.36,1.70,0.008 pos=0.18*cos(T),2.35,-0.18*sin(T) rot=0,T,0
+box size=0.36,1.70,0.008 pos=0.54*cos(T),2.35,-0.18*sin(T) rot=0,-T,0
+box size=0.28,0.35,0.008 pos=0.14*cos(T),1.325,-0.14*sin(T) rot=0,T,0
+box size=0.28,0.35,0.008 pos=0.42*cos(T),1.325,-0.14*sin(T) rot=0,-T,0
+color color_r*0.55 color_g*0.55 color_b*0.55
+box size=0.20,0.30,0.008 pos=0.10*cos(T),1.0,-0.10*sin(T) rot=0,T,0
+box size=0.20,0.30,0.008 pos=0.30*cos(T),1.0,-0.10*sin(T) rot=0,-T,0
+# Top under the bent tip
+color color_r color_g color_b
+box size=0.64,0.30,0.008 pos=0.42,3.35,-0.06
+box size=0.54,0.22,0.008 pos=0.47,3.61,-0.06
+box size=0.38,0.12,0.008 pos=0.55,3.78,-0.05
+# Accent stripe near the free edge
+color #f2f2f2
+box size=0.06,2.45,0.004 pos=0.62,2.35,-0.02

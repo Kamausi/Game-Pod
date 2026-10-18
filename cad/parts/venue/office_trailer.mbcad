@@ -1,0 +1,88 @@
+# Portable office trailer (site trailer) set up on concrete blocks: long axis along X,
+# entry door, steps and windows on the +Z side. Welcome centre / registration / race control.
+param color_r = 0.90
+param color_g = 0.89
+param color_b = 0.84
+param stripe_r = 0.15
+param stripe_g = 0.32
+param stripe_b = 0.62
+set L = 9
+set W = 3.6
+set fl = 0.62
+set bh = 2.55
+# Concrete blocks and steel chassis rails
+material matte
+color #8f8b84
+box size=0.4,0.5,0.4 pos=3.9,0.25,1.3 mirror=x
+box size=0.4,0.5,0.4 pos=3.9,0.25,-1.3 mirror=x
+box size=0.4,0.5,0.4 pos=1.3,0.25,1.3 mirror=x
+box size=0.4,0.5,0.4 pos=1.3,0.25,-1.3 mirror=x
+material steel
+color #2a2a2a
+box size=L-0.2,0.12,0.12 pos=0,0.56,1.3
+box size=L-0.2,0.12,0.12 pos=0,0.56,-1.3
+# Hitch tongue at -X
+box size=1.3,0.1,0.1 pos=-L/2-0.55,0.52,0.45 rot=0,-22,0
+box size=1.3,0.1,0.1 pos=-L/2-0.55,0.52,-0.45 rot=0,22,0
+cyl r=0.04 h=0.5 pos=-L/2-1.15,0.3,0 seg=8
+# Body, roof cap and stripe
+material paint
+color color_r color_g color_b
+box size=L,bh,W pos=0,fl+bh/2,0
+color color_r*0.88 color_g*0.88 color_b*0.88
+box size=L+0.06,0.1,W+0.06 pos=0,fl+bh+0.05,0
+box size=L+0.04,0.08,W+0.04 pos=0,fl+0.04,0
+color stripe_r stripe_g stripe_b
+box size=L+0.02,0.2,W+0.02 pos=0,fl+0.85,0
+# Door (+Z) with frame and handle
+material paint
+color color_r*0.7 color_g*0.7 color_b*0.7
+box size=1.06,2.1,0.04 pos=2.7,fl+1.08,W/2+0.01
+color #8a8f94
+box size=0.94,2.02,0.05 pos=2.7,fl+1.05,W/2+0.02
+material glass
+color #22303a
+box size=0.3,0.45,0.03 pos=2.7,fl+1.6,W/2+0.05
+material chrome
+color #c8c8c8
+box size=0.12,0.04,0.06 pos=2.36,fl+1.0,W/2+0.06
+# Windows on +Z (frame + glass)
+material paint
+color #d8d8d8
+box size=1.3,1.0,0.04 pos=-3.2,fl+1.55,W/2+0.01
+box size=1.3,1.0,0.04 pos=-1.3,fl+1.55,W/2+0.01
+box size=1.3,1.0,0.04 pos=0.6,fl+1.55,W/2+0.01
+material glass
+color #26323a
+box size=1.18,0.88,0.05 pos=-3.2,fl+1.55,W/2+0.02
+box size=1.18,0.88,0.05 pos=-1.3,fl+1.55,W/2+0.02
+box size=1.18,0.88,0.05 pos=0.6,fl+1.55,W/2+0.02
+# Windows on -Z
+material paint
+color #d8d8d8
+box size=1.3,1.0,0.04 pos=-2.0,fl+1.55,-W/2-0.01
+box size=1.3,1.0,0.04 pos=2.0,fl+1.55,-W/2-0.01
+material glass
+color #26323a
+box size=1.18,0.88,0.05 pos=-2.0,fl+1.55,-W/2-0.02
+box size=1.18,0.88,0.05 pos=2.0,fl+1.55,-W/2-0.02
+# Wall air conditioner on +X end
+material plastic
+color #bfc0bb
+box size=0.45,0.5,0.7 pos=L/2+0.22,fl+1.7,0.6
+color #6c6e70
+box size=0.02,0.38,0.58 pos=L/2+0.45,fl+1.7,0.6
+# Timber landing, steps and handrail at the door
+material matte
+color #7a6446
+box size=1.6,0.08,1.1 pos=2.7,fl-0.06,W/2+0.6
+box size=1.6,0.06,0.3 pos=2.7,0.38,W/2+1.28
+box size=1.6,0.06,0.3 pos=2.7,0.17,W/2+1.55
+box size=0.08,0.6,1.6 pos=3.46,0.30,W/2+0.85
+box size=0.08,0.6,1.6 pos=1.94,0.30,W/2+0.85
+material steel
+color #3a3a3a
+box size=0.05,1.0,0.05 pos=3.45,fl+0.48,W/2+1.1
+box size=0.05,1.0,0.05 pos=3.45,fl+0.48,W/2+0.12
+box size=0.05,0.05,1.04 pos=3.45,fl+0.98,W/2+0.61
+box size=0.05,0.05,0.9 pos=3.45,0.95,W/2+1.55 rot=35,0,0

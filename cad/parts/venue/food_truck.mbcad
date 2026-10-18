@@ -1,0 +1,98 @@
+# Concession trailer / food truck: boxy body on a single axle, serving window on the +Z side
+# with the awning flap propped up on struts, fold-down counter, menu board panel, roof vents,
+# tongue and jack at -X. Long axis along X. Origin at ground centre of the footprint.
+param body_r = 0.80
+param body_g = 0.14
+param body_b = 0.12
+param trim_r = 0.93
+param trim_g = 0.92
+param trim_b = 0.88
+set L = 6
+set W = 2.4
+set fl = 0.75
+set bh = 2.35
+# Chassis, axle, wheels
+material steel
+color #2a2a2a
+box size=L-0.3,0.14,1.6 pos=0,fl-0.07,0
+box size=0.1,0.1,W+0.1 pos=0.3,0.36,0
+material rubber
+color #161616
+cyl r=0.36 h=0.24 axis=z pos=0.3,0.36,1.1 seg=12 mirror=z
+material chrome
+color #b8b8b8
+cyl r=0.2 h=0.25 axis=z pos=0.3,0.36,1.1 seg=10 mirror=z
+# Fenders
+material paint
+color #303030
+box size=0.95,0.05,0.3 pos=0.3,0.8,1.32 mirror=z
+# Tongue, coupler and jack
+material steel
+color #2a2a2a
+box size=1.5,0.1,0.1 pos=-L/2-0.6,0.6,0.38 rot=0,-18,0
+box size=1.5,0.1,0.1 pos=-L/2-0.6,0.6,-0.38 rot=0,18,0
+box size=0.3,0.1,0.14 pos=-L/2-1.35,0.6,0
+cyl r=0.045 h=0.6 pos=-L/2-1.1,0.32,0 seg=8
+# Body
+material paint
+color body_r body_g body_b
+box size=L,bh,W pos=0,fl+bh/2,0 bevel=0.05
+color trim_r trim_g trim_b
+box size=L+0.02,0.25,W+0.02 pos=0,fl+0.3,0
+box size=L+0.04,0.08,W+0.04 pos=0,fl+bh+0.03,0
+# Serving window opening (dark interior) on +Z, frame, counter
+material matte
+color #2a2622
+box size=3.0,1.05,0.04 pos=0.2,fl+1.5,W/2+0.005
+material steel
+color #c0c4c8
+box size=3.1,0.06,0.05 pos=0.2,fl+2.05,W/2+0.02
+box size=3.1,0.06,0.05 pos=0.2,fl+0.95,W/2+0.02
+box size=0.06,1.16,0.05 pos=-1.33,fl+1.5,W/2+0.02
+box size=0.06,1.16,0.05 pos=1.73,fl+1.5,W/2+0.02
+box size=3.0,0.05,0.38 pos=0.2,fl+0.95,W/2+0.19
+box size=0.04,0.3,0.04 pos=-1.2,fl+0.8,W/2+0.18 rot=40,0,0
+box size=0.04,0.3,0.04 pos=1.6,fl+0.8,W/2+0.18 rot=40,0,0
+# Awning flap hinged at the top of the window, propped up and out
+material paint
+color body_r body_g body_b
+box size=3.1,0.05,1.1 pos=0.2,fl+2.22,W/2+0.52 rot=-18,0,0
+color trim_r trim_g trim_b
+box size=3.12,0.12,0.03 pos=0.2,fl+2.36,W/2+1.05
+material steel
+color #9aa0a6
+box size=0.03,0.03,1.43 pos=-1.2,fl+1.77,W/2+0.46 rot=-52,0,0
+box size=0.03,0.03,1.43 pos=1.6,fl+1.77,W/2+0.46 rot=-52,0,0
+# Menu board panel beside the window
+material paint
+color #1c1c1c
+box size=1.0,1.2,0.04 pos=-2.2,fl+1.5,W/2+0.02
+color #f2d23a
+box size=0.84,0.1,0.05 pos=-2.2,fl+1.95,W/2+0.03
+color #e6e6e6
+box size=0.7,0.05,0.05 pos=-2.2,fl+1.7,W/2+0.03
+box size=0.7,0.05,0.05 pos=-2.2,fl+1.5,W/2+0.03
+box size=0.7,0.05,0.05 pos=-2.2,fl+1.3,W/2+0.03
+box size=0.7,0.05,0.05 pos=-2.2,fl+1.1,W/2+0.03
+# Side door at +X end of the +Z side and a back-side door on -Z
+color trim_r*0.85 trim_g*0.85 trim_b*0.85
+box size=0.8,1.95,0.04 pos=2.4,fl+1.05,W/2+0.01
+box size=0.8,1.95,0.04 pos=1.6,fl+1.05,-W/2-0.01
+material chrome
+color #c8c8c8
+box size=0.04,0.12,0.05 pos=2.1,fl+1.0,W/2+0.04
+# Rear (+X) lights
+material lens
+color #c81a14
+box size=0.03,0.12,0.2 pos=L/2+0.01,fl+0.45,0.9 mirror=z
+# Roof vent hood and exhaust fan
+material steel
+color #b0b4b8
+box size=0.7,0.25,0.6 pos=0.6,fl+bh+0.18,0.2
+box size=0.5,0.08,0.5 pos=-1.4,fl+bh+0.1,-0.3
+cyl r=0.08 h=0.4 pos=2.0,fl+bh+0.2,-0.5 seg=8
+# Propane bottles on the tongue
+material paint
+color #e8e8e8
+cyl r=0.16 h=0.6 pos=-L/2-0.35,fl+0.3,0.22 seg=10
+cyl r=0.16 h=0.6 pos=-L/2-0.35,fl+0.3,-0.22 seg=10

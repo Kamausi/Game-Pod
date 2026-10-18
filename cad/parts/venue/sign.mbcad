@@ -1,0 +1,32 @@
+# Directional / info sign on two timber posts (paddock, camping, parking).
+# Panel faces +Z, panel bottom at 1.2 m. Optional arrow (pointing +X).
+param w = 1.6
+param h = 0.9
+param panel_r = 0.06
+param panel_g = 0.30
+param panel_b = 0.18
+param arrow = 1
+set B = 1.2                        # panel bottom height
+set C = B+h/2                      # panel centre height
+# Posts behind the panel
+material matte
+color #6f5235
+box size=0.09,B+h+0.08,0.09 pos=w/2-0.18,(B+h+0.08)/2,-0.07 mirror=x
+color #5a4128
+box size=0.10,0.02,0.10 pos=w/2-0.18,B+h+0.09,-0.07 mirror=x
+# Panel
+material paint
+color panel_r panel_g panel_b
+box size=w,h,0.035 pos=0,C,0
+color panel_r*0.6 panel_g*0.6 panel_b*0.6
+box size=w,h,0.004 pos=0,C,-0.019
+# Border stripe
+color #f0f0ea
+box size=w-0.06,0.03,0.006 pos=0,B+h-0.045,0.019
+box size=w-0.06,0.03,0.006 pos=0,B+0.045,0.019
+box size=0.03,h-0.06,0.006 pos=w/2-0.045,C,0.019 mirror=x
+# Arrow: shaft box + two wedges forming the head (lighter tint)
+color min(1,panel_r*0.3+0.7) min(1,panel_g*0.3+0.7) min(1,panel_b*0.3+0.7)
+box size=w*0.42*arrow,h*0.16*arrow,0.006 pos=-w*0.09,C,0.02
+wedge size=0.006,h*0.24*arrow,w*0.20*arrow pos=w*0.22,C+h*0.12*arrow,0.02 rot=0,90,0
+wedge size=0.006,h*0.24*arrow,w*0.20*arrow pos=w*0.22,C-h*0.12*arrow,0.02 rot=0,-90,180

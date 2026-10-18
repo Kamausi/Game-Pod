@@ -1,0 +1,39 @@
+# Sponsor banner zip-tied to a pipe fence rail: two-colour stripes, grommets,
+# short steel posts at each end. Runs along X, faces +Z, origin at ground centre.
+param len = 4
+param a_r = 0.08
+param a_g = 0.20
+param a_b = 0.55
+param b_r = 0.95
+param b_g = 0.78
+param b_b = 0.10
+set Y0 = 0.25                      # banner bottom
+set H = 0.9
+# End posts and the two fence rails behind the banner
+material steel
+color #7c7f82
+cyl r=0.03 h=Y0+H+0.15 pos=len/2+0.06,(Y0+H+0.15)/2,-0.03 seg=8 mirror=x
+cyl r=0.02 h=len+0.12 axis=x pos=0,Y0+H-0.03,-0.035 seg=6
+cyl r=0.02 h=len+0.12 axis=x pos=0,Y0+0.03,-0.035 seg=6
+color #5c5f62
+cyl r=0.034 h=0.02 pos=len/2+0.06,Y0+H+0.16,-0.03 seg=8 mirror=x
+# Banner body (colour A) with colour B stripes
+material matte
+color a_r a_g a_b
+box size=len,H,0.008 pos=0,Y0+H/2,0
+color b_r b_g b_b
+box size=len,H*0.30,0.004 pos=0,Y0+H*0.50,0.006
+box size=len,H*0.05,0.004 pos=0,Y0+H*0.24,0.006
+box size=len,H*0.05,0.004 pos=0,Y0+H*0.76,0.006
+box size=len*0.12,H,0.004 pos=len*0.40,Y0+H/2,0.006 mirror=x
+color a_r*0.6 a_g*0.6 a_b*0.6
+box size=len*0.20,H*0.18,0.003 pos=0,Y0+H*0.50,0.009
+# Hemmed edge, grommets and zip ties
+color #f0f0f0
+box size=len,0.02,0.010 pos=0,Y0+H-0.01,0.001
+box size=len,0.02,0.010 pos=0,Y0+0.01,0.001
+material chrome
+color #d0d0d0
+cyl r=0.012 h=0.012 axis=z pos=len/2-0.04,Y0+H-0.04,0.004 seg=8 mirror=x
+cyl r=0.012 h=0.012 axis=z pos=len/2-0.04,Y0+0.04,0.004 seg=8 mirror=x
+cyl r=0.012 h=0.012 axis=z pos=0,Y0+H-0.04,0.004 seg=8

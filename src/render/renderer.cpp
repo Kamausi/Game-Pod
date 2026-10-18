@@ -147,9 +147,9 @@ uniform vec2 uOrigin;
 uniform float uCell;
 uniform mat4 uVP;
 uniform int uWaterPass;
-out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth; out vec2 vTrackGrad; out vec2 vTrackDir; out vec3 vSoil;
+out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth; out vec2 vTrackGrad; out vec2 vTrackDir; out vec3 vSoil; out float vGravel;
 // Soil tint per type (loam, clay gumbo, silt, wet sand, peat muck) - matches kSoils in terramechanics.h.
-const vec3 kSoilTint[5] = vec3[5](vec3(1.0), vec3(0.86,0.84,0.82), vec3(1.10,1.06,1.00), vec3(1.30,1.18,0.92), vec3(0.52,0.46,0.40));
+const vec3 kSoilTint[6] = vec3[6](vec3(1.0), vec3(0.86,0.84,0.82), vec3(1.10,1.06,1.00), vec3(1.30,1.18,0.92), vec3(0.52,0.46,0.40), vec3(1.0));
 float H(ivec2 c){ c = clamp(c, ivec2(0), ivec2(TN)); return texelFetch(uHeight, c, 0).r; }
 float T(ivec2 c){ c = clamp(c, ivec2(0), ivec2(TN)); return texelFetch(uState, c, 0).a; }
 void main(){
@@ -162,7 +162,9 @@ void main(){
   // Tire heading as a doubled angle so opposite directions interpolate cleanly; untracked cells add nothing.
   vec2 td = texelFetch(uTrackDir, c, 0).rg;
   float ang = td.r * 6.2831853;
-  vSoil = kSoilTint[clamp(int(td.g*255.0/40.0 + 0.5), 0, 4)];
+  int soilId = clamp(int(td.g*255.0/40.0 + 0.5), 0, 5);
+  vSoil = kSoilTint[soilId];
+  vGravel = soilId == 5 ? 1.0 : 0.0;
   vTrackDir = vec2(cos(ang), sin(ang))*step(0.03, vState.a);
   float y = h - aGrid.y*0.6;
   vDepth = hw.g - h;
@@ -173,7 +175,7 @@ void main(){
 )";
 
 const char* kTerrainFS = R"(
-in vec3 vWorld; in vec3 vN; in vec4 vState; in float vDepth; in vec2 vTrackGrad; in vec2 vTrackDir; in vec3 vSoil;
+in vec3 vWorld; in vec3 vN; in vec4 vState; in float vDepth; in vec2 vTrackGrad; in vec2 vTrackDir; in vec3 vSoil; in float vGravel;
 uniform int uWaterPass;
 uniform vec4 uOcc[8];   // vehicle contact occlusion: x, z, yaw, length (0 = unused)
 out vec4 frag;
@@ -279,6 +281,13 @@ void main(){
   mudC = mix(mudC, mudC*1.45, clod*berm*0.7);
   vec3 soil = mix(dirt, mudC, max(mudAmt, wetness*0.6));
   soil = clamp(soil*vSoil, 0.0, 1.0);
+  // Crushed-stone roads and pads: grey speckled aggregate, mud tracked over it where wet.
+  if(vGravel > 0.01){
+    float st = vnoise(p*14.0)*0.6 + vnoise(p*41.0)*0.4;
+    vec3 grav = vec3(0.50,0.48,0.45)*(0.72 + 0.5*st);
+    grav = mix(grav, vec3(0.62,0.60,0.56), smoothstep(0.72, 0.9, vnoise(p*23.0 + 5.0))*0.6);
+    soil = mix(soil, grav, vGravel*(1.0 - 0.75*max(mudAmt, wetness*0.5)));
+  }
 
   // Drying crust: polygonal cracks where mud sits on drier ground (pit edges, splash zones).
   float crust = mudAmt*smoothstep(0.62, 0.42, moist)*(1.0 - track);

@@ -11,6 +11,7 @@ namespace mb {
 
 struct AiDriver {
     std::string name;
+    std::string rig;          // the truck's racing name, as the announcer calls it
     VehicleConfig cfg;
     Vehicle v;
     float skill = 0.7f;       // 0..1: line accuracy, throttle discipline

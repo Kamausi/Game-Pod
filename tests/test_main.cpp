@@ -109,6 +109,37 @@ int main(int argc, char** argv) {
     cadSetRoot("cad/parts");
     if (argc > 1 && std::string(argv[1]) == "--whoops") { debugWhoops(argc > 2 ? VehicleConfig::parse(argv[2]) : VehicleConfig{}); return 0; }
     if (argc > 1 && std::string(argv[1]) == "--bogdbg") { debugBog(argc > 2 ? VehicleConfig::parse(argv[2]) : VehicleConfig{}); return 0; }
+    if (argc > 2 && std::string(argv[1]) == "--map") {   // top-down layout dump: mb_tests --map out.ppm
+        static World w;
+        w.generate(1976);
+        const int M = 1024;
+        const float S = w.terrain.size();
+        std::vector<uint8_t> img(size_t(M) * M * 3);
+        for (int j = 0; j < M; j++)
+            for (int i = 0; i < M; i++) {
+                int oi = i * w.overviewN / M, oj = j * w.overviewN / M;
+                for (int c = 0; c < 3; c++) img[(size_t(j) * M + i) * 3 + c] = w.overview[(size_t(oj) * w.overviewN + oi) * 4 + c];
+            }
+        auto dot = [&](float x, float z, int r, uint8_t R, uint8_t G, uint8_t B) {
+            int ci = int((x - w.terrain.originX()) / S * M), cj = int((z - w.terrain.originZ()) / S * M);
+            for (int dj = -r; dj <= r; dj++) for (int di = -r; di <= r; di++) {
+                int ii = ci + di, jj = cj + dj;
+                if (ii < 0 || jj < 0 || ii >= M || jj >= M) continue;
+                uint8_t* px = &img[(size_t(jj) * M + ii) * 3]; px[0] = R; px[1] = G; px[2] = B;
+            }
+        };
+        for (auto& p : w.props) {
+            if (p.part.find("vegetation/") != std::string::npos) { if (p.part.find("poplar") != std::string::npos || p.part.find("spruce") != std::string::npos) dot(p.pos.x, p.pos.z, 1, 20, 60, 20); continue; }
+            if (p.part.find("wheels/") != std::string::npos) continue;
+            dot(p.pos.x, p.pos.z, 2, 255, 40, 200);
+        }
+        for (auto& b : w.colliders) if (b.half.x > 0.5f) dot(b.center.x, b.center.z, 1, 255, 255, 255);
+        FILE* f = std::fopen(argv[2], "wb");
+        std::fprintf(f, "P6 %d %d 255\n", M, M);
+        std::fwrite(img.data(), 1, img.size(), f);
+        std::fclose(f);
+        return 0;
+    }
     if (argc > 1 && std::string(argv[1]) == "--lane") { debugLane(VehicleConfig{}); return 0; }
     if (argc > 1 && std::string(argv[1]) == "--climb") { debugClimb(VehicleConfig{}, argc > 2 ? float(std::atof(argv[2])) : 20.f); return 0; }
     if (argc > 1 && std::string(argv[1]) == "--probe") {
@@ -575,6 +606,96 @@ int main(int argc, char** argv) {
             CHECK(onPad > 0, "tires climbed onto the boards");
             CHECK(v.pos.x - x0 > 1.5f, "dig + boards gets the stuck rig moving (%.1f m)", v.pos.x - x0);
         }
+    });
+
+
+    test("venue: grounds layout (roads, paddock, wash bay, bounty trench, campground)", [] {
+        static World w;
+        w.generate(1976);
+        CHECK(w.terrain.sample(w.gatePos.x, w.gatePos.z + 2).soil == uint8_t(Soil::Gravel), "gravel at the gate");
+        CHECK(w.terrain.sample(0, -70).soil == uint8_t(Soil::Gravel), "entrance road is gravel");
+        CHECK(w.terrain.sample(-10, -58).soil == uint8_t(Soil::Gravel), "return road is gravel");
+        CHECK(w.terrain.sample(w.washCenter.x, w.washCenter.z).soil == uint8_t(Soil::Gravel), "wash bay apron");
+        Vec3 bc = w.bountyCenter();
+        TerrainSample b = w.terrain.sample(bc.x, bc.z);
+        CHECK(b.waterDepth > 0.1f && b.mudDepth() > 1.2f && b.soil == uint8_t(Soil::Clay), "bounty trench: water %.2f soft %.2f", b.waterDepth, b.mudDepth());
+        int trees = 0, buildings = 0, people = 0;
+        for (auto& p : w.props) {
+            bool tree = p.part.find("poplar") != std::string::npos || p.part.find("spruce") != std::string::npos;
+            if (tree && (w.builtUp(p.pos.x, p.pos.z))) trees++;
+            if (p.part.find("venue/") != std::string::npos) buildings++;
+            if (p.part.find("spectator") != std::string::npos) people++;
+        }
+        std::printf("    %d venue props, %d people\n", buildings, people);
+        CHECK(trees == 0, "%d trees growing in built-up grounds", trees);
+        CHECK(buildings > 150 && people > 120, "grounds populated");
+        // Spawns and the camp road stay clear of colliders.
+        auto blocked = [&](float x, float z) {
+            for (auto& c : w.colliders) {
+                float dx = x - c.center.x, dz = z - c.center.z, cs = std::cos(c.yaw), sn = std::sin(c.yaw);
+                float lx = dx * cs - dz * sn, lz = dx * sn + dz * cs;
+                if (std::fabs(lx) < c.half.x + 1.f && std::fabs(lz) < c.half.z + 1.f) return true;
+            }
+            return false;
+        };
+        CHECK(!blocked(w.garageSpot.x, w.garageSpot.z), "garage spot clear");
+        for (float t = 0; t <= 1.f; t += 0.05f) {
+            Vec3 a = w.returnRoad[2], c = w.returnRoad[3];
+            Vec3 p = lerp(a, c, t);
+            CHECK(!blocked(p.x, p.z), "return road blocked at %.0f,%.0f", p.x, p.z);
+        }
+        CHECK(!blocked(w.bountyX0 - 8, w.bountyZ), "bounty start clear");
+        for (auto& fp : w.posts) CHECK(length(Vec3{fp.base.x - (w.bountyX0 - 8), 0, fp.base.z - w.bountyZ}) > 3.f, "fence post at the bounty start");
+    });
+
+    test("vehicles: every body drives and stays upright (squarebody, SUV, ATV, mega truck)", [] {
+        static Terrain t;
+        fieldTerrain(t);
+        for (const char* body : {"squarebody", "fullsize_suv", "atv", "megatruck", "comanche", "silverado", "utv", "bogcar76"}) {
+            VehicleConfig c = VehicleConfig::parse(std::string("body=") + body + ";engine=" + findBody(body).defaultEngine +
+                                                   ";tire=" + std::to_string(int(findBody(body).defaultTireIn)) + (std::string(body) == "megatruck" ? ";width=22" : ""));
+            Vehicle v;
+            v.configure(c);
+            v.reset({-60, 0, 0}, PI / 2);
+            v.placeOnGround(t);
+            settle(v, t);
+            float h0 = v.pos.y;
+            VehicleInput in;
+            in.throttle = 1;
+            for (int i = 0; i < 240 * 5; i++) v.step(t, in, Vehicle::DT);
+            std::printf("    %-13s %.0f kg  5 s: %.1f m/s  ride %.2f m\n", body, v.mass, v.speed(), h0);
+            CHECK(v.speed() > 6.f && v.up().y > 0.9f && std::isfinite(v.pos.x), "%s should drive off upright", body);
+        }
+        // The mega truck floats over the slurry pit that swallows a stock rig.
+        VehicleConfig mega = VehicleConfig::parse("body=megatruck;engine=ls53_sc;tire=54;width=22;tread=paddle;psi=8;bead=1");
+        VehicleConfig atv = VehicleConfig::parse("body=atv;engine=twin_1000t;tire=30;width=10;tread=paddle;psi=7;bead=1");
+        float m = runPit(mega, 0.9f, 0.25f, -25, 14), a = runPit(atv, 0.9f, 0.25f, -25, 14);
+        std::printf("    pit: mega truck %.1f m, mud ATV %.1f m\n", m, a);
+        CHECK(m > 60.f, "a mega truck clears the slurry pit");
+        CHECK(a > 0.f, "the ATV gets into the pit");
+    });
+
+    test("modes: bounty hole (pot grows on failure, claim pays out)", [] {
+        static World w;
+        w.generate(1976);
+        ModeRunner m;
+        Vehicle v;
+        v.configure(VehicleConfig{});
+        m.start(ModeId::Bounty, w, v, 0, 0);
+        CHECK(v.pos.x < w.bountyX0 && std::fabs(v.pos.z - w.bountyZ) < 1.f, "spawned at the bounty start");
+        m.update(0.1f, 1.0, w, v, 0, 0, 0);
+        CHECK(m.phase == Phase::Running, "running");
+        int pot0 = m.bountyPot;
+        v.pos.x = w.bountyX0 + 10.f;
+        m.update(0.1f, 1.1, w, v, 0, 0, 0);
+        CHECK(std::fabs(m.distance - 10.f) < 0.5f, "distance into the hole %.1f", m.distance);
+        m.requestTow(w, v);
+        CHECK(m.phase == Phase::Finished && m.bountyPot == pot0 + 250 && m.results[0].board == "bounty_distance", "tow grows the pot");
+        m.start(ModeId::Bounty, w, v, 0, 0);
+        m.update(0.1f, 1.0, w, v, 0, 0, 0);
+        v.pos.x = w.bountyX1 + 0.5f;
+        m.update(0.1f, 1.1, w, v, 0, 0, 0);
+        CHECK(m.claimed && m.results[0].board == "bounty_time" && m.bountyPot == 1500, "claimed, pot resets");
     });
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);

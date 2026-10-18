@@ -1,0 +1,41 @@
+# Portable toilet: moulded plastic cabin on a skid base, translucent lighter roof, door with
+# vent slots and latch on +Z, rear vent stack. Origin at ground centre.
+param body_r = 0.16
+param body_g = 0.36
+param body_b = 0.66
+param roof_r = 0.90
+param roof_g = 0.91
+param roof_b = 0.88
+material plastic
+# Skid base
+color body_r*0.6 body_g*0.6 body_b*0.6
+box size=1.14,0.1,1.16 pos=0,0.05,0
+# Cabin walls (slightly tapered look via a darker lower band)
+color body_r body_g body_b
+box size=1.1,2.06,1.1 pos=0,1.13,0 bevel=0.03
+color body_r*0.85 body_g*0.85 body_b*0.85
+box size=0.05,2.0,0.05 pos=0.56,1.12,0.56 mirror=x
+box size=0.05,2.0,0.05 pos=0.56,1.12,-0.56 mirror=x
+box size=0.03,1.9,0.06 pos=0.56,1.1,0 mirror=x
+# Door panel with recessed vents, latch and pull handle
+color body_r*1.1 body_g*1.1 body_b*1.1
+box size=0.86,1.9,0.04 pos=0,1.07,0.56
+color body_r*0.6 body_g*0.6 body_b*0.6
+box size=0.5,0.03,0.02 pos=0,1.85,0.585
+box size=0.5,0.03,0.02 pos=0,1.78,0.585
+box size=0.5,0.03,0.02 pos=0,1.71,0.585
+material chrome
+color #b8b8b8
+box size=0.04,0.24,0.05 pos=-0.32,1.05,0.6
+box size=0.1,0.05,0.04 pos=0.3,1.15,0.59
+material paint
+color #c9302a
+box size=0.12,0.05,0.03 pos=0.3,1.25,0.59
+# Roof cap and vent stack
+material plastic
+color roof_r roof_g roof_b
+box size=1.18,0.12,1.18 pos=0,2.2,0 bevel=0.04
+sphere r=0.48 pos=0,2.26,0 scale=1.15,0.18,1.15 seg=10
+color body_r*0.7 body_g*0.7 body_b*0.7
+cyl r=0.05 h=0.45 pos=0.35,2.25,-0.42 seg=8
+cyl r=0.07 h=0.06 pos=0.35,2.5,-0.42 seg=8

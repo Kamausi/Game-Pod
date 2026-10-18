@@ -1,0 +1,103 @@
+# Paddock work-area clutter laid out inside ~3 x 3 m: rolling toolbox, floor jack,
+# two stacked spare mud tires, cooler, two folding camp chairs, jerry can.
+# Origin at ground centre of the set, chairs face +Z.
+param tool_r = 0.75
+param tool_g = 0.08
+param tool_b = 0.06
+# --- Rolling tool chest (back-left) ---
+set TX = -0.85
+set TZ = -0.95
+material rubber
+color #1a1a1a
+cyl r=0.05 h=0.04 axis=z pos=TX+0.30,0.05,TZ+0.16 seg=8
+cyl r=0.05 h=0.04 axis=z pos=TX-0.30,0.05,TZ+0.16 seg=8
+cyl r=0.05 h=0.04 axis=z pos=TX+0.30,0.05,TZ-0.16 seg=8
+cyl r=0.05 h=0.04 axis=z pos=TX-0.30,0.05,TZ-0.16 seg=8
+material paint
+color tool_r tool_g tool_b
+box size=0.72,0.78,0.46 pos=TX,0.49,TZ bevel=0.015
+box size=0.68,0.32,0.42 pos=TX,1.05,TZ-0.01
+material steel
+color #2a2a2a
+box size=0.66,0.01,0.005 pos=TX,0.36,TZ+0.231
+box size=0.66,0.01,0.005 pos=TX,0.56,TZ+0.231
+box size=0.66,0.01,0.005 pos=TX,0.72,TZ+0.231
+box size=0.62,0.01,0.005 pos=TX,1.02,TZ+0.20
+material chrome
+color #d4d4d4
+cyl r=0.012 h=0.62 axis=x pos=TX,0.82,TZ+0.25 seg=6
+cyl r=0.014 h=0.50 axis=z pos=TX-0.39,0.80,TZ seg=6
+# --- Floor jack (back-centre), handle raised toward +Z ---
+material paint
+color #1f2a5c
+box size=0.28,0.12,0.62 pos=0.15,0.10,-1.05
+material steel
+color #b0b0b0
+box size=0.10,0.14,0.30 pos=0.15,0.20,-1.12 rot=-20,0,0
+cyl r=0.06 h=0.03 pos=0.15,0.29,-1.25 seg=10
+cyl r=0.04 h=0.04 axis=x pos=0.15,0.04,-1.30 seg=8
+cyl r=0.04 h=0.04 axis=x pos=0.15,0.04,-0.78 seg=8
+color #3a3a3a
+cyl r=0.016 h=1.00 pos=0.15,0.45,-0.42 rot=55,0,0 seg=6
+# --- Two stacked spare mud tires (right-back) ---
+set MX = 0.85
+set MZ = -0.70
+set R = 0.47
+material rubber
+color #1b1b1b
+cyl r=R h=0.34 pos=MX,0.17,MZ seg=12
+color #202020
+cyl r=R h=0.34 pos=MX+0.03,0.51,MZ+0.02 seg=12
+color #0e0e0e
+cyl r=0.24 h=0.69 pos=MX+0.015,0.345,MZ+0.01 seg=10
+color #262626
+box size=0.05,0.24,0.10 pos=MX+R,0.17,MZ
+box size=0.05,0.24,0.10 pos=MX+R*cos(60),0.17,MZ+R*sin(60) rot=0,-60,0
+box size=0.05,0.24,0.10 pos=MX+R*cos(120),0.17,MZ+R*sin(120) rot=0,-120,0
+box size=0.05,0.24,0.10 pos=MX-R,0.17,MZ
+box size=0.05,0.24,0.10 pos=MX+R*cos(240),0.17,MZ+R*sin(240) rot=0,-240,0
+box size=0.05,0.24,0.10 pos=MX+R*cos(300),0.17,MZ+R*sin(300) rot=0,-300,0
+box size=0.05,0.24,0.10 pos=MX+0.03+R*cos(30),0.51,MZ+0.02+R*sin(30) rot=0,-30,0
+box size=0.05,0.24,0.10 pos=MX+0.03,0.51,MZ+0.02+R rot=0,-90,0
+box size=0.05,0.24,0.10 pos=MX+0.03+R*cos(150),0.51,MZ+0.02+R*sin(150) rot=0,-150,0
+box size=0.05,0.24,0.10 pos=MX+0.03+R*cos(210),0.51,MZ+0.02+R*sin(210) rot=0,-210,0
+box size=0.05,0.24,0.10 pos=MX+0.03,0.51,MZ+0.02-R rot=0,-270,0
+box size=0.05,0.24,0.10 pos=MX+0.03+R*cos(330),0.51,MZ+0.02+R*sin(330) rot=0,-330,0
+# --- Cooler (front-left) ---
+material plastic
+color #1f5fa8
+box size=0.62,0.34,0.38 pos=-0.55,0.17,0.45
+color #f2f2f2
+box size=0.64,0.07,0.40 pos=-0.55,0.37,0.45
+color #2a2a2a
+box size=0.03,0.04,0.16 pos=-0.88,0.28,0.45
+box size=0.03,0.04,0.16 pos=-0.22,0.28,0.45
+# --- Jerry can (front-left corner) ---
+material paint
+color #a51e18
+box size=0.17,0.44,0.34 pos=-1.20,0.22,1.05
+box size=0.04,0.04,0.20 pos=-1.20,0.47,1.03
+material plastic
+color #1e1e1e
+cyl r=0.025 h=0.06 pos=-1.20,0.46,1.18 rot=30,0,0 seg=8
+# --- Two folding camp chairs (front-right) ---
+material steel
+color #1c1c1c
+cyl r=0.012 h=0.60 pos=0.21,0.30,1.07 seg=6
+cyl r=0.012 h=0.60 pos=0.69,0.30,1.07 seg=6
+cyl r=0.012 h=0.96 pos=0.21,0.48,0.63 seg=6
+cyl r=0.012 h=0.96 pos=0.69,0.48,0.63 seg=6
+cyl r=0.012 h=0.60 pos=0.86,0.30,0.97 seg=6
+cyl r=0.012 h=0.60 pos=1.34,0.30,0.97 seg=6
+cyl r=0.012 h=0.96 pos=0.86,0.48,0.53 seg=6
+cyl r=0.012 h=0.96 pos=1.34,0.48,0.53 seg=6
+material matte
+color #24406b
+box size=0.48,0.03,0.44 pos=0.45,0.42,0.85
+box size=0.48,0.50,0.03 pos=0.45,0.70,0.635
+color #3c5a2a
+box size=0.48,0.03,0.44 pos=1.10,0.42,0.75
+box size=0.48,0.50,0.03 pos=1.10,0.70,0.535
+color #1c1c1c
+box size=0.54,0.025,0.44 pos=0.45,0.60,0.85
+box size=0.54,0.025,0.44 pos=1.10,0.60,0.75

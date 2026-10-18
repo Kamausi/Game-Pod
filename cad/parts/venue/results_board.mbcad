@@ -1,0 +1,57 @@
+# Timing / results board: big dark display panel on two steel posts with a lit row of amber
+# and red "digit" segments, a sponsor stripe across the top and a little rain hood.
+# Display faces +Z. Origin at ground centre between the posts.
+param stripe_r = 0.95
+param stripe_g = 0.48
+param stripe_b = 0.08
+set pw = 4.0
+set ph = 2.0
+set yc = 3.9
+# Footings and posts
+material matte
+color #8e8a82
+box size=0.6,0.15,0.6 pos=1.8,0.075,0 mirror=x
+material steel
+color #4a4f55
+box size=0.2,yc+ph/2+0.3,0.2 pos=1.8,(yc+ph/2+0.3)/2,-0.22 mirror=x
+box size=0.12,0.12,2.3 pos=1.8,1.02,-0.95 rot=-57,0,0 mirror=x
+# Cabinet, bezel and rain hood
+material paint
+color #202326
+box size=pw+0.2,ph+0.2,0.3 pos=0,yc,0
+material matte
+color #0b0c0d
+box size=pw-0.1,ph-0.5,0.04 pos=0,yc-0.2,0.15
+material paint
+color #202326
+box size=pw+0.3,0.05,0.35 pos=0,yc+ph/2+0.12,0.12 rot=-10,0,0
+# Sponsor stripe across the top of the face
+color stripe_r stripe_g stripe_b
+box size=pw,0.36,0.04 pos=0,yc+ph/2-0.2,0.155
+color #f2f0ea
+box size=pw,0.05,0.045 pos=0,yc+ph/2-0.41,0.155
+# Lit digit blocks: top row amber (time), bottom row red (position / speed)
+material lens
+color #ffb020
+box size=0.36,0.62,0.03 pos=-1.55,yc+0.1,0.17
+box size=0.36,0.62,0.03 pos=-1.1,yc+0.1,0.17
+box size=0.08,0.08,0.03 pos=-0.78,yc-0.1,0.17
+box size=0.36,0.62,0.03 pos=-0.45,yc+0.1,0.17
+box size=0.36,0.62,0.03 pos=0.0,yc+0.1,0.17
+box size=0.08,0.08,0.03 pos=0.32,yc-0.1,0.17
+box size=0.36,0.62,0.03 pos=0.65,yc+0.1,0.17
+box size=0.36,0.62,0.03 pos=1.1,yc+0.1,0.17
+color #ff2a1a
+box size=0.26,0.42,0.03 pos=-1.6,yc-0.6,0.17
+box size=0.26,0.42,0.03 pos=-1.26,yc-0.6,0.17
+box size=0.26,0.42,0.03 pos=0.9,yc-0.6,0.17
+box size=0.26,0.42,0.03 pos=1.24,yc-0.6,0.17
+box size=0.26,0.42,0.03 pos=1.58,yc-0.6,0.17
+color #ffb020
+box size=1.3,0.12,0.03 pos=-0.15,yc-0.6,0.17
+# Small status lamp and service cabinet at the base
+color #3cff6a
+cyl r=0.06 h=0.04 axis=z pos=1.75,yc+0.1,0.17 seg=8
+material paint
+color #6d7378
+box size=0.6,0.8,0.35 pos=1.8,1.1,0.0

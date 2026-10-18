@@ -1,0 +1,33 @@
+# Two-pole camping dome tent: coloured inner body, darker rain fly over the top,
+# zippered door on +Z. ~2.4 x 2.1 m, 1.3 m tall, origin at ground centre.
+param color_r = 0.20
+param color_g = 0.55
+param color_b = 0.30
+material matte
+# Groundsheet
+color #2b2b2b
+box size=2.44,0.02,2.14 pos=0,0.01,0
+# Inner body: half-ellipsoid
+color color_r color_g color_b
+lathe pts=1,0,0.966,0.259,0.866,0.5,0.707,0.707,0.5,0.866,0.259,0.966,0,1 seg=12 scale=1.2,1.3,1.05
+# Rain fly: darker cap over the upper body
+color color_r*0.55 color_g*0.55 color_b*0.55
+lathe pts=0.90,0.40,0.866,0.5,0.707,0.707,0.5,0.866,0.259,0.966,0,1 seg=12 scale=1.215,1.32,1.065
+# Pole sleeves crossing over the top
+color #1f1f1f
+lathe pts=0.025,1.005,0,1.01 seg=6 scale=1.2,1.3,1.05
+box size=2.3,0.02,0.04 pos=0,1.305,0
+box size=0.04,0.02,2.0 pos=0,1.305,0
+# Door on +Z: three tilted panels following the dome curve, zip line up the middle
+color color_r*0.4 color_g*0.4 color_b*0.4
+box size=0.72,0.32,0.01 pos=0,0.158,1.048 rot=-5.7,0,0
+box size=0.60,0.31,0.01 pos=0,0.465,0.988 rot=-17.2,0,0
+box size=0.40,0.30,0.01 pos=0,0.745,0.868 rot=-29.5,0,0
+color #d9d9d9
+box size=0.015,0.32,0.014 pos=0,0.158,1.050 rot=-5.7,0,0
+box size=0.015,0.31,0.014 pos=0,0.465,0.990 rot=-17.2,0,0
+# Corner stakes and guy points
+material steel
+color #a0a0a0
+box size=0.02,0.10,0.02 pos=1.24,0.05,0.9 mirror=x
+box size=0.02,0.10,0.02 pos=1.24,0.05,-0.9 mirror=x
