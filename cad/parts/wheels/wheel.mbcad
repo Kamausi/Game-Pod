@@ -24,3 +24,26 @@ cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(120),LR*sin(120)
 cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,-LR,0
 cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(240),LR*sin(240)
 cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(300),LR*sin(300)
+# Shoulder lugs wrapping down both sidewalls (M/T only: mt scales them away for A/T and paddles)
+set mt = max(0,1-abs(tread-1))
+set rt = tire_r-depth
+set hw = tire_w*0.5
+color #1f1e1c
+material rubber
+for k = 0, lugs-1
+  set a = k*360/lugs
+  box size=0.024*mt,0.07*mt,2*pi*rt/lugs*0.42 pos=hw+0.004,(rt-0.045)*sin(a),(rt-0.045)*cos(a) rot=90-a,0,0 mirror=x
+end
+# Beadlock ring bolts (16)
+color #c8c8c4
+material chrome
+for k = 0, 15
+  cyl r=0.009*beadlock h=0.02 axis=x seg=6 pos=tire_w*0.4+0.02,rim_r*0.97*sin(k*22.5),rim_r*0.97*cos(k*22.5)
+end
+# Rim lip and valve stem
+color #2a2a2a
+material steel
+lathe seg=28 axis=x pts=rim_r*0.98,tire_w*0.40,rim_r*1.03,tire_w*0.40,rim_r*1.03,tire_w*0.43,rim_r*0.98,tire_w*0.43
+color #111111
+material rubber
+cyl r=0.006 h=0.035 axis=x seg=6 pos=tire_w*0.38,rim_r*0.80,0.02

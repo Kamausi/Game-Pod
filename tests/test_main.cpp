@@ -239,6 +239,8 @@ int main(int argc, char** argv) {
         CHECK(txt.error.empty() && !txt.mesh.verts.empty(), "text primitive: %s", txt.error.c_str());
         CHECK(std::fabs(txt.mesh.boundsMax().x + txt.mesh.boundsMin().x) < 0.06f && txt.mesh.boundsMax().y > 0.3f, "text is centred, cap height ~0.7");
         CHECK(!cadBuildSource("text str=A?B\n", {}, "badtext").error.empty(), "unknown glyph should error");
+        CadResult flat = cadBuildSource("param on = 0\nbox size=1*on,1,1\ncyl r=0.2 h=0.5*on\nsphere r=0.3 scale=1,on,1\nbox size=1,1,1\n", {}, "flat");
+        CHECK(flat.error.empty() && flat.mesh.verts.size() == one.mesh.verts.size(), "zero-size features emit nothing (%zu verts)", flat.mesh.verts.size());
         CHECK(std::fabs(cadEval("1.5e2+2e-1", {}, &err) - 150.2f) < 1e-3f && err.empty(), "exponent literals: %s", err.c_str());
         CadResult hexLoop = cadBuildSource("for i = 0, 1\n  color #ff0000\n  box size=1,1,1 pos=i*2,0,0\nend\n", {}, "hexloop");
         CHECK(hexLoop.error.empty() && !hexLoop.mesh.verts.empty() && hexLoop.mesh.verts[0].r > 0.99f, "indented hex color: %s", hexLoop.error.c_str());

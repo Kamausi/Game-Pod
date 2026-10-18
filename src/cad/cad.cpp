@@ -673,6 +673,13 @@ struct Interp {
     }
     void emitRaw(const CadMesh& prim, const std::map<std::string, std::string>& a, const std::string& scadPrim) {
         Vec3 pos = vec3(a, "pos", {0, 0, 0}), rot = vec3(a, "rot", {0, 0, 0}), scl = vec3(a, "scale", {1, 1, 1});
+        // Parts switch features off by scaling them to zero (hat*, vest*, beadlock*): emit nothing
+        // for a primitive collapsed on any axis instead of a fan of degenerate triangles.
+        if (prim.verts.empty() || std::fabs(scl.x * scl.y * scl.z) < 1e-9f) return;
+        {
+            Vec3 mn = prim.boundsMin(), mx = prim.boundsMax();
+            if (mx.x - mn.x < 1e-6f || mx.y - mn.y < 1e-6f || mx.z - mn.z < 1e-6f) return;
+        }
         Quat q = Quat::euler(rot.x * DEG, rot.y * DEG, rot.z * DEG);
         Mat4 M = Mat4::trs(pos, q, scl);
         mesh.append(prim, M);
