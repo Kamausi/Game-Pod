@@ -55,7 +55,7 @@ try {
   await sleep(150);
   const st2 = b.msgs.filter((m) => m.t === 'start').pop();
   check(st2 && st2.mode === 6, 'burnout (and bounty) modes start in multiplayer');
-  check(st2 && st2.weather && st2.weather.w === 2 && st2.weather.tod === 3 && st2.weather.wet === 0.6, "host's weather is shared with the room");
+  check(st2 && st2.weather && st2.weather.w === 2 && st2.weather.tod === 3 && st2.weather.wet === 0.6 && Number.isInteger(st2.weather.seed), "host's weather is shared with the room");
   a.close(); b.close();
 } catch (e) { failed++; console.error(e); }
 srv.kill();

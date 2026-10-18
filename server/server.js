@@ -256,7 +256,7 @@ function onClient(ws, ip) {
         // The host's sky goes to everyone so the whole room races in the same rain / dark.
         const wx = m.wx || {};
         const weather = { w: [0, 1, 2].includes(+wx.w) ? +wx.w : 0, tod: [0, 1, 2, 3].includes(+wx.tod) ? +wx.tod : 0,
-          wet: Math.min(1, Math.max(0, Number(wx.wet) || 0)) };
+          wet: Math.min(1, Math.max(0, Number(wx.wet) || 0)), seed: Math.floor(Math.random() * 1e9) };
         const lanes = {};
         for (const p of r.players.values()) lanes[p.id] = p.lane;
         const msg = JSON.stringify({ t: 'start', mode: r.mode, startAt: now() + 4.5, lanes, weather });

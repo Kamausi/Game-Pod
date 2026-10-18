@@ -717,7 +717,7 @@ function onNet(m) {
       Module._mb_set_ai_count(0);
       loadGhost(-1);
       net.lane = (m.lanes && m.lanes[net.id]) || 0;
-      if (m.weather) { applyWeather(m.weather.w, m.weather.tod, m.weather.wet, true); roomWeather = true; }
+      if (m.weather) { applyWeather(m.weather.w, m.weather.tod, m.weather.wet, true); api.action('sky:' + (m.weather.seed | 0)); roomWeather = true; }
       hideAll();
       api.startMode(m.mode, net.lane, m.startAt);
       break;

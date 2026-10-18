@@ -126,6 +126,7 @@ private:
     // Weather and time of day: 0 dry/1 overcast/2 rain; 0 afternoon/1 midday/2 golden hour.
     int weatherMode = 0, timeOfDay = 0;
     float cloudCover = 0, rainAmt = 0, lightningTimer = 25, flashT = -1;
+    Rng skyRng{0x5eedULL};   // lightning schedule; seeded per room so every player sees the same strikes
     void updateWeather(float dt);
     void say(const std::string& m, float t = 2.5f) { if (!m.empty()) { mode.message = m; mode.messageTimer = t; } }
     void updateCoach(float dt);

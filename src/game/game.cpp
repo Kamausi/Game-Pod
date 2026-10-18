@@ -217,6 +217,11 @@ void Game::action(const std::string& a) {
         weatherMode = std::atoi(a.c_str() + 8);
         if (a.back() == '!') { cloudCover = weatherMode == 0 ? 0.f : (weatherMode == 1 ? 0.8f : 1.f); rainAmt = weatherMode == 2 ? 1.f : 0.f; }   // photo mode: no fade
     }
+    else if (a.rfind("sky:", 0) == 0) {   // multiplayer: shared lightning schedule from the room's seed
+        skyRng = Rng(uint64_t(std::strtoull(a.c_str() + 4, nullptr, 10)) * 2654435761ULL + 1);
+        lightningTimer = skyRng.range(8.f, 20.f);
+        flashT = -1;
+    }
     else if (a.rfind("challenges:", 0) == 0) {   // restore saved progress (no payout)
         unsigned mask = unsigned(std::atoi(a.c_str() + 11));
         for (size_t i = 0; i < challenges.goals.size(); i++) challenges.goals[i].done = (mask >> i) & 1u;
@@ -566,7 +571,7 @@ void Game::updateWeather(float dt) {
     // Lightning in heavy rain: a flicker of light now, thunder after the sound's travel time.
     lightningTimer -= dt;
     if (rainAmt > 0.6f && lightningTimer <= 0) {
-        Rng& R = particles.rng;
+        Rng& R = skyRng;
         lightningTimer = R.range(18.f, 45.f);
         audio.thunder(R.range(250.f, 2400.f));
         flashT = 0;
