@@ -69,6 +69,10 @@ EMSCRIPTEN_KEEPALIVE const float* mb_ghost_trace_ptr() { return g_game ? g_game-
 EMSCRIPTEN_KEEPALIVE int mb_ghost_trace_len() { return g_game ? int(g_game->lastRunTrace().size()) : 0; }
 
 // Catalog for the garage UI (bodies, engines) as JSON.
+// Minimap overview: RGBA image of the whole map (north = -z at the top), and the map's size in m.
+EMSCRIPTEN_KEEPALIVE const uint8_t* mb_map_image() { return g_game ? g_game->world.overview.data() : nullptr; }
+EMSCRIPTEN_KEEPALIVE int mb_map_res() { return g_game ? g_game->world.overviewN : 0; }
+EMSCRIPTEN_KEEPALIVE float mb_map_size() { return g_game ? g_game->world.terrain.size() : 0.f; }
 EMSCRIPTEN_KEEPALIVE const char* mb_catalog() {
     g_catalog = "{\"bodies\":[";
     char b[512];

@@ -25,8 +25,8 @@ struct DirtyRect {
 
 class Terrain {
 public:
-    static constexpr int N = 768;           // cells per side
-    static constexpr float CELL = 0.25f;    // meters per cell -> 192 m world
+    static constexpr int N = 1536;          // cells per side
+    static constexpr float CELL = 0.25f;    // meters per cell -> 384 m world
     static constexpr float NO_WATER = -1000.f;
 
     Terrain();

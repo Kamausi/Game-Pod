@@ -27,6 +27,18 @@ void World::generate(uint32_t seed) {
     circuit = {{-60, 0, 8},  {-20, 0, 10}, {25, 0, 12}, {62, 0, 18}, {80, 0, 42}, {66, 0, 70}, {35, 0, 80},
                {5, 0, 62},   {0, 0, 32},   {-30, 0, 40}, {-50, 0, 52}, {-74, 0, 38}, {-76, 0, 18}};
 
+    // Back-country trail: a wobbly loop well outside the venue's tree line.
+    trail.clear();
+    for (int k = 0; k < 72; k++) {
+        float a = 2 * PI * float(k) / 72.f;
+        float R = 148.f + 12.f * std::sin(3 * a + 0.7f) + 7.f * std::sin(7 * a + 2.f);
+        trail.push_back({R * std::cos(a), 0, R * std::sin(a)});
+    }
+    {
+        Vec3 dir = normalize(Vec3{-hillCenter.x, 0, -hillCenter.z});
+        chuteTop = hillCenter + dir * 5.f;
+        chuteBottom = hillCenter + dir * (hillRadius + 4.f);
+    }
     auto natural = [&](float x, float z) { return (fbm(x * 0.011f + 3.1f, z * 0.011f - 7.4f, 4, seed) - 0.5f) * 1.8f; };
     const float hPit = natural(0, pitZ), hBowl = natural(bowlCenter.x, bowlCenter.z);
     const float hPond = natural(pondCenter.x, pondCenter.z);
@@ -40,7 +52,7 @@ void World::generate(uint32_t seed) {
         struct Slot { float x, dz, r, d; };
         std::vector<Slot> slots;
         for (float x = pitX0 + 9.f + hr.range(0.f, 3.f); x < pitX1 - 6.f; x += hr.range(6.5f, 8.5f))
-            slots.push_back({x, hr.range(-0.6f, 0.6f), hr.range(1.9f, 2.3f), hr.range(0.52f, 0.62f)});
+            slots.push_back({x, hr.range(-0.6f, 0.6f), hr.range(1.9f, 2.3f), hr.range(0.6f, 0.7f)});
         for (int l = 0; l < lanes; l++)
             for (const Slot& sl : slots) holes.push_back({sl.x, laneZ(l) + sl.dz, sl.r, sl.d});
         // Spoil mounds (negative depth = hump), also mirrored into every lane.
@@ -160,6 +172,87 @@ void World::generate(uint32_t seed) {
                 h -= 0.07f * rut * t;
                 grass -= 0.25f * rut * t;
                 if (seg == 3) h += 0.32f * std::sin(along * 2 * PI / 6.5f) * t;  // whoops
+            }
+
+            // ---------------- back-country ----------------
+            float edge = std::max(std::fabs(x), std::fabs(z));
+            float outer = smoothstep(98.f, 130.f, edge);
+            if (outer > 0) {
+                // Rolling farm country beyond the venue.
+                float roll = (fbm(x * 0.006f + 11.f, z * 0.006f - 3.f, 4, seed + 21) - 0.5f) * 8.f;
+                h += roll * outer;
+                base += roll * outer;
+                // The hill (with a muddy climb chute facing the venue).
+                float dH = length(Vec2{x - hillCenter.x, z - hillCenter.z});
+                if (dH < hillRadius) {
+                    float hh = hillHeight * std::pow(std::cos(dH / hillRadius * PI * 0.5f), 1.5f);
+                    h += hh; base += hh;
+                    float t;
+                    float dc = distToSegment({x, z}, {chuteTop.x, chuteTop.z}, {chuteBottom.x, chuteBottom.z}, &t);
+                    float ch = std::exp(-dc * dc / 6.f);
+                    h -= 0.55f * ch;
+                    base -= 1.0f * ch;
+                    moist = std::max(moist, 0.62f + 0.3f * ch * (0.6f + 0.4f * n1));
+                    grass *= 1.f - ch;
+                }
+                // Mud flats to the west: a big shallow slop field with puddles.
+                float ex = (x - flatsCenter.x) / flatsHalfX, ez = (z - flatsCenter.z) / flatsHalfZ;
+                float e = ex * ex + ez * ez;
+                if (e < 1.2f) {
+                    float t = 1.f - smoothstep(0.65f, 1.15f, e);
+                    float flatH = natural(flatsCenter.x, flatsCenter.z) - 0.2f + (n1 - 0.5f) * 0.25f + (n2 - 0.5f) * 0.08f;
+                    h = lerpf(h, flatH, t);
+                    base = lerpf(base, flatH - 0.55f, t);
+                    moist = lerpf(moist, 0.72f + 0.25f * n1, t);
+                    grass *= 1.f - t;
+                    if (t > 0.6f && n2 > 0.6f) water = flatH - (n1 - 0.5f) * 0.25f - 0.06f;
+                }
+                // Creek across the south: muddy banks, deep pools, shallow fords where the trail crosses.
+                float dz = std::fabs(z - creekZ(x));
+                if (dz < creekHalfW + 4.f) {
+                    float bank = h;
+                    float ford = 0;
+                    for (const Vec3& tp : trail)
+                        if (std::fabs(tp.x - x) < 9.f && std::fabs(creekZ(tp.x) - tp.z) < 12.f) ford = 1;
+                    float depth = lerpf(1.25f, 0.55f, ford) * (0.8f + 0.4f * n1);
+                    if (dz < creekHalfW) {
+                        float bed = bank - depth * (1.f - sq(dz / creekHalfW));
+                        h = bed;
+                        base = std::min(base, bed - 0.35f);
+                        grass = 0;
+                        water = bank - 0.45f;
+                    }
+                    moist = std::max(moist, lerpf(1.f, 0.5f, clampf((dz - creekHalfW) / 4.f, 0.f, 1.f)));
+                    grass *= clampf((dz - creekHalfW) / 4.f, 0.f, 1.f);
+                }
+                // The trail: two ruts, worn grass, mud holes every so often.
+                float rr = length(Vec2{x, z});
+                if (rr > 115.f && rr < 182.f) {
+                    float a = std::atan2(z, x);
+                    int n = int(trail.size()), k0 = int(std::floor((a < 0 ? a + 2 * PI : a) / (2 * PI) * n));
+                    float bestD = 1e9f;
+                    int bestK = 0;
+                    for (int dk = -2; dk <= 2; dk++) {
+                        int ka = ((k0 + dk) % n + n) % n, kb = (ka + 1) % n;
+                        float d = distToSegment({x, z}, {trail[ka].x, trail[ka].z}, {trail[kb].x, trail[kb].z});
+                        if (d < bestD) { bestD = d; bestK = ka; }
+                    }
+                    if (bestD < 4.f) {
+                        float tw = 1.f - smoothstep(2.0f, 3.6f, bestD);
+                        float rut = std::exp(-sq(bestD - 0.8f) / 0.04f);
+                        h -= 0.08f * rut * tw;
+                        grass = lerpf(grass, 0.25f, tw);
+                        grass -= 0.2f * rut * tw;
+                        moist = std::max(moist, 0.38f * tw);
+                        if (bestK % 6 == 3) {   // mud hole
+                            const Vec3& hp = trail[size_t(bestK)];
+                            float g = gauss(sq(x - hp.x) + sq(z - hp.z), 3.2f);
+                            h -= 0.42f * g; base -= 0.6f * g;
+                            moist = std::max(moist, 0.95f * g);
+                            if (g > 0.35f) water = std::max(water, h + 0.42f * g - 0.18f);
+                        }
+                    }
+                }
             }
 
             T.h[k] = h;
@@ -304,6 +397,7 @@ void World::generate(uint32_t seed) {
         bool cluster = length(Vec2{x - busPos.x, z - busPos.z - 14}) < 16;
         if (edge < 82 && !cluster) continue;
         if (!clearOfCourse(x, z, 2)) continue;
+        if (std::fabs(x) < 7.f || std::fabs(z) < 7.f) continue;   // gaps out to the back-country
         bool spruce = rng.uniform() < (cluster ? 0.35f : 0.12f);
         float sc = rng.range(0.75f, 1.25f);
         if (spruce) addProp("vegetation/spruce.mbcad", x, z, rng.range(0, 6.28f), sc);
@@ -319,8 +413,86 @@ void World::generate(uint32_t seed) {
         if (!clearOfCourse(x, z, 1)) continue;
         addProp("vegetation/goldenrod.mbcad", x, z, rng.range(0, 6.28f), rng.range(0.7f, 1.3f));
     }
-    // Barbed-wire perimeter posts (photo 1-2 foreground).
-    for (float x = -90; x <= 90; x += 4.5f) addProp("props/fencepost_wood.mbcad", x, -91.5f, rng.range(-0.2f, 0.2f));
+    // Barbed-wire perimeter posts (photo 1-2 foreground), with a gate gap.
+    for (float x = -90; x <= 90; x += 4.5f)
+        if (std::fabs(x) > 7.f) addProp("props/fencepost_wood.mbcad", x, -91.5f, rng.range(-0.2f, 0.2f));
+
+    // ---- Back-country woods: patchy forest between the venue and the map edge ----
+    {
+        Rng fr(seed * 131u + 5u);
+        const float lim = terrain.size() * 0.5f - 6.f;
+        auto clearBack = [&](float x, float z) {
+            for (size_t k = 0; k < trail.size(); k++) {
+                const Vec3 &a = trail[k], &b = trail[(k + 1) % trail.size()];
+                if (distToSegment({x, z}, {a.x, a.z}, {b.x, b.z}) < 5.5f) return false;
+            }
+            if (std::fabs(z - creekZ(x)) < creekHalfW + 2.5f) return false;
+            if (distToSegment({x, z}, {chuteTop.x, chuteTop.z}, {chuteBottom.x, chuteBottom.z}) < 7.f) return false;
+            float ex = (x - flatsCenter.x) / flatsHalfX, ez = (z - flatsCenter.z) / flatsHalfZ;
+            if (ex * ex + ez * ez < 1.3f) return false;
+            if (std::fabs(x) < 8.f || std::fabs(z) < 8.f) return false;   // keep the way out open
+            return true;
+        };
+        for (int s = 0; s < 9000; s++) {
+            float x = fr.range(-lim, lim), z = fr.range(-lim, lim);
+            if (std::max(std::fabs(x), std::fabs(z)) < 100.f) continue;
+            float dens = fbm(x * 0.012f + 4.f, z * 0.012f + 9.f, 3, seed + 33);
+            if (fr.uniform() > smoothstep(0.42f, 0.62f, dens)) continue;
+            if (!clearBack(x, z)) continue;
+            bool spruce = fr.uniform() < 0.3f + 0.3f * smoothstep(0.55f, 0.7f, dens);
+            float sc = fr.range(0.8f, 1.3f);
+            if (spruce) addProp("vegetation/spruce.mbcad", x, z, fr.range(0, 6.28f), sc);
+            else {
+                float yel = std::round(fr.range(0.55f, 1.f) * 4.f) / 4.f, ht = std::round(fr.range(7, 12) / 2.5f) * 2.5f;
+                addProp("vegetation/poplar.mbcad", x, z, fr.range(0, 6.28f), sc, {{"yellow", yel}, {"h", ht}});
+            }
+            colliders.push_back({{x, ground(x, z) + 2, z}, {0.25f, 2, 0.25f}, 0});
+        }
+        // Brush and goldenrod along trail edges and field margins.
+        for (int s = 0; s < 1400; s++) {
+            float x = fr.range(-lim, lim), z = fr.range(-lim, lim);
+            if (std::max(std::fabs(x), std::fabs(z)) < 100.f || !clearBack(x, z)) continue;
+            if (fr.uniform() < 0.8f) addProp("vegetation/goldenrod.mbcad", x, z, fr.range(0, 6.28f), fr.range(0.7f, 1.3f));
+            else addProp("vegetation/sumac.mbcad", x, z, fr.range(0, 6.28f), fr.range(0.8f, 1.4f), {{"red", fr.uniform() < 0.5f ? 1.f : 0.25f}});
+        }
+        // A couple of abandoned rigs in the woods by the trail.
+        auto nearTrail = [&](int k, float off) { const Vec3& a = trail[size_t(k)]; Vec3 n = normalize(Vec3{a.x, 0, a.z}); return a + n * off; };
+        Vec3 r1 = nearTrail(14, 9.f), r2 = nearTrail(47, -9.f);
+        addParked("vehicles/silverado.mbcad", r1.x, r1.z, 1.1f, 1.56f, -2.34f, 1.73f, -0.46f, 0.4826f, 0.95f, {{"paint_r", 0.42f}, {"paint_g", 0.16f}, {"paint_b", 0.12f}});
+        boxCol(r1, {1.0f, 0.9f, 3.0f}, 1.1f);
+        addParked("vehicles/comanche.mbcad", r2.x, r2.z, -0.6f, 1.29f, -1.58f, 1.47f, -0.42f, 0.4445f, 0.9f, {{"paint_r", 0.2f}, {"paint_g", 0.3f}, {"paint_b", 0.45f}});
+        boxCol(r2, {0.9f, 0.8f, 2.3f}, -0.6f);
+    }
+    buildOverview();
+}
+
+void World::buildOverview() {
+    const int M = overviewN;
+    overview.assign(size_t(M) * M * 4, 255);
+    const float S = terrain.size();
+    for (int j = 0; j < M; j++)
+        for (int i = 0; i < M; i++) {
+            float x = terrain.originX() + (i + 0.5f) * S / M, z = terrain.originZ() + (j + 0.5f) * S / M;
+            TerrainSample t = terrain.sample(x, z);
+            float shade = clampf(0.85f + (terrain.heightAt(x + 1.f, z) - terrain.heightAt(x - 1.f, z)) * 0.25f, 0.6f, 1.15f);
+            float r = 70, g = 98, b = 46;                                    // grass
+            float mud = smoothstep(0.02f, 0.2f, t.mudDepth()) * smoothstep(0.4f, 0.7f, t.moisture);
+            float bare = 1.f - t.grass;
+            r = lerpf(r, 118, bare * 0.7f); g = lerpf(g, 100, bare * 0.7f); b = lerpf(b, 70, bare * 0.7f);
+            r = lerpf(r, 72, mud); g = lerpf(g, 52, mud); b = lerpf(b, 34, mud);
+            if (t.waterDepth > 0.03f) { r = 88; g = 104; b = 128; }
+            size_t o = (size_t(j) * M + i) * 4;
+            overview[o] = uint8_t(clampf(r * shade, 0, 255));
+            overview[o + 1] = uint8_t(clampf(g * shade, 0, 255));
+            overview[o + 2] = uint8_t(clampf(b * shade, 0, 255));
+        }
+    for (const PropInstance& p : props) {   // trees as dark dots
+        if (p.part.find("poplar") == std::string::npos && p.part.find("spruce") == std::string::npos) continue;
+        int i = int((p.pos.x - terrain.originX()) / S * M), j = int((p.pos.z - terrain.originZ()) / S * M);
+        if (i < 0 || j < 0 || i >= M || j >= M) continue;
+        size_t o = (size_t(j) * M + i) * 4;
+        overview[o] = 38; overview[o + 1] = 56; overview[o + 2] = 30;
+    }
 }
 
 void World::resetDynamics() {

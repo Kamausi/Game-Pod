@@ -74,6 +74,20 @@ public:
     Vec3 dozerPos{47, 0, -40};
     Vec3 crowdCenter{0, 0, -8};
     Vec3 busPos{-55, 0, 58};
+
+    // Back-country beyond the venue (the map is 384 m across; the venue is the middle 190 m).
+    std::vector<Vec3> trail;        // closed two-track loop through the woods
+    Vec3 hillCenter{128, 0, -128};
+    float hillRadius = 50, hillHeight = 16;
+    Vec3 chuteTop, chuteBottom;     // muddy hill-climb chute down the hill's venue-facing side
+    Vec3 flatsCenter{-138, 0, -18};
+    float flatsHalfX = 36, flatsHalfZ = 62;
+    float creekZ(float x) const { return 150.f + 10.f * std::sin(x * 0.035f) + 6.f * std::sin(x * 0.011f + 1.f); }
+    float creekHalfW = 4.f;
+    // Overview image for the minimap (RGBA, overviewN^2, north = -z up).
+    std::vector<uint8_t> overview;
+    int overviewN = 256;
+    void buildOverview();
 };
 
 }  // namespace mb

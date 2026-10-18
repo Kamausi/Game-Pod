@@ -65,7 +65,7 @@ private:
     GLuint texHeight = 0, texState = 0, texTrackDir = 0, shadowTex = 0, shadowFbo = 0;
     GLuint chunkVao = 0, chunkVbo = 0, chunkIbo = 0, skyVao = 0;
     struct Lod { GLuint offset; GLsizei count; };
-    Lod lods[3];
+    Lod lods[4];
     std::vector<float> chunkMin, chunkMax;
     std::vector<bool> chunkWater;
     GLuint particleVao = 0, particleQuad = 0, particleInst = 0;
@@ -74,7 +74,15 @@ private:
     GLsizei grassVerts = 0;
     GLsizei fenceVerts = 0;
     std::map<std::string, GpuMesh> meshes;
-    struct Batch { GpuMesh mesh; int count = 0; };
+    struct Batch {
+        GpuMesh mesh;
+        int count = 0, visible = 0;
+        std::vector<float> inst;          // 20 floats per instance (matrix + tint)
+        std::vector<Vec3> centers;
+        std::vector<float> scales;
+        float radius = 1;
+    };
+    void cullStatic(const Mat4& vp, Vec3 eye, float maxDist);
     std::vector<Batch> batches;
     const GpuMesh *barrelMesh[2] = {nullptr, nullptr}, *postMesh = nullptr;
     GpuMesh barrelInst[2], postInst;

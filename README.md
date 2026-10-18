@@ -30,6 +30,8 @@ server (zero npm dependencies, Node ≥ 18).
 | | |
 |---|---|
 | **Terramechanics** | Bekker pressure–sinkage per terrain cell with viscous sinkage rate (momentum matters), Janosi–Hanamoto shear traction, Rankine bulldozing, suction, slurry/water drag. Tires dig holes, roost re-deposits where it lands, ruts fill with water, soupy mud flows back. [docs/PHYSICS.md](docs/PHYSICS.md) |
+| **Map** | 384 m × 384 m deformable world: the mud-bog venue (drag pit, freestyle bowl, two-track circuit, pond, old bus) in the middle, ringed by back-country — a wooded trail loop with mud holes, a 16 m hill with a mud climb chute, a creek with fords, western mud flats, patchy forest. North-up minimap built from the terrain. |
+| **Suspension** | Quarter-car per corner (unsprung wheel mass, pressure-dependent tire spring, bump/rebound damping, hydraulic bump stops, anti-roll bars), load-sensitive tires; `mb_tests --probe` prints a handling report. |
 | **Getting stuck** | High-centering on diff pumpkins and frame rails, tread packing with clay (wheel speed flings it out), open diffs vs lockers, hydrolock, radiator clogging → overheating. Ways out: rock it, air down, lockers, 4-LO, or the dozer tow. |
 | **Vehicles** | '88 Comanche MJ, '76 full-size bog car, crew-cab diesel mud truck, sport UTV; 6 engines; tire size 31–44", width, A/T / M/T / paddles, lift, axle gears, lockers, 4WD, snorkel, on-board air, paint. |
 | **Audio** | Per-cylinder firing-order pulses into exhaust waveguides (real cross-plane V8 burble, limiter bounce, pops), diesel clatter, turbo/blower, lug-slap granular mud, Minnaert water bubbles, debris patter, barrel modal synthesis, crowd, dozer idle, tree-line slapback, Doppler. [docs/AUDIO.md](docs/AUDIO.md) |

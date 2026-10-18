@@ -148,10 +148,10 @@ uniform float uCell;
 uniform mat4 uVP;
 uniform int uWaterPass;
 out vec3 vWorld; out vec3 vN; out vec4 vState; out float vDepth; out vec2 vTrackGrad; out vec2 vTrackDir;
-float H(ivec2 c){ c = clamp(c, ivec2(0), ivec2(767)); return texelFetch(uHeight, c, 0).r; }
-float T(ivec2 c){ c = clamp(c, ivec2(0), ivec2(767)); return texelFetch(uState, c, 0).a; }
+float H(ivec2 c){ c = clamp(c, ivec2(0), ivec2(TN)); return texelFetch(uHeight, c, 0).r; }
+float T(ivec2 c){ c = clamp(c, ivec2(0), ivec2(TN)); return texelFetch(uState, c, 0).a; }
 void main(){
-  ivec2 c = clamp(uChunk + ivec2(aGrid.xz), ivec2(0), ivec2(767));
+  ivec2 c = clamp(uChunk + ivec2(aGrid.xz), ivec2(0), ivec2(TN));
   vec2 hw = texelFetch(uHeight, c, 0).rg;
   float h = hw.r;
   vN = normalize(vec3(H(c-ivec2(1,0)) - H(c+ivec2(1,0)), 2.0*uCell, H(c-ivec2(0,1)) - H(c+ivec2(0,1))));
@@ -198,9 +198,13 @@ void main(){
     if(vDepth < 0.004) discard;
     vec2 q = p*1.3;
     float t = uTime;
-    vec2 g = vec2(vnoise(q*1.7 + vec2(t*0.35, t*0.2)) - vnoise(q*1.7 + vec2(0.31, 0.0) + vec2(t*0.35, t*0.2)),
-                  vnoise(q.yx*1.9 - t*0.3) - vnoise(q.yx*1.9 + vec2(0.0, 0.29) - t*0.3));
-    vec3 wn = normalize(vec3(g.x*0.7, 1.0, g.y*0.7));
+    // Ripples: a few directional sine waves (analytic slopes) wobbled by low-frequency noise,
+    // faded with distance so they never alias into a pattern.
+    float wob = vnoise(p*0.35 + t*0.05)*6.2831;
+    vec2 d1 = vec2(0.8, 0.6), d2 = vec2(-0.5, 0.86), d3 = vec2(0.96, -0.28);
+    vec2 g = d1*cos(dot(p, d1)*3.1 + t*1.7 + wob)*0.5 + d2*cos(dot(p, d2)*4.3 - t*2.1)*0.3 + d3*cos(dot(p, d3)*6.7 + t*2.9 + wob*0.5)*0.2;
+    float far = 1.0/(1.0 + length(vWorld - uCamPos)*0.06);
+    vec3 wn = normalize(vec3(g.x*0.12*far, 1.0, g.y*0.12*far));
     vec3 V = normalize(uCamPos - vWorld);
     float fres = 0.02 + 0.98*pow(1.0 - max(dot(wn, V), 0.0), 5.0);
     vec3 rd = reflect(-V, wn);
@@ -208,15 +212,15 @@ void main(){
     if(uQuality > 0) refl = mix(refl, withClouds(refl, rd), 0.7);
     // Suspended clay makes bog water an opaque milky brown; sediment swirls drift slowly.
     float silt = fbm(p*0.45 + vec2(t*0.02, -t*0.015));
-    vec3 body = pow(vec3(0.40,0.31,0.20)*(0.8 + 0.35*silt), vec3(2.2));
+    vec3 body = pow(vec3(0.40,0.31,0.20)*(0.8 + 0.35*silt)*mix(1.0, 0.6, smoothstep(0.15, 0.8, vDepth)), vec3(2.2));
     float sh = shadowAt(vWorld, wn);
     vec3 c = body*(kSun*max(uSunDir.y, 0.0)*0.55*sh + vec3(0.32,0.36,0.42));
     c = mix(c, refl, fres*0.55);
     vec3 H = normalize(uSunDir + V);
     c += kSun*pow(max(dot(wn, H), 0.0), 600.0)*1.4*sh;
     // Scum and froth collect along the shoreline.
-    float edge = 1.0 - smoothstep(0.0, 0.07, vDepth);
-    float froth = smoothstep(0.45, 0.75, vnoise(p*9.0 + t*0.1)*0.6 + vnoise(p*23.0)*0.4) * edge;
+    float edge = 1.0 - smoothstep(0.0, 0.04, vDepth);
+    float froth = smoothstep(0.55, 0.8, vnoise(p*9.0 + t*0.1)*0.6 + vnoise(p*23.0)*0.4) * edge;
     c = mix(c, pow(vec3(0.62,0.55,0.44), vec3(2.2))*(kSun*0.35*sh + 0.4), froth*0.8);
     float a = clamp(0.78 + vDepth*3.0, 0.78, 0.97) * (1.0 - edge*0.35);
     frag = vec4(finalize(c, vWorld), a);
@@ -457,7 +461,7 @@ void main(){
   vec2 id = floor(cellW/uSpacing + 0.5);
   vec2 rnd = hash2(id*0.731);
   vec2 wxz = cellW + (rnd - 0.5)*uSpacing;
-  ivec2 tc = clamp(ivec2((wxz - uOrigin)/uCell + 0.5), ivec2(0), ivec2(767));
+  ivec2 tc = clamp(ivec2((wxz - uOrigin)/uCell + 0.5), ivec2(0), ivec2(TN));
   vec2 hw = texelFetch(uHeight, tc, 0).rg;
   vec4 st = texelFetch(uState, tc, 0);
   float cover = smoothstep(0.3, 0.75, st.b)*(1.0 - st.a);       // bare where worn or rutted
@@ -639,7 +643,9 @@ void main(){
 }
 )";
 
-std::string src(const char* body) { return std::string(kHeader) + kCommon + body; }
+std::string src(const char* body) {
+    return std::string(kHeader) + "#define TN " + std::to_string(Terrain::N - 1) + "\n" + kCommon + body;
+}
 
 void extractPlanes(const Mat4& m, float planes[6][4]) {
     for (int i = 0; i < 4; i++) {
@@ -711,8 +717,8 @@ bool Renderer::init(int w, int h) {
     for (int j = 0; j <= CH; j++) addV(float(CH), 1, float(j));
     auto V = [](int i, int j) { return uint32_t(j * (CH + 1) + i); };
     std::vector<uint32_t> idx;
-    const int steps[3] = {1, 2, 4};
-    for (int l = 0; l < 3; l++) {
+    const int steps[4] = {1, 2, 4, 8};
+    for (int l = 0; l < 4; l++) {
         int s = steps[l];
         lods[l].offset = GLuint(idx.size() * 4);
         for (int j = 0; j < CH; j += s)
@@ -964,8 +970,13 @@ void Renderer::loadWorld(World& w) {
             inst.insert(inst.end(), m.m, m.m + 16);
             inst.insert(inst.end(), {1, 1, 1, p->dirt});
         }
-        setInstances(b.mesh, inst.data(), int(g.second.size()), false);
+        setInstances(b.mesh, inst.data(), int(g.second.size()), true);
         b.count = int(g.second.size());
+        b.inst = inst;
+        Vec3 ext = b.mesh.bmax - b.mesh.bmin;
+        b.radius = 0.6f * length(ext);
+        for (auto* p : g.second) b.centers.push_back(p->pos + Vec3{0, 0.5f * (b.mesh.bmin.y + b.mesh.bmax.y) * p->scale, 0});
+        for (auto* p : g.second) b.scales.push_back(p->scale);
         batches.push_back(b);
     }
     CadResult bb = cadBuild("props/barrel.mbcad");
@@ -1020,11 +1031,35 @@ void Renderer::drawTerrain(bool water, const Mat4& vp) {
             if (!aabbVisible(planes, mn, mx)) continue;
             Vec3 ctr = (mn + mx) * 0.5f;
             float d = length(Vec3{ctr.x - cam.x, 0, ctr.z - cam.z});
-            int lod = d < 34.f ? 0 : (d < 80.f ? 1 : 2);
-            if (quality == 0) lod = std::min(2, lod + 1);
+            int lod = d < 34.f ? 0 : (d < 80.f ? 1 : (d < 150.f ? 2 : 3));
+            if (quality == 0) lod = std::min(3, lod + 1);
             glUniform2i(locChunk, cx * CH, cz * CH);
             glDrawElements(GL_TRIANGLES, lods[lod].count, GL_UNSIGNED_INT, (void*)(intptr_t)lods[lod].offset);
         }
+}
+
+// Static props are culled per instance (distance + frustum) and re-uploaded each pass: the map has
+// thousands of trees but only a few hundred are ever in view.
+void Renderer::cullStatic(const Mat4& vp, Vec3 eye, float maxDist) {
+    float planes[6][4];
+    extractPlanes(vp, planes);
+    for (auto& b : batches) {
+        scratch.clear();
+        int n = 0;
+        for (size_t k = 0; k < b.centers.size(); k++) {
+            const Vec3& c = b.centers[k];
+            float r = b.radius * b.scales[k];
+            if (sq(c.x - eye.x) + sq(c.z - eye.z) > sq(maxDist + r)) continue;
+            bool vis = true;
+            for (int pl = 0; pl < 6 && vis; pl++)
+                if (planes[pl][0] * c.x + planes[pl][1] * c.y + planes[pl][2] * c.z + planes[pl][3] < -r * std::sqrt(planes[pl][0] * planes[pl][0] + planes[pl][1] * planes[pl][1] + planes[pl][2] * planes[pl][2])) vis = false;
+            if (!vis) continue;
+            scratch.insert(scratch.end(), b.inst.begin() + long(k * 20), b.inst.begin() + long(k * 20 + 20));
+            n++;
+        }
+        b.visible = n;
+        if (n) setInstances(b.mesh, scratch.data(), n, true);
+    }
 }
 
 void Renderer::drawStatic(GLuint prog) {
@@ -1034,7 +1069,8 @@ void Renderer::drawStatic(GLuint prog) {
     glUniform2f(glGetUniformLocation(prog, "uDirtRange"), -0.45f, 1.0f);
     glUniform1f(glGetUniformLocation(prog, "uSeed"), 7.f);
     glUniform1f(glGetUniformLocation(prog, "uAlpha"), 1.f);
-    for (auto& b : batches) drawMesh(b.mesh, b.count);
+    for (auto& b : batches)
+        if (b.visible) drawMesh(b.mesh, b.visible);
 }
 
 void Renderer::drawDynamic(World& w, const RenderFrame& f, GLuint prog, bool shadowPass, bool transparent) {
@@ -1148,7 +1184,10 @@ void Renderer::render(World& w, const RenderFrame& f) {
     glBindTexture(GL_TEXTURE_2D, 0);
     glUseProgram(progShadow);
     glUniformMatrix4fv(glGetUniformLocation(progShadow, "uVP"), 1, GL_FALSE, lightVP.m);
-    if (quality >= 1) drawStatic(progShadow);
+    if (quality >= 1) {
+        cullStatic(lightVP, center, ext * 1.5f);
+        drawStatic(progShadow);
+    }
     drawDynamic(w, f, progShadow, true);
     glUseProgram(progFence);
     glUniformMatrix4fv(glGetUniformLocation(progFence, "uVP"), 1, GL_FALSE, lightVP.m);
@@ -1228,6 +1267,7 @@ void Renderer::render(World& w, const RenderFrame& f) {
     // Meshes
     setCommon(progMesh);
     glUniformMatrix4fv(glGetUniformLocation(progMesh, "uVP"), 1, GL_FALSE, viewProj.m);
+    cullStatic(viewProj, f.camPos, quality >= 2 ? 260.f : (quality == 1 ? 200.f : 150.f));
     drawStatic(progMesh);
     drawDynamic(w, f, progMesh, false);
 

@@ -339,19 +339,40 @@ function updateHud() {
   }
 }
 
+// Minimap: the C++ overview image of the whole map, north-up, following the player at ~200 m across.
+let mapImg = null, mapSize = 384;
+function ensureMapImage() {
+  if (mapImg || !Module._mb_map_res) return;
+  const n = Module._mb_map_res(), ptr = Module._mb_map_image();
+  if (!n || !ptr) return;
+  mapSize = Module._mb_map_size();
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = n;
+  const img = new ImageData(new Uint8ClampedArray(Module.HEAPU8.buffer, ptr, n * n * 4).slice(), n, n);
+  cv.getContext('2d').putImageData(img, 0, 0);
+  mapImg = cv;
+}
 function drawMinimap() {
+  ensureMapImage();
   const c = $('minimap'), g = c.getContext('2d');
-  const W = c.width, s = W / 192;
+  const W = c.width, view = 200, s = W / view;
   g.clearRect(0, 0, W, W);
-  const P = (x, z) => [W / 2 + x * s, W / 2 + z * s];
-  g.fillStyle = '#3a2a1c'; let [x, y] = P(-40, -43); g.fillRect(x, y, 80 * s, 26 * s);
-  g.beginPath(); [x, y] = P(60, -66); g.arc(x, y, 17 * s, 0, 7); g.fill();
-  g.fillStyle = '#5b6e8a'; g.beginPath(); [x, y] = P(0, 32); g.arc(x, y, 9 * s, 0, 7); g.fill();
-  g.fillStyle = '#ff5a14';
+  g.save();
+  g.beginPath(); g.arc(W / 2, W / 2, W / 2, 0, 7); g.clip();
+  const cx = hud.x || 0, cz = hud.z || 0;
+  if (mapImg) {
+    const k = mapImg.width / mapSize;   // image px per meter
+    g.imageSmoothingEnabled = true;
+    g.drawImage(mapImg, (cx + mapSize / 2 - view / 2) * k, (cz + mapSize / 2 - view / 2) * k, view * k, view * k, 0, 0, W, W);
+  }
+  const P = (x, z) => [W / 2 + (x - cx) * s, W / 2 + (z - cz) * s];
+  let x, y;
   for (const o of hud.others || []) { g.fillStyle = o.ai ? '#e8e2d0' : '#ff5a14'; [x, y] = P(o.x, o.z); g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
-  [x, y] = P(hud.x, hud.z);
+  g.restore();
+  [x, y] = P(cx, cz);
   g.save(); g.translate(x, y); g.rotate(-hud.heading + Math.PI);
-  g.fillStyle = '#f2c418'; g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(-5, 6); g.closePath(); g.fill();
+  g.fillStyle = '#f2c418'; g.strokeStyle = '#000a'; g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(-5, 6); g.closePath(); g.fill(); g.stroke();
   g.restore();
 }
 
