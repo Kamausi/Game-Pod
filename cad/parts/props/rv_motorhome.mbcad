@@ -1,35 +1,160 @@
-# Class-C motorhome 2.5 x 9 x 3.4 m: cutaway cab with cab-over bunk, coach box with windows,
-# entry door on +X, rolled-up awning. Cab faces +Z. Origin at ground centre.
+# Class-C motorhome 2.5 x 9 x 3.4 m: cutaway cab with cab-over bunk, coach box with framed
+# windows, swoosh graphics, basement storage doors, a slide-out on the -X side, entry door with
+# step on +X, rolled awning on arms, roof AC units, vents, ladder and rails, dual rear wheels.
+# Cab faces +Z. Origin at ground centre.
 param stripe_r = 0.60
 param stripe_g = 0.15
 param stripe_b = 0.10
+set W = 2.50
 color #f2f0ea
 material paint
-box size=2.50,2.70,6.6 pos=0,1.95,-1.10 bevel=0.10
+# Coach box and the cab-over bunk / cutaway cab
+box size=W,2.70,6.6 pos=0,1.95,-1.10 bevel=0.10
 extrude depth=2.45 bevel=0.08 pts=2.20,1.40,2.20,3.30,3.40,3.25,3.75,2.80,3.30,2.65,2.20,2.65
 extrude depth=2.20 bevel=0.08 pts=2.20,0.55,2.20,2.30,3.10,2.25,3.95,1.30,4.30,1.05,4.30,0.55
+# Slide-out on the -X side (dinette)
+box size=0.30,1.55,2.40 pos=-W/2-0.13,2.05,-1.30 bevel=0.04
+color #d9d6cd
+box size=0.32,0.06,2.44 pos=-W/2-0.13,2.85,-1.30
+
+# ---- Graphics: swooshes rising toward the rear, a darker under-stripe ----
 color stripe_r stripe_g stripe_b
-box size=2.52,0.20,6.5 pos=0,1.25,-1.10
+box size=W+0.02,0.20,6.5 pos=0,1.25,-1.10
+for k = 0, 2
+  box size=W+0.025,0.10-k*0.02,2.6 pos=0,1.55+k*0.22,-3.0+k*0.25 rot=-9-k*3,0,0
+end
+color stripe_r*0.55 stripe_g*0.55 stripe_b*0.55
+box size=W+0.022,0.07,6.5 pos=0,1.10,-1.10
 extrude depth=2.47 pts=2.20,2.80,2.20,2.95,3.65,2.95,3.75,2.80
+# Cab-over swoosh
+color stripe_r stripe_g stripe_b
+box size=2.47,0.08,1.4 pos=0,2.70,3.0 rot=8,0,0
+
+# ---- Windows: dark glass in black frames ----
 color #111820
 material glass
 extrude depth=2.10 pts=3.12,2.20,3.92,1.35,3.92,1.85,3.12,2.25
-box size=2.52,0.55,1.10 pos=0,2.20,-0.40
-box size=2.52,0.55,0.90 pos=0,2.20,-3.20
 box size=0.03,0.55,0.70 pos=1.11,1.95,3.30 mirror=x
+box size=W+0.02,0.55,1.10 pos=0,2.20,-0.40
+box size=W+0.02,0.55,0.90 pos=0,2.20,-3.20
+box size=0.02,0.50,1.60 pos=-W/2-0.29,2.25,-1.30
+box size=1.30,0.45,0.02 pos=0,2.25,-4.415
+box size=W+0.02,0.32,0.8 pos=0,2.95,3.0
+color #1a1a1a
+material matte
+box size=W+0.03,0.65,1.20 pos=0,2.20,-0.40
+box size=W+0.03,0.65,1.00 pos=0,2.20,-3.20
+box size=0.025,0.60,1.70 pos=-W/2-0.285,2.25,-1.30
+color #111820
+material glass
+box size=W+0.04,0.55,1.10 pos=0,2.20,-0.40
+box size=W+0.04,0.55,0.90 pos=0,2.20,-3.20
+box size=0.03,0.50,1.60 pos=-W/2-0.29,2.25,-1.30
+
+# ---- Basement storage doors with handles ----
+color #e6e3da
+material paint
+for k = 0, 2
+  box size=W+0.02,0.55,1.0 pos=0,0.88,-3.6+k*1.25
+end
+color #9a9c9e
+material steel
+for k = 0, 2
+  box size=W+0.05,0.04,0.12 pos=0,0.98,-3.6+k*1.25
+end
+
+# ---- Entry door (+X) with window, grab handle and fold-out step ----
+color #e8e5dc
+material paint
+box size=0.04,1.90,0.75 pos=1.26,1.55,-2.0
+color #111820
+material glass
+box size=0.05,0.42,0.40 pos=1.27,2.05,-2.0
+color #c9c9c4
+material chrome
+box size=0.06,0.40,0.03 pos=1.31,1.55,-1.58
+color #3a3a3a
+material steel
+box size=0.30,0.04,0.62 pos=1.42,0.38,-2.0
+box size=0.30,0.04,0.62 pos=1.42,0.62,-2.0
+
+# ---- Awning: rolled canvas in the case, support arms ----
 color #2a2a2a
 material matte
-box size=0.04,1.90,0.75 pos=1.26,1.55,-2.0
-cyl r=0.08 h=4.5 axis=z pos=1.24,3.05,-1.4
+cyl r=0.08 h=4.5 axis=z pos=1.24,3.05,-1.4 seg=10
+color #b8bcc0
+material steel
+box size=0.04,1.70,0.05 pos=1.25,2.15,0.75
+box size=0.04,1.70,0.05 pos=1.25,2.15,-3.55
+
+# ---- Roof: AC units, vents, rails, rear ladder ----
+color #ecebe6
+material plastic
+box size=0.75,0.28,1.0 pos=0,3.44,-0.6 bevel=0.08
+box size=0.75,0.28,1.0 pos=0,3.44,-3.2 bevel=0.08
+color #c8c6c0
+for k = 0, 2
+  box size=0.40,0.10,0.40 pos=-0.6,3.35,1.2-k*2.0 bevel=0.03
+end
+color #9a9c9e
+material steel
+for k = 0, 9
+  box size=0.30,0.025,0.025 pos=0.6,0.70+k*0.30,-4.45
+end
+box size=0.03,2.8,0.03 pos=0.75,2.00,-4.45 mirror=x
+box size=0.03,2.8,0.03 pos=0.45,2.00,-4.45
+box size=0.03,0.03,6.2 pos=1.15,3.36,-1.1 mirror=x
+
+# ---- Cab front: grille, headlamps, chrome bumper, mirrors ----
+color #161616
+material matte
+box size=1.30,0.40,0.04 pos=0,0.98,4.31
 color #c6c8ca
 material chrome
 box size=2.10,0.25,0.15 pos=0,0.70,4.30 bevel=0.03
-color #111111
-material rubber
-cyl r=0.40 h=0.25 axis=x pos=1.00,0.40,2.90 mirror=x
-cyl r=0.40 h=0.40 axis=x pos=0.95,0.40,-2.20 mirror=x
+box size=1.32,0.05,0.05 pos=0,1.19,4.32
 color #e8eef2
 material lens
 box size=0.28,0.18,0.04 pos=0.82,0.95,4.29 mirror=x
+color #e08a1a
+box size=0.12,0.06,0.04 pos=0.82,0.82,4.30 mirror=x
+color #1a1a1a
+material matte
+box size=0.06,0.35,0.20 pos=1.32,1.95,3.75 mirror=x bevel=0.02
+box size=0.18,0.03,0.03 pos=1.22,1.90,3.80 mirror=x
+
+# ---- Rear: tail lights, spare tire, bumper ----
 color #b01313
+material lens
 box size=0.10,0.40,0.04 pos=1.15,1.20,-4.41 mirror=x
+color #1e1e1e
+material rubber
+cyl r=0.36 h=0.22 axis=z pos=0,1.25,-4.55 seg=16
+color stripe_r stripe_g stripe_b
+material paint
+cyl r=0.37 h=0.08 axis=z pos=0,1.25,-4.68 seg=16
+color #2a2a2a
+material steel
+box size=2.30,0.16,0.18 pos=0,0.55,-4.48 bevel=0.02
+
+# ---- Wheels: singles up front, duals at the rear; steel rims and hubs ----
+color #111111
+material rubber
+cyl r=0.40 h=0.25 axis=x pos=1.00,0.40,2.90 mirror=x seg=18
+cyl r=0.40 h=0.22 axis=x pos=0.86,0.40,-2.20 mirror=x seg=18
+cyl r=0.40 h=0.22 axis=x pos=1.10,0.40,-2.20 mirror=x seg=18
+color #b8bcc0
+material chrome
+cyl r=0.24 h=0.03 axis=x pos=1.13,0.40,2.90 mirror=x seg=14
+cyl r=0.24 h=0.03 axis=x pos=1.22,0.40,-2.20 mirror=x seg=14
+color #555555
+material steel
+cyl r=0.09 h=0.05 axis=x pos=1.15,0.40,2.90 mirror=x seg=10
+# Black wheel-well shadows and leveling jacks
+color #0a0a0a
+material matte
+box size=W+0.02,0.55,1.05 pos=0,0.52,2.90
+box size=W+0.02,0.55,1.15 pos=0,0.52,-2.20
+color #2a2a2a
+material steel
+box size=0.10,0.40,0.10 pos=1.0,0.25,-4.0 mirror=x

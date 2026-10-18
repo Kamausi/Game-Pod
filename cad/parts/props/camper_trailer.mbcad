@@ -1,45 +1,155 @@
-# Travel trailer 2.4 x 7 x 3 m with rounded ends, stripes, door and windows on +X, awning
-# extended over a mat on +X, A-frame tongue toward +Z, tandem axle. Origin at ground centre.
+# Travel trailer 2.4 x 7 x 3 m: rounded ends, diamond-plate stone guard on the front cap,
+# swoosh graphics, framed windows, entry door with fold-out steps on +X, a striped awning
+# out over a camp mat with two chairs and a cooler, roof AC and vents, rear ladder and bumper,
+# tandem axle with fender skirts, A-frame tongue with propane, battery box and jack.
+# Origin at ground centre, tongue toward +Z.
 param stripe_r = 0.15
 param stripe_g = 0.30
 param stripe_b = 0.55
+set W = 2.40
 color #eeece6
 material paint
-box size=2.40,2.30,6.4 pos=0,1.80,-0.30 bevel=0.30
+box size=W,2.30,6.4 pos=0,1.80,-0.30 bevel=0.30
+# Front cap: smooth fibreglass nose with a diamond-plate stone guard
+color #e2e0d9
+box size=W-0.02,1.70,0.30 pos=0,1.95,2.80 bevel=0.14
+color #b9bcbf
+material steel
+box size=W-0.10,0.55,0.06 pos=0,1.00,2.93 bevel=0.02
+color #a5a9ad
+for k = 0, 7
+  box size=0.10,0.10,0.02 pos=-0.98+k*0.28,1.00,2.965 rot=0,0,45
+end
+
+# ---- Graphics ----
 color stripe_r stripe_g stripe_b
-box size=2.42,0.14,6.0 pos=0,1.40,-0.30
-box size=2.42,0.06,6.0 pos=0,1.62,-0.30
+material paint
+box size=W+0.02,0.14,6.0 pos=0,1.40,-0.30
+box size=W+0.02,0.06,6.0 pos=0,1.62,-0.30
+for k = 0, 2
+  box size=W+0.025,0.09-k*0.02,2.2 pos=0,1.80+k*0.18,-2.30+k*0.2 rot=-12-k*4,0,0
+end
+color stripe_r*0.5 stripe_g*0.5 stripe_b*0.5
+box size=W+0.022,0.04,6.0 pos=0,1.30,-0.30
+
+# ---- Windows: black frames, dark glass, front window under a stone shield ----
+color #1a1a1a
+material matte
+box size=W+0.03,0.60,1.00 pos=0,2.15,0.90
+box size=W+0.03,0.60,1.30 pos=0,2.15,-2.10
+box size=2.20,0.55,0.05 pos=0,2.20,2.93
 color #111820
 material glass
-box size=2.42,0.50,0.90 pos=0,2.15,0.90
-box size=2.42,0.50,1.20 pos=0,2.15,-2.10
-box size=2.10,0.45,0.04 pos=0,2.20,2.91
-color #2a2a2a
-material matte
-box size=0.04,1.85,0.70 pos=1.21,1.55,-0.60
-# Awning on the +X side, poles, mat
+box size=W+0.04,0.50,0.90 pos=0,2.15,0.90
+box size=W+0.04,0.50,1.20 pos=0,2.15,-2.10
+box size=2.10,0.45,0.06 pos=0,2.20,2.94
+box size=0.9,0.40,0.03 pos=0,2.20,-3.52
+
+# ---- Entry door (+X): window, handle, fold-out steps ----
+color #e6e3da
+material paint
+box size=0.04,1.85,0.70 pos=W/2+0.01,1.55,-0.60
+color #111820
+material glass
+box size=0.05,0.40,0.36 pos=W/2+0.02,2.05,-0.60
+color #c9c9c4
+material chrome
+box size=0.06,0.05,0.12 pos=W/2+0.04,1.50,-0.36
+color #3a3a3a
+material steel
+box size=0.30,0.04,0.58 pos=W/2+0.17,0.32,-0.60
+box size=0.30,0.04,0.58 pos=W/2+0.17,0.56,-0.60
+
+# ---- Awning: striped canvas out over a mat, arms, rolled lead rail ----
 color stripe_r stripe_g stripe_b
+material matte
 box size=2.2,0.03,4.0 pos=2.30,2.65,-0.50 rot=0,0,-8
+color #f2f0ea
+for k = 0, 3
+  box size=2.21,0.035,0.24 pos=2.30,2.655,-2.20+k*1.0 rot=0,0,-8
+end
 color #9a9a9a
 material steel
-cyl r=0.025 h=2.6 pos=3.35,1.30,1.45 mirror=z
-cyl r=0.025 h=2.6 pos=3.35,1.30,-2.45
+cyl r=0.025 h=2.6 pos=3.35,1.30,1.45 seg=8
+cyl r=0.025 h=2.6 pos=3.35,1.30,-2.45 seg=8
+cyl r=0.04 h=4.0 axis=z pos=3.38,2.52,-0.50 seg=8
 color #5a7a5a
 material matte
 box size=2.0,0.01,3.6 pos=2.30,0.005,-0.50
-# Tongue, jack, propane tanks
+# Two camp chairs and a cooler on the mat
+color #1d3b6a
+material matte
+for c = 0, 1
+  box size=0.50,0.04,0.48 pos=2.20+c*0.9,0.42,-1.40+c*0.2 rot=0,20-c*40,0
+  box size=0.50,0.50,0.04 pos=2.20+c*0.9,0.68,-1.63+c*0.2 rot=-12,20-c*40,0
+end
+color #6c6c6c
+material steel
+for c = 0, 1
+  cyl r=0.012 h=0.45 pos=2.00+c*0.9,0.22,-1.25+c*0.2 rot=15,0,12 seg=5
+  cyl r=0.012 h=0.45 pos=2.40+c*0.9,0.22,-1.25+c*0.2 rot=15,0,-12 seg=5
+end
+color #c41e1e
+material plastic
+box size=0.55,0.38,0.35 pos=2.70,0.20,0.40 bevel=0.04
+color #f2f2f2
+box size=0.57,0.07,0.37 pos=2.70,0.40,0.40 bevel=0.02
+
+# ---- Roof: AC unit, vents, rear ladder ----
+color #ecebe6
+material plastic
+box size=0.75,0.28,1.0 pos=0,3.05,-0.6 bevel=0.08
+color #c8c6c0
+box size=0.40,0.10,0.40 pos=-0.5,2.98,1.5 bevel=0.03
+box size=0.40,0.10,0.40 pos=-0.5,2.98,-2.6 bevel=0.03
+color #9a9c9e
+material steel
+for k = 0, 7
+  box size=0.30,0.025,0.025 pos=-0.6,0.80+k*0.28,-3.55
+end
+box size=0.03,2.2,0.03 pos=-0.45,1.90,-3.55
+box size=0.03,2.2,0.03 pos=-0.75,1.90,-3.55
+# Rear bumper with the sewer-hose tube, tail lights
+color #2a2a2a
+box size=2.30,0.10,0.10 pos=0,0.62,-3.58
+color #b01313
+material lens
+box size=0.10,0.20,0.03 pos=1.00,1.00,-3.52 mirror=x
+color #e08a1a
+box size=0.06,0.06,0.03 pos=1.00,1.18,-3.52 mirror=x
+
+# ---- Tongue, coupler, jack, propane, battery box ----
 color #2a2a2c
 material steel
 box size=0.10,0.10,1.4 pos=0.30,0.50,3.40 rot=0,10,0
 box size=0.10,0.10,1.4 pos=-0.30,0.50,3.40 rot=0,-10,0
-cyl r=0.035 h=0.50 pos=0,0.25,3.90
+box size=0.16,0.10,0.24 pos=0,0.50,4.05
+cyl r=0.035 h=0.50 pos=0,0.25,3.90 seg=8
+cyl r=0.05 h=0.12 pos=0,0.58,3.90 seg=8
 color #f2f2f2
 material paint
-cyl r=0.15 h=0.45 pos=0.18,0.80,3.25 mirror=x
+cyl r=0.15 h=0.45 pos=0.18,0.80,3.25 mirror=x seg=12
+sphere r=0.15 pos=0.18,1.02,3.25 scale=1,0.5,1 mirror=x seg=8
+color #1a1a1a
+material plastic
+box size=0.34,0.25,0.22 pos=0,0.68,3.60 bevel=0.02
+
+# ---- Running gear: tandem axle, rims, fender skirts, stabilizer jacks ----
 color #111111
 material rubber
-cyl r=0.34 h=0.22 axis=x pos=1.05,0.34,-0.10 mirror=x
-cyl r=0.34 h=0.22 axis=x pos=1.05,0.34,-0.90 mirror=x
-color #b01313
-material lens
-box size=0.10,0.20,0.03 pos=1.00,1.00,-3.52 mirror=x
+cyl r=0.34 h=0.22 axis=x pos=1.05,0.34,-0.10 mirror=x seg=16
+cyl r=0.34 h=0.22 axis=x pos=1.05,0.34,-0.90 mirror=x seg=16
+color #c4c6c8
+material chrome
+cyl r=0.20 h=0.03 axis=x pos=1.17,0.34,-0.10 mirror=x seg=12
+cyl r=0.20 h=0.03 axis=x pos=1.17,0.34,-0.90 mirror=x seg=12
+color #d8d6cf
+material paint
+box size=0.05,0.10,1.75 pos=W/2+0.01,0.78,-0.50 mirror=x
+color #0a0a0a
+material matte
+box size=W+0.02,0.48,1.65 pos=0,0.60,-0.50
+color #2a2a2a
+material steel
+box size=0.08,0.50,0.08 pos=1.0,0.30,2.40 mirror=x rot=20,0,0
+box size=0.08,0.50,0.08 pos=1.0,0.30,-3.20 mirror=x rot=-20,0,0
