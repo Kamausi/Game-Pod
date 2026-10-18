@@ -798,6 +798,14 @@ int main(int argc, char** argv) {
         float dry = sink(0.f), wet = sink(1.f);
         std::printf("    parked rut: dry %.3f m, soaked %.3f m\n", dry, wet);
         CHECK(wet < dry, "soaked ground gives way more under a parked truck");
+        // The pit and the bounty trench fill up.
+        float pit0 = w.terrain.sample(0, w.laneZ(1)).waterDepth, b0 = w.terrain.sample(w.bountyCenter().x, w.bountyZ).waterDepth;
+        w.setRainRise(0.18f);
+        float pit1 = w.terrain.sample(0, w.laneZ(1)).waterDepth, b1 = w.terrain.sample(w.bountyCenter().x, w.bountyZ).waterDepth;
+        std::printf("    pit water %.2f -> %.2f m, bounty %.2f -> %.2f m (%zu pool cells)\n", pit0, pit1, b0, b1, w.rainPools.size());
+        CHECK(pit1 > pit0 + 0.15f && b1 > b0 + 0.15f, "rain fills the pools");
+        w.setRainRise(0.f);
+        CHECK(std::fabs(w.terrain.sample(0, w.laneZ(1)).waterDepth - pit0) < 0.01f, "and they drain back");
         w.terrain.rainWet = 0;
     });
 

@@ -50,6 +50,9 @@ public:
     float weather[4] = {0, 0, 0, 0};       // cloud cover, ground wetness, rain, golden hour
     Vec3 sunColor{3.1f, 2.883f, 2.542f};
     float flash = 0;                       // lightning
+    float night = 0;                       // 0 day .. 1 night
+    struct Light { Vec3 pos; float range; Vec3 color; Vec3 dir; float cosCone; };   // cosCone -1 = point
+    std::vector<Light> lights;             // up to 16, refreshed by the game each frame
     void setSun(float azimuthDeg, float elevationDeg);
     Mat4 viewProj;
 

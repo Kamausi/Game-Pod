@@ -105,6 +105,11 @@ public:
     // Weekend campground through the east tree-line gap.
     Vec3 campMin{98, 0, -4}, campMax{130, 0, 38};
     bool builtUp(float x, float z) const;   // grounds where no brush/trees grow
+    // Rain fills the venue's pools (bog pit, pond, bowl puddle, bounty trench): their water
+    // surfaces rise by up to ~18 cm with a fully soaked map.
+    std::vector<std::pair<int, float>> rainPools;   // cell index, dry-weather water level
+    float poolRise = 0;
+    void setRainRise(float r);
     // Overview image for the minimap (RGBA, overviewN^2, north = -z up).
     std::vector<uint8_t> overview;
     int overviewN = 256;

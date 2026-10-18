@@ -219,6 +219,7 @@ void Game::action(const std::string& a) {
         timeOfDay = std::atoi(a.c_str() + 4);
         if (timeOfDay == 1) renderer.setSun(200.f, 58.f);
         else if (timeOfDay == 2) renderer.setSun(242.f, 9.f);
+        else if (timeOfDay == 3) renderer.setSun(150.f, 42.f);   // the moon
         else renderer.setSun(219.f, 41.f);   // mid-afternoon from the south-west (the default)
     }
     else if (a.rfind("dirt:", 0) == 0) player.dirt = clampf(float(std::atof(a.c_str() + 5)), 0.f, 1.f);  // photo mode
@@ -530,6 +531,7 @@ void Game::updateWeather(float dt) {
     rainAmt += clampf(rainT * smoothstep(0.7f, 1.f, cloudCover) - rainAmt, -dt * 0.2f, dt * 0.1f);
     float& wet = world.terrain.rainWet;
     wet = rainAmt > 0.05f ? std::min(1.f, wet + dt * rainAmt / 150.f) : std::max(0.f, wet - dt / 500.f);
+    world.setRainRise(0.18f * wet);
     float golden = timeOfDay == 2 ? 1.f : 0.f;
     renderer.weather[0] = cloudCover;
     renderer.weather[1] = wet;
@@ -551,6 +553,36 @@ void Game::updateWeather(float dt) {
     }
     // Sun: warm and low at golden hour, dimmed and cooled by cloud.
     Vec3 sun = golden > 0 ? Vec3{3.0f, 2.2f, 1.45f} : (timeOfDay == 1 ? Vec3{3.2f, 3.05f, 2.8f} : Vec3{3.1f, 2.883f, 2.542f});
+    bool nightTime = timeOfDay == 3;
+    if (nightTime) sun = Vec3{0.16f, 0.2f, 0.3f};   // moonlight
+    renderer.night = nightTime ? 1.f : 0.f;
+    renderer.lights.clear();
+    if (nightTime) {
+        // Headlights: a pair of spots on every truck in play (player first).
+        auto heads = [&](const Vehicle& v, float power) {
+            Vec3 f = v.forward(), l = v.left();
+            Vec3 dir = normalize(f - v.up() * 0.12f);
+            for (int s = -1; s <= 1; s += 2) {
+                Vec3 p = v.pos + f * (v.body->dims[2] * 0.5f + 0.1f) + l * (float(s) * v.body->dims[0] * 0.32f) + v.up() * (v.body->bellyY + 0.45f);
+                renderer.lights.push_back({p, 45.f, Vec3{9.f, 8.6f, 7.6f} * power, dir, 0.86f});
+            }
+        };
+        if (state == AppState::Playing || state == AppState::Garage) heads(player, 1.f);
+        for (auto& a : ais) if (renderer.lights.size() < (renderer.quality >= 1 ? 8u : 2u)) heads(a.v, 0.8f);
+        // Venue floods: the nearest light towers to the camera.
+        std::vector<std::pair<float, const PropInstance*>> towers;
+        for (const PropInstance& p : world.props)
+            if (p.part == "venue/light_tower.mbcad") towers.push_back({length(p.pos - camPos), &p});
+        std::sort(towers.begin(), towers.end(), [](auto& x, auto& y) { return x.first < y.first; });
+        const size_t maxLights = renderer.quality >= 2 ? 16 : (renderer.quality == 1 ? 10 : 5);   // phones: fewer
+        for (auto& t : towers) {
+            if (renderer.lights.size() >= maxLights) break;
+            const PropInstance& p = *t.second;
+            Vec3 fwd{std::sin(p.yaw), 0, std::cos(p.yaw)};
+            Vec3 lamp = p.pos + Vec3{0, 7.2f, 0} + fwd * 0.3f;
+            renderer.lights.push_back({lamp, 60.f, Vec3{60.f, 56.f, 48.f}, normalize(fwd * 0.75f - Vec3{0, 1, 0}), 0.45f});
+        }
+    }
     float dim = 1.f - 0.72f * cloudCover;
     renderer.sunColor = lerp(sun * dim, Vec3{1.0f, 1.05f, 1.15f} * dim, cloudCover * 0.6f);
     if (rainAmt > 0.02f) {

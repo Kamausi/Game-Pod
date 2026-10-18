@@ -27,6 +27,14 @@ uniform mat4 uLightVP;
 uniform vec3 uSunColor;
 uniform vec4 uWeather;   // x cloud cover, y ground wetness (rain soak), z rain intensity, w golden hour
 uniform float uFlash;    // lightning flash 0..1
+uniform float uNight;    // 0 day .. 1 night (moonlight, dark ambient, lights on)
+float gStars = 0.0;      // only the sky dome itself draws stars (not reflections)
+// Local lights at night: light-tower floods and headlights (spots). pos.w = range,
+// col.rgb = intensity, dir.xyz = spot axis, dir.w = cos of the cone edge (-1 = point light).
+uniform int uNumLights;
+uniform vec4 uLightPos[16];
+uniform vec4 uLightCol[16];
+uniform vec4 uLightDir[16];
 float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
 vec2 hash2(vec2 p){ return vec2(hash(p), hash(p+19.19)); }
 float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
@@ -77,7 +85,7 @@ vec3 withClouds(vec3 c, vec3 d){
   if(den <= 0.0) return c;
   float toward = cloudDensity(q + uSunDir.xz*55.0);              // self-shadowing toward the sun
   float lit = clamp(1.0 - (toward - den)*1.6 - den*0.35, 0.0, 1.0);
-  vec3 col = mix(vec3(0.50,0.53,0.60), vec3(1.05,1.01,0.95), lit)*(1.0 - 0.5*uWeather.x);
+  vec3 col = mix(vec3(0.50,0.53,0.60), vec3(1.05,1.01,0.95), lit)*(1.0 - 0.5*uWeather.x)*(1.0 - 0.94*uNight);
   col = mix(col, col*vec3(1.3,0.95,0.75), uWeather.w);
   col += vec3(1.0,0.9,0.7)*pow(max(dot(d, uSunDir), 0.0), 12.0)*0.5*(1.0 - den);   // silver lining
   float fade = smoothstep(0.015, 0.16, d.y);
@@ -89,10 +97,17 @@ vec3 skyColor(vec3 d){
   vec3 c = mix(hor, zen, pow(t, 0.5));
   float s = max(dot(d, uSunDir), 0.0);
   c = mix(c, c*vec3(1.35,0.92,0.62) + vec3(0.12,0.04,0.0), uWeather.w*(1.0 - pow(t, 0.35)));   // golden-hour horizon
-  c += (vec3(1.0,0.92,0.75)*pow(s, 900.0)*20.0 + vec3(1.0,0.85,0.6)*pow(s, 6.0)*(0.14 + 0.3*uWeather.w))*(1.0 - uWeather.x);
+  c += (vec3(1.0,0.92,0.75)*pow(s, 900.0)*20.0 + vec3(1.0,0.85,0.6)*pow(s, 6.0)*(0.14 + 0.3*uWeather.w))*(1.0 - uWeather.x)*(1.0 - uNight);
   c = mix(c, vec3(0.55,0.58,0.63)*(1.0 - 0.32*uWeather.z), uWeather.x*0.85);              // overcast / rain
   c += vec3(0.75,0.8,0.95)*uFlash*1.6;
   if(d.y < 0.0) c = mix(hor, vec3(0.35,0.33,0.28), clamp(-d.y*4.0, 0.0, 1.0));
+  if(uNight > 0.0){
+    vec3 nightSky = d.y < 0.0 ? vec3(0.02,0.022,0.03) : mix(vec3(0.035,0.045,0.08), vec3(0.006,0.009,0.025), pow(t, 0.4));
+    vec2 sp = d.xz/(d.y + 0.25)*260.0;
+    float star = gStars*step(0.9975, hash(floor(sp)))*smoothstep(0.02, 0.2, d.y)*(1.0 - uWeather.x);
+    nightSky += vec3(0.9,0.92,1.0)*star*0.8 + vec3(0.8,0.85,0.95)*pow(s, 1800.0)*6.0;   // stars + moon
+    c = mix(c, nightSky, uNight);
+  }
   return c;
 }
 #define kSun uSunColor
@@ -114,6 +129,25 @@ vec3 grassColor(vec2 p){
 float D_GGX(float NoH, float a){ float a2 = a*a; float d = NoH*NoH*(a2-1.0)+1.0; return a2/(3.14159*d*d); }
 float V_Smith(float NoV, float NoL, float a){ float k = a*0.5; return 0.25/((NoV*(1.0-k)+k)*(NoL*(1.0-k)+k)); }
 vec3 F_Schlick(vec3 f0, float VoH){ return f0 + (1.0-f0)*pow(1.0-VoH, 5.0); }
+// Point/spot lights (no shadows): Lambert + GGX, smooth range falloff.
+vec3 localLights(vec3 diffAlb, vec3 f0, vec3 n, vec3 wp, vec3 V, float a){
+  vec3 sum = vec3(0.0);
+  for(int i = 0; i < 16; i++){
+    if(i >= uNumLights) break;
+    vec3 Lv = uLightPos[i].xyz - wp;
+    float d2 = dot(Lv, Lv), r = uLightPos[i].w;
+    if(d2 > r*r) continue;
+    vec3 L = Lv*inversesqrt(d2);
+    float NoL = max(dot(n, L), 0.0);
+    if(NoL <= 0.0) continue;
+    float fall = 1.0 - d2/(r*r); fall *= fall;
+    float spot = uLightDir[i].w < -0.5 ? 1.0 : smoothstep(uLightDir[i].w, uLightDir[i].w + 0.08, dot(-L, uLightDir[i].xyz));
+    vec3 H = normalize(L + V);
+    vec3 spec = D_GGX(max(dot(n, H), 0.0), a)*V_Smith(max(dot(n, V), 1e-3), NoL, a)*F_Schlick(f0, max(dot(V, H), 0.0));
+    sum += (diffAlb + spec*3.14159)*uLightCol[i].rgb*NoL*fall*spot/(1.0 + d2*0.05);
+  }
+  return sum;
+}
 // One shading model for every surface. rough is perceptual roughness, ao attenuates indirect.
 vec3 pbr(vec3 alb, vec3 n, vec3 wp, float rough, float metal, float sh, float ao){
   vec3 V = normalize(uCamPos - wp), L = uSunDir, H = normalize(L + V);
@@ -124,7 +158,8 @@ vec3 pbr(vec3 alb, vec3 n, vec3 wp, float rough, float metal, float sh, float ao
   vec3 spec = D_GGX(NoH, a)*V_Smith(NoV, NoL, a)*F;
   vec3 diff = alb*(1.0-metal)*(1.0-F)/3.14159;
   vec3 direct = (diff*3.14159 + spec*3.14159)*kSun*NoL*sh;
-  vec3 amb = mix(vec3(0.30,0.25,0.18), vec3(0.42,0.55,0.82), n.y*0.5+0.5)*0.6;
+  vec3 amb = mix(vec3(0.30,0.25,0.18), vec3(0.42,0.55,0.82), n.y*0.5+0.5)*0.6*mix(1.0, 0.06, uNight);
+  direct += localLights(alb*(1.0-metal), f0, n, wp, V, a);
   // Grazing-angle reflection fades with roughness (microfacet masking) so satin surfaces don't mirror the sky.
   vec3 Fr = f0 + (1.0 - f0)*pow(1.0-NoV, 5.0)*(1.0-rough)*(1.0-rough);
   vec3 R = reflect(-V, n);
@@ -229,7 +264,7 @@ void main(){
     float silt = fbm(p*0.45 + vec2(t*0.02, -t*0.015));
     vec3 body = pow(vec3(0.40,0.31,0.20)*(0.8 + 0.35*silt)*mix(1.0, 0.6, smoothstep(0.15, 0.8, vDepth)), vec3(2.2));
     float sh = shadowAt(vWorld, wn);
-    vec3 c = body*(kSun*max(uSunDir.y, 0.0)*0.55*sh + vec3(0.32,0.36,0.42));
+    vec3 c = body*(kSun*max(uSunDir.y, 0.0)*0.55*sh + vec3(0.32,0.36,0.42)*mix(1.0, 0.06, uNight)) + localLights(body, vec3(0.02), wn, vWorld, V, 0.05);
     c = mix(c, refl, fres*0.55);
     vec3 H = normalize(uSunDir + V);
     c += kSun*pow(max(dot(wn, H), 0.0), 600.0)*1.4*sh;
@@ -455,7 +490,7 @@ void main(){
     c += coat*(envColor(R, 0.04)*Fc*clamp(1.0 + dot(R, n), 0.0, 1.0)*ao*0.75 +
                kSun*D_GGX(max(dot(n, H), 0.0), 0.06*0.06)*V_Smith(NoV, NoL, 0.0036)*Fc*NoL*sh*3.14159);
   }
-  c += alb*glow;
+  c += alb*glow*(1.0 + 7.0*uNight);
   if(leafT > 0.0){
     // Light through thin leaves when looking toward the sun.
     vec3 V1 = normalize(uCamPos - vWorld);
@@ -526,8 +561,8 @@ void main(){
   float sh = shadowAt(vWorld, vec3(0.0, 1.0, 0.0));
   float ndl = abs(dot(n, uSunDir))*0.6 + 0.4*max(uSunDir.y, 0.0);
   float trans = pow(max(dot(-V, uSunDir), 0.0), 4.0)*0.6;
-  vec3 amb = vec3(0.36,0.42,0.50)*0.65*(0.45 + 0.55*vT);
-  vec3 c = alb*(kSun*(ndl + trans)*sh + amb);
+  vec3 amb = vec3(0.36,0.42,0.50)*0.65*(0.45 + 0.55*vT)*mix(1.0, 0.06, uNight);
+  vec3 c = alb*(kSun*(ndl + trans)*sh + amb) + localLights(alb, vec3(0.04), vec3(0.0, 1.0, 0.0), vWorld, V, 0.6);
   frag = vec4(finalize(c, vWorld), 1.0);
 }
 )";
@@ -546,6 +581,7 @@ in vec2 vNdc; uniform mat4 uInvVP; out vec4 frag;
 void main(){
   vec4 a = uInvVP*vec4(vNdc, -1.0, 1.0), b = uInvVP*vec4(vNdc, 1.0, 1.0);
   vec3 d = normalize(b.xyz/b.w - a.xyz/a.w);
+  gStars = 1.0;
   vec3 c = withClouds(skyColor(d), d);
   c = c*(2.51*c+0.03)/(c*(2.43*c+0.59)+0.14);
   frag = vec4(pow(clamp(c,0.0,1.0), vec3(1.0/2.2)), 1.0);
@@ -598,7 +634,7 @@ void main(){
   if(soft){
     a *= smoothstep(1.0, 0.2, d)*(0.7 + 0.3*vnoise(vUV*3.0 + vSeed*9.0));
     if(a < 0.01) discard;
-    vec3 c = alb*(kSun*0.45*(0.5 + 0.5*max(uSunDir.y, 0.0)) + vec3(0.35,0.42,0.55)*0.7);
+    vec3 c = alb*(kSun*0.45*(0.5 + 0.5*max(uSunDir.y, 0.0)) + vec3(0.35,0.42,0.55)*0.7*mix(1.0, 0.08, uNight));
     frag = vec4(finalize(c, vWorld), a);
     return;
   }
@@ -1208,6 +1244,21 @@ void Renderer::render(World& w, const RenderFrame& f) {
         glUniform3f(glGetUniformLocation(p, "uSunColor"), sunColor.x, sunColor.y, sunColor.z);
         glUniform4f(glGetUniformLocation(p, "uWeather"), weather[0], weather[1], weather[2], weather[3]);
         glUniform1f(glGetUniformLocation(p, "uFlash"), flash);
+        glUniform1f(glGetUniformLocation(p, "uNight"), night);
+        int nl = int(std::min<size_t>(16, lights.size()));
+        glUniform1i(glGetUniformLocation(p, "uNumLights"), nl);
+        if (nl) {
+            float lp[64], lc[64], ld[64];
+            for (int i = 0; i < nl; i++) {
+                const Light& L = lights[size_t(i)];
+                lp[i * 4] = L.pos.x; lp[i * 4 + 1] = L.pos.y; lp[i * 4 + 2] = L.pos.z; lp[i * 4 + 3] = L.range;
+                lc[i * 4] = L.color.x; lc[i * 4 + 1] = L.color.y; lc[i * 4 + 2] = L.color.z; lc[i * 4 + 3] = 0;
+                ld[i * 4] = L.dir.x; ld[i * 4 + 1] = L.dir.y; ld[i * 4 + 2] = L.dir.z; ld[i * 4 + 3] = L.cosCone;
+            }
+            glUniform4fv(glGetUniformLocation(p, "uLightPos"), nl, lp);
+            glUniform4fv(glGetUniformLocation(p, "uLightCol"), nl, lc);
+            glUniform4fv(glGetUniformLocation(p, "uLightDir"), nl, ld);
+        }
     };
 
     // ---- shadow pass ----

@@ -862,7 +862,26 @@ void World::generate(uint32_t seed) {
         addParked("vehicles/comanche.mbcad", r2.x, r2.z, -0.6f, 1.29f, -1.58f, 1.47f, -0.42f, 0.4445f, 0.9f, {{"paint_r", 0.2f}, {"paint_g", 0.3f}, {"paint_b", 0.45f}});
         boxCol(r2, {0.9f, 0.8f, 2.3f}, -0.6f);
     }
+    // Remember the venue pools' dry-weather levels so rain can raise them.
+    rainPools.clear();
+    poolRise = 0;
+    for (int j = 0; j < Terrain::N; j++)
+        for (int i = 0; i < Terrain::N; i++) {
+            Vec3 c = T.cellToWorld(i, j);
+            if (c.x < -50 || c.x > 130 || c.z < -95 || c.z > 45) continue;
+            int k = T.idx(i, j);
+            if (T.water[k] > Terrain::NO_WATER + 1) rainPools.push_back({k, T.water[k]});
+        }
     buildOverview();
+}
+
+void World::setRainRise(float r) {
+    if (std::fabs(r - poolRise) < 0.01f) return;   // only re-upload in centimetre steps
+    poolRise = r;
+    for (auto& p : rainPools) {
+        terrain.water[p.first] = p.second + r;
+        terrain.dirty.add(p.first % Terrain::N, p.first / Terrain::N);
+    }
 }
 
 void World::buildOverview() {
