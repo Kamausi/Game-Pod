@@ -48,6 +48,7 @@ void ModeRunner::resetToSpawn(World& w, Vehicle& v) {
     Vec3 p = spawnFor(w, lane, yaw);
     p.y = w.terrain.heightAt(p.x, p.z) - v.rideAxleY + v.wheels[0].radius + 0.25f;
     v.reset(p, yaw);
+    v.placeOnGround(w.terrain);
 }
 
 void ModeRunner::start(ModeId m, World& w, Vehicle& v, int ln, double at) {
@@ -115,6 +116,7 @@ void ModeRunner::requestTow(World& w, Vehicle& v) {
     float yaw = std::atan2(fwd.x, fwd.z);
     float keepDirt = v.dirt;
     v.reset(best, yaw);
+    v.placeOnGround(w.terrain);
     v.dirt = keepDirt;
     if (id == ModeId::Circuit) penalty += 10.f;
     if (id == ModeId::Freestyle) { score = std::max(0.f, score - 250.f); combo = 1; }

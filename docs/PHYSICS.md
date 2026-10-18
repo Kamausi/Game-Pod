@@ -14,16 +14,32 @@ q  ← normalize(q + ½ (ω ⊗ q) dt)
 I  = m/12 · (h²+l², w²+l², w²+h²)
 ```
 
-## Suspension (raycast spring–damper per corner)
+## Suspension (quarter car per corner)
+Each corner is a two-mass system: the chassis (sprung mass) and a wheel end (tire + wheel + brake +
+half a solid axle, `m_u ≈ 60–110 kg`) that slides on the strut axis.
 ```
-F_s = k·c + d·ċ  (+ bump stop k_b·(c − 0.9·travel) beyond 90 % travel)
-k   = (m g / 4) / (0.38 · travel)          static sag = 38 % of travel
-d   = 2 ζ √(k · m/4),  ζ = 0.42
+tire:    F_t = k_t·δ + 2ζ_t√(k_t m_u)·δ̇        k_t = 1.6e5 (psi/25)^0.85,  rim strike past 0.55·sidewall
+spring:  F_s = k·c + d(ċ)·ċ + F_stop + F_arb     k = W_corner / (0.38·travel)  (per-axle weight split)
+damper:  d = 0.28·d_crit in bump, 0.80·d_crit in rebound
+stop:    hydraulic over the last 25 % of travel: k·travel(1.5x + 6x³) + 7 d_bump x ċ   (x = 0..1)
+arb:     front 0.45 k, rear 0.20 k on the left/right compression difference
+wheel:   m_u (s̈) = F_s − F_t + m_u (a_chassis · up)          semi-implicit at 240 Hz
 ```
-Compression rate is limited to 3 m/s so ground that "appears" under a wheel (refilling ruts, berms)
-can't produce a force spike. The tire is sampled as a **cylinder**: 5 points along the rolling
-direction offset by the wheel curvature `r − √(r² − Δx²)` plus 2 across the tread; the highest
-support wins, so tires straddle holes and climb rut walls.
+Ground that appears inside a wheel (rut walls, hole edges) beyond what the rubber can take pushes the
+wheel up the strut kinematically instead of producing a force spike, and tire damping rises with
+how soupy the ground is (slurry is a huge damper). The tire is sampled as a **cylinder**: 5 points
+along the rolling direction offset by the wheel curvature `r − √(r² − Δx²)` plus 2 across the tread;
+the highest support wins, so tires straddle holes and climb rut walls.
+
+Firm-ground grip has **load sensitivity**, `μ_eff = μ·clamp(1 − 0.22(F_z/F_z,static − 1), 0.65, 1.15)`, so
+weight transfer costs grip and roll-stiffness balance shapes the handling; crawling tires get a
+static-friction term so parked trucks don't creep. Steering lock tapers with speed
+(`0.62 / (1 + (v/8)^1.3)` rad, ≥ 0.09). With all four wheels airborne a mild sim-cade assist bleeds
+pitch/roll rate. Paddle tires add **paddle-wheel thrust** in soup and water,
+`0.5 ρ C_d A_buried v_slip|v_slip|`.
+
+`mb_tests --probe [cfg]` prints a handling report (0–60, braking, cornering g and roll, lane change,
+drop, whoops, hill climbs, parked on slopes); `mb_tests --bog "<cfg>"` drives real bog lanes.
 
 ## Contact patch from air pressure
 ```
@@ -117,5 +133,8 @@ inertia-weighted averaging of wheel speeds after integration.
 
 ## Verified behaviours (`tests/test_main.cpp`)
 * Stock rig (31" A/T, open diffs, 2WD) in soup: < 3 m of progress, digs ≥ 15 cm hole, no rollover.
-* Water-topped pit: stock 28 m < default Comanche 50 m < built (40" paddles, lockers, 454) clears 60 m.
+* Water-topped pit: stock < default Comanche < built (40" paddles, lockers, 454) clears 60 m.
+* Mud bog: the starter Comanche bogs down (~40–50 m of 80 in every lane); paddle builds make full passes.
+* Handling: climbs 20° grass, recovers from a 45 mph lane change, survives 36 cm whoops at 22 mph,
+  parked trucks hold on a 15° side slope.
 * Firm ground: > 12 m/s in 5 s, stays upright, brakes to a stop then rolls into reverse.

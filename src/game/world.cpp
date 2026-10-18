@@ -30,22 +30,24 @@ void World::generate(uint32_t seed) {
     auto natural = [&](float x, float z) { return (fbm(x * 0.011f + 3.1f, z * 0.011f - 7.4f, 4, seed) - 0.5f) * 1.8f; };
     const float hPit = natural(0, pitZ), hBowl = natural(bowlCenter.x, bowlCenter.z);
     const float hPond = natural(pondCenter.x, pondCenter.z);
-    Vec2 pools[3] = {{-12, pitZ + 4}, {9, pitZ - 5}, {24, pitZ + 2}};
     // Sinkholes staggered down every lane (own RNG so the rest of the layout is unchanged):
     // deep, water-filled pockets of soft slop that catch a front axle and stop a stock rig.
     struct Hole { float x, z, r, depth; };
     std::vector<Hole> holes;
     {
         Rng hr(seed * 31u + 7u);
-        for (int l = 0; l < lanes; l++) {
-            float x = pitX0 + 9.f + hr.range(0.f, 5.f);
-            while (x < pitX1 - 6.f) {
-                holes.push_back({x, laneZ(l) + hr.range(-1.0f, 1.0f), hr.range(1.5f, 2.4f), hr.range(0.38f, 0.62f)});
-                x += hr.range(6.f, 10.f);
-            }
-        }
-        for (int k = 0; k < 18; k++)   // stray mounds of spoil and old clods, negative depth = hump
-            holes.push_back({hr.range(pitX0 + 4, pitX1 - 4), pitZ + hr.range(-pitHalfW + 1, pitHalfW - 1), hr.range(1.0f, 2.0f), -hr.range(0.18f, 0.32f)});
+        // Same hole pattern in every lane, so a drag race is fair and difficulty is consistent.
+        struct Slot { float x, dz, r, d; };
+        std::vector<Slot> slots;
+        for (float x = pitX0 + 9.f + hr.range(0.f, 3.f); x < pitX1 - 6.f; x += hr.range(6.5f, 8.5f))
+            slots.push_back({x, hr.range(-0.6f, 0.6f), hr.range(1.9f, 2.3f), hr.range(0.52f, 0.62f)});
+        for (int l = 0; l < lanes; l++)
+            for (const Slot& sl : slots) holes.push_back({sl.x, laneZ(l) + sl.dz, sl.r, sl.d});
+        // Spoil mounds (negative depth = hump), also mirrored into every lane.
+        std::vector<Slot> mounds;
+        for (int k = 0; k < 4; k++) mounds.push_back({hr.range(pitX0 + 8, pitX1 - 8), hr.range(-2.2f, 2.2f), hr.range(1.0f, 1.6f), -hr.range(0.18f, 0.3f)});
+        for (int l = 0; l < lanes; l++)
+            for (const Slot& m : mounds) holes.push_back({m.x, laneZ(l) + m.dz, m.r, m.d});
     }
 
     for (int j = 0; j < Terrain::N; j++)
@@ -72,13 +74,14 @@ void World::generate(uint32_t seed) {
             float tp = tx * tz;
             if (tp > 0) {
                 float floor = hPit - 0.42f + (n1 - 0.5f) * 0.16f;
-                for (auto& pl : pools) floor -= 0.38f * gauss(sq(x - pl.x) + sq(z - pl.y), 4.f);
+                for (int l = 0; l < lanes; l++)   // one old wallow per lane, same spot in each
+                    floor -= 0.3f * gauss(sq(x - (pitX0 + 0.42f * (pitX1 - pitX0))) + sq(z - laneZ(l)), 3.f);
                 // Whoops: humps across the lanes that unload the tires on every crest.
                 float along = (x - pitX0) / (pitX1 - pitX0);
                 floor += 0.22f * std::sin(x * (2 * PI / 6.2f) + n1 * 2.5f) * smoothstep(0.06f, 0.2f, along) * (0.6f + 0.6f * n2);
                 // The middle third is the soup: the floor falls away under deeper water and softer slop.
                 float soup = smoothstep(0.28f, 0.45f, along) * (1.f - smoothstep(0.78f, 0.92f, along));
-                floor -= 0.2f * soup;
+                floor -= 0.32f * soup;
                 // Old ruts from earlier runs pull the tires into the lane's grooves.
                 float soft = 0;
                 for (int l = 0; l < lanes; l++) {

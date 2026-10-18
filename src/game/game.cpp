@@ -75,6 +75,7 @@ void Game::setState(AppState s) {
                 Vec3 p = world.garageSpot;
                 p.y = world.terrain.heightAt(p.x, p.z) - player.rideAxleY + player.wheels[0].radius + 0.1f;
                 player.reset(p, PI * 0.5f);
+                player.placeOnGround(world.terrain);
             }
         }
     }
@@ -103,6 +104,7 @@ void Game::startMode(ModeId m, int lane, double startAt) {
             Vec3 p = mode.spawnFor(world, a.lane, yaw);
             p.y = world.terrain.heightAt(p.x, p.z) - a.v.rideAxleY + a.v.wheels[0].radius + 0.25f;
             a.v.reset(p, yaw);
+            a.v.placeOnGround(world.terrain);
             a.v.gear = 0;
             a.v.manual = true;
             VehicleVisual vis;
@@ -126,6 +128,7 @@ void Game::action(const std::string& a) {
             p.y = world.terrain.heightAt(p.x, p.z) - player.rideAxleY + player.wheels[0].radius + 1.0f;
             float d = player.dirt;
             player.reset(p, yaw);
+            player.placeOnGround(world.terrain);
             player.dirt = d;
         }
     } else if (a == "camera") camMode = (camMode + 1) % 3;
@@ -159,6 +162,7 @@ void Game::action(const std::string& a) {
         std::sscanf(a.c_str() + 5, "%f,%f,%f", &x, &z, &yaw);
         Vec3 p{x, world.terrain.heightAt(x, z) - player.rideAxleY + player.wheels[0].radius + 0.2f, z};
         player.reset(p, yaw * DEG);
+        player.placeOnGround(world.terrain);
         camPos = p + Vec3{-std::sin(yaw * DEG) * 8.f, 3.f, -std::cos(yaw * DEG) * 8.f};
     }
 }

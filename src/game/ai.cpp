@@ -143,6 +143,7 @@ void aiProgress(AiDriver& ai, ModeId mode, const World& w, float dt, float elaps
                 Vec3 p{cp.x, 0, cp.z};
                 p.y = w.terrain.heightAt(p.x, p.z) - v.rideAxleY + v.wheels[0].radius + 0.3f;
                 v.reset(p, std::atan2(dir.x, dir.z));
+                v.placeOnGround(w.terrain);
                 ai.tows++;
                 passed = true;
             }

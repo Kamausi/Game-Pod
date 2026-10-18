@@ -100,8 +100,18 @@ static float runBog(const VehicleConfig& c, int lane, float secs, bool rock) {
     return best;
 }
 
+#include "probe.inc"
+
 int main(int argc, char** argv) {
     cadSetRoot("cad/parts");
+    if (argc > 1 && std::string(argv[1]) == "--whoops") { debugWhoops(argc > 2 ? VehicleConfig::parse(argv[2]) : VehicleConfig{}); return 0; }
+    if (argc > 1 && std::string(argv[1]) == "--bogdbg") { debugBog(argc > 2 ? VehicleConfig::parse(argv[2]) : VehicleConfig{}); return 0; }
+    if (argc > 1 && std::string(argv[1]) == "--lane") { debugLane(VehicleConfig{}); return 0; }
+    if (argc > 1 && std::string(argv[1]) == "--climb") { debugClimb(VehicleConfig{}, argc > 2 ? float(std::atof(argv[2])) : 20.f); return 0; }
+    if (argc > 1 && std::string(argv[1]) == "--probe") {
+        runProbe(argc > 2 ? VehicleConfig::parse(argv[2]) : VehicleConfig{});
+        return 0;
+    }
     if (argc > 2 && std::string(argv[1]) == "--bog") {   // tuning probe: mb_tests --bog "<cfg>" [secs] [lane]
         float secs = argc > 3 ? float(std::atof(argv[3])) : 120.f;
         int lane = argc > 4 ? std::atoi(argv[4]) : 1;
@@ -298,6 +308,44 @@ int main(int argc, char** argv) {
         CHECK(maxJ > 100.f, "impact registered (%.0f N*s)", maxJ);
         CHECK(minGap > 4.9f, "bodies stayed apart (closest %.2f m between centers)", minGap);
         CHECK(a.pos.x < b.pos.x, "no tunneling");
+    });
+
+    test("physics: handling sanity (climb, whoops, lane change, parked)", [] {
+        static Terrain t;
+        VehicleConfig c;
+        auto spawn = [&](Vehicle& v, Vec3 p, float yaw) { v.configure(c); v.reset(p, yaw); v.placeOnGround(t); settle(v, t); };
+        fieldTerrain(t, 20);
+        { Vehicle v; spawn(v, {-30, 0, 0}, PI / 2); VehicleInput in; in.throttle = 1;
+          for (int i = 0; i < 240 * 6; i++) v.step(t, in, Vehicle::DT);
+          CHECK(v.pos.x + 30 > 15.f, "should climb a 20 deg grass slope (%.1f m)", v.pos.x + 30); }
+        fieldTerrain(t, 15, true);
+        { Vehicle v; spawn(v, {0, 0, 0}, PI / 2); Vec3 p0 = v.pos; VehicleInput in; in.handbrake = true;
+          for (int i = 0; i < 240 * 10; i++) v.step(t, in, Vehicle::DT);
+          CHECK(length(Vec3{v.pos.x - p0.x, 0, v.pos.z - p0.z}) < 1.f, "parked on a side slope shouldn't creep away"); }
+        fieldTerrain(t);
+        { Vehicle v; spawn(v, {-80, 0, 0}, PI / 2); v.vel = v.forward() * 20.f; for (auto& w : v.wheels) w.omega = 20.f / w.radius;
+          VehicleInput in; in.throttle = 0.4f;
+          for (int i = 0; i < 240 * 5; i++) { in.steer = i < 480 ? std::sin(i * Vehicle::DT * PI) : 0.f; v.step(t, in, Vehicle::DT); }
+          Vec3 f = v.forward();
+          CHECK(std::fabs(std::atan2(f.z, f.x)) < 20.f * DEG && v.up().y > 0.9f, "lane change at 45 mph should recover, heading %.0f deg",
+                std::atan2(f.z, f.x) / DEG); }
+        for (float amp : {0.08f, 0.18f}) {
+            for (int j = 0; j < Terrain::N; j++)
+                for (int i = 0; i < Terrain::N; i++) {
+                    Vec3 w = t.cellToWorld(i, j); int k = t.idx(i, j);
+                    t.h[k] = (w.x > -40 && w.x < 40) ? amp * std::sin(w.x * 2 * PI / 5.f) : 0.f; t.base[k] = t.h[k] - 0.05f;
+                }
+            Vehicle v; spawn(v, {-60, 0, 0}, PI / 2); v.vel = v.forward() * 10.f; for (auto& w : v.wheels) w.omega = 10.f / w.radius;
+            VehicleInput in; float pitch = 0; bool flipped = false;
+            for (int i = 0; i < 240 * 8; i++) {
+                in.throttle = v.speed() < 10.f ? 0.7f : 0.f;
+                v.step(t, in, Vehicle::DT);
+                pitch = std::max(pitch, std::fabs(pitchDeg(v)));
+                flipped = flipped || v.up().y < 0.3f;
+            }
+            CHECK(!flipped, "whoops (%.0f cm) at 22 mph must not flip the truck", amp * 200.f);
+            if (amp < 0.1f) CHECK(pitch < 12.f, "moderate whoops pitch %.1f deg", pitch);
+        }
     });
 
     test("mud bog: the starter truck can't rip through in one go", [] {

@@ -1,4 +1,5 @@
-// Sim-cade vehicle: 6-DOF rigid chassis, raycast spring-damper suspension, terramechanics tire
+// Sim-cade vehicle: 6-DOF rigid chassis, quarter-car suspension (unsprung wheel mass, series tire
+// spring, bump/rebound damping, anti-roll bars), terramechanics tire
 // model blended with a Pacejka model for firm ground, torque-converter drivetrain with open /
 // locked differentials and a part-time transfer case, engine thermals, hydrolock and tread
 // packing. Runs at a fixed 240 Hz.
@@ -23,6 +24,11 @@ struct WheelState {
     bool front = false, left = false;
     float radius = 0.44f, width = 0.32f, inertia = 4.f;
     float susLen = 0, compression = 0, prevCompression = 0;
+    // Quarter-car state: the wheel is a mass sliding on the suspension axis (susVel = d susLen/dt)
+    // and the tire is a second, pressure-dependent spring between wheel and ground.
+    float susVel = 0, unsprung = 70.f, springK = 40000.f, bumpC = 2000.f, reboundC = 4000.f;
+    float tirePen = 0, prevTirePen = 0;
+    float nomLoad = 4000.f;   // static corner load, reference for tire load sensitivity
     float omega = 0, spin = 0, steer = 0;
     bool contact = false;
     float load = 0, fx = 0, fy = 0;
@@ -52,6 +58,8 @@ public:
 
     void configure(const VehicleConfig& cfg);
     void reset(Vec3 pos, float yaw);
+    // After reset(): sit the truck on the ground at ride height, pitched and rolled to the slope.
+    void placeOnGround(const Terrain& terrain);
     void step(Terrain& terrain, const VehicleInput& in, float dt);
 
     // State
@@ -65,6 +73,9 @@ public:
     Quat rot;
     std::array<WheelState, 4> wheels;  // FL, FR, RL, RR
     float springK = 40000, damperC = 2800, travel = 0.25f, rideAxleY = -0.4f;
+    float sprungMass = 1300;      // chassis mass the springs carry (mass minus four wheel ends)
+    float arbFront = 0, arbRear = 0;  // anti-roll bar rates (N/m of left-right compression difference)
+    Vec3 lastAccel;               // chassis non-gravity acceleration from the previous step
 
     // Drivetrain
     int gear = 1;            // -1 reverse, 0 neutral, 1..3

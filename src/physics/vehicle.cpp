@@ -53,10 +53,14 @@ void Vehicle::configure(const VehicleConfig& c) {
     travel = body->travel + c.liftIn * IN * 0.35f;
     rideAxleY = body->axleY - c.liftIn * IN;
     const float sag = travel * 0.38f;
-    springK = (mass * G * 0.25f) / sag;
-    damperC = 2.f * 0.42f * std::sqrt(springK * mass * 0.25f);
-
+    // Unsprung corner: tire + wheel + brake + half a solid axle (independent arms on the UTV).
+    const float unsprung = tireMass + (body->id == "utv" ? 14.f : 42.f);
+    sprungMass = mass - 4.f * unsprung;
+    springK = (sprungMass * G * 0.25f) / sag;
+    damperC = 2.f * 0.42f * std::sqrt(springK * sprungMass * 0.25f);
     const float L = body->wheelbase, fb = body->frontBias;
+    arbFront = 0.45f * springK;
+    arbRear = 0.2f * springK;
     const float zf = L * (1.f - fb), zr = -L * fb;
     const float tx = body->track * 0.5f;
     const Vec3 mounts[4] = {{tx, 0, zf}, {-tx, 0, zf}, {tx, 0, zr}, {-tx, 0, zr}};
@@ -73,6 +77,14 @@ void Vehicle::configure(const VehicleConfig& c) {
         ws.mount = {mounts[i].x, rideAxleY + (travel - sag), mounts[i].z};
         ws.susLen = travel - sag;
         ws.compression = ws.prevCompression = sag;
+        // Per-axle rates from the static weight split, so the truck sits level at ride height.
+        const float cornerW = sprungMass * G * 0.5f * (ws.front ? fb : 1.f - fb);
+        ws.unsprung = unsprung;
+        ws.nomLoad = cornerW + unsprung * G;
+        ws.springK = cornerW / sag;
+        const float crit = 2.f * std::sqrt(ws.springK * cornerW / G);
+        ws.bumpC = 0.28f * crit;      // soft on compression so bumps pass through
+        ws.reboundC = 0.8f * crit;    // firm on rebound so it doesn't pogo
     }
 }
 
@@ -83,13 +95,32 @@ void Vehicle::reset(Vec3 p, float yaw) {
     for (auto& w : wheels) {
         w.omega = 0;
         w.pack = 0;
+        w.susVel = 0;
+        w.tirePen = w.prevTirePen = 0;
     }
+    lastAccel = {};
     gear = 1;
     engineRpm = engine ? engine->idleRpm : 800;
     stallTimer = 0;
     fuelCut = false;
     airTime = 0;
     events.clear();
+}
+
+void Vehicle::placeOnGround(const Terrain& t) {
+    Vec3 f = forward();
+    float yaw = std::atan2(f.x, f.z);
+    Quat qy = Quat::axisAngle({0, 1, 0}, yaw);
+    float h[4];
+    for (int i = 0; i < 4; i++) {
+        Vec3 m = pos + qy.rotate(Vec3{wheels[i].mount.x, 0, wheels[i].mount.z});
+        h[i] = t.heightAt(m.x, m.z);
+    }
+    float pitch = std::atan2(0.5f * (h[0] + h[1]) - 0.5f * (h[2] + h[3]), body->wheelbase);
+    float roll = std::atan2(0.5f * (h[0] + h[2]) - 0.5f * (h[1] + h[3]), body->track);
+    rot = qy * Quat::axisAngle({1, 0, 0}, -pitch) * Quat::axisAngle({0, 0, 1}, roll);
+    float avg = 0.25f * (h[0] + h[1] + h[2] + h[3]);
+    pos.y = avg + (wheels[0].radius - rideAxleY) / std::max(0.5f, std::cos(pitch) * std::cos(roll)) + 0.03f;
 }
 
 float Vehicle::derate() const {
@@ -147,7 +178,9 @@ void Vehicle::stepDrivetrain(float dt, const VehicleInput& in, float& totalTorqu
         return;
     }
 
-    float rpmWheel = std::fabs(Gr * sd) / rpmToW;
+    // Turbine speed is signed: wheels dragged backwards against the selected gear (rolling back
+    // on a climb) put the converter at stall - full torque multiplication, not lock-up.
+    float rpmWheel = Gr * sd / rpmToW;
     float freeTarget = e.idleRpm + thr * (e.stallRpm - e.idleRpm);
     float target = std::max(rpmWheel, freeTarget);
     engineRpm = approach(engineRpm, target, rpmWheel >= freeTarget ? 80.f : 9.f, dt);
@@ -168,7 +201,8 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
 
     // ---- input / gear selection ----
     float spd = speed();
-    float maxSteer = lerpf(0.62f, 0.2f, clampf(spd / 24.f, 0, 1));
+    // Speed-sensitive lock: full lock for crawling, ~6 deg at highway speed (a real truck needs 2-3).
+    float maxSteer = std::max(0.09f, 0.62f / (1.f + std::pow(spd / 8.f, 1.3f)));
     steerApplied = approach(steerApplied, in.steer * maxSteer, 7.f, dt);
 
     float drivePedal = in.throttle, brakePedal = in.brake;
@@ -202,7 +236,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
     int nDriven = fourWD ? 4 : 2;
 
     // ---- forces ----
-    Vec3 F{0, -G * mass, 0}, T{};
+    Vec3 F{0, -G * sprungMass, 0}, T{};
     const Vec3 U = up();
     const float cosT = std::max(0.25f, U.y);
     wheelsInContact = 0;
@@ -212,7 +246,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
     for (int i = 0; i < 4; i++) {
         WheelState& w = wheels[i];
         const Vec3 mountW = pos + rot.rotate(w.mount);
-        const Vec3 probe = mountW - U * w.susLen;
+        const Vec3 probe = mountW - U * w.susLen;   // current wheel centre
         // Footprint sampling: the tire is a cylinder, not a point. Sample along the rolling
         // direction (accounting for wheel curvature) and across the tread; the highest support
         // wins. Lets tires straddle dug holes and climb rut walls.
@@ -235,40 +269,77 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
             float hh = terrain.heightAt(sp.x, sp.z);
             if (hh > gy) { gy = hh; support = sp; }
         }
-        const float dist = (mountW.y - gy) / cosT;
-        const float lenAvail = dist - w.radius;
-        float compression;
-        if (lenAvail < travel) {
-            w.contact = true;
-            compression = travel - lenAvail;
-            w.susLen = clampf(lenAvail, 0.f, travel);
-        } else {
-            w.contact = false;
-            compression = 0;
-            w.susLen = travel;
+        // ---- quarter car ----
+        // Tire: spring between wheel centre and ground, stiffer with pressure; bottoms on the rim.
+        const float dist = (mountW.y - gy) / cosT;           // mount to ground along the strut
+        float pen = w.radius + w.susLen - dist;               // tire deflection
+        const float kTire = 1.6e5f * std::pow(psi / 25.f, 0.85f);
+        const float sidewallH = std::max(0.08f, w.radius - 0.2f);
+        // Ground that appears inside the wheel (rut walls, hole edges, berms) can't be absorbed by
+        // the rubber: the wheel climbs it, pushing up the strut instead of exploding the tire force.
+        const float maxPen = 0.6f * sidewallH;
+        if (pen > maxPen) {
+            w.susLen = std::max(0.f, w.susLen - (pen - maxPen));
+            w.susVel = std::min(w.susVel, 0.f);
+            pen = w.radius + w.susLen - dist;
+        }
+        float Ftire = 0;
+        if (pen > 0) {
+            float penVel = clampf((pen - w.prevTirePen) / dt, -8.f, 8.f);
+            // Slop is a huge damper: a tire sitting in it doesn't hop like one on hardpan.
+            TerrainSample gs = terrain.sample(support.x, support.z);
+            float soft = smoothstep(0.02f, 0.15f, gs.mudDepth()) * smoothstep(0.35f, 0.7f, gs.moisture);
+            float zeta = 0.08f + 0.9f * soft + (gs.waterDepth > 0.05f ? 0.3f : 0.f);
+            Ftire = kTire * pen + 2.f * zeta * std::sqrt(kTire * w.unsprung) * penVel;
+            float rimAt = 0.55f * sidewallH;
+            if (pen > rimAt) Ftire += 12.f * kTire * (pen - rimAt) + 1500.f * std::max(0.f, penVel);
+            Ftire = clampf(Ftire, 0.f, mass * G * 2.5f);
+        }
+        w.prevTirePen = std::max(0.f, pen);
+        w.tirePen = std::max(0.f, pen);
+        w.contact = pen > 0;
+        // Suspension: spring + bump/rebound damper + progressive bump stop between body and wheel.
+        float compression = travel - w.susLen;
+        float compVel = -w.susVel;
+        float Fs = w.springK * g_tuning.spring * compression +
+                   (compVel > 0 ? w.bumpC : w.reboundC) * g_tuning.damper * compVel;
+        // Hydraulic bump stop over the last 25% of travel: a progressive spring plus heavy damping,
+        // so big hits are soaked up instead of being stored and fired back as a launch.
+        const float stop = travel * 0.75f;
+        if (compression > stop) {
+            float x = (compression - stop) / (travel - stop);
+            Fs += w.springK * travel * (1.5f * x + 6.f * x * x * x) +
+                  (compVel > 0 ? w.bumpC * 7.f * x : w.reboundC * 0.8f * x) * compVel;
+            if (compVel > 1.5f) {
+                float imp = (compVel - 1.5f) * mass * 0.25f;
+                if (imp > events.impact) { events.impact = imp; events.impactPos = probe; }
+            }
+        }
+        // Anti-roll bar: resists left/right compression difference on the axle.
+        {
+            const WheelState& o = wheels[size_t(i ^ 1)];
+            float diff = compression - (travel - o.susLen);
+            Fs += (w.front ? arbFront : arbRear) * diff * 0.5f;
+        }
+        Fs = clampf(Fs, -mass * G * 0.5f, mass * G * 3.f);
+        // Wheel moves along the strut relative to the chassis (semi-implicit Euler).
+        {
+            float aRel = (Fs - Ftire) / w.unsprung + dot(lastAccel, U);
+            w.susVel += aRel * dt;
+            w.susLen += w.susVel * dt;
+            if (w.susLen < 0.f) { w.susLen = 0.f; w.susVel = std::max(w.susVel, 0.f); }
+            if (w.susLen > travel) { w.susLen = travel; w.susVel = std::min(w.susVel, 0.f); }
         }
         w.worldCenter = mountW - U * w.susLen;
-        // Ground can "appear" under a wheel (rut walls refilling, berms): tire carcass + soft mud
-        // absorb it, so compression may only grow at a bounded rate. Prevents force spikes.
-        compression = std::min(compression, w.prevCompression + 3.0f * dt);
-        float compVel = clampf((compression - w.prevCompression) / dt, -2.5f, 2.5f);
-        w.prevCompression = compression;
+        compression = travel - w.susLen;
+        w.prevCompression = w.compression;
         w.compression = compression;
-
-        float Fs = 0;
-        if (w.contact) {
-            Fs = springK * g_tuning.spring * std::min(compression, travel) + damperC * g_tuning.damper * compVel;
-            float stop = travel * 0.9f;
-            if (compression > stop) {
-                Fs += springK * 14.f * std::min(compression - stop, 0.08f) + damperC * 2.f * std::max(0.f, compVel);
-                if (compVel > 1.2f) {
-                    float imp = (compVel - 1.2f) * mass * 0.25f;
-                    if (imp > events.impact) { events.impact = imp; events.impactPos = w.worldCenter; }
-                }
-            }
-            Fs = clampf(Fs, 0.f, mass * G * 1.6f);
+        w.load = Ftire;
+        {
+            Vec3 Fsv = U * Fs;   // what the chassis feels through the strut
+            F += Fsv;
+            T += cross(w.worldCenter - pos, Fsv);
         }
-        w.load = Fs;
 
         // Steering (simple Ackermann: inside wheel turns more).
         float sa = 0;
@@ -320,8 +391,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         // Contact patch from tire deflection (air pressure matters).
         const float rr = w.radius;
         const float sidewall = std::max(0.08f, rr - 0.2f);
-        const float kTire = 1.6e5f * std::pow(psi / 25.f, 0.85f);
-        const float defl = std::min(w.load / kTire, 0.5f * sidewall);
+        const float defl = std::min(w.tirePen, 0.5f * sidewall);
         float dirSign = std::fabs(vLong) > 0.3f ? signf(vLong) : signf(w.omega + 1e-6f);
         float hAhead = terrain.heightAt(cp.x + f.x * rr * 0.75f * dirSign, cp.z + f.z * rr * 0.75f * dirSign);
         float wall = clampf(hAhead - gy, 0.f, rr);
@@ -347,6 +417,9 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         const float muFirm = g_tuning.firmGrip * lerpf(0.8f, 0.62f, ts.grass) * (1.f - 0.38f * wetness) * tc.firm *
                              (1.f - 0.3f * clampf(ts.waterDepth / 0.1f, 0.f, 1.f));
         const float psiLat = 1.f - 0.25f * clampf(1.f - psi / 25.f, 0.f, 1.f);
+        // Load sensitivity: friction coefficient falls as a tire is loaded up, so weight transfer
+        // in a turn costs grip and roll-stiffness balance shapes understeer/oversteer.
+        const float muLoad = clampf(1.f - 0.22f * (w.load / std::max(w.nomLoad, 1.f) - 1.f), 0.65f, 1.15f);
 
         auto tireForces = [&](float omega, float& Fx, float& Fy) {
             float wr = omega * rr;
@@ -354,23 +427,37 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
             float kappa = clampf(slip / std::max(std::fabs(vLong), 2.5f), -6.f, 6.f);
             float alpha = std::atan2(vLat, std::max(std::fabs(vLong), 2.0f));
             float iMud = clampf(slip / std::max(std::max(std::fabs(wr), std::fabs(vLong)), 0.5f), -1.f, 1.f);
-            float fxF = muFirm * w.load * magicFormula(kappa, 10.f, 1.65f, 1.f, 0.97f);
-            float fyF = -muFirm * w.load * magicFormula(alpha, 9.f, 1.35f, 1.f, -0.5f) * tc.lateral * psiLat;
+            float fxF = muFirm * muLoad * w.load * magicFormula(kappa, 10.f, 1.65f, 1.f, 0.97f);
+            float fyF = -muFirm * muLoad * w.load * magicFormula(alpha, 9.f, 1.35f, 1.f, -0.5f) * tc.lateral * psiLat;
             float fxM = janosiHanamoto(A, w.load, coh * tc.grouser, std::atan(tanEff), iMud, Lc, Kshear);
             float fyM = -signf(vLat) * fmaxM * 0.8f * tc.lateralMud *
                         (1.f - std::exp(-std::fabs(std::tan(alpha)) * Lc / (1.5f * Kshear)));
             Fx = lerpf(fxF, fxM, mudW);
             Fy = lerpf(fyF, fyM, mudW);
-            float fmax = lerpf(muFirm * w.load * 1.05f, fmaxM, mudW);
+            // Static friction at crawl speeds: a parked tire grips sideways instead of creeping.
+            float crawl = 1.f - clampf(std::fabs(vLong) / 1.5f, 0.f, 1.f);
+            Fy -= crawl * vLat * w.load / G * 10.f;
+            float fmax = lerpf(muFirm * muLoad * w.load * 1.05f, fmaxM, mudW);
             float mag = std::sqrt(Fx * Fx + Fy * Fy);
             if (mag > fmax && mag > 0) { Fx *= fmax / mag; Fy *= fmax / mag; }
         };
 
+        // Paddle-wheel propulsion: in soup and standing water the lugs throw slurry backwards.
+        // Thrust ~ 0.5 rho Cd A (v_slip)|v_slip| on the buried part of the tread, strongest for paddles.
+        const float paddleK = cfg.tread == Tread::Paddle ? 0.25f : 0.f;   // only scoops make real thrust
+        const float buriedP = std::min(std::max(wall + 0.5f * w.tirePen, 0.f) * mudW + std::min(ts.waterDepth, rr), 1.2f * rr);
+        const float paddleA = w.width * buriedP * paddleK * g_tuning.digRate;
+        auto paddleThrust = [&](float omega) {
+            float vs = clampf(omega * rr - vLong, -12.f, 12.f);
+            return 0.5f * MudModel::slurryDensity * 1.1f * paddleA * vs * std::fabs(vs);
+        };
         float Fx, Fy;
         tireForces(w.omega, Fx, Fy);
+        Fx += paddleThrust(w.omega);
         const float eps = 0.05f;
         float Fx2, Fy2;
         tireForces(w.omega + eps, Fx2, Fy2);
+        Fx2 += paddleThrust(w.omega + eps);
         float dFdw = std::max(0.f, (Fx2 - Fx) / eps);
 
         // Resistances: compaction (Bekker), bulldozing (Rankine), suction, rolling.
@@ -395,9 +482,7 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
         Vec3 Ft = f * FxNet + lf * Fy;
         F += Ft;
         T += cross(r, Ft);
-        Vec3 Fsv = U * w.load;
-        F += Fsv;
-        T += cross(w.worldCenter - pos, Fsv);
+        (void)0;
         w.fx = Fx;
         w.fy = Fy;
 
@@ -554,14 +639,17 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
     float intakeY = cfg.snorkel ? body->dims[1] * 0.5f + 0.45f : body->intakeY;
     Vec3 intake = pos + rot.rotate({0, intakeY, body->intakeZ});
     TerrainSample ti = terrain.sample(intake.x, intake.z);
+    // Only liquid kills it: standing water, or soupy slurry. A nose buried in dry dirt doesn't.
+    bool liquid = ti.waterDepth > 0.02f || (ti.moisture > 0.8f && ti.mudDepth() > 0.15f);
     float slop = ti.waterDepth > 0 ? ti.height + ti.waterDepth : ti.height;
-    if (stallTimer <= 0 && slop > intake.y && engineRpm > 200.f) {
+    if (stallTimer <= 0 && liquid && slop > intake.y && engineRpm > 200.f) {
         stallTimer = 4.f;
         events.hydrolocked = true;
     }
 
     // ---- integrate ----
-    vel += F * (dt / mass);
+    lastAccel = (F + Vec3{0, G * sprungMass, 0}) * (1.f / sprungMass);
+    vel += F * (dt / sprungMass);
     pos += vel * dt;
     Vec3 tb = rot.unrotate(T);
     Vec3 wb = rot.unrotate(angVel);
@@ -570,6 +658,14 @@ void Vehicle::step(Terrain& terrain, const VehicleInput& in, float dt) {
     Vec3 dwb{(tb.x - gyro.x) / inertia.x, (tb.y - gyro.y) / inertia.y, (tb.z - gyro.z) / inertia.z};
     angVel += rot.rotate(dwb) * dt;
     angVel *= std::exp(-0.08f * dt);
+    // Sim-cade air assist: with all four wheels off the ground, gently bleed pitch/roll rate (not
+    // yaw) so a hard launch lands on its wheels more often than its roof.
+    if (wheelsInContact == 0) {
+        Vec3 a = rot.unrotate(angVel);
+        float k = std::exp(-0.9f * dt);
+        a.x *= k; a.z *= k;
+        angVel = rot.rotate(a);
+    }
     rot = rot.integrated(angVel, dt);
 
     // Safety: never fall through the world.
