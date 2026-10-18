@@ -46,6 +46,7 @@ public:
     int width = 1280, height = 720;
     int quality = 2;  // 0 low, 1 medium, 2 high
     bool postEnabled = true;
+    int debugView = 0;   // post debug: 1 AO, 2 sun shafts
     Vec3 sunDirection() const { return sunDir; }
     float weather[4] = {0, 0, 0, 0};       // cloud cover, ground wetness, rain, golden hour
     Vec3 sunColor{3.1f, 2.883f, 2.542f};
@@ -66,6 +67,9 @@ private:
     void postPass(const RenderFrame& f);
     GLuint progPost = 0, msFbo = 0, msColor = 0, msDepth = 0, resolveFbo = 0, resolveTex = 0, postVao = 0;
     GLuint progBloom = 0, bloomFbo[2] = {0, 0}, bloomTex[2] = {0, 0};   // quarter-res ping-pong
+    GLuint progAo = 0, aoFbo = 0, aoTex = 0, resolveDepth = 0;            // half-res AO (r) + sun shafts (g)
+    int aoW = 1, aoH = 1;
+    Vec3 shaftCol{0, 0, 0};
     int bloomW = 0, bloomH = 0;
     int targetW = 0, targetH = 0;
 

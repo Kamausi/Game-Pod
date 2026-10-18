@@ -117,6 +117,13 @@ vec3 envColor(vec3 d, float rough){
   vec3 ground = vec3(0.19,0.17,0.10)*(0.55 + 0.45*max(uSunDir.y, 0.0));
   vec3 sky = skyColor(normalize(vec3(d.x, max(d.y, 0.0) + rough*0.35, d.z)));
   sky = mix(sky, vec3(0.42,0.55,0.80), rough*0.7);
+  // Ragged dark treeline just above the horizon: gives paint, glass and puddles the horizon
+  // line you see reflected in real panels. Blurs out as the surface gets rougher.
+  float az = atan(d.z, d.x);
+  float tl = 0.035 + 0.05*vnoise(vec2(az*9.0, 1.3)) + 0.03*vnoise(vec2(az*31.0, 4.7));
+  vec3 trees = mix(vec3(0.07,0.09,0.05), vec3(0.16,0.15,0.09), uWeather.w)*(0.35 + 0.65*max(uSunDir.y, 0.15))*(1.0 - 0.85*uNight);
+  float inTrees = (1.0 - smoothstep(tl - band*0.5, tl + band*0.5, d.y))*smoothstep(-band, band*0.5, d.y);
+  sky = mix(sky, trees, inTrees*0.85);
   return mix(ground, sky, smoothstep(-band, band, d.y));
 }
 // Field palette shared by the terrain and the grass blades so they blend seamlessly.
@@ -705,6 +712,64 @@ void main(){
   frag = vec4(c, 1.0);
 }
 )";
+// Half-res pass: r = ambient occlusion from the depth buffer (view-space hemisphere samples),
+// g = sun shafts (radial blur of the visible sky toward the sun's screen position).
+const char* kAoFS = R"(
+in vec2 vUV;
+uniform sampler2D uDepth;
+uniform sampler2D uScene;
+uniform vec2 uNF;       // near, far
+uniform vec2 uTanH;     // tan(fov/2)*aspect, tan(fov/2)
+uniform vec2 uTexel;    // full-res texel
+uniform int uAoOn;
+uniform vec3 uSunUV;    // xy screen pos, z strength (0 = sun behind or off)
+out vec4 frag;
+float lin(float d){ float z = d*2.0 - 1.0; return 2.0*uNF.x*uNF.y/(uNF.y + uNF.x - z*(uNF.y - uNF.x)); }
+vec3 viewPos(vec2 uv){ float z = lin(texture(uDepth, uv).r); return vec3((uv*2.0 - 1.0)*uTanH*z, -z); }
+float h21(vec2 p){ p = fract(p*vec2(233.34, 851.73)); p += dot(p, p+23.45); return fract(p.x*p.y); }
+void main(){
+  float ao = 1.0, shaft = 0.0;
+  float d0 = texture(uDepth, vUV).r;
+  if(uAoOn == 1 && d0 < 0.9999){
+    vec3 P = viewPos(vUV);
+    vec3 Px = viewPos(vUV + vec2(uTexel.x*2.0, 0.0)), Py = viewPos(vUV + vec2(0.0, uTexel.y*2.0));
+    vec3 N = normalize(cross(Px - P, Py - P));
+    if(N.z < 0.0) N = -N;
+    float dist = -P.z;
+    float rad = clamp(0.35 + dist*0.012, 0.35, 1.2);
+    float a0 = h21(gl_FragCoord.xy)*6.2832, occ = 0.0;
+    vec3 T = normalize(abs(N.y) < 0.9 ? cross(N, vec3(0,1,0)) : cross(N, vec3(1,0,0))), B = cross(N, T);
+    for(int i = 0; i < 10; i++){
+      float fi = float(i) + 0.5;
+      float a = a0 + fi*2.39996, r = sqrt(fi/10.0);
+      vec3 s = P + (T*cos(a)*r + B*sin(a)*r + N*(0.25 + 0.75*fract(fi*0.618)))*rad*r;
+      vec2 suv = (s.xy/(-s.z))/uTanH*0.5 + 0.5;
+      if(suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) continue;
+      float sd = lin(texture(uDepth, suv).r);
+      float diff = (-s.z) - sd;
+      occ += smoothstep(0.06, 0.14, diff)*smoothstep(rad*2.5, rad*0.5, diff);   // ignore blade-thin occluders
+    }
+    ao = pow(1.0 - occ/10.0, 1.4);
+    ao = mix(1.0, ao, smoothstep(140.0, 60.0, dist));
+  }
+  if(uSunUV.z > 0.0){
+    vec2 dir = (uSunUV.xy - vUV)/24.0;
+    vec2 uv = vUV + dir*h21(gl_FragCoord.yx);
+    float w = 1.0;
+    for(int i = 0; i < 24; i++){
+      if(uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+      float sky = step(0.9999, texture(uDepth, uv).r);
+      vec3 c = texture(uScene, uv).rgb;
+      shaft += sky*smoothstep(0.55, 1.0, dot(c, vec3(0.3, 0.5, 0.2)))*w;
+      w *= 0.93;
+      uv += dir;
+    }
+    float ds = length((uSunUV.xy - vUV)*vec2(uTanH.x/uTanH.y, 1.0));
+    shaft *= uSunUV.z/10.0*(1.0 - smoothstep(0.08, 0.75, ds))*0.8;   // fade with screen distance from the sun
+  }
+  frag = vec4(ao, shaft, 0.0, 1.0);
+}
+)";
 const char* kPostFS = R"(
 in vec2 vUV;
 uniform sampler2D uScene;
@@ -713,6 +778,10 @@ uniform float uBloomK;
 uniform vec4 uSplats[16];
 uniform int uSplatN;
 uniform vec2 uRes;
+uniform sampler2D uAo;
+uniform sampler2D uDepth;
+uniform vec3 uShaftCol;
+uniform int uDebug;   // 1 = show AO, 2 = show sun shafts
 out vec4 frag;
 float h21(vec2 p){ p = fract(p*vec2(233.34, 851.73)); p += dot(p, p+23.45); return fract(p.x*p.y); }
 void main(){
@@ -737,6 +806,20 @@ void main(){
   vec3 blur = (texture(uScene, suv + vec2(px.x, 0.0)).rgb + texture(uScene, suv - vec2(px.x, 0.0)).rgb +
                texture(uScene, suv + vec2(0.0, px.y)).rgb + texture(uScene, suv - vec2(0.0, px.y)).rgb)*0.25;
   col = max(col + (col - blur)*0.35, 0.0);
+  // Ambient occlusion: depth-aware 3x3 upsample of the half-res term so it doesn't bleed across edges.
+  {
+    float dc = texture(uDepth, suv).r, sum = 0.0, wsum = 0.0;
+    vec2 aot = 2.0/uRes;
+    for(int y = -1; y <= 1; y++) for(int x = -1; x <= 1; x++){
+      vec2 o = vec2(x, y)*aot;
+      float wgt = 1.0/(1.0 + abs(texture(uDepth, suv + o).r - dc)*4000.0);
+      sum += texture(uAo, suv + o).r*wgt; wsum += wgt;
+    }
+    col *= mix(1.0, sum/wsum, 0.85);
+    col += uShaftCol*texture(uAo, suv).g;
+    if(uDebug == 1){ frag = vec4(vec3(sum/wsum), 1.0); return; }
+    if(uDebug == 2){ frag = vec4(vec3(texture(uAo, suv).g), 1.0); return; }
+  }
   // Bloom: screen-blend so highlights glow without blowing out.
   vec3 b = texture(uBloom, suv).rgb*uBloomK;
   col = 1.0 - (1.0 - col)*(1.0 - b);
@@ -788,6 +871,7 @@ bool Renderer::init(int w, int h) {
     progFence = compileProgram("fence", src(kFenceVS), src(kFenceFS));
     progPost = compileProgram("post", std::string(kHeader) + kPostVS, std::string(kHeader) + kPostFS);
     progBloom = compileProgram("bloom", std::string(kHeader) + kPostVS, std::string(kHeader) + kBloomFS);
+    progAo = compileProgram("ao", std::string(kHeader) + kPostVS, std::string(kHeader) + kAoFS);
     progGrass = compileProgram("grass", src(kGrassVS), src(kGrassFS));
     {
         // One tuft: fourteen thin single-triangle blades spread over the cell, leaning outward.
@@ -960,8 +1044,27 @@ void Renderer::ensureTargets() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (!resolveDepth) glGenTextures(1, &resolveDepth);
+    glBindTexture(GL_TEXTURE_2D, resolveDepth);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resolveTex, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, resolveDepth, 0);
+    aoW = std::max(1, width / 2);
+    aoH = std::max(1, height / 2);
+    if (!aoTex) { glGenTextures(1, &aoTex); glGenFramebuffers(1, &aoFbo); }
+    glBindTexture(GL_TEXTURE_2D, aoTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, aoW, aoH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindFramebuffer(GL_FRAMEBUFFER, aoFbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, aoTex, 0);
     bloomW = std::max(1, width / 4);
     bloomH = std::max(1, height / 4);
     for (int i = 0; i < 2; i++) {
@@ -981,10 +1084,46 @@ void Renderer::ensureTargets() {
 void Renderer::postPass(const RenderFrame& f) {
     glBindFramebuffer(GL_READ_FRAMEBUFFER, msFbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
-    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glBindVertexArray(postVao);
+    // Half-res AO + sun shafts.
+    {
+        float aspect = float(width) / float(std::max(1, height));
+        float th = std::tan(f.fov * 0.5f);
+        Vec3 sp = f.camPos + sunDir * 500.f;
+        float cx = viewProj.at(0, 0) * sp.x + viewProj.at(0, 1) * sp.y + viewProj.at(0, 2) * sp.z + viewProj.at(0, 3);
+        float cy = viewProj.at(1, 0) * sp.x + viewProj.at(1, 1) * sp.y + viewProj.at(1, 2) * sp.z + viewProj.at(1, 3);
+        float cw = viewProj.at(3, 0) * sp.x + viewProj.at(3, 1) * sp.y + viewProj.at(3, 2) * sp.z + viewProj.at(3, 3);
+        float shaftK = 0;
+        Vec3 su{0.5f, 0.5f, 0};
+        if (cw > 0.f && quality >= 1) {
+            su.x = cx / cw * 0.5f + 0.5f;
+            su.y = cy / cw * 0.5f + 0.5f;
+            float onScreen = clampf(1.6f - std::max(std::fabs(su.x - 0.5f), std::fabs(su.y - 0.5f)) * 1.6f, 0.f, 1.f);
+            shaftK = onScreen * (1.f - weather[0]) * (1.f - night) * (0.35f + 0.65f * weather[3]);
+        }
+        su.z = shaftK;
+        glViewport(0, 0, aoW, aoH);
+        glBindFramebuffer(GL_FRAMEBUFFER, aoFbo);
+        glUseProgram(progAo);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, resolveDepth);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, resolveTex);
+        glUniform1i(glGetUniformLocation(progAo, "uDepth"), 5);
+        glUniform1i(glGetUniformLocation(progAo, "uScene"), 1);
+        glUniform2f(glGetUniformLocation(progAo, "uNF"), 0.15f, 600.f);
+        glUniform2f(glGetUniformLocation(progAo, "uTanH"), th * aspect, th);
+        glUniform2f(glGetUniformLocation(progAo, "uTexel"), 1.f / float(width), 1.f / float(height));
+        glUniform1i(glGetUniformLocation(progAo, "uAoOn"), quality >= 2 ? 1 : 0);
+        glUniform3f(glGetUniformLocation(progAo, "uSunUV"), su.x, su.y, su.z);
+        if (quality >= 2 || shaftK > 0.f) glDrawArrays(GL_TRIANGLES, 0, 3);
+        else { glClearColor(1.f, 0.f, 0.f, 1.f); glClear(GL_COLOR_BUFFER_BIT); }   // both effects off: skip the pass
+        Vec3 sc = weather[3] > 0.f ? Vec3{1.0f, 0.72f, 0.42f} : Vec3{1.0f, 0.93f, 0.78f};
+        shaftCol = sc * 0.55f;
+    }
     // Bloom chain at quarter resolution: bright pass, then horizontal + vertical blur.
     glViewport(0, 0, bloomW, bloomH);
     glUseProgram(progBloom);
@@ -1021,6 +1160,16 @@ void Renderer::postPass(const RenderFrame& f) {
     glUniform1i(glGetUniformLocation(progPost, "uSplatN"), n);
     if (n) glUniform4fv(glGetUniformLocation(progPost, "uSplats"), n, f.lens.data());
     glUniform2f(glGetUniformLocation(progPost, "uRes"), float(width), float(height));
+    // Units 4/5: 2 and 3 stay bound to the shadow-compare maps the scene shaders expect.
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, aoTex);
+    glUniform1i(glGetUniformLocation(progPost, "uAo"), 4);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, resolveDepth);
+    glUniform1i(glGetUniformLocation(progPost, "uDepth"), 5);
+    glActiveTexture(GL_TEXTURE0);
+    glUniform3f(glGetUniformLocation(progPost, "uShaftCol"), shaftCol.x, shaftCol.y, shaftCol.z);
+    glUniform1i(glGetUniformLocation(progPost, "uDebug"), debugView);
     glBindVertexArray(postVao);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glEnable(GL_DEPTH_TEST);

@@ -217,6 +217,7 @@ void Game::action(const std::string& a) {
         weatherMode = std::atoi(a.c_str() + 8);
         if (a.back() == '!') { cloudCover = weatherMode == 0 ? 0.f : (weatherMode == 1 ? 0.8f : 1.f); rainAmt = weatherMode == 2 ? 1.f : 0.f; }   // photo mode: no fade
     }
+    else if (a.rfind("debugview:", 0) == 0) renderer.debugView = std::atoi(a.c_str() + 10);
     else if (a.rfind("sky:", 0) == 0) {   // multiplayer: shared lightning schedule from the room's seed
         skyRng = Rng(uint64_t(std::strtoull(a.c_str() + 4, nullptr, 10)) * 2654435761ULL + 1);
         lightningTimer = skyRng.range(8.f, 20.f);
