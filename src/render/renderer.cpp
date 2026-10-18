@@ -412,10 +412,13 @@ void main(){
     rough = 0.72;
     vec3 V0 = normalize(uCamPos - vWorld);
     float lf = vnoise(vWorld.xz*6.0 + vWorld.y*4.3) *0.6 + vnoise(vWorld.xy*13.0 + vWorld.z*7.0)*0.4;
+    // Fine leaf / needle-clump scale: dark gaps between clumps, and it frays the silhouette.
+    float lf2 = vnoise(vWorld.xz*31.0 + vWorld.y*23.0)*0.55 + vnoise(vWorld.zy*47.0 + vWorld.x*19.0)*0.45;
     // Ragged leafy outline: eat away grazing parts of each cluster with noise.
     float edge = 1.0 - abs(dot(n, V0));
-    if(lf < (edge - 0.55)*1.9) discard;
-    alb *= 0.62 + 0.7*lf;
+    if(mix(lf, lf2, 0.45) < (edge - 0.45)*1.9) discard;
+    alb *= (0.62 + 0.7*lf)*(0.55 + 0.75*smoothstep(0.15, 0.75, lf2));
+    n = normalize(n + (vec3(lf2, lf, lf2*lf) - 0.45)*0.6);   // clumpy normals break up the smooth shading
     leafT = 1.0;
   }
   float ao = 0.62 + 0.38*smoothstep(-0.9, 0.5, n.y);

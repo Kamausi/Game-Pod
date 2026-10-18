@@ -626,7 +626,8 @@ struct Interp {
             auto hash = line.find('#');
             if (hash != std::string::npos) {
                 // allow "#rrggbb" in color lines
-                bool colorHex = line.compare(0, 5, "color") == 0 && hash > 5;
+                size_t lead = line.find_first_not_of(" \t");
+                bool colorHex = lead != std::string::npos && line.compare(lead, 5, "color") == 0 && hash > lead + 5;   // indented too (loop bodies)
                 if (!colorHex) line = line.substr(0, hash);
             }
             std::stringstream ls(line);
@@ -682,6 +683,7 @@ struct Interp {
                 k.erase(std::remove_if(k.begin(), k.end(), ::isspace), k.end());
                 if (op == "param" && vars.count(k)) continue;  // overridden from outside
                 vars[k] = cadEval(v, vars, &err);
+                if (!err.empty()) err = name + ":" + std::to_string(lineNo) + ": " + err;
                 continue;
             }
             if (op == "material") {
@@ -706,6 +708,7 @@ struct Interp {
                     cs >> g >> b;
                     color = {cadEval(t, vars, &err), cadEval(g, vars, &err), cadEval(b, vars, &err)};
                 }
+                if (!err.empty()) err = name + ":" + std::to_string(lineNo) + ": " + err;
                 continue;
             }
             std::map<std::string, std::string> a;

@@ -1,29 +1,32 @@
-# Dark conifer in the tree line behind the bus (photo 1): drooping whorled tiers.
+# Dark conifer in the tree line behind the bus (photo 1): a narrow dense core wrapped in whorls
+# of drooping branch sprays, each tier rotated against the last so the silhouette is ragged,
+# lighter new growth at the tips, a spire leader on top.
 param h = 7
 color #4d3c2a
 material matte
-cyl r=0.16 r2=0.06 h=h pos=0,h/2,0 seg=6
+cyl r=0.17 r2=0.05 h=h pos=0,h/2,0 seg=6
+# exposed dead branch stubs low on the trunk
+color #3b2f22
+cyl r=0.025 r2=0.01 h=0.6 pos=0.28,h*0.07,0 rot=0,0,-70 seg=4
+cyl r=0.025 r2=0.01 h=0.5 pos=-0.22,h*0.09,0.12 rot=20,0,65 seg=4
 material leaf
-color #203a26
-cyl r=2.35 r2=0.08 h=1.50 pos=0,h*0.120+0.75,0 seg=11
-cyl r=2.30 r2=1.65 h=0.16 pos=0,h*0.120-0.06,0 seg=11
-color #284a2e
-cyl r=2.02 r2=0.08 h=1.40 pos=0,h*0.240+0.70,0 seg=11
-cyl r=1.98 r2=1.41 h=0.16 pos=0,h*0.240-0.06,0 seg=11
-color #1d3523
-cyl r=1.68 r2=0.08 h=1.30 pos=0,h*0.360+0.65,0 seg=11
-cyl r=1.65 r2=1.18 h=0.16 pos=0,h*0.360-0.06,0 seg=11
-color #203a26
-cyl r=1.35 r2=0.08 h=1.20 pos=0,h*0.480+0.60,0 seg=11
-cyl r=1.32 r2=0.94 h=0.16 pos=0,h*0.480-0.06,0 seg=11
-color #284a2e
-cyl r=1.02 r2=0.08 h=1.10 pos=0,h*0.600+0.55,0 seg=11
-cyl r=1.00 r2=0.71 h=0.16 pos=0,h*0.600-0.06,0 seg=11
-color #1d3523
-cyl r=0.68 r2=0.08 h=1.00 pos=0,h*0.720+0.50,0 seg=11
-cyl r=0.67 r2=0.48 h=0.16 pos=0,h*0.720-0.06,0 seg=11
-color #203a26
-cyl r=0.35 r2=0.08 h=0.90 pos=0,h*0.840+0.45,0 seg=11
-cyl r=0.34 r2=0.24 h=0.16 pos=0,h*0.840-0.06,0 seg=11
-color #22402a
-cyl r=0.25 r2=0.01 h=1.1 pos=0,h*0.92+0.3,0 seg=7
+# dense inner core (keeps the tree from looking see-through between sprays)
+color #1b3121
+cyl r=1.45 r2=0.06 h=h*0.86 pos=0,h*0.55,0 seg=9
+# whorls of branch sprays: 9 tiers, 6 sprays each, drooping, shrinking toward the top
+for t = 0, 8
+  set R = 2.45*(1-t/9.6)+0.25
+  set Y = h*(0.13+t*0.093)
+  for k = 0, 5
+    set a = k*60+t*37
+    # outer sprays catch lighter new growth at the tips
+    color 0.13+0.04*sin(t*71+k*43) 0.25+0.06*sin(t*29+k*61) 0.15+0.02*sin(k*53)
+    sphere r=R*0.42 pos=R*0.52*sin(a),Y-R*0.12,R*0.52*cos(a) scale=0.38,0.34,1 rot=24,a,0 seg=5
+    # a shorter, darker spray between each pair, tucked higher and further in
+    color 0.09 0.18+0.03*sin(t*41+k*17) 0.11
+    sphere r=R*0.3 pos=R*0.36*sin(a+30),Y+0.05,R*0.36*cos(a+30) scale=0.45,0.38,1 rot=18,a+30,0 seg=5
+  end
+end
+# leader
+color #24452b
+cyl r=0.22 r2=0.01 h=1.2 pos=0,h*0.95+0.25,0 seg=6
