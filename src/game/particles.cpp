@@ -26,6 +26,7 @@ void Particles::update(float dt, Terrain& terrain) {
             case PType::Mist: drag = 2.5f; grav = 0.6f; q.size += dt * 0.9f; break;
             case PType::Smoke: drag = 1.6f; grav = -0.7f; q.size += dt * 1.4f; break;
             case PType::Grass: drag = 2.0f; grav = 3.f; break;
+            case PType::Rain: drag = 0.f; grav = 0.f; break;   // already at terminal velocity
         }
         q.v.y -= grav * dt;
         q.v *= std::exp(-drag * dt);

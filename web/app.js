@@ -394,11 +394,15 @@ function initSettings() {
   if (s.tilt != null) $('s_tilt').checked = s.tilt;
   if (s.tsize != null) $('s_tsize').value = s.tsize;
   if (s.career != null) $('s_career').checked = s.career;
+  if (s.weather != null) $('s_weather').value = s.weather;
+  if (s.tod != null) $('s_tod').value = s.tod;
   $('s_scale').value = store.get('scale', IS_TOUCH ? 0.75 : 1);
   const save = () => {
     store.set('settings', { master: +$('s_master').value, engine: +$('s_engine').value, sfx: +$('s_sfx').value, amb: +$('s_amb').value,
       quality: +$('s_quality').value, assist: $('s_assist').checked, ai: +$('s_ai').value, ghost: $('s_ghost').checked, post: $('s_post').checked,
-      tilt: $('s_tilt').checked, tsize: +$('s_tsize').value, career: $('s_career').checked });
+      tilt: $('s_tilt').checked, tsize: +$('s_tsize').value, career: $('s_career').checked, weather: +$('s_weather').value, tod: +$('s_tod').value });
+    api.action('weather:' + $('s_weather').value);
+    api.action('tod:' + $('s_tod').value);
     updateWallet();
     applyUiScale();
     if ($('s_tilt').checked) enableTilt();

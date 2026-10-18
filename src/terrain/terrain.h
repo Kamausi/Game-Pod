@@ -67,6 +67,13 @@ public:
     void grade(Vec3 center, float radius, float target, float rate, float dt);
 
     DirtyRect dirty;  // consumed by renderer each frame
+    // Rain soaking the whole map 0..1 (weather): raises the effective moisture of every cell
+    // without touching the stored field, so it dries back out when the rain stops.
+    float rainWet = 0;
+    float wetMoist(int k) const {
+        float m = moist[k];
+        return m + (1.f - m) * rainWet * (soil[k] == 5 ? 0.15f : 0.55f);   // 5 = gravel drains
+    }
 
     std::vector<float> h, base, water, moist, comp;
     std::vector<uint8_t> grass, track;

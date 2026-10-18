@@ -65,6 +65,7 @@ TerrainSample Terrain::sample(float x, float z) const {
     s.grass = grass[idx(ni, nj)] / 255.f;
     s.soil = soil[idx(ni, nj)];
     s.disturb = track[idx(ni, nj)] / 255.f;
+    s.moisture += (1.f - s.moisture) * rainWet * (s.soil == 5 ? 0.15f : 0.55f);
     if (s.waterDepth > 0.f) s.moisture = 1.f;
     return s;
 }
@@ -100,7 +101,7 @@ float Terrain::pressPatch(Vec3 center, Vec3 fwd, float halfLen, float halfWidth,
             count++;
             float avail = h[k] - base[k];
             if (avail <= 1e-4f) continue;
-            float m = water[k] > h[k] ? 1.f : moist[k];
+            float m = water[k] > h[k] ? 1.f : wetMoist(k);
             SoilState ss = soilState(m, soil[k], track[k] / 255.f);
             float pBear = bekkerPressure(ss.kEq, ss.n, comp[k]);
             float excess = pressure - pBear;
@@ -218,7 +219,7 @@ void Terrain::relax(Vec3 center, float radius, float dt) {
     for (int j = b.j0 + 1; j < b.j1; j++)
         for (int i = b.i0 + 1; i < b.i1; i++) {
             int k = idx(i, j);
-            float m = water[k] > h[k] ? 1.f : moist[k];
+            float m = water[k] > h[k] ? 1.f : wetMoist(k);
             if (m < 0.45f) continue;
             int lx = i - b.i0, lz = j - b.j0;
             float avg = 0.25f * (tmp[lz * w + lx - 1] + tmp[lz * w + lx + 1] + tmp[(lz - 1) * w + lx] + tmp[(lz + 1) * w + lx]);

@@ -24,6 +24,8 @@ uniform float uTime;
 uniform int uQuality;
 uniform sampler2DShadow uShadow;
 uniform mat4 uLightVP;
+uniform vec3 uSunColor;
+uniform vec4 uWeather;   // x cloud cover, y ground wetness (rain soak), z rain intensity, w golden hour
 float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
 vec2 hash2(vec2 p){ return vec2(hash(p), hash(p+19.19)); }
 float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
@@ -48,7 +50,8 @@ const float kCloudH = 600.0;
 float cloudDensity(vec2 q){
   q = q*0.0016 + vec2(uTime*0.004, uTime*0.0015);
   float f = 0.5*vnoise(q) + 0.25*vnoise(q*2.03 + 1.7) + 0.125*vnoise(q*4.1 + 3.3) + 0.0625*vnoise(q*8.3);
-  return smoothstep(0.42, 0.66, f/0.9375);
+  float cov = uWeather.x;
+  return smoothstep(0.42 - 0.40*cov, 0.66 - 0.24*cov, f/0.9375);
 }
 float cloudShadow(vec3 wp){
   if(uQuality == 0) return 1.0;
@@ -73,7 +76,8 @@ vec3 withClouds(vec3 c, vec3 d){
   if(den <= 0.0) return c;
   float toward = cloudDensity(q + uSunDir.xz*55.0);              // self-shadowing toward the sun
   float lit = clamp(1.0 - (toward - den)*1.6 - den*0.35, 0.0, 1.0);
-  vec3 col = mix(vec3(0.50,0.53,0.60), vec3(1.05,1.01,0.95), lit);
+  vec3 col = mix(vec3(0.50,0.53,0.60), vec3(1.05,1.01,0.95), lit)*(1.0 - 0.5*uWeather.x);
+  col = mix(col, col*vec3(1.3,0.95,0.75), uWeather.w);
   col += vec3(1.0,0.9,0.7)*pow(max(dot(d, uSunDir), 0.0), 12.0)*0.5*(1.0 - den);   // silver lining
   float fade = smoothstep(0.015, 0.16, d.y);
   return mix(c, col, den*fade*0.95);
@@ -83,11 +87,13 @@ vec3 skyColor(vec3 d){
   vec3 zen = vec3(0.06,0.23,0.68), hor = vec3(0.45,0.61,0.88);
   vec3 c = mix(hor, zen, pow(t, 0.5));
   float s = max(dot(d, uSunDir), 0.0);
-  c += vec3(1.0,0.92,0.75)*pow(s, 900.0)*20.0 + vec3(1.0,0.85,0.6)*pow(s, 6.0)*0.14;
+  c = mix(c, c*vec3(1.35,0.92,0.62) + vec3(0.12,0.04,0.0), uWeather.w*(1.0 - pow(t, 0.35)));   // golden-hour horizon
+  c += (vec3(1.0,0.92,0.75)*pow(s, 900.0)*20.0 + vec3(1.0,0.85,0.6)*pow(s, 6.0)*(0.14 + 0.3*uWeather.w))*(1.0 - uWeather.x);
+  c = mix(c, vec3(0.55,0.58,0.63)*(1.0 - 0.32*uWeather.z), uWeather.x*0.85);              // overcast / rain
   if(d.y < 0.0) c = mix(hor, vec3(0.35,0.33,0.28), clamp(-d.y*4.0, 0.0, 1.0));
   return c;
 }
-const vec3 kSun = vec3(1.0, 0.93, 0.82) * 3.1;
+#define kSun uSunColor
 // Pre-blurred environment: sky above, sunlit fall field below, blurrier with roughness.
 vec3 envColor(vec3 d, float rough){
   float band = 0.04 + rough*0.6;
@@ -129,7 +135,7 @@ vec3 shade(vec3 alb, vec3 n, vec3 wp, float wet, float sh){
 }
 vec3 finalize(vec3 c, vec3 wp){
   float d = length(wp - uCamPos);
-  float f = 1.0 - exp(-d*0.0022);
+  float f = 1.0 - exp(-d*(0.0022 + 0.007*uWeather.z));
   vec3 fc = skyColor(normalize(vec3(wp.x-uCamPos.x, 0.03, wp.z-uCamPos.z)));
   c = mix(c, fc, f*0.65);
   c = c*(2.51*c+0.03)/(c*(2.43*c+0.59)+0.14);
@@ -232,7 +238,7 @@ void main(){
     frag = vec4(finalize(c, vWorld), a);
     return;
   }
-  float moist = vState.r, mud = vState.g, grass = vState.b, track = vState.a;
+  float moist = vState.r + (1.0 - vState.r)*uWeather.y*0.55*(1.0 - 0.7*vGravel), mud = vState.g, grass = vState.b, track = vState.a;
   float n1 = fbm(p*0.18), n2 = fbm(p*0.9+7.0), n3 = vnoise(p*6.0);
   vec3 grassC = grassColor(p);
   float blades = vnoise(p*23.0)*vnoise(p*7.0 + 2.0);
@@ -555,7 +561,11 @@ void main(){
   vec3 rgt = uRight, up = uUp;
   float stretch = 1.0;
   // Spray and water droplets streak along their velocity (motion blur in a ~1/30 s exposure).
-  if(iType > 0.5 && iType < 2.5){
+  if(iType > 5.5){   // rain: long thin streaks along the fall direction
+    vec3 v = iVel - dot(iVel, cross(uRight, uUp))*cross(uRight, uUp);
+    float sp = max(length(v), 0.1);
+    up = v/sp; rgt = normalize(cross(up, cross(uRight, uUp))); stretch = 16.0;
+  } else if(iType > 0.5 && iType < 2.5){
     vec3 v = iVel - dot(iVel, cross(uRight, uUp))*cross(uRight, uUp);
     float sp = length(v);
     if(sp > 0.5){ up = v/sp; rgt = normalize(cross(up, cross(uRight, uUp))); stretch = 1.0 + min(sp*0.035/max(iPos.w, 0.01), 4.0); }
@@ -570,8 +580,16 @@ in vec2 vUV; in vec4 vCol; in float vType; in vec3 vWorld; in float vSeed;
 uniform int uSoft; uniform vec3 uRight; uniform vec3 uUp; out vec4 frag;
 void main(){
   float d = length(vUV);
-  bool soft = vType > 2.5 && vType < 4.5;   // mist, smoke
+  bool rain = vType > 5.5;
+  bool soft = (vType > 2.5 && vType < 4.5) || rain;   // mist, smoke, rain
   if((uSoft == 1) != soft) discard;
+  if(rain){
+    float a = vCol.a*0.7*(1.0 - abs(vUV.x))*(1.0 - smoothstep(0.6, 1.0, abs(vUV.y)));
+    if(a < 0.01) discard;
+    vec3 c = vec3(0.62,0.66,0.72)*(0.6 + 0.4*max(uSunDir.y, 0.0));
+    frag = vec4(finalize(pow(c, vec3(2.2)), vWorld), a);
+    return;
+  }
   float a = vCol.a;
   vec3 alb = pow(vCol.rgb, vec3(2.2));
   if(soft){
@@ -1184,6 +1202,8 @@ void Renderer::render(World& w, const RenderFrame& f) {
         glUniformMatrix4fv(glGetUniformLocation(p, "uLightVP"), 1, GL_FALSE, lightVP.m);
         glUniform1i(glGetUniformLocation(p, "uShadow"), 2);
         glUniform1i(glGetUniformLocation(p, "uQuality"), quality);
+        glUniform3f(glGetUniformLocation(p, "uSunColor"), sunColor.x, sunColor.y, sunColor.z);
+        glUniform4f(glGetUniformLocation(p, "uWeather"), weather[0], weather[1], weather[2], weather[3]);
     };
 
     // ---- shadow pass ----

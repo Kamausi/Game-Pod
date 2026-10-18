@@ -47,6 +47,8 @@ public:
     int quality = 2;  // 0 low, 1 medium, 2 high
     bool postEnabled = true;
     Vec3 sunDirection() const { return sunDir; }
+    float weather[4] = {0, 0, 0, 0};       // cloud cover, ground wetness, rain, golden hour
+    Vec3 sunColor{3.1f, 2.883f, 2.542f};
     void setSun(float azimuthDeg, float elevationDeg);
     Mat4 viewProj;
 

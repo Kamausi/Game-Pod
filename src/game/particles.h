@@ -9,7 +9,7 @@
 
 namespace mb {
 
-enum class PType : uint8_t { MudChunk, MudSpray, Water, Mist, Smoke, Grass };
+enum class PType : uint8_t { MudChunk, MudSpray, Water, Mist, Smoke, Grass, Rain };
 
 struct Particle {
     Vec3 p, v;

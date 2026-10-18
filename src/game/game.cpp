@@ -210,6 +210,17 @@ void Game::action(const std::string& a) {
     } else if (a == "camera") camMode = (camMode + 1) % 3;
     else if (a == "horn") { audio.trigger(SfxType::Horn, player.pos, 1.f); hornTimer = 0.7f; }
     else if (a == "restart") startMode(mode.id, mode.lane, 0);
+    else if (a.rfind("weather:", 0) == 0) {
+        weatherMode = std::atoi(a.c_str() + 8);
+        if (a.back() == '!') { cloudCover = weatherMode == 0 ? 0.f : (weatherMode == 1 ? 0.8f : 1.f); rainAmt = weatherMode == 2 ? 1.f : 0.f; }   // photo mode: no fade
+    }
+    else if (a.rfind("soak:", 0) == 0) world.terrain.rainWet = clampf(float(std::atof(a.c_str() + 5)), 0.f, 1.f);   // photo/debug
+    else if (a.rfind("tod:", 0) == 0) {
+        timeOfDay = std::atoi(a.c_str() + 4);
+        if (timeOfDay == 1) renderer.setSun(200.f, 58.f);
+        else if (timeOfDay == 2) renderer.setSun(242.f, 9.f);
+        else renderer.setSun(219.f, 41.f);   // mid-afternoon from the south-west (the default)
+    }
     else if (a.rfind("dirt:", 0) == 0) player.dirt = clampf(float(std::atof(a.c_str() + 5)), 0.f, 1.f);  // photo mode
     else if (a.rfind("camyaw:", 0) == 0) {
         camYaw = float(std::atof(a.c_str() + 7));
@@ -510,6 +521,40 @@ void Game::addVehicleDraws(RenderFrame& f, const Vehicle& g, const VehicleVisual
     }
 }
 
+// Weather: clouds roll in, rain falls around the camera, soaks the whole map (every field gets
+// slicker and softer, see Terrain::rainWet) and dries out slowly afterwards.
+void Game::updateWeather(float dt) {
+    float coverT = weatherMode == 0 ? 0.f : (weatherMode == 1 ? 0.8f : 1.f);
+    float rainT = weatherMode == 2 ? 1.f : 0.f;
+    cloudCover += clampf(coverT - cloudCover, -dt * 0.05f, dt * 0.05f);
+    rainAmt += clampf(rainT * smoothstep(0.7f, 1.f, cloudCover) - rainAmt, -dt * 0.2f, dt * 0.1f);
+    float& wet = world.terrain.rainWet;
+    wet = rainAmt > 0.05f ? std::min(1.f, wet + dt * rainAmt / 150.f) : std::max(0.f, wet - dt / 500.f);
+    float golden = timeOfDay == 2 ? 1.f : 0.f;
+    renderer.weather[0] = cloudCover;
+    renderer.weather[1] = wet;
+    renderer.weather[2] = rainAmt;
+    renderer.weather[3] = golden;
+    // Sun: warm and low at golden hour, dimmed and cooled by cloud.
+    Vec3 sun = golden > 0 ? Vec3{3.0f, 2.2f, 1.45f} : (timeOfDay == 1 ? Vec3{3.2f, 3.05f, 2.8f} : Vec3{3.1f, 2.883f, 2.542f});
+    float dim = 1.f - 0.72f * cloudCover;
+    renderer.sunColor = lerp(sun * dim, Vec3{1.0f, 1.05f, 1.15f} * dim, cloudCover * 0.6f);
+    if (rainAmt > 0.02f) {
+        Rng& R = particles.rng;
+        int n = int(rainAmt * 1200.f * dt) + 1;
+        Vec3 wind{1.4f, 0, 0.6f};
+        for (int k = 0; k < n; k++) {
+            Vec3 p = camPos + Vec3{R.range(-11.f, 11.f), R.range(1.f, 10.f), R.range(-11.f, 11.f)} + (camTarget - camPos) * 0.6f;
+            particles.emit(PType::Rain, p, Vec3{wind.x, -9.f, wind.z}, 0.014f, 1.4f, {0.7f, 0.72f, 0.76f});
+        }
+        // Drops on the lens when looking out level or up.
+        if (renderer.postEnabled && R.uniform() < rainAmt * dt * 3.f && lens.size() < 16) {
+            LensSplat l{R.uniform(), R.range(0.3f, 1.f), R.range(0.015f, 0.04f), -0.8f};
+            lens.push_back(l);
+        }
+    }
+}
+
 void Game::updateLens(float dt) {
     for (auto& l : lens) {
         l.a -= dt * (l.a > 0 ? 0.12f : -0.6f);   // mud fades slowly, water drops evaporate fast
@@ -773,6 +818,7 @@ void Game::frame(double nowMs) {
     g_lastPhase = mode.phase;
 
     updateCamera(dt, in);
+    updateWeather(dt);
     updateLens(dt);
     feedAudio(dt);
     RenderFrame f;

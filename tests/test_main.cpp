@@ -775,6 +775,32 @@ int main(int argc, char** argv) {
         CHECK(serial == 5, "five rewards (%d)", serial);
     });
 
+
+    test("weather: rain soaks the map, gravel drains, soaked ground gives way", [] {
+        static World w;
+        w.generate(1976);
+        TerrainSample field0 = w.terrain.sample(-30, 60), road0 = w.terrain.sample(0, -70);
+        w.terrain.rainWet = 1.f;
+        TerrainSample field1 = w.terrain.sample(-30, 60), road1 = w.terrain.sample(0, -70);
+        std::printf("    field moisture %.2f -> %.2f, gravel road %.2f -> %.2f\n", field0.moisture, field1.moisture, road0.moisture, road1.moisture);
+        CHECK(field1.moisture > field0.moisture + 0.3f, "rain soaks the fields");
+        CHECK(road1.moisture - road0.moisture < 0.15f, "gravel drains");
+        // A stock rig on a soaked field sinks deeper than on a dry one.
+        auto sink = [&](float wet) {
+            w.terrain.rainWet = wet;
+            static World w2; w2.generate(1976); w2.terrain.rainWet = wet;
+            Vehicle v; v.configure(VehicleConfig{});
+            v.reset({-30, w2.terrain.heightAt(-30, 60) + 1.f, 60}, 0); v.placeOnGround(w2.terrain);
+            VehicleInput in; in.handbrake = true;
+            for (int i = 0; i < 240 * 3; i++) v.step(w2.terrain, in, Vehicle::DT);
+            return w2.terrain.heightAt(v.wheels[0].contactPos.x, v.wheels[0].contactPos.z);
+        };
+        float dry = sink(0.f), wet = sink(1.f);
+        std::printf("    parked rut: dry %.3f m, soaked %.3f m\n", dry, wet);
+        CHECK(wet < dry, "soaked ground gives way more under a parked truck");
+        w.terrain.rainWet = 0;
+    });
+
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
 }

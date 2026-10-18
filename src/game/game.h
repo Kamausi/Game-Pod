@@ -123,6 +123,10 @@ private:
     std::vector<int> aiState;   // last announced state per rival (0 running, 1 finished, 2 gave up)
     void announceLine(const std::string& s) { if (announceQ.size() < 8) announceQ.push_back(s); }
     void updateVenue(float dt);
+    // Weather and time of day: 0 dry/1 overcast/2 rain; 0 afternoon/1 midday/2 golden hour.
+    int weatherMode = 0, timeOfDay = 0;
+    float cloudCover = 0, rainAmt = 0;
+    void updateWeather(float dt);
     void say(const std::string& m, float t = 2.5f) { if (!m.empty()) { mode.message = m; mode.messageTimer = t; } }
     void updateCoach(float dt);
     bool competitionRun() const;
