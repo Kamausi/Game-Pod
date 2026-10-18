@@ -810,6 +810,15 @@ void Game::updateCoach(float dt) {
 
 // Venue life: the PA announcer, rival milestones, and the wash bay on the return road.
 void Game::updateVenue(float dt) {
+    if (mode.id == ModeId::FreeRoam && state == AppState::Playing) {
+        int c = challenges.update(world, player, dt);
+        if (c >= 0) {
+            const auto& g = challenges.goals[size_t(c)];
+            say(std::string("CHALLENGE COMPLETE: ") + g.name + " +$" + std::to_string(g.pay), 4.f);
+            announceLine(player.cfg.name + " just did the " + g.name + "! That's $" + std::to_string(g.pay));
+            audio.trigger(SfxType::Cheer, player.pos, 0.8f);
+        }
+    }
     for (size_t i = 0; i < ais.size() && i < aiState.size(); i++) {
         const AiDriver& a = ais[i];
         int st = a.finished ? 1 : (a.gaveUp ? 2 : 0);
@@ -876,7 +885,7 @@ std::string Game::standingsJson() {
 }
 
 const char* Game::hud() {
-    char buf[8192];
+    char buf[12288];
     const EngineSpec& e = *player.engine;
     double now = serverNow();
     std::string res = "[";
@@ -913,6 +922,13 @@ const char* Game::hud() {
     int soil = 0;
     for (int k = 1; k < int(Soil::Count); k++) if (soilCount[k] > soilCount[soil]) soil = k;
     const char* soilName = soilMods(uint8_t(soil)).name;
+    std::string chal = "[";
+    for (size_t i = 0; i < challenges.goals.size(); i++) {
+        const auto& g = challenges.goals[i];
+        chal += std::string(i ? "," : "") + "{\"name\":\"" + g.name + "\",\"hint\":\"" + g.hint + "\",\"pay\":" + std::to_string(g.pay) +
+                ",\"done\":" + (g.done ? "true" : "false") + "}";
+    }
+    chal += "]";
     std::string announceSafe;
     for (char c : announce) if (c != '"' && c != '\\' && c >= 32) announceSafe += c;
     int winchState = !player.cfg.winch ? 0 : (recovery.winch.broken ? 3 : (recovery.winch.active ? 2 : 1));
@@ -926,7 +942,7 @@ const char* Game::hud() {
                   "\"pause\":%s,\"pad\":%s,\"padName\":\"%s\",\"engine\":\"%s\",\"dirt\":%.2f,\"lane\":%d,\"standings\":%s,\"ghost\":%s,"
                   "\"coach\":\"%s\",\"soil\":\"%s\",\"tcase\":%d,\"diffF\":\"%s\",\"diffR\":\"%s\",\"belt\":%.0f,\"cvt\":%s,"
                   "\"windup\":%.2f,\"winch\":%d,\"winchKn\":%.1f,\"winchHeat\":%.2f,\"boards\":%d,\"dig\":%.1f,"
-                  "\"flooded\":%s,\"broken\":%s,\"recover\":%s,\"brakeWet\":%.2f,\"bead\":%s,\"shaft\":%s,\"announce\":\"%s\",\"pot\":%d,\"payout\":%d,\"beltBurnt\":%s}",
+                  "\"flooded\":%s,\"broken\":%s,\"recover\":%s,\"brakeWet\":%.2f,\"bead\":%s,\"shaft\":%s,\"announce\":\"%s\",\"pot\":%d,\"payout\":%d,\"beltBurnt\":%s,\"rewardSerial\":%d,\"reward\":%d,\"challenges\":%s}",
                   int(state), player.speed() * 2.237f, player.engineRpm, e.redlineRpm, player.gear, player.manual ? "true" : "false",
                   player.lowRange ? "true" : "false", player.fourWD ? "true" : "false", player.lockFront ? "true" : "false",
                   player.lockRear ? "true" : "false", player.psi, player.engineTemp, player.radiatorClog, player.boost,
@@ -940,7 +956,7 @@ const char* Game::hud() {
                   diffName(player.diffF), diffName(player.diffR), player.beltTemp, player.isCvt() ? "true" : "false", player.windup,
                   winchState, recovery.winch.force / 1000.f, recovery.winch.heat, recovery.boardsCarried, std::max(0.f, recovery.digTimer),
                   player.flooded ? "true" : "false", player.engineBroken ? "true" : "false", recoverMenu ? "true" : "false",
-                  player.brakeWet, debead ? "true" : "false", player.frontShaftBroken ? "true" : "false", announceSafe.c_str(), mode.bountyPot, mode.payout, player.beltBurnt ? "true" : "false");
+                  player.brakeWet, debead ? "true" : "false", player.frontShaftBroken ? "true" : "false", announceSafe.c_str(), mode.bountyPot, mode.payout, player.beltBurnt ? "true" : "false", challenges.rewardSerial, challenges.lastReward, chal.c_str());
     hudJson = buf;
     g_pauseRequested = false;
     return hudJson.c_str();

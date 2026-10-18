@@ -11,6 +11,7 @@
 #include "ai.h"
 #include "modes.h"
 #include "particles.h"
+#include "challenges.h"
 #include "recovery.h"
 #include "world.h"
 
@@ -67,6 +68,7 @@ public:
     AppState state = AppState::Attract;
     double clockOffset = 0;
     Recovery recovery;
+    Challenges challenges;
     std::string coach;            // field-guide coaching line for the HUD
     bool recoverMenu = false;     // tow key asks the UI for the recovery menu
     int localId = 0;

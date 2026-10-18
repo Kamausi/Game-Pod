@@ -22,6 +22,7 @@ set(MB_CORE_SOURCES
   src/game/particles.cpp
   src/game/modes.cpp
   src/game/recovery.cpp
+  src/game/challenges.cpp
 )
 add_library(mbcore STATIC ${MB_CORE_SOURCES})
 target_include_directories(mbcore PUBLIC src)
@@ -54,8 +55,11 @@ if(EMSCRIPTEN)
     -sEXPORTED_FUNCTIONS=_main,_malloc,_free
     -sENVIRONMENT=web
     --embed-file ${CMAKE_SOURCE_DIR}/cad/parts@/cad)
+  # The CAD parts are embedded at link time: relink when any of them changes.
+  file(GLOB_RECURSE MB_CAD_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/cad/parts/*.mbcad)
   foreach(T mudbuddies mudbuddies_single)
     add_executable(${T} ${MB_WEB_SOURCES})
+    set_property(TARGET ${T} APPEND PROPERTY LINK_DEPENDS ${MB_CAD_FILES})
     target_link_libraries(${T} mbcore)
     if(MB_DEVTOOLS)
       target_link_libraries(${T} imgui)

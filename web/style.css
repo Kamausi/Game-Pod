@@ -240,3 +240,9 @@ body.touch #stuckHint, body.touch #coach { bottom: calc(120px * var(--ui) + 80px
 h2 .wallet { float: right; font-size: 18px; margin: 4px 0 0; }
 .wallet.neg { color: var(--fence); }
 .prize { color: var(--pj1); font-size: 22px; margin: 10px 0; font-family: Oswald, sans-serif; }
+.challenges { margin-top: 14px; text-align: left; max-width: 460px; font-size: 14px; }
+.challenges h3 { color: var(--pj1); margin: 6px 0; font-size: 16px; }
+.challenges div { padding: 4px 0; border-bottom: 1px solid #ffffff14; }
+.challenges div span { float: right; color: var(--pj1); }
+.challenges div small { display: block; color: var(--dim); }
+.challenges div.done { opacity: .55; }

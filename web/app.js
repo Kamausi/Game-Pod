@@ -416,10 +416,12 @@ function applyVolumes() { if (api) api.volume(+$('s_master').value, +$('s_engine
 
 // ------------------------------------------------------------------------------------------
 // HUD
-let lastSerial = 0, hud = {};
+let lastSerial = 0, hud = {}, lastReward = null;
 function updateHud() {
   try { hud = JSON.parse(api.hud()); } catch { return; }
   if (hud.pause && current === null) { api.setState(3); show('pause'); }
+  if (current === 'pause') $('challengeList').innerHTML = hud.mode === 0 && hud.challenges ? '<h3>Open Pits challenges</h3>' +
+    hud.challenges.map((c) => `<div class="${c.done ? 'done' : ''}"><b>${c.done ? '✔' : '○'} ${esc(c.name)}</b> <span>$${c.pay}</span><small>${esc(c.hint)}</small></div>`).join('') : '';
   $('padHint').textContent = hud.pad ? `🎮 ${hud.padName.slice(0, 40)}` : 'Connect a gamepad — press any button';
   if (current !== null) return;
   const rn = hud.rpm / hud.redline;
@@ -463,6 +465,10 @@ function updateHud() {
   $('hudSub').textContent = sub;
   const cd = hud.phase === 1 ? Math.ceil(hud.countdown) : 0;
   $('countdown').textContent = hud.phase === 1 && cd > 0 && cd <= 5 ? cd : '';
+  if (hud.rewardSerial !== lastReward) {
+    if (lastReward !== null && hud.reward) career.add(hud.reward, 'challenge prize');
+    lastReward = hud.rewardSerial;
+  }
   $('hudMsg').textContent = hud.message || '';
   $('announce').textContent = hud.announce ? `📢 ${hud.announce}` : '';
   $('announce').style.display = hud.announce ? 'block' : 'none';

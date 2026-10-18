@@ -16,6 +16,7 @@
 #include "physics/collide.h"
 #include "game/ai.h"
 #include "game/recovery.h"
+#include "game/challenges.h"
 
 using namespace mb;
 
@@ -741,6 +742,37 @@ int main(int argc, char** argv) {
         m.update(0.1f, 1.1, w, v, 0, 0, 0);
         CHECK(m.claimed && m.results[0].board == "bounty_time" && m.bountyPot == 1500, "claimed, pot resets");
         CHECK(m.payout == 1750, "claimed bounty pays the pot (%d)", m.payout);
+    });
+
+
+    test("open pits: back-country challenges complete once and pay out", [] {
+        static World w;
+        w.generate(1976);
+        Challenges ch;
+        Vehicle v;
+        v.configure(VehicleConfig{});
+        auto at = [&](float x, float z) { v.reset({x, w.terrain.heightAt(x, z) + 1.f, z}, 0); v.wheelsInContact = 4; v.vel = {}; return ch.update(w, v, 0.1f); };
+        CHECK(at(0, -80) == -1, "nothing in the village");
+        CHECK(at(w.hillCenter.x, w.hillCenter.z) == 0 && ch.lastReward == 300, "hill top");
+        CHECK(at(w.hillCenter.x, w.hillCenter.z) == -1, "only once");
+        Vec3 s = w.swampCenter;
+        at(s.x - w.swampRadius - 3, s.z);
+        at(s.x - w.swampRadius + 3, s.z);
+        at(s.x, s.z);
+        CHECK(at(s.x + w.swampRadius + 3, s.z) == 1, "swamp crossing");
+        float cx = -60.f, cz = w.creekZ(cx);
+        at(cx, cz - w.creekHalfW - 2);
+        CHECK(at(cx, cz + 1.f) == 2 || at(cx, cz + 0.5f) == 2, "creek ford");
+        v.reset({w.flatsCenter.x, 0, w.flatsCenter.z}, 0);
+        v.vel = {16.f, 0, 0};
+        int r = -1;
+        for (int i = 0; i < 40 && r < 0; i++) r = ch.update(w, v, 0.1f);
+        CHECK(r == 3, "flats speed run");
+        size_t n = w.trail.size();
+        for (unsigned q = 0; q < 3; q++) at(w.trail[q * n / 4].x, w.trail[q * n / 4].z);
+        CHECK(at(w.trail[3 * n / 4].x, w.trail[3 * n / 4].z) == 4, "trail loop");
+        int serial = ch.rewardSerial;
+        CHECK(serial == 5, "five rewards (%d)", serial);
     });
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
