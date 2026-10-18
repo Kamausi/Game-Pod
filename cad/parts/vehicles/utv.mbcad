@@ -1,5 +1,9 @@
 # Sport side-by-side UTV (photo 3, left): white/black panels, tube cage, roof.
-# Front axle z=1.03, rear z=-1.26.
+# Sculpted hood with LED slit headlights and a light bar, front bumper with winch plate,
+# long-travel A-arms with coilovers, skid plate and rock sliders, bucket seats with harnesses,
+# dash and steering, tube cage (A-pillars into roof rails, B-hoop, rear braces) under a roof,
+# half doors, side intakes, cargo bed with rails and a spare, exhaust, LED tails, whip flag.
+# Body frame: +Z forward, +X left. Front axle z=1.03, rear z=-1.26.
 param paint_r = 0.92
 param paint_g = 0.92
 param paint_b = 0.90
@@ -8,40 +12,139 @@ set FA = 1.03
 set RA = -1.26
 set AY = -0.18
 set AR = 0.48
-# Black plastic floor tub
+set HX = 0.70          # hub x for the suspension arms
+
+# ---- Floor tub, skid plate, rock sliders ----
 color #1c1c1c
 material matte
 box size=W-0.2,0.30,2.70 pos=0,0.05,-0.15 bevel=0.04
-# Painted hood/front fenders and rear fenders/cargo box, arches cut in
+color #6a6e72
+material steel
+box size=0.95,0.03,2.50 pos=0,-0.115,-0.15
+box size=0.06,0.06,1.25 pos=W/2-0.08,-0.06,-0.10 mirror=x
+
+# ---- Painted body: hood/front fenders and rear fenders/cargo box with the arches ----
 color paint_r paint_g paint_b
 material paint
 extrude depth=W-0.08 bevel=0.05 pts=0.55,0.00,arc(FA,AY,AR,158,22,10),1.62,0.0,1.70,0.20,1.62,0.42,0.95,0.52,0.60,0.55,0.55,0.45
 extrude depth=W-0.08 bevel=0.05 pts=-0.62,0.05,arc(RA,AY,AR,22,158,10),-1.86,0.05,-1.88,0.36,-0.62,0.40
-# Doors (half doors) in contrast black
+# Raised hood centre bulge and nose
+extrude depth=0.62 bevel=0.04 pts=0.70,0.50,1.55,0.42,1.66,0.36,1.60,0.47,0.95,0.58,0.70,0.58
+# Black accent panels: hood stripe, lower nose, fender liners, side intakes
+color #141414
+material matte
+box size=0.20,0.012,0.80 pos=0,0.585,1.05 rot=-6,0,0
+box size=1.10,0.16,0.04 pos=0,0.12,1.69 rot=-12,0,0
+for k = 0, 3
+  box size=0.012,0.045,0.30 pos=W/2-0.04+0.005,0.30+k*0.07,-0.95 mirror=x
+end
+
+# ---- Front: LED slit headlights, light bar, bumper with winch plate ----
+color #f2f8ff
+material lens
+box size=0.26,0.035,0.04 pos=0.36,0.40,1.665 rot=0,-14,8 mirror=x
+box size=0.90,0.06,0.06 pos=0,0.15,1.705
+color #121212
+material steel
+box size=1.20,0.10,0.10 pos=0,0.06,1.80 bevel=0.02
+box size=0.08,0.30,0.08 pos=0.45,0.16,1.78 mirror=x
+box size=0.40,0.18,0.06 pos=0,0.10,1.84
+color #c8c8c8
+material chrome
+box size=0.16,0.06,0.04 pos=0,0.10,1.88
+
+# ---- Long-travel suspension: A-arms and coilovers (front and rear) ----
+color #262626
+material steel
+box size=0.42,0.035,0.06 pos=HX/2+0.12,AY-0.05,FA+0.12 rot=0,-16,0 mirror=x
+box size=0.42,0.035,0.06 pos=HX/2+0.12,AY-0.05,FA-0.12 rot=0,16,0 mirror=x
+box size=0.38,0.035,0.05 pos=HX/2+0.14,AY+0.12,FA rot=0,0,-10 mirror=x
+box size=0.44,0.035,0.06 pos=HX/2+0.10,AY-0.05,RA+0.14 rot=0,-14,0 mirror=x
+box size=0.44,0.035,0.06 pos=HX/2+0.10,AY-0.05,RA-0.14 rot=0,14,0 mirror=x
+color #c41a1a
+cyl r=0.05 h=0.46 pos=0.46,AY+0.25,FA-0.05 rot=0,0,-32 mirror=x seg=10
+cyl r=0.05 h=0.50 pos=0.42,AY+0.28,RA+0.10 rot=10,0,-28 mirror=x seg=10
+color #d8d8d2
+material chrome
+cyl r=0.022 h=0.30 pos=0.52,AY+0.12,FA-0.05 rot=0,0,-32 mirror=x seg=8
+cyl r=0.022 h=0.32 pos=0.48,AY+0.13,RA+0.10 rot=10,0,-28 mirror=x seg=8
+
+# ---- Half doors with the cut-out top edge ----
 color #202020
+material matte
 box size=0.05,0.34,0.95 pos=W/2-0.06,0.30,0.0 bevel=0.02 mirror=x
-# Seats
+color paint_r paint_g paint_b
+material paint
+box size=0.052,0.10,0.55 pos=W/2-0.06,0.22,-0.10 mirror=x
+
+# ---- Cockpit: bucket seats with bolsters and harnesses, dash, steering, grab bar ----
 color #222222
-box size=0.48,0.10,0.50 pos=0.33,0.25,-0.15 bevel=0.03 mirror=x
-box size=0.48,0.70,0.10 pos=0.33,0.55,-0.42 rot=-12,0,0 bevel=0.03 mirror=x
-# Roll cage
+material matte
+box size=0.46,0.10,0.48 pos=0.33,0.25,-0.15 bevel=0.03 mirror=x
+box size=0.06,0.14,0.46 pos=0.33+0.22,0.31,-0.15 bevel=0.02 mirror=x
+box size=0.06,0.14,0.46 pos=0.33-0.22,0.31,-0.15 bevel=0.02 mirror=x
+box size=0.46,0.72,0.10 pos=0.33,0.58,-0.43 rot=-12,0,0 bevel=0.03 mirror=x
+box size=0.08,0.50,0.12 pos=0.33+0.22,0.62,-0.40 rot=-12,0,0 bevel=0.02 mirror=x
+box size=0.08,0.50,0.12 pos=0.33-0.22,0.62,-0.40 rot=-12,0,0 bevel=0.02 mirror=x
+color #d02020
+box size=0.05,0.55,0.012 pos=0.43,0.62,-0.36 rot=-12,0,0 mirror=x
+box size=0.05,0.55,0.012 pos=0.23,0.62,-0.36 rot=-12,0,0 mirror=x
+box size=0.30,0.05,0.012 pos=0.33,0.38,-0.12 mirror=x
+color #181818
+box size=1.20,0.22,0.22 pos=0,0.48,0.42 rot=-20,0,0 bevel=0.04
+color #e8eef2
+material lens
+cyl r=0.04 h=0.01 axis=z pos=0.33,0.55,0.52 rot=-20,0,0 seg=10
+color #2a2a2a
+material steel
+cyl r=0.02 h=0.40 pos=0.33,0.52,0.26 rot=-55,0,0 seg=8
+color #111111
+material rubber
+cyl r=0.17 h=0.035 pos=0.33,0.66,0.12 rot=-55,0,0 seg=14
+color #2a2a2a
+material steel
+cyl r=0.018 h=0.40 pos=-0.33,0.66,0.30 axis=x seg=8
+
+# ---- Tube cage: A-pillars into roof rails, B-hoop, rear braces, roof ----
 color #151515
 material steel
-cyl r=0.025 h=1.25 pos=0.62,0.80,0.35 rot=-18,0,0 mirror=x
-cyl r=0.025 h=1.20 pos=0.62,0.78,-0.55 mirror=x
-cyl r=0.025 h=1.25 pos=0,1.40,0.20 axis=x
-cyl r=0.025 h=1.25 pos=0,1.38,-0.55 axis=x
-cyl r=0.025 h=0.80 pos=0.62,1.40,-0.18 axis=z mirror=x
+cyl r=0.025 h=1.25 pos=0.62,0.80,0.35 rot=-18,0,0 mirror=x seg=8
+cyl r=0.025 h=1.20 pos=0.62,0.78,-0.55 mirror=x seg=8
+cyl r=0.025 h=1.25 pos=0,1.40,0.20 axis=x seg=8
+cyl r=0.025 h=1.25 pos=0,1.38,-0.55 axis=x seg=8
+cyl r=0.025 h=0.80 pos=0.62,1.40,-0.18 axis=z mirror=x seg=8
+cyl r=0.022 h=0.90 pos=0.40,0.95,-0.78 rot=-35,0,-18 mirror=x seg=8
+cyl r=0.022 h=1.20 pos=0,0.90,-0.56 rot=0,0,58 seg=8
 box size=0.04,0.04,0.80 pos=W/2-0.02,0.40,0.0 bevel=0.015 mirror=x
 color #f5f5f5
 material paint
 box size=1.30,0.03,0.85 pos=0,1.43,-0.18 bevel=0.012
-# LED headlights and tail lights
-color #e8eef2
-material lens
-box size=0.22,0.06,0.03 pos=0.40,0.40,1.665 bevel=0.01 mirror=x
-color #b01313
-box size=0.18,0.05,0.03 pos=0.50,0.30,-1.88 bevel=0.01 mirror=x
-color #121212
+color #141414
+material matte
+box size=1.10,0.012,0.10 pos=0,1.448,0.18
+
+# ---- Cargo bed: rails, spare tire, exhaust, LED tail lights, whip flag ----
+color #1c1c1c
+material matte
+box size=1.10,0.04,0.70 pos=0,0.38,-1.35
+color #151515
 material steel
-box size=1.20,0.10,0.10 pos=0,0.10,1.78 bevel=0.02
+box size=0.03,0.12,0.70 pos=0.55,0.48,-1.35 mirror=x
+box size=1.12,0.03,0.03 pos=0,0.54,-1.70
+color #111111
+material rubber
+cyl r=0.30 h=0.20 axis=y pos=0,0.52,-1.33 seg=16
+color #2a2a2a
+material steel
+cyl r=0.15 h=0.21 axis=y pos=0,0.52,-1.33 seg=12
+color #4a4a48
+cyl r=0.04 h=0.30 axis=z pos=-0.45,0.20,-1.90 seg=10
+color #b01313
+material lens
+box size=0.18,0.04,0.03 pos=0.50,0.32,-1.885 bevel=0.01 mirror=x
+color #2a2a2a
+material steel
+cyl r=0.007 h=1.60 pos=-0.62,1.20,-0.78 seg=4
+color #f06010
+material matte
+extrude depth=0.004 pts=0,0,0.30,-0.07,0,-0.18 rot=0,90,0 pos=-0.62,2.0,-0.78
