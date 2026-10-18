@@ -26,6 +26,7 @@
 <div id="menu" class="overlay panel-left">
   <div class="logo">MUD<span>BUDDIES</span></div>
   <p class="tag">Bog it. Sling it. Get stuck with your buddies.</p>
+  <div class="wallet" id="walletMenu"></div>
   <nav class="stack">
     <button data-nav data-go="play">Play Solo</button>
     <button data-nav data-go="lobby">Multiplayer</button>
@@ -54,7 +55,7 @@
 
 <!-- Garage -->
 <div id="garage" class="overlay panel-right">
-  <h2>Garage</h2>
+  <h2>Garage <span class="wallet" id="walletGarage"></span></h2>
   <div class="form" id="garageForm">
     <label>Driver <input data-nav id="g_name" maxlength="16" value="Buddy"></label>
     <label>Body <select data-nav id="g_body"></select></label>
@@ -126,6 +127,7 @@
     <label>Solo rivals (AI) <select data-nav id="s_ai"><option value="0">None</option><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option></select></label>
     <label class="row"><input data-nav type="checkbox" id="s_ghost" checked> Show personal-best ghost</label>
     <label class="row"><input data-nav type="checkbox" id="s_post" checked> Lens mud &amp; post effects</label>
+    <label class="row"><input data-nav type="checkbox" id="s_career" checked> Career economy (prize money buys parts; off = everything unlocked)</label>
     <label class="row touch-only"><input data-nav type="checkbox" id="s_tilt"> Tilt to steer (touch)</label>
     <label class="touch-only">Touch controls size <input data-nav type="range" id="s_tsize" min="0.7" max="1.4" step="0.05" value="1"></label>
   </div>

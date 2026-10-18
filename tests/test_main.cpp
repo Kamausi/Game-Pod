@@ -734,11 +734,13 @@ int main(int argc, char** argv) {
         CHECK(std::fabs(m.distance - 10.f) < 0.5f, "distance into the hole %.1f", m.distance);
         m.requestTow(w, v);
         CHECK(m.phase == Phase::Finished && m.bountyPot == pot0 + 250 && m.results[0].board == "bounty_distance", "tow grows the pot");
+        CHECK(m.payout == int(10.f * 3.281f * 2.f), "failed attempt pays per foot (%d)", m.payout);
         m.start(ModeId::Bounty, w, v, 0, 0);
         m.update(0.1f, 1.0, w, v, 0, 0, 0);
         v.pos.x = w.bountyX1 + 0.5f;
         m.update(0.1f, 1.1, w, v, 0, 0, 0);
         CHECK(m.claimed && m.results[0].board == "bounty_time" && m.bountyPot == 1500, "claimed, pot resets");
+        CHECK(m.payout == 1750, "claimed bounty pays the pot (%d)", m.payout);
     });
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);

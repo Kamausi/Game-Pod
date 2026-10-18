@@ -1,4 +1,5 @@
 #include "modes.h"
+#include <algorithm>
 #include <cstdio>
 
 namespace mb {
@@ -68,6 +69,7 @@ void ModeRunner::start(ModeId m, World& w, Vehicle& v, int ln, double at) {
     stuck = false;
     resultCount = 0;
     claimed = false;
+    payout = claimedPot = 0;
     timeLimit = m == ModeId::Freestyle ? 90.f : (m == ModeId::King ? 120.f : 0.f);
     resetToSpawn(w, v);
     if (m != ModeId::FreeRoam) v.gear = 0;  // rev it on the line
@@ -81,6 +83,15 @@ void ModeRunner::finish(const std::string& msg) {
     auto add = [&](const char* board, float val, bool lower, const std::string& s) {
         if (resultCount < 2) results[resultCount++] = {true, board, val, lower, s};
     };
+    // Prize money: a full pass pays well (faster pays more), otherwise so much per foot.
+    switch (id) {
+        case ModeId::MudBog: payout = distance >= 79.9f ? 1000 + int(std::max(0.f, 60.f - elapsed) * 20.f) : int(distance * 3.281f * 4.f); break;
+        case ModeId::Circuit: payout = lap >= laps ? 800 + int(std::max(0.f, 300.f - elapsed - penalty) * 2.f) : lap * 150; break;
+        case ModeId::Freestyle: payout = int(score * 0.05f); break;
+        case ModeId::King: payout = int(kingTime * 12.f); break;
+        case ModeId::Bounty: payout = claimed ? claimedPot : int(distance * 3.281f * 2.f); break;
+        default: payout = 0; break;
+    }
     switch (id) {
         case ModeId::MudBog:
             if (distance >= 79.9f) add("bog_time", elapsed, true, "Full pass " + fmtTime(elapsed));
@@ -207,6 +218,7 @@ void ModeRunner::update(float dt, double now, World& w, Vehicle& v, float ejecte
             if (v.pos.x >= w.bountyX1) {
                 claimed = true;
                 int won = bountyPot;
+                claimedPot = won;
                 bountyPot = 1500;
                 finish("BOUNTY CLAIMED! $" + std::to_string(won) + " in " + fmtTime(elapsed));
             } else if (std::fabs(v.pos.z - w.bountyZ) > w.bountyHalfW + 3.f && v.pos.x > w.bountyX0) {

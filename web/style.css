@@ -235,3 +235,8 @@ body.touch #stuckHint, body.touch #coach { bottom: calc(120px * var(--ui) + 80px
   #garage { top: auto; height: 58dvh; }
   .cards { grid-template-columns: 1fr; }
 }
+
+.wallet { color: var(--pj1); font-family: Oswald, sans-serif; font-size: 20px; margin: 6px 0; }
+h2 .wallet { float: right; font-size: 18px; margin: 4px 0 0; }
+.wallet.neg { color: var(--fence); }
+.prize { color: var(--pj1); font-size: 22px; margin: 10px 0; font-family: Oswald, sans-serif; }

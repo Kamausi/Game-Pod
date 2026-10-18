@@ -926,7 +926,7 @@ const char* Game::hud() {
                   "\"pause\":%s,\"pad\":%s,\"padName\":\"%s\",\"engine\":\"%s\",\"dirt\":%.2f,\"lane\":%d,\"standings\":%s,\"ghost\":%s,"
                   "\"coach\":\"%s\",\"soil\":\"%s\",\"tcase\":%d,\"diffF\":\"%s\",\"diffR\":\"%s\",\"belt\":%.0f,\"cvt\":%s,"
                   "\"windup\":%.2f,\"winch\":%d,\"winchKn\":%.1f,\"winchHeat\":%.2f,\"boards\":%d,\"dig\":%.1f,"
-                  "\"flooded\":%s,\"broken\":%s,\"recover\":%s,\"brakeWet\":%.2f,\"bead\":%s,\"shaft\":%s,\"announce\":\"%s\",\"pot\":%d}",
+                  "\"flooded\":%s,\"broken\":%s,\"recover\":%s,\"brakeWet\":%.2f,\"bead\":%s,\"shaft\":%s,\"announce\":\"%s\",\"pot\":%d,\"payout\":%d,\"beltBurnt\":%s}",
                   int(state), player.speed() * 2.237f, player.engineRpm, e.redlineRpm, player.gear, player.manual ? "true" : "false",
                   player.lowRange ? "true" : "false", player.fourWD ? "true" : "false", player.lockFront ? "true" : "false",
                   player.lockRear ? "true" : "false", player.psi, player.engineTemp, player.radiatorClog, player.boost,
@@ -940,7 +940,7 @@ const char* Game::hud() {
                   diffName(player.diffF), diffName(player.diffR), player.beltTemp, player.isCvt() ? "true" : "false", player.windup,
                   winchState, recovery.winch.force / 1000.f, recovery.winch.heat, recovery.boardsCarried, std::max(0.f, recovery.digTimer),
                   player.flooded ? "true" : "false", player.engineBroken ? "true" : "false", recoverMenu ? "true" : "false",
-                  player.brakeWet, debead ? "true" : "false", player.frontShaftBroken ? "true" : "false", announceSafe.c_str(), mode.bountyPot);
+                  player.brakeWet, debead ? "true" : "false", player.frontShaftBroken ? "true" : "false", announceSafe.c_str(), mode.bountyPot, mode.payout, player.beltBurnt ? "true" : "false");
     hudJson = buf;
     g_pauseRequested = false;
     return hudJson.c_str();

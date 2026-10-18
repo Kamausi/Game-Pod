@@ -163,7 +163,8 @@ function show(name) {
   for (const s of screens) $(s).classList.toggle('show', s === name);
   current = name;
   $('hud').classList.toggle('hidden', name !== 'pause');
-  if (name === 'garage') api.setState(1);
+  if (name === 'garage') { if (current !== 'garage') chargeRepairs(); api.setState(1); updateWallet(); }
+  if (name === 'menu') updateWallet();
   if (name === 'boards') loadBoards();
   focusFirst();
 }
@@ -195,6 +196,7 @@ function goFullscreen() {
   }).catch(() => {});
 }
 function startSolo(mode) {
+  chargeRepairs();
   goFullscreen();
   touch.tiltZero = null;   // re-center tilt steering at the start of every event
   lastMode = mode;
@@ -219,7 +221,10 @@ function openRecover() {
   $('recWinch').firstChild.textContent = hud.winch === 2 ? 'Release winch ' : 'Winch ';
   show('recover');
 }
-document.querySelectorAll('[data-rec]').forEach((b) => (b.onclick = () => { hideAll(); api.setState(2); api.action(b.dataset.rec); $('canvas').focus(); }));
+document.querySelectorAll('[data-rec]').forEach((b) => (b.onclick = () => {
+  if (b.dataset.rec === 'dozer' && hud.mode === 0) career.add(-75, 'dozer tow');
+  hideAll(); api.setState(2); api.action(b.dataset.rec); $('canvas').focus();
+}));
 $('btnRecClose').onclick = () => { hideAll(); api.setState(2); $('canvas').focus(); };
 $('btnQuit').onclick = () => { api.setState(0); show('menu'); };
 $('btnAgain').onclick = () => { if (net.room) { hideAll(); api.startMode(lastMode, net.lane || 0, 0); } else startSolo(lastMode); };
@@ -247,7 +252,12 @@ function initGarage() {
     const el = $(id);
     if (el.type === 'checkbox') el.checked = !!cfg[key]; else el.value = key === 'paint' ? '#' + cfg[key] : cfg[key];
     el.addEventListener('input', () => {
-      cfg[key] = el.type === 'checkbox' ? el.checked : conv(el.value);
+      const nv = el.type === 'checkbox' ? el.checked : conv(el.value);
+      if (!buy(key, nv)) {   // can't afford it: put the control back
+        if (el.type === 'checkbox') el.checked = !!cfg[key]; else el.value = key === 'paint' ? '#' + cfg[key] : cfg[key];
+        return;
+      }
+      cfg[key] = nv;
       if (key === 'body') {   // pick sensible defaults for the new body
         const b = catalog.bodies.find((x) => x.id === cfg.body);
         if (b) { cfg.engine = b.engine; cfg.tire = b.tire; cfg.awd = b.awd; cfg.paint = b.paint; refreshGarage(); }
@@ -261,9 +271,85 @@ function initGarage() {
   bind('g_btc', 'btc'); bind('g_bead', 'bead'); bind('g_winch', 'winch');
   bind('g_snorkel', 'snorkel'); bind('g_paint', 'paint', (v) => v.replace('#', ''));
   applyCfg();
+  updateWallet();
 }
 const DIFF = { open: 'open', lsd: 'LSD', locker: 'locker', spool: 'spool' };
-$('btnWash').onclick = () => { api.action('wash'); toast('Washed and repaired'); };
+$('btnWash').onclick = () => { chargeRepairs(); career.add(-20, 'wash'); api.action('wash'); toast('Washed and repaired'); };
+// ------------------------------------------------------------------------------------------
+// Career economy: prize money from events buys trucks and parts; repairs and tows cost money.
+const career = {
+  money: store.get('money', 2500),
+  owned: new Set(store.get('owned', ['body:comanche', 'engine:i6_40', 'tread:at', 'tread:mt', 'axle:4.56', 'diffF:open', 'diffR:open', 'diffR:locker'])),
+  maxTire: store.get('maxTire', 35), maxLift: store.get('maxLift', 4),
+  on() { return !$('s_career') || $('s_career').checked; },
+  save() { store.set('money', this.money); store.set('owned', [...this.owned]); store.set('maxTire', this.maxTire); store.set('maxLift', this.maxLift); updateWallet(); },
+  add(n, why) { if (!this.on() || !n) return; this.money += n; this.save(); if (why) toast(`${n > 0 ? '+' : '−'}$${Math.abs(n).toLocaleString()} ${why}`); },
+};
+const BODY_PRICE = { comanche: 0, bogcar76: 1500, squarebody: 2500, fullsize_suv: 3000, atv: 4000, utv: 6000, silverado: 9000, megatruck: 30000 };
+const DIFF_PRICE = { open: 0, lsd: 500, locker: 900, spool: 250 };
+function engPrice(id) { const e = catalog.engines.find((x) => x.id === id); return e ? Math.round((e.hp || 100) * 14 / 50) * 50 : 0; }
+// Cost of changing cfg[key] to value (0 if owned/free). Returns [cost, ownKey, label].
+function priceOf(key, value) {
+  const k = `${key}:${value}`;
+  switch (key) {
+    case 'body': return career.owned.has(k) ? [0] : [BODY_PRICE[value] ?? 5000, k, (catalog.bodies.find((b) => b.id === value) || {}).name || value];
+    case 'engine': return career.owned.has(k) ? [0] : [engPrice(value), k, (catalog.engines.find((e) => e.id === value) || {}).name || value];
+    case 'tread': return career.owned.has(k) ? [0] : [1200, k, 'paddle tires'];
+    case 'axle': return career.owned.has(k) ? [0] : [900, k, `${value} gears (regear)`];
+    case 'diffF': case 'diffR': return career.owned.has(k) ? [0] : [DIFF_PRICE[value] || 0, k, `${key === 'diffF' ? 'front' : 'rear'} ${value}`];
+    case 'tire': { const t = +value; if (t <= career.maxTire) return [0]; let c = 0; for (let i = career.maxTire + 1; i <= t; i++) c += i > 44 ? 400 : 180; return [c, 'maxTire', `${t}" tires`]; }
+    case 'lift': { const l = +value; return l <= career.maxLift ? [0] : [Math.ceil((l - career.maxLift) * 150), 'maxLift', `${l}" lift`]; }
+    case 'bead': return value && !career.owned.has('bead') ? [800, 'bead', 'beadlocks'] : [0];
+    case 'btc': return value && !career.owned.has('btc') ? [400, 'btc', 'brake traction control'] : [0];
+    case 'winch': return value && !career.owned.has('winch') ? [1200, 'winch', 'front winch'] : [0];
+    case 'snorkel': return value && !career.owned.has('snorkel') ? [350, 'snorkel', 'snorkel'] : [0];
+    case 'awd': return value && !career.owned.has('awd') && !(catalog.bodies.find((b) => b.id === cfg.body) || {}).awd ? [2000, 'awd', '4WD conversion'] : [0];
+    default: return [0];
+  }
+}
+function buy(key, value) {
+  if (!career.on()) return true;
+  const [cost, ownKey, label] = priceOf(key, value);
+  if (!cost) return true;
+  if (career.money < cost) { toast(`${label}: $${cost.toLocaleString()} — you have $${career.money.toLocaleString()}. Win some prize money!`); return false; }
+  career.money -= cost;
+  if (ownKey === 'maxTire') career.maxTire = +value; else if (ownKey === 'maxLift') career.maxLift = +value; else career.owned.add(ownKey);
+  if (key === 'body') {   // a truck comes with its stock engine, tires and drivetrain
+    const b = catalog.bodies.find((x) => x.id === value);
+    if (b) { career.owned.add('engine:' + b.engine); career.maxTire = Math.max(career.maxTire, b.tire); if (b.awd) career.owned.add('awd'); }
+  }
+  career.save();
+  toast(`Bought ${label} — $${cost.toLocaleString()}`);
+  return true;
+}
+// First run of the career: whatever is already on your truck is yours.
+if (store.get('owned', null) == null) {
+  for (const k of ['body', 'engine', 'tread', 'axle', 'diffF', 'diffR']) career.owned.add(`${k}:${cfg[k]}`);
+  for (const k of ['bead', 'btc', 'winch', 'snorkel', 'awd']) if (cfg[k]) career.owned.add(k);
+  career.maxTire = Math.max(career.maxTire, +cfg.tire); career.maxLift = Math.max(career.maxLift, +cfg.lift);
+  store.set('owned', [...career.owned]); store.set('maxTire', career.maxTire); store.set('maxLift', career.maxLift);
+}
+function updateWallet() {
+  const s = career.on() ? `$${career.money.toLocaleString()}` : '';
+  for (const id of ['walletMenu', 'walletGarage']) { const el = $(id); if (el) { el.textContent = s; el.classList.toggle('neg', career.money < 0); } }
+  refreshPrices();
+}
+// Price tags on the garage's locked options.
+function refreshPrices() {
+  if (!catalog.bodies.length) return;
+  const tag = (key, v, base) => { const [c] = career.on() ? priceOf(key, v) : [0]; return c ? `${base} — 🔒 $${c.toLocaleString()}` : base; };
+  for (const o of $('g_body').options) o.textContent = tag('body', o.value, (catalog.bodies.find((b) => b.id === o.value) || {}).name || o.value);
+  for (const o of $('g_engine').options) { const e = catalog.engines.find((x) => x.id === o.value) || {}; o.textContent = tag('engine', o.value, `${e.name} — ${e.hp} hp`); }
+  for (const o of $('g_axle').options) o.textContent = tag('axle', o.value, o.value);
+  for (const o of $('g_tread').options) if (o.value === 'paddle') o.textContent = tag('tread', 'paddle', 'Paddles');
+  for (const id of ['g_diffF', 'g_diffR']) for (const o of $(id).options) o.textContent = tag(id.slice(2), o.value, o.dataset.base || (o.dataset.base = o.textContent));
+}
+// Pit crew bill for anything broken (charged when you go back to the garage or start an event).
+function repairBill() {
+  if (!hud || !career.on()) return 0;
+  return (hud.broken ? 1200 : 0) + (hud.shaft ? 300 : 0) + (hud.bead ? 60 : 0) + (hud.beltBurnt ? 250 : 0) + (hud.winch === 3 ? 150 : 0);
+}
+function chargeRepairs() { const c = repairBill(); if (c) career.add(-c, 'pit crew repairs'); }
 function refreshGarage() {
   $('g_engine').value = cfg.engine; $('g_tire').value = cfg.tire; $('g_awd').checked = cfg.awd; $('g_paint').value = '#' + cfg.paint;
 }
@@ -307,11 +393,13 @@ function initSettings() {
   if (s.post != null) $('s_post').checked = s.post;
   if (s.tilt != null) $('s_tilt').checked = s.tilt;
   if (s.tsize != null) $('s_tsize').value = s.tsize;
+  if (s.career != null) $('s_career').checked = s.career;
   $('s_scale').value = store.get('scale', IS_TOUCH ? 0.75 : 1);
   const save = () => {
     store.set('settings', { master: +$('s_master').value, engine: +$('s_engine').value, sfx: +$('s_sfx').value, amb: +$('s_amb').value,
       quality: +$('s_quality').value, assist: $('s_assist').checked, ai: +$('s_ai').value, ghost: $('s_ghost').checked, post: $('s_post').checked,
-      tilt: $('s_tilt').checked, tsize: +$('s_tsize').value });
+      tilt: $('s_tilt').checked, tsize: +$('s_tsize').value, career: $('s_career').checked });
+    updateWallet();
     applyUiScale();
     if ($('s_tilt').checked) enableTilt();
     else if (touch.tiltOn) { touch.tiltOn = false; $('tSteer').classList.remove('tilt'); }
@@ -488,7 +576,14 @@ async function onResults(results) {
   $('resTitle').textContent = hud.modeName;
   const pb = !net.room && maybeSaveGhost(hud.mode, results);
   const st = (hud.standings || []).length > 1 ? `<ol class="standings">${hud.standings.map((r) => `<li class="${r.you ? 'you' : ''}">${esc(r.name)} <span>${esc(r.text)}</span></li>`).join('')}</ol>` : '';
+  // Prize money, with a podium bonus when racing rivals.
+  let prize = hud.payout || 0;
+  const place = (hud.standings || []).findIndex((r) => r.you);
+  if ((hud.standings || []).length > 1) prize = Math.round(prize * (place === 0 ? 1.5 : place === 1 ? 1.15 : 1));
+  const paid = career.on() && prize > 0;
+  if (paid) career.add(prize);
   $('resBody').innerHTML = results.map((r) => `<div>${r.summary}</div><div class="rank" id="rank_${r.board}">&nbsp;</div>`).join('') +
+    (paid ? `<div class="prize">+$${prize.toLocaleString()} prize money${place === 0 && hud.standings.length > 1 ? ' (winner bonus)' : ''} · bank $${career.money.toLocaleString()}</div>` : '') +
     (pb ? '<div class="rank">New personal best — ghost saved</div>' : '') + st;
   show('results');
   for (const r of results) {

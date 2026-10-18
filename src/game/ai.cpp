@@ -145,7 +145,7 @@ void aiProgress(AiDriver& ai, ModeId mode, const World& w, float dt, float elaps
             const Vec3& nx = w.circuit[size_t(ai.nextCp + 1) % w.circuit.size()];
             float d2 = sq(cp.x - v.pos.x) + sq(cp.z - v.pos.z);
             // Count it when close, or when we've clearly moved past it toward the next one.
-            bool passed = d2 < 144.f || (d2 < 900.f && dot(v.pos - cp, normalize(nx - cp)) > 0.f);
+            bool passed = d2 < 144.f || (d2 < 1600.f && dot(v.pos - cp, normalize(nx - cp)) > 0.f);
             ai.cpTimer += dt;
             if (ai.cpTimer > 22.f) {
                 // Lost the line (or stuck in the water hole): the dozer drags them to the checkpoint.

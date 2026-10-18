@@ -46,7 +46,9 @@ public:
     float stuckTimer = 0, progressTimer = 0, bestProgress = -1e9f;
     bool stuck = false, claimed = false;
     int lane = 0;
-    int bountyPot = 1500;          // grows $250 with every failed attempt, resets when claimed
+    int bountyPot = 1500;
+    int claimedPot = 0;
+    int payout = 0;                // prize money for the run just finished (career economy)          // grows $250 with every failed attempt, resets when claimed
     bool judged() const { return (id == ModeId::MudBog || id == ModeId::Bounty) && phase == Phase::Running; }
     std::string message;
     float messageTimer = 0;
