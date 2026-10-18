@@ -254,6 +254,17 @@ void Game::action(const std::string& a) {
                 world.terrain.scuff(c, 0.16f, 0.3f, 0.5f, std::atan2(f.z, f.x));
             }
     }
+    else if (a.rfind("freecam:", 0) == 0) {   // asset shots: fixed camera, heights above the ground, player hidden
+        freeCam = a != "freecam:off";
+        if (freeCam) {
+            float d = 50;
+            int n = std::sscanf(a.c_str() + 8, "%f,%f,%f,%f,%f,%f,%f", &freePos.x, &freePos.y, &freePos.z, &freeTgt.x, &freeTgt.y, &freeTgt.z, &d);
+            if (n < 6) freeCam = false;
+            freeFov = (n >= 7 ? d : 50.f) * DEG;
+            freePos.y += world.terrain.heightAt(freePos.x, freePos.z);
+            freeTgt.y += world.terrain.heightAt(freeTgt.x, freeTgt.z);
+        }
+    }
     else if (a.rfind("photo:", 0) == 0) {  // photo mode orbit: photo:yawDeg,dist,height (photo:off to release)
         photoCam = a != "photo:off";
         if (photoCam) std::sscanf(a.c_str() + 6, "%f,%f,%f", &photoYaw, &photoDist, &photoH);
@@ -386,6 +397,12 @@ void Game::updateCamera(float dt, const InputState& in) {
         camPos = lerp(camPos, pos, 1.f - std::exp(-2.f * dt));
         camTarget = lerp(camTarget, tgt, 1.f - std::exp(-2.f * dt));
         fov = 1.0f;
+        return;
+    }
+    if (freeCam && state == AppState::Playing) {
+        camPos = freePos;
+        camTarget = freeTgt;
+        fov = freeFov;
         return;
     }
     if (photoCam && state == AppState::Playing) {
@@ -667,7 +684,7 @@ void Game::buildFrame(RenderFrame& f) {
     f.particles = &particles.all();
     float comp[4], spin[4];
     for (int i = 0; i < 4; i++) { comp[i] = player.wheels[size_t(i)].compression; spin[i] = player.wheels[size_t(i)].spin; }
-    if (camMode != 2 || state != AppState::Playing)
+    if ((camMode != 2 && !freeCam) || state != AppState::Playing)
         addVehicleDraws(f, player, playerVis, player.pos, player.rot, comp, spin, player.steerApplied, player.dirt, 1.f);
     for (auto& kv : remotes) {
         Remote& r = kv.second;

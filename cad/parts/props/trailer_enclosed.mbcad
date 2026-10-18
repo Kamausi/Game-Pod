@@ -1,41 +1,103 @@
-# Enclosed race trailer 2.6 x 7.5 x 3 m: V-nose toward +Z, rear ramp door, side door,
-# tandem axles, accent stripe. Origin at ground centre.
+# Enclosed race trailer 2.6 x 7.5 x 3 m: V-nose toward +Z with a diamond-plate stone guard,
+# seamed aluminium skin, team lettering both sides, LED marker lights, roof vents, side door
+# with lock, rear ramp door with hinges and lock bars, tandem axles with fender trims,
+# stabilizer jacks, A-frame tongue with jack and battery box. Origin at ground centre.
 param body_r = 0.18
 param body_g = 0.18
 param body_b = 0.20
 param stripe_r = 0.85
 param stripe_g = 0.20
 param stripe_b = 0.10
+set W = 2.60
 color body_r body_g body_b
 material paint
-box size=2.60,2.45,6.6 pos=0,1.78,-0.40 bevel=0.06
-extrude depth=2.60 bevel=0.05 pts=2.90,0.55,2.90,3.00,3.60,2.70,3.60,0.85
+box size=W,2.45,6.6 pos=0,1.78,-0.40 bevel=0.06
+extrude depth=W bevel=0.05 pts=2.90,0.55,2.90,3.00,3.60,2.70,3.60,0.85
+# Skin seams every 60 cm along both sides
+color body_r*0.7 body_g*0.7 body_b*0.7
+for k = 0, 10
+  box size=W+0.006,2.30,0.02 pos=0,1.80,-3.40+k*0.60
+end
+# Accent stripes and team lettering
 color stripe_r stripe_g stripe_b
-box size=2.62,0.25,6.4 pos=0,1.25,-0.40
-box size=2.62,0.06,6.4 pos=0,1.47,-0.40
+box size=W+0.02,0.25,6.4 pos=0,1.25,-0.40
+box size=W+0.02,0.06,6.4 pos=0,1.47,-0.40
+use props/trailer_decal.mbcad pos=W/2+0.012,2.15,-1.30 rot=0,90,0 col_r=stripe_r col_g=stripe_g col_b=stripe_b
+use props/trailer_decal.mbcad pos=-W/2-0.012,2.15,-1.30 rot=0,-90,0 col_r=stripe_r col_g=stripe_g col_b=stripe_b
+# Diamond-plate stone guard on the V-nose
+color #b9bcbf
+material steel
+extrude depth=W+0.02 pts=2.92,0.56,2.92,1.35,3.62,1.28,3.62,0.86
+color #a4a8ac
+for k = 0, 8
+  box size=0.09,0.09,0.02 pos=-1.1+k*0.275,1.05,3.635 rot=0,0,45
+end
+# Bottom trim rail
 color #c4c6c8
 material chrome
-box size=2.62,0.10,6.62 pos=0,0.60,-0.40
-box size=2.52,2.30,0.04 pos=0,1.78,-3.72
+box size=W+0.02,0.10,6.62 pos=0,0.60,-0.40
+# ---- Rear ramp door: hinges, lock bars, handle ----
+color body_r*1.1 body_g*1.1 body_b*1.1
+material paint
+box size=2.48,2.28,0.05 pos=0,1.78,-3.735
+color #c4c6c8
+material chrome
+for k = 0, 2
+  box size=0.20,0.06,0.07 pos=0,0.70+k*0.02,-3.77
+end
+box size=2.40,0.05,0.06 pos=0,0.72,-3.765
+box size=0.05,2.0,0.05 pos=0.55,1.80,-3.77 mirror=x
+box size=0.14,0.05,0.07 pos=0.55,1.10,-3.79 mirror=x
 color #1a1a1a
 material matte
-box size=0.04,1.85,0.85 pos=1.31,1.60,1.40
 box size=2.30,0.06,0.06 pos=0,2.95,-3.72
+# ---- Side door (+X): frame, flush lock, grab handle ----
+color body_r*1.15 body_g*1.15 body_b*1.15
+material paint
+box size=0.04,1.90,0.86 pos=W/2+0.01,1.62,1.40
+color #c4c6c8
+material chrome
+box size=0.06,0.14,0.10 pos=W/2+0.03,1.60,1.05
+box size=0.06,0.50,0.03 pos=W/2+0.03,1.70,1.92
+# ---- LED marker lights: amber along the sides, red at the rear, clearance up top ----
+color #e8a020
+material lens
+for k = 0, 3
+  box size=W+0.03,0.05,0.10 pos=0,2.93,-3.0+k*1.9
+end
+box size=0.06,0.06,0.03 pos=1.28,2.95,-3.73 mirror=x
+color #b01313
+box size=0.08,0.22,0.03 pos=1.20,0.90,-3.75 mirror=x
+box size=0.60,0.04,0.03 pos=0,3.00,-3.73
+# ---- Roof vents ----
+color #d8d8d8
+material plastic
+box size=0.42,0.10,0.42 pos=0,3.05,1.2 bevel=0.03
+box size=0.42,0.10,0.42 pos=0,3.05,-2.2 bevel=0.03
+# ---- Tongue, coupler, jack, battery box ----
 color #2a2a2c
 material steel
 box size=0.10,0.10,1.4 pos=0.30,0.50,4.15 rot=0,10,0
 box size=0.10,0.10,1.4 pos=-0.30,0.50,4.15 rot=0,-10,0
-cyl r=0.06 h=0.15 pos=0,0.50,4.85
+cyl r=0.06 h=0.15 pos=0,0.50,4.85 seg=10
+cyl r=0.04 h=0.55 pos=0,0.28,4.40 seg=8
+color #1a1a1a
+material plastic
+box size=0.34,0.24,0.22 pos=0,0.70,3.85 bevel=0.02
+# ---- Running gear: tandem axle, rims, fender trims, stabilizer jacks ----
 color #111111
 material rubber
-cyl r=0.34 h=0.22 axis=x pos=1.10,0.34,-0.10 mirror=x
-cyl r=0.34 h=0.22 axis=x pos=1.10,0.34,-0.90 mirror=x
+cyl r=0.34 h=0.22 axis=x pos=1.10,0.34,-0.10 mirror=x seg=14
+cyl r=0.34 h=0.22 axis=x pos=1.10,0.34,-0.90 mirror=x seg=14
 color #c8c8c8
 material chrome
-cyl r=0.17 h=0.23 axis=x pos=1.10,0.34,-0.10 mirror=x
-cyl r=0.17 h=0.23 axis=x pos=1.10,0.34,-0.90 mirror=x
-color #b01313
-material lens
-box size=0.08,0.22,0.03 pos=1.20,0.90,-3.73 mirror=x
-color #e8a020
-box size=0.06,0.06,0.03 pos=1.28,2.95,-3.73 mirror=x
+cyl r=0.18 h=0.23 axis=x pos=1.10,0.34,-0.10 mirror=x seg=12
+cyl r=0.18 h=0.23 axis=x pos=1.10,0.34,-0.90 mirror=x seg=12
+box size=0.04,0.06,1.70 pos=W/2+0.01,0.80,-0.50 mirror=x
+color #0a0a0a
+material matte
+box size=W+0.01,0.40,1.60 pos=0,0.62,-0.50
+color #2a2a2a
+material steel
+box size=0.08,0.50,0.08 pos=1.1,0.30,2.5 rot=20,0,0 mirror=x
+box size=0.08,0.50,0.08 pos=1.1,0.30,-3.4 rot=-20,0,0 mirror=x

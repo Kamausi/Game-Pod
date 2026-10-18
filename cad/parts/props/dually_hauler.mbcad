@@ -1,44 +1,124 @@
-# Parked heavy-duty dually crew-cab tow truck with gooseneck hitch, wheels included.
+# Parked heavy-duty dually crew-cab tow rig with a gooseneck ball in the bed, wheels included:
+# tall HD front clip with the arch cut in, crew cab, wide dually bed with flared rear fenders,
+# amber cab clearance lights, tow mirrors, big chrome grille, polished duals.
 # Front faces +Z. Origin at ground centre. ~2.4 m wide at the duals, 6.6 m long.
 param paint_r = 0.90
 param paint_g = 0.90
 param paint_b = 0.90
 set FA = 2.10
 set RA = -1.80
+set WR = 0.40
+set W = 2.0
 color paint_r paint_g paint_b
 material paint
-extrude depth=2.0 bevel=0.05 pts=1.10,0.65,1.12,1.20,3.25,1.12,3.30,0.90,3.30,0.62
-extrude depth=2.0 bevel=0.05 pts=-1.05,0.62,-1.05,1.30,1.12,1.30,1.12,0.62
+# HD front clip (taller hood) with the front arch
+extrude depth=W bevel=0.05 pts=1.10,0.62,arc(FA,WR,WR+0.10,180,0,9),3.30,0.62,3.32,0.92,3.26,1.14,1.12,1.22,1.10,1.18
+# Crew cab lower and greenhouse
+extrude depth=W bevel=0.05 pts=-1.05,0.62,-1.05,1.30,1.12,1.30,1.12,0.62
 extrude depth=1.92 bevel=0.04 pts=0.75,1.30,0.35,1.92,-0.95,1.95,-1.05,1.30
-box size=2.40,0.75,2.30 pos=0,1.00,-2.10 bevel=0.04
+# Dually bed: narrow box between wide flared rear fenders
+box size=W-0.04,0.70,2.30 pos=0,1.00,-2.12
+extrude depth=0.22 pts=-1.30,0.62,arc(RA,WR,WR+0.12,0,180,9),-2.40,0.62,-2.30,0.95,-1.40,0.95 pos=1.11,0,0 mirror=x
 color #1c1c1c
 material matte
-box size=2.16,0.04,2.20 pos=0,1.35,-2.10
-cyl r=0.05 h=0.20 pos=0,1.45,-1.90
+box size=W-0.16,0.04,2.20 pos=0,1.35,-2.12
+# Gooseneck ball and plate centred over the rear axle
+color #2a2a2a
+material steel
+box size=0.30,0.02,0.30 pos=0,1.37,-1.80
+color #c8c8c8
+material chrome
+cyl r=0.03 h=0.08 pos=0,1.41,-1.80 seg=8
+sphere r=0.045 pos=0,1.48,-1.80 seg=8
+# Tailgate handle, rear bumper with receiver
+color #1c1c1c
+material matte
+box size=0.26,0.06,0.02 pos=0,1.20,-3.27
+color #c4c4c0
+material chrome
+box size=2.30,0.18,0.16 pos=0,0.55,-3.30 bevel=0.03
+color #1a1a1a
+material steel
+box size=0.08,0.08,0.20 pos=0,0.45,-3.40
+
+# ---- Glass, pillars, doors, handles, mirrors ----
 color #10161c
 material glass
 extrude depth=1.95 pts=0.70,1.32,0.33,1.88,-0.92,1.90,-1.02,1.32
+color #111111
+material matte
+box size=1.955,0.56,0.08 pos=0,1.60,-0.15
+color paint_r*0.45 paint_g*0.45 paint_b*0.45
+box size=W+0.008,0.66,0.012 pos=0,0.96,1.10
+box size=W+0.008,0.66,0.012 pos=0,0.96,-0.15
 color #c4c4c0
 material chrome
-box size=1.30,0.40,0.05 pos=0,0.95,3.30 bevel=0.02
-box size=2.10,0.22,0.18 pos=0,0.55,3.32 bevel=0.03
-box size=2.30,0.18,0.16 pos=0,0.55,-3.27 bevel=0.03
+box size=W+0.02,0.035,0.16 pos=0,1.18,0.80
+box size=W+0.02,0.035,0.16 pos=0,1.18,-0.45
+color #151515
+material matte
+box size=0.22,0.30,0.10 pos=1.14,1.46,0.90 mirror=x bevel=0.02
+box size=0.18,0.03,0.04 pos=1.04,1.40,0.94 mirror=x
+# Amber cab clearance lights
+color #e8a020
+material lens
+for k = -2, 2
+  box size=0.07,0.035,0.04 pos=k*0.22,1.955,0.38
+end
+
+# ---- Front: tall chrome grille, badge, headlamps, bumper, tow hooks ----
+color #111111
+material matte
+box size=1.30,0.48,0.04 pos=0,0.95,3.31
+color #c4c4c0
+material chrome
+box size=1.36,0.50,0.03 pos=0,0.95,3.30 bevel=0.02
+for k = 0, 4
+  box size=1.24,0.04,0.05 pos=0,0.76+k*0.095,3.33
+end
+color #b8b8b8
+box size=0.26,0.12,0.02 pos=0,0.98,3.36 bevel=0.01
 color #e8eef2
 material lens
-box size=0.30,0.20,0.04 pos=0.78,1.00,3.29 bevel=0.01 mirror=x
-color #b01313
-box size=0.06,0.32,0.04 pos=1.16,1.10,-3.26 mirror=x
-color #e8a020
-box size=0.08,0.04,0.04 pos=0.4,1.97,0.38 mirror=x
-color #111111
-material rubber
-cyl r=0.40 h=0.28 axis=x pos=0.86,0.40,FA mirror=x
-cyl r=0.40 h=0.26 axis=x pos=0.86,0.40,RA mirror=x
-cyl r=0.40 h=0.26 axis=x pos=1.12,0.40,RA mirror=x
-color #c8c8c8
+box size=0.32,0.22,0.05 pos=0.82,1.00,3.27 rot=0,-8,0 bevel=0.01 mirror=x
+color #c4c4c0
 material chrome
-cyl r=0.20 h=0.29 axis=x pos=0.86,0.40,FA mirror=x
-cyl r=0.20 h=0.27 axis=x pos=1.13,0.40,RA mirror=x
+box size=2.10,0.22,0.18 pos=0,0.55,3.34 bevel=0.03
+color #1a1a1a
+material steel
+box size=0.06,0.08,0.10 pos=0.55,0.44,3.42 mirror=x
+# Rear lamps
+color #b01313
+material lens
+box size=0.06,0.32,0.06 pos=0.96,1.10,-3.26 mirror=x
+
+# ---- Black front flares, running boards, frame rails ----
+color #151515
+material matte
+extrude depth=0.08 pts=arc(FA,WR,WR+0.17,182,-2,9),arc(FA,WR,WR+0.10,-2,182,9) pos=W/2+0.03,0,0 mirror=x
+color #2a2a2a
+material steel
+box size=0.20,0.05,2.05 pos=W/2+0.07,0.42,0.05 mirror=x
 color #1a1a1a
 material matte
 box size=0.08,0.10,6.3 pos=0.50,0.40,0 mirror=x
+
+# ---- Wheels: singles up front, polished duals at the rear (outer hub dished) ----
+color #111111
+material rubber
+cyl r=WR h=0.28 axis=x pos=0.86,WR,FA mirror=x seg=14
+cyl r=WR h=0.26 axis=x pos=0.86,WR,RA mirror=x seg=14
+cyl r=WR h=0.26 axis=x pos=1.13,WR,RA mirror=x seg=14
+color #d0d0d0
+material chrome
+cyl r=0.24 h=0.03 axis=x pos=1.00,WR,FA mirror=x seg=12
+cyl r=0.24 h=0.03 axis=x pos=1.27,WR,RA mirror=x seg=12
+cyl r=0.10 h=0.10 axis=x pos=1.02,WR,FA mirror=x seg=10 r2=0.07
+color #2a2a2a
+material steel
+for k = 0, 7
+  cyl r=0.018 h=0.03 axis=x pos=1.29,WR+0.15*sin(k*45),RA+0.15*cos(k*45) mirror=x seg=5
+end
+color #c8c8c8
+material chrome
+cyl r=0.09 h=0.04 axis=x pos=1.30,WR,RA mirror=x seg=10
