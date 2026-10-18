@@ -1,8 +1,25 @@
-# Green steel T-post holding the orange safety fence (photos 5-6).
+# Green steel T-post holding the orange safety fence (photos 5-6): T-section with the row of
+# studs up the flange, painted white tip, spade anchor plate at the ground line, wire fence
+# clips. Origin at ground level (the bottom 0.3 m is driven into the ground).
 param h = 1.5
 color #1f5e4a
+material paint
 box size=0.035,h,0.012 pos=0,h/2-0.3,0
 box size=0.012,h,0.035 pos=0,h/2-0.3,0.012
+# studs up the flange face
+color #1a5040
+for k = 0, 8
+  box size=0.016,0.012,0.010 pos=0,0.05+k*0.12,-0.010
+end
+# white-painted tip
+color #e8e8e2
+box size=0.037,0.07,0.014 pos=0,h-0.335,0
+box size=0.014,0.07,0.037 pos=0,h-0.335,0.012
+# anchor plate just below grade, showing a sliver of rust
+color #6e4a2a
+material steel
+box size=0.10,0.08,0.006 pos=0,-0.02,0.02
+# wire clips holding the fence
 color #d8d8d8
 box size=0.05,0.015,0.05 pos=0,h*0.62-0.3,0.01
 box size=0.05,0.015,0.05 pos=0,h*0.18-0.3,0.01

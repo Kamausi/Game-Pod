@@ -1,3 +1,26 @@
-# Weathered wooden post for the barbed-wire perimeter (photos 1-2 foreground).
+# Weathered wooden post for the barbed-wire perimeter (photos 1-2 foreground): split, grey,
+# cracked cedar with a chamfered top, staples holding three strands of barbed wire, a grass
+# tuft at the foot. Origin at ground level.
+material matte
 color #6f6553
-cyl r=0.06 h=1.4 pos=0,0.55,0 seg=7
+cyl r=0.06 r2=0.055 h=1.4 pos=0,0.55,0 seg=8
+color #5a5243
+cyl r=0.063 h=0.03 pos=0,0.02,0 seg=8
+# chamfered, darker top
+color #4f483c
+cyl r=0.055 r2=0.03 h=0.05 pos=0,1.275,0 seg=8
+# a long split down one face and a knot
+color #2f2a22
+box size=0.006,0.70,0.02 pos=0.057,0.80,0.0
+sphere r=0.018 pos=-0.05,0.45,0.03 scale=0.6,1,1 seg=5
+# staples and barbed-wire stubs (the wire itself runs between posts)
+color #8a8a86
+material steel
+for k = 0, 2
+  box size=0.025,0.012,0.012 pos=0,0.45+k*0.30,0.062
+  box size=0.12,0.006,0.006 pos=0,0.45+k*0.30,0.066
+end
+# grass tuft round the foot
+color #5d6a35
+material leaf
+sphere r=0.14 pos=0,0.03,0 scale=1,0.35,1 seg=5

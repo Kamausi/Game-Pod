@@ -6,6 +6,7 @@ param panel_r = 0.06
 param panel_g = 0.30
 param panel_b = 0.18
 param arrow = 1
+param label = 0                    # 0 none, else an index into the label list below
 set B = 1.2                        # panel bottom height
 set C = B+h/2                      # panel centre height
 # Posts behind the panel
@@ -25,8 +26,36 @@ color #f0f0ea
 box size=w-0.06,0.03,0.006 pos=0,B+h-0.045,0.019
 box size=w-0.06,0.03,0.006 pos=0,B+0.045,0.019
 box size=0.03,h-0.06,0.006 pos=w/2-0.045,C,0.019 mirror=x
+# Label text (upper band when a label is set; the arrow drops into the lower band)
+set hasL = min(1,label)
+set AY = C-h*0.20*hasL
+set AS = 1-0.35*hasL
+# light lettering on dark panels, near-black on bright ones (yellow, white)
+set dk = max(0,min(1,(0.3*panel_r+0.6*panel_g+0.1*panel_b-0.5)*20))
+color 0.95-0.87*dk 0.95-0.87*dk 0.92-0.84*dk
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(7*1.45))
+text str=WELCOME size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-1)),max(0,1-abs(label-1)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(8*1.45))
+text str=PRO_SHOP size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-2)),max(0,1-abs(label-2)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(9*1.45))
+text str=FIRST_AID size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-3)),max(0,1-abs(label-3)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(5*1.45))
+text str=ENTRY size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-4)),max(0,1-abs(label-4)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(7*1.45))
+text str=PADDOCK size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-5)),max(0,1-abs(label-5)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(4*1.45))
+text str=EXIT size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-6)),max(0,1-abs(label-6)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(4*1.45))
+text str=PITS size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-7)),max(0,1-abs(label-7)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(7*1.45))
+text str=BURNOUT size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-8)),max(0,1-abs(label-8)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(11*1.45))
+text str=BOUNTY_HOLE size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-9)),max(0,1-abs(label-9)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(7*1.45))
+text str=CAMPING size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-10)),max(0,1-abs(label-10)),1
+set sz = min(h*(0.28-0.15*arrow),(w*0.84)/(12*1.45))
+text str=DUMP_STATION size=sz t=sz*0.24 depth=0.006 pos=0,C+h*0.2*arrow*hasL,0.022 scale=max(0,1-abs(label-11)),max(0,1-abs(label-11)),1
 # Arrow: shaft box + two wedges forming the head (lighter tint)
-color min(1,panel_r*0.3+0.7) min(1,panel_g*0.3+0.7) min(1,panel_b*0.3+0.7)
-box size=w*0.42*arrow,h*0.16*arrow,0.006 pos=-w*0.09,C,0.02
-wedge size=0.006,h*0.24*arrow,w*0.20*arrow pos=w*0.22,C+h*0.12*arrow,0.02 rot=0,90,0
-wedge size=0.006,h*0.24*arrow,w*0.20*arrow pos=w*0.22,C-h*0.12*arrow,0.02 rot=0,-90,180
+box size=w*0.42*arrow*AS,h*0.16*arrow*AS,0.006 pos=-w*0.09*AS,AY,0.02
+wedge size=0.006,h*0.24*arrow*AS,w*0.20*arrow*AS pos=w*0.22*AS,AY+h*0.12*arrow*AS,0.02 rot=0,90,0
+wedge size=0.006,h*0.24*arrow*AS,w*0.20*arrow*AS pos=w*0.22*AS,AY-h*0.12*arrow*AS,0.02 rot=0,-90,180

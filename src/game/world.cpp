@@ -587,7 +587,7 @@ void World::generate(uint32_t seed) {
         person(4.2f, -86.f, -PI * 0.5f, true);
         person(-3.8f, -89.f, PI * 0.5f, true);
         building("venue/office_trailer.mbcad", -9.f, -82.f, PI * 0.5f, {4.6f, 1.6f, 1.9f}, col3(0.9f, 0.89f, 0.84f, "color"));
-        addProp("venue/sign.mbcad", 4.5f, -95.f, PI, 1.f, {{"panel_r", 0.85f}, {"panel_g", 0.4f}, {"panel_b", 0.08f}});
+        addProp("venue/sign.mbcad", 4.5f, -95.f, PI, 1.f, {{"label", 1}, {"arrow", 0}, {"panel_r", 0.85f}, {"panel_g", 0.4f}, {"panel_b", 0.08f}});
         addProp("venue/flag_pole.mbcad", -6.f, -93.f, 0, 1.f, col3(0.95f, 0.5f, 0.05f, "color"));
         addProp("venue/flag_pole.mbcad", 6.f, -93.f, 0, 1.f, col3(0.1f, 0.3f, 0.75f, "color"));
 
@@ -601,11 +601,11 @@ void World::generate(uint32_t seed) {
         // Shops along the return road: pro shop/parts store, washroom block, first aid.
         building("venue/metal_building.mbcad", -42.f, -66.5f, 0, {5.f, 2.f, 4.f},
                  with(with(col3(0.55f, 0.12f, 0.1f, "wall"), col3(0.25f, 0.26f, 0.27f, "roof")), {{"w", 10}, {"l", 8}}));
-        addProp("venue/sign.mbcad", -42.f, -61.5f, 0, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.1f}, {"panel_b", 0.12f}, {"w", 2.4f}});
+        addProp("venue/sign.mbcad", -42.f, -61.5f, 0, 1.f, {{"label", 2}, {"arrow", 0}, {"panel_r", 0.1f}, {"panel_g", 0.1f}, {"panel_b", 0.12f}, {"w", 2.4f}});
         building("venue/metal_building.mbcad", -28.f, -66.f, 0, {4.f, 1.8f, 3.f},
                  with(with(col3(0.82f, 0.8f, 0.72f, "wall"), col3(0.18f, 0.32f, 0.2f, "roof")), {{"w", 8}, {"l", 6}, {"h", 3.f}}));
         building("venue/canopy.mbcad", -19.f, -66.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.92f}, {"color_g", 0.92f}, {"color_b", 0.92f}, {"walls", 1}});
-        addProp("venue/sign.mbcad", -19.f, -63.5f, 0, 1.f, {{"panel_r", 0.85f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"w", 1.0f}, {"h", 0.6f}});
+        addProp("venue/sign.mbcad", -19.f, -63.5f, 0, 1.f, {{"label", 3}, {"arrow", 0}, {"panel_r", 0.85f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"w", 1.0f}, {"h", 0.6f}});
         person(-18.f, -64.5f, 0, true);
         for (int i = 0; i < 4; i++) building("venue/portajohn.mbcad", -33.5f + i * 1.3f, -71.5f, 0, {0.55f, 1.1f, 0.55f},
                                               col3(0.1f, 0.35f, 0.6f, "body"));
@@ -676,12 +676,12 @@ void World::generate(uint32_t seed) {
         building("venue/canopy.mbcad", -66.f, -48.f, PI * 0.5f, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.1f}, {"color_g", 0.3f}, {"color_b", 0.7f}, {"walls", 1}});
         addProp("venue/folding_table.mbcad", -65.f, -48.f, PI * 0.5f);
         person(-64.5f, -47.f, PI * 0.5f, true);
-        addProp("venue/sign.mbcad", -66.f, -45.f, PI * 0.5f, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.3f}, {"panel_b", 0.7f}, {"w", 1.4f}});
+        addProp("venue/sign.mbcad", -66.f, -45.f, PI * 0.5f, 1.f, {{"label", 4}, {"panel_r", 0.1f}, {"panel_g", 0.3f}, {"panel_b", 0.7f}, {"w", 1.4f}});
         for (int i = 0; i < 4; i++) addProp("venue/cone.mbcad", -62.f + (i % 2) * 5.f, -51.f + (i / 2) * 6.f, 0);
         building("venue/canopy.mbcad", -52.f, -64.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.95f}, {"color_g", 0.5f}, {"color_b", 0.05f}});
         addProp("venue/folding_table.mbcad", -52.f, -63.f, 0);
         person(-52.f, -64.f, 0, true);
-        addProp("venue/sign.mbcad", -48.5f, -62.5f, 0, 1.f, {{"panel_r", 0.95f}, {"panel_g", 0.5f}, {"panel_b", 0.05f}, {"w", 1.4f}});
+        addProp("venue/sign.mbcad", -48.5f, -62.5f, 0, 1.f, {{"label", 5}, {"panel_r", 0.95f}, {"panel_g", 0.5f}, {"panel_b", 0.05f}, {"w", 1.4f}});
 
         // Recovery holding: loader tractor and the crew's tow truck by the pit's start corner.
         building("props/tractor_loader.mbcad", -50.f, -46.f, PI * 0.5f, {1.0f, 1.3f, 2.2f}, col3(0.2f, 0.45f, 0.15f, "body"));
@@ -692,8 +692,8 @@ void World::generate(uint32_t seed) {
             addProp("venue/cone.mbcad", 50.f + i * 4.f, -17.5f, 0);
             addProp("venue/cone.mbcad", 50.f + i * 4.f, -42.5f + std::max(0, i - 3) * 1.5f, 0);
         }
-        addProp("venue/sign.mbcad", 74.f, -30.f, -PI * 0.5f, 1.f, {{"panel_r", 0.85f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"arrow", 1}});
-        addProp("venue/sign.mbcad", 60.f, -44.f, -PI * 0.25f, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.4f}, {"panel_b", 0.15f}, {"arrow", 1}});
+        addProp("venue/sign.mbcad", 74.f, -30.f, -PI * 0.5f, 1.f, {{"label", 6}, {"panel_r", 0.85f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"arrow", 1}});
+        addProp("venue/sign.mbcad", 60.f, -44.f, -PI * 0.25f, 1.f, {{"label", 7}, {"panel_r", 0.1f}, {"panel_g", 0.4f}, {"panel_b", 0.15f}, {"arrow", 1}});
         person(52.f, -18.5f, -PI * 0.5f, true);
         for (int i = 0; i < 6; i++) addProp("venue/hay_bale.mbcad", 79.f, -38.f + i * 3.6f, PI * 0.5f, 1.f, {{"round", 0}});
 
@@ -766,7 +766,7 @@ void World::generate(uint32_t seed) {
             }
             building("venue/bleachers.mbcad", c.x, c.z + burnoutHalfZ + 5.f, PI, {6.f, 1.2f, 2.f}, {{"len", 12}});
             for (int i = 0; i < 14; i++) person(c.x + gr.range(-6.f, 6.f), c.z + burnoutHalfZ + gr.range(2.5f, 3.2f), PI + gr.range(-0.3f, 0.3f), false);
-            addProp("venue/sign.mbcad", c.x - burnoutHalfX - 2.f, c.z + 1.f, -PI * 0.5f, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"w", 1.8f}});
+            addProp("venue/sign.mbcad", c.x - burnoutHalfX - 2.f, c.z + 1.f, -PI * 0.5f, 1.f, {{"label", 8}, {"arrow", 0}, {"panel_r", 0.1f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"w", 1.8f}});
             person(c.x - burnoutHalfX - 1.f, c.z - 2.f, PI * 0.5f, true);
         }
         // Bounty hole: prize board, viewing bank with bleachers and crowd, flags, hay bales.
@@ -776,7 +776,7 @@ void World::generate(uint32_t seed) {
             for (int i = 0; i < 18; i++) person(bc.x + gr.range(-13.f, 13.f), bountyZ - bountyHalfW - gr.range(4.5f, 5.5f), gr.range(-0.3f, 0.3f), false);
             for (int i = 0; i < 6; i++) person(bc.x - 8.f + i * 2.f, bountyZ - bountyHalfW - 6.6f, 0, false, ground(bc.x, bountyZ - bountyHalfW - 7.f) + 0.45f);
             building("venue/results_board.mbcad", bountyX0 - 4.f, bountyZ - bountyHalfW - 5.f, PI * 0.15f, {2.f, 2.5f, 0.3f});
-            addProp("venue/sign.mbcad", bountyX0 - 6.f, bountyZ + 5.f, PI * 0.5f, 1.f, {{"panel_r", 0.85f}, {"panel_g", 0.65f}, {"panel_b", 0.1f}, {"w", 2.2f}, {"h", 1.1f}});
+            addProp("venue/sign.mbcad", bountyX0 - 6.f, bountyZ + 5.f, PI * 0.5f, 1.f, {{"label", 9}, {"arrow", 0}, {"panel_r", 0.85f}, {"panel_g", 0.65f}, {"panel_b", 0.1f}, {"w", 2.2f}, {"h", 1.1f}});
             for (float x = bountyX0; x <= bountyX1; x += 8.f) {
                 addProp("venue/flag_pole.mbcad", x, bountyZ - bountyHalfW - 3.5f, 0, 1.f, col3(gr.uniform(), gr.uniform() * 0.6f, 0.1f, "color"));
                 addProp("venue/hay_bale.mbcad", x + 2.f, bountyZ + bountyHalfW + 3.5f, gr.range(0, 6.28f), 1.f, {{"round", 1}});
@@ -790,8 +790,8 @@ void World::generate(uint32_t seed) {
         {
             building("venue/metal_building.mbcad", 106.f, 30.f, PI, {4.f, 1.8f, 3.f},
                      with(with(col3(0.62f, 0.5f, 0.36f, "wall"), col3(0.22f, 0.24f, 0.25f, "roof")), {{"w", 8}, {"l", 6}, {"h", 3.f}}));
-            addProp("venue/sign.mbcad", 98.f, 6.f, PI * 0.5f, 1.f, {{"panel_r", 0.4f}, {"panel_g", 0.25f}, {"panel_b", 0.12f}});
-            addProp("venue/sign.mbcad", 120.f, 36.f, PI, 1.f, {{"panel_r", 0.1f}, {"panel_g", 0.3f}, {"panel_b", 0.6f}, {"w", 1.0f}});   // RV dump station
+            addProp("venue/sign.mbcad", 98.f, 6.f, PI * 0.5f, 1.f, {{"label", 10}, {"panel_r", 0.4f}, {"panel_g", 0.25f}, {"panel_b", 0.12f}});
+            addProp("venue/sign.mbcad", 120.f, 36.f, PI, 1.f, {{"label", 11}, {"arrow", 0}, {"panel_r", 0.1f}, {"panel_g", 0.3f}, {"panel_b", 0.6f}, {"w", 1.0f}});   // RV dump station
             int site = 0;
             for (float z = 8.f; z < 34.f; z += 9.f)
                 for (int side = -1; side <= 1; side += 2, site++) {
