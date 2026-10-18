@@ -114,7 +114,7 @@ void aiThink(AiDriver& ai, ModeId mode, const World& w, float dt, float elapsed,
         if (ai.rockPhase == 1) { in.throttle = 0; in.brake = 1; }
         else { in.throttle = 1; in.brake = 0; }
         if (spd > 2.5f && ai.rockPhase == 2) { ai.stuckTimer = 0; ai.rockPhase = 0; ai.rockCycles = 0; }
-        if (mode == ModeId::MudBog && ai.rockCycles > 4) ai.gaveUp = true;
+        if (mode == ModeId::MudBog && ai.rockCycles > 14) ai.gaveUp = true;  // rivals fight it out too
     }
     ai.input = in;
 }
@@ -128,7 +128,7 @@ void aiProgress(AiDriver& ai, ModeId mode, const World& w, float dt, float elaps
             if (v.pos.x > ai.bestProgress + 0.3f) { ai.bestProgress = v.pos.x; ai.progressTimer = 0; }
             else ai.progressTimer += dt;
             if (v.pos.x >= w.pitX1) { ai.finished = true; ai.finishTime = elapsed; }
-            else if (v.pos.x > w.pitX0 && ai.progressTimer > 5.f) ai.gaveUp = true;
+            else if (v.pos.x > w.pitX0 && ai.progressTimer > 40.f) ai.gaveUp = true;
             break;
         case ModeId::Circuit: {
             const Vec3& cp = w.circuit[size_t(ai.nextCp)];

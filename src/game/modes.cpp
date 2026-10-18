@@ -141,10 +141,11 @@ void ModeRunner::update(float dt, double now, World& w, Vehicle& v, float ejecte
             distance = clampf(v.pos.x - w.pitX0, 0.f, w.pitX1 - w.pitX0);
             if (v.pos.x > bestProgress + 0.3f) { bestProgress = v.pos.x; progressTimer = 0; }
             else progressTimer += dt;
+            // No clock: the run lasts until a full pass, leaving the lane, or calling the dozer
+            // (T / View / TOW), which scores the distance reached.
             if (v.pos.x >= w.pitX1) finish("FULL PASS! " + fmtTime(elapsed));
-            else if (v.pos.x > w.pitX0 && progressTimer > 5.f) finish("Forward motion stopped - " + std::to_string(int(distance * 3.281f)) + " ft");
             else if (std::fabs(v.pos.z - w.laneZ(lane % w.lanes)) > 7.5f && v.pos.x > w.pitX0) finish("Out of lane!");
-            else if (v.pos.x < w.pitX0 && elapsed > 25.f) finish("Never left the line");
+            else if (stuck && progressTimer > 8.f && messageTimer <= 0) flash("Stuck! Rock it, air down - or T to call the dozer", 3.f);
             break;
         }
         case ModeId::Circuit: {

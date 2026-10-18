@@ -31,6 +31,22 @@ void World::generate(uint32_t seed) {
     const float hPit = natural(0, pitZ), hBowl = natural(bowlCenter.x, bowlCenter.z);
     const float hPond = natural(pondCenter.x, pondCenter.z);
     Vec2 pools[3] = {{-12, pitZ + 4}, {9, pitZ - 5}, {24, pitZ + 2}};
+    // Sinkholes staggered down every lane (own RNG so the rest of the layout is unchanged):
+    // deep, water-filled pockets of soft slop that catch a front axle and stop a stock rig.
+    struct Hole { float x, z, r, depth; };
+    std::vector<Hole> holes;
+    {
+        Rng hr(seed * 31u + 7u);
+        for (int l = 0; l < lanes; l++) {
+            float x = pitX0 + 9.f + hr.range(0.f, 5.f);
+            while (x < pitX1 - 6.f) {
+                holes.push_back({x, laneZ(l) + hr.range(-1.0f, 1.0f), hr.range(1.5f, 2.4f), hr.range(0.38f, 0.62f)});
+                x += hr.range(6.f, 10.f);
+            }
+        }
+        for (int k = 0; k < 18; k++)   // stray mounds of spoil and old clods, negative depth = hump
+            holes.push_back({hr.range(pitX0 + 4, pitX1 - 4), pitZ + hr.range(-pitHalfW + 1, pitHalfW - 1), hr.range(1.0f, 2.0f), -hr.range(0.18f, 0.32f)});
+    }
 
     for (int j = 0; j < Terrain::N; j++)
         for (int i = 0; i < Terrain::N; i++) {
@@ -57,8 +73,25 @@ void World::generate(uint32_t seed) {
             if (tp > 0) {
                 float floor = hPit - 0.42f + (n1 - 0.5f) * 0.16f;
                 for (auto& pl : pools) floor -= 0.38f * gauss(sq(x - pl.x) + sq(z - pl.y), 4.f);
+                // Whoops: humps across the lanes that unload the tires on every crest.
+                float along = (x - pitX0) / (pitX1 - pitX0);
+                floor += 0.22f * std::sin(x * (2 * PI / 6.2f) + n1 * 2.5f) * smoothstep(0.06f, 0.2f, along) * (0.6f + 0.6f * n2);
+                // The middle third is the soup: the floor falls away under deeper water and softer slop.
+                float soup = smoothstep(0.28f, 0.45f, along) * (1.f - smoothstep(0.78f, 0.92f, along));
+                floor -= 0.2f * soup;
+                // Old ruts from earlier runs pull the tires into the lane's grooves.
+                float soft = 0;
+                for (int l = 0; l < lanes; l++) {
+                    float dz = z - laneZ(l);
+                    floor -= 0.13f * (std::exp(-sq(dz - 0.8f) / 0.05f) + std::exp(-sq(dz + 0.8f) / 0.05f));
+                }
+                for (auto& hl : holes) {
+                    float g = gauss(sq(x - hl.x) + sq(z - hl.z), hl.r);
+                    floor -= hl.depth * g;
+                    if (hl.depth > 0) soft = std::max(soft, g);
+                }
                 h = lerpf(h, floor, tp);
-                base = lerpf(base, hPit - 1.3f + (n2 - 0.5f) * 0.1f, tp);
+                base = lerpf(base, hPit - 1.3f - 0.5f * std::max(soft, soup) + (n2 - 0.5f) * 0.1f, tp);
                 moist = lerpf(moist, 0.86f + 0.14f * n1, tp);
                 grass = lerpf(grass, 0.f, std::min(1.f, tp * 2));
                 if (tp > 0.6f) water = hPit - 0.53f;

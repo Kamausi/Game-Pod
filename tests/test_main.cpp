@@ -2,6 +2,7 @@
 // behaviors (getting stuck, build differentiation), mode scoring and audio sanity.
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <string>
 #include <vector>
@@ -63,8 +64,51 @@ static float runPit(VehicleConfig c, float moist, float water, float startX, flo
     return maxX;
 }
 
-int main() {
+// Drive a lane of the real mud bog pit at full throttle, holding the lane. Returns the best
+// distance into the pit (m). rock = back off and re-hit the throttle when stuck, like a player.
+static float runBog(const VehicleConfig& c, int lane, float secs, bool rock) {
+    static World w;
+    w.generate(1976);
+    ModeRunner m;
+    m.id = ModeId::MudBog;
+    Vehicle v;
+    v.configure(c);
+    float yaw;
+    Vec3 p = m.spawnFor(w, lane, yaw);
+    p.y = w.terrain.heightAt(p.x, p.z) - v.rideAxleY + v.wheels[0].radius + 0.2f;
+    v.reset(p, yaw);
+    float laneZ = w.laneZ(lane), best = 0, stuckT = 0, rockT = 0;
+    VehicleInput in;
+    for (int i = 0; i < int(secs * 240); i++) {
+        if (i % 4 == 0) {
+            Vec3 f = v.forward();
+            float ang = std::atan2(f.z, f.x);
+            in.steer = clampf(-(laneZ - v.pos.z) * 0.35f + ang * 1.6f, -1.f, 1.f);
+            in.throttle = 1; in.brake = 0;
+            if (rock) {
+                stuckT = v.speed() < 0.6f ? stuckT + 4 * Vehicle::DT : 0.f;
+                if (stuckT > 2.f) rockT += 4 * Vehicle::DT;
+                if (rockT > 0 && std::fmod(rockT, 2.4f) < 0.8f) { in.throttle = 0; in.brake = 1; }
+                if (v.speed() > 2.f) rockT = 0;
+            }
+            w.terrain.relax(v.pos, 5, 4 * Vehicle::DT);
+        }
+        v.step(w.terrain, in, Vehicle::DT);
+        best = std::max(best, v.pos.x - w.pitX0);
+        if (v.pos.x >= w.pitX1 || !std::isfinite(v.pos.x)) break;
+    }
+    return best;
+}
+
+int main(int argc, char** argv) {
     cadSetRoot("cad/parts");
+    if (argc > 2 && std::string(argv[1]) == "--bog") {   // tuning probe: mb_tests --bog "<cfg>" [secs] [lane]
+        float secs = argc > 3 ? float(std::atof(argv[3])) : 120.f;
+        int lane = argc > 4 ? std::atoi(argv[4]) : 1;
+        VehicleConfig c = VehicleConfig::parse(argv[2]);
+        std::printf("%s: throttle %.1f m, rocking %.1f m (of 80, %g s)\n", argv[2], runBog(c, lane, secs, false), runBog(c, lane, secs, true), secs);
+        return 0;
+    }
 
     test("terramechanics formulas", [] {
         float k = MudModel::kEq(0.6f), n = MudModel::n(0.6f);
@@ -125,7 +169,8 @@ int main() {
     test("world generation", [] {
         static World w;
         w.generate(1976);
-        float hPit = w.terrain.heightAt(0, w.pitZ), hOut = w.terrain.heightAt(0, w.pitZ + 30);
+        float hPit = 0, hOut = w.terrain.heightAt(0, w.pitZ + 30);
+        for (int k = 0; k < 40; k++) hPit += w.terrain.heightAt(-30.f + 1.5f * float(k), w.laneZ(1)) / 40.f;  // floor is rough now
         CHECK(hPit < hOut - 0.2f, "pit should be excavated (%.2f vs %.2f)", hPit, hOut);
         TerrainSample s = w.terrain.sample(0, w.pitZ);
         CHECK(s.moisture > 0.8f && s.mudDepth() > 0.5f, "pit slurry: moist %.2f depth %.2f", s.moisture, s.mudDepth());
@@ -193,8 +238,14 @@ int main() {
         CHECK(std::fabs(v.pos.z - w.laneZ(1)) < 0.01f, "spawned in lane");
         m.update(0.01f, 1.0, w, v, 0, 0, 0);
         CHECK(m.phase == Phase::Running, "countdown elapsed");
+        v.pos.x = w.pitX0 + 20.f;                       // parked mid-pit: no clock, the run keeps going
+        for (int i = 0; i < 600; i++) m.update(0.1f, 1.1 + i * 0.1, w, v, 0, 0, 0);
+        CHECK(m.phase == Phase::Running, "standing still in the pit must not end the run");
+        ModeRunner towed = m;
+        towed.requestTow(w, v);
+        CHECK(towed.phase == Phase::Finished && towed.results[0].board == "bog_distance", "dozer tow ends the run on distance");
         v.pos.x = w.pitX1 + 0.5f;
-        m.update(0.01f, 1.1, w, v, 0, 0, 0);
+        m.update(0.01f, 61.1, w, v, 0, 0, 0);
         CHECK(m.phase == Phase::Finished && m.resultCount == 2 && m.results[0].board == "bog_time", "full pass result");
     });
 
@@ -247,6 +298,17 @@ int main() {
         CHECK(maxJ > 100.f, "impact registered (%.0f N*s)", maxJ);
         CHECK(minGap > 4.9f, "bodies stayed apart (closest %.2f m between centers)", minGap);
         CHECK(a.pos.x < b.pos.x, "no tunneling");
+    });
+
+    test("mud bog: the starter truck can't rip through in one go", [] {
+        VehicleConfig starter;                       // garage defaults
+        float a = runBog(starter, 1, 45, false), b = runBog(starter, 2, 45, true);
+        VehicleConfig built = VehicleConfig::parse("body=comanche;engine=ls53_sc;tire=40;tread=paddle;lockF=1;lockR=1;psi=9");
+        float c = runBog(built, 1, 45, true);
+        std::printf("    starter %.1f m (throttle) / %.1f m (rocking), built %.1f m of 80\n", a, b, c);
+        CHECK(a < 70.f && b < 79.f, "starter should bog down before a full pass");
+        CHECK(a > 6.f, "starter should at least get into the pit");
+        CHECK(c > a, "a built rig should get further than the starter");
     });
 
     test("ai: rivals race the circuit and attack the bog", [] {
