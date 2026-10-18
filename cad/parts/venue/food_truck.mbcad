@@ -96,3 +96,77 @@ material paint
 color #e8e8e8
 cyl r=0.16 h=0.6 pos=-L/2-0.35,fl+0.3,0.22 seg=10
 cyl r=0.16 h=0.6 pos=-L/2-0.35,fl+0.3,-0.22 seg=10
+# ---- Interior seen through the serving window: back wall, fryer, hood, warm lights ----
+material matte
+color #d9d2c2
+box size=2.9,1.0,0.03 pos=0.2,fl+1.5,-0.4
+material steel
+color #b8bcc0
+box size=0.9,0.45,0.55 pos=-0.5,fl+1.18,-0.05
+box size=1.2,0.28,0.5 pos=0.6,fl+1.95,-0.12
+color #3a3a3a
+box size=0.35,0.02,0.4 pos=-0.7,fl+1.42,-0.05
+box size=0.35,0.02,0.4 pos=-0.3,fl+1.42,-0.05
+material lens
+color #ffd890
+box size=0.5,0.03,0.12 pos=-0.4,fl+2.0,0.5
+box size=0.5,0.03,0.12 pos=0.9,fl+2.0,0.5
+# ---- Counter: condiments and a napkin dispenser ----
+material plastic
+color #c41a1a
+cyl r=0.035 h=0.2 pos=-0.6,fl+1.08,W/2+0.2 seg=8
+color #e8c41a
+cyl r=0.035 h=0.2 pos=-0.5,fl+1.08,W/2+0.2 seg=8
+material steel
+color #c8c8c8
+box size=0.14,0.16,0.10 pos=0.9,fl+1.06,W/2+0.2
+# ---- Striped awning: trim-colour stripes over the flap ----
+material paint
+color trim_r trim_g trim_b
+for k = 0, 4
+  box size=0.30,0.052,1.1 pos=-1.05+k*0.6,fl+2.225,W/2+0.52 rot=-18,0,0
+end
+# ---- Roof sign: board with block letters, both faces ----
+set post_h = fl+bh+0.62
+color #1c1c1c
+box size=2.2,0.08,0.08 pos=0,fl+bh+0.1,0
+box size=0.08,0.5,0.08 pos=0.9,fl+bh+0.3,0 mirror=x
+color #f2d23a
+box size=2.4,0.62,0.10 pos=0,post_h,0 bevel=0.02
+color #c41a1a
+for s = -1, 1, 2
+  box size=0.523,0.075,0.03 pos=s*-0.856,0.000+post_h,s*0.055 rot=0,0,s*90.0
+  box size=0.395,0.075,0.03 pos=s*-0.696,0.224+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.315,0.075,0.03 pos=s*-0.736,0.000+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.395,0.075,0.03 pos=s*-0.696,-0.224+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.491,0.075,0.03 pos=s*-0.392,-0.016+post_h,s*0.055 rot=0,0,s*90.0
+  box size=0.491,0.075,0.03 pos=s*-0.072,-0.016+post_h,s*0.055 rot=0,0,s*90.0
+  box size=0.395,0.075,0.03 pos=s*-0.232,0.224+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.395,0.075,0.03 pos=s*-0.232,0.000+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.523,0.075,0.03 pos=s*0.232,0.000+post_h,s*0.055 rot=0,0,s*90.0
+  box size=0.395,0.075,0.03 pos=s*0.232,0.224+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.395,0.075,0.03 pos=s*0.696,0.224+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.395,0.075,0.03 pos=s*0.696,0.000+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.395,0.075,0.03 pos=s*0.696,-0.224+post_h,s*0.055 rot=0,0,s*0.0
+  box size=0.299,0.075,0.03 pos=s*0.536,0.112+post_h,s*0.055 rot=0,0,s*90.0
+  box size=0.299,0.075,0.03 pos=s*0.856,-0.112+post_h,s*0.055 rot=0,0,s*90.0
+end
+# ---- Pennant string along the roof edge ----
+color #2a2a2a
+material matte
+box size=L,0.01,0.01 pos=0,fl+bh+0.05,W/2+0.05
+for k = 0, 14
+  color 0.9*abs(sin(k*60)) 0.2+0.6*abs(sin(k*60+60)) 0.15+0.7*abs(sin(k*60+120))
+  extrude depth=0.005 pts=0,0,0.16,0,0.08,-0.22 rot=0,90,0 pos=-L/2+0.25+k*0.39,fl+bh+0.05,W/2+0.05
+end
+# ---- A-frame chalkboard out front ----
+material matte
+color #6e5434
+box size=0.62,0.92,0.03 pos=-2.3,0.45,W/2+1.05 rot=-12,0,0
+box size=0.62,0.92,0.03 pos=-2.3,0.45,W/2+1.45 rot=12,0,0
+color #1d2620
+box size=0.52,0.70,0.035 pos=-2.3,0.50,W/2+1.035 rot=-12,0,0
+color #e6e6e6
+for k = 0, 3
+  box size=0.38-0.06*(k-2*(k/2-0.25)),0.025,0.04 pos=-2.3,0.70-k*0.13,W/2+1.0+k*0.03 rot=-12,0,0
+end

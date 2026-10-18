@@ -1,31 +1,94 @@
-# Generic family crossover/sedan for the visitor lot, wheels included.
-# Front faces +Z. Origin at ground centre.
+# Generic family crossover for the visitor lot, wheels included: arched wheel openings with
+# black cladding, A/B/C pillars and door seams, handles, mirrors, grille and badge, wraparound
+# lamps, roof rails, plates, five-spoke alloys. Front faces +Z. Origin at ground centre.
 param paint_r = 0.12
 param paint_g = 0.20
 param paint_b = 0.38
 set FA = 1.42
 set RA = -1.38
+set WR = 0.34
+set W = 1.85
 color paint_r paint_g paint_b
 material paint
-extrude depth=1.85 bevel=0.08 pts=-2.35,0.35,-2.40,0.85,-1.90,0.95,1.40,0.92,2.30,0.75,2.40,0.50,2.35,0.32
+# Lower body: side profile with both wheel arches cut in
+extrude depth=W bevel=0.08 pts=-2.35,0.30,arc(RA,WR,WR+0.06,180,0,10),arc(FA,WR,WR+0.06,180,0,10),2.35,0.30,2.42,0.52,2.30,0.76,1.40,0.93,-1.90,0.96,-2.40,0.86
+# Greenhouse
 extrude depth=1.70 bevel=0.06 pts=1.30,0.92,0.55,1.42,-1.20,1.46,-1.85,0.95
 color #10161c
 material glass
 extrude depth=1.74 pts=1.22,0.95,0.52,1.38,-1.15,1.42,-1.75,0.97
-color #1a1a1a
+# Pillars over the glass (A, B, C) and the roof edge
+color #121212
 material matte
-box size=1.80,0.20,0.06 pos=0,0.42,2.36
-box size=1.80,0.20,0.06 pos=0,0.42,-2.37
+box size=1.745,0.44,0.07 pos=0,1.16,-0.05 rot=-4,0,0
+box size=1.745,0.40,0.10 pos=0,1.13,-1.52 rot=36,0,0
+# Black cladding round the arches and along the sills
+color #1b1b1b
+extrude depth=W+0.03 pts=arc(FA,WR,WR+0.12,182,-2,12),arc(FA,WR,WR+0.06,-2,182,12)
+extrude depth=W+0.03 pts=arc(RA,WR,WR+0.12,182,-2,12),arc(RA,WR,WR+0.06,-2,182,12)
+box size=W+0.03,0.12,1.85 pos=0,0.36,0.02
+# Door seams and handles
+color paint_r*0.45 paint_g*0.45 paint_b*0.45
+box size=W+0.008,0.56,0.012 pos=0,0.68,0.62
+box size=W+0.008,0.56,0.012 pos=0,0.68,-0.38
+box size=W+0.008,0.012,1.90 pos=0,0.42,0.12
+color #c9c9c4
+material chrome
+box size=W+0.02,0.03,0.14 pos=0,0.84,0.38
+box size=W+0.02,0.03,0.14 pos=0,0.84,-0.62
+# Mirrors
+color paint_r paint_g paint_b
+material paint
+box size=0.16,0.10,0.14 pos=0.98,0.98,0.95 mirror=x bevel=0.03
+# Front: grille, badge, lamps, plate, lower intake
+color #0d0d0d
+material matte
+box size=0.95,0.22,0.04 pos=0,0.60,2.39 bevel=0.02
+box size=1.30,0.12,0.04 pos=0,0.36,2.36
+color #c8c8c8
+material chrome
+box size=0.95,0.025,0.045 pos=0,0.66,2.40
+cyl r=0.05 h=0.02 axis=z pos=0,0.62,2.415 seg=10
 color #e8eef2
 material lens
-box size=0.35,0.10,0.04 pos=0.62,0.70,2.33 bevel=0.01 mirror=x
+box size=0.40,0.10,0.05 pos=0.65,0.72,2.31 rot=0,-14,0 bevel=0.015 mirror=x
+color #e08a1a
+box size=0.10,0.05,0.12 pos=0.88,0.68,2.20 mirror=x
+color #f2f2ee
+material matte
+box size=0.30,0.15,0.01 pos=0,0.47,2.40
+# Rear: wraparound tail lamps, plate, reflectors, rear wiper
 color #b01313
-box size=0.40,0.08,0.04 pos=0.55,0.78,-2.38 mirror=x
+material lens
+box size=0.42,0.10,0.06 pos=0.58,0.80,-2.37 rot=0,12,0 mirror=x
+box size=0.06,0.10,0.30 pos=0.90,0.80,-2.22 mirror=x
+color #f2f2ee
+material matte
+box size=0.30,0.15,0.01 pos=0,0.58,-2.43
+color #1a1a1a
+box size=0.30,0.015,0.02 pos=0.10,1.03,-1.88 rot=0,0,-15
+# Roof rails
+color #2a2a2a
+material steel
+box size=0.04,0.05,1.40 pos=0.68,1.48,-0.30 mirror=x
+# Wheels: tires, five-spoke alloys, hub caps
 color #111111
 material rubber
-cyl r=0.34 h=0.24 axis=x pos=0.80,0.34,FA mirror=x
-cyl r=0.34 h=0.24 axis=x pos=0.80,0.34,RA mirror=x
+cyl r=WR h=0.24 axis=x pos=0.80,WR,FA mirror=x seg=18
+cyl r=WR h=0.24 axis=x pos=0.80,WR,RA mirror=x seg=18
 color #b8b8b8
 material chrome
-cyl r=0.20 h=0.25 axis=x pos=0.80,0.34,FA mirror=x
-cyl r=0.20 h=0.25 axis=x pos=0.80,0.34,RA mirror=x
+cyl r=0.215 h=0.03 axis=x pos=0.915,WR,FA mirror=x seg=16
+cyl r=0.215 h=0.03 axis=x pos=0.915,WR,RA mirror=x seg=16
+color #2a2a2a
+material matte
+cyl r=0.19 h=0.032 axis=x pos=0.917,WR,FA mirror=x seg=16
+cyl r=0.19 h=0.032 axis=x pos=0.917,WR,RA mirror=x seg=16
+color #c4c4c4
+material chrome
+for k = 0, 4
+  box size=0.035,0.18,0.045 pos=0.925,WR+0.09*sin(k*72),FA+0.09*cos(k*72) rot=90-k*72,0,0 mirror=x
+  box size=0.035,0.18,0.045 pos=0.925,WR+0.09*sin(k*72),RA+0.09*cos(k*72) rot=90-k*72,0,0 mirror=x
+end
+cyl r=0.05 h=0.04 axis=x pos=0.93,WR,FA mirror=x seg=10
+cyl r=0.05 h=0.04 axis=x pos=0.93,WR,RA mirror=x seg=10
