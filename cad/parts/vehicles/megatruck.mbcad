@@ -62,7 +62,7 @@ cyl r=0.04 h=0.55 pos=0.55,1.15,1.45 rot=-30,0,0 seg=8 mirror=x
 # Roll cage over the cab
 color #1a1a1a
 material steel
-cyl r=0.04 h=1.6 pos=0.85,1.95,0.65 rot=-25,0,0 seg=8 mirror=x
+cyl r=0.04 h=1.29 pos=0.85,1.825,0.39 rot=-26.8,0,0 seg=8 mirror=x   # cowl (y1.25,z0.68) to roof bar (y2.40,z0.10)
 cyl r=0.04 h=1.3 pos=0.85,1.90,-0.95 seg=8 mirror=x
 cyl r=0.04 h=1.74 axis=x pos=0,2.40,0.10 seg=8
 cyl r=0.04 h=1.74 axis=x pos=0,2.40,-0.95 seg=8
@@ -78,3 +78,68 @@ color #1a1a1a
 material steel
 box size=1.4,0.20,0.20 pos=0,0.10,2.60 bevel=0.03
 box size=1.4,0.20,0.20 pos=0,0.10,-3.05 bevel=0.03
+# ---- Cab glass and pillars (the cab was painted solid) ----
+color #10161c
+material glass
+extrude depth=1.975 pts=0.64,1.26,0.34,1.82,-0.70,1.84,-0.88,1.32
+color #141414
+material matte
+box size=1.985,0.62,0.07 pos=0,1.54,0.50 rot=-28,0,0
+box size=1.985,0.56,0.09 pos=0,1.58,-0.25
+box size=1.985,0.55,0.08 pos=0,1.58,-0.80 rot=18,0,0
+# Door lettering
+color #f2b01a
+material paint
+text str=MEGA size=0.22 t=0.06 depth=0.01 pos=0.988,0.78,-0.15 rot=0,90,0
+text str=MEGA size=0.22 t=0.06 depth=0.01 pos=-0.988,0.78,-0.15 rot=0,-90,0
+# ---- Chassis detail: driveshafts, transfer case, steering, bypass shocks, limit straps ----
+color #2b2b2b
+material steel
+box size=0.30,0.25,0.40 pos=0,-0.20,0.20
+cyl r=0.05 h=1.50 axis=z pos=0,-0.38,1.00 rot=-10,0,0 seg=10
+cyl r=0.05 h=2.00 axis=z pos=0,-0.38,-0.85 rot=9,0,0 seg=10
+box size=0.18,0.16,0.20 pos=0.30,-0.15,2.20
+cyl r=0.03 h=1.70 axis=x pos=0,AY+0.05,FA+0.22 seg=8
+color #3a3a3a
+for k = -1, 1, 2
+  cyl r=0.06 h=0.55 pos=0.30*k,-0.22,FA+0.05 seg=10
+  cyl r=0.06 h=0.55 pos=0.30*k,-0.22,RA-0.05 seg=10
+end
+color #c8c8c8
+material chrome
+for k = -1, 1, 2
+  cyl r=0.035 h=0.30 pos=0.30*k+0.09,-0.10,FA+0.05 seg=8
+  cyl r=0.035 h=0.30 pos=0.30*k+0.09,-0.10,RA-0.05 seg=8
+end
+color #d03a10
+material matte
+box size=0.05,0.40,0.012 pos=0.20,-0.30,FA+0.25 mirror=x
+box size=0.05,0.40,0.012 pos=0.20,-0.30,RA-0.25 mirror=x
+# ---- Bed: aluminium fuel cell, battery box, strapped nitrous bottles ----
+color #b9bcbf
+material steel
+box size=0.80,0.30,0.50 pos=0,0.68,-2.70 bevel=0.02
+color #1a1a1a
+material plastic
+box size=0.36,0.26,0.24 pos=0.55,0.66,-1.45
+color #1c4fa8
+material paint
+cyl r=0.08 h=0.80 axis=x pos=-0.30,0.62,-1.55 seg=12
+cyl r=0.08 h=0.80 axis=x pos=-0.30,0.62,-1.75 seg=12
+color #111111
+material matte
+box size=0.04,0.20,0.40 pos=-0.55,0.63,-1.65 mirror=x
+# ---- Tube bumpers with hoops, tow points, chrome grille bars ----
+color #1a1a1a
+material steel
+cyl r=0.05 h=1.30 axis=x pos=0,0.42,2.78 seg=10
+cyl r=0.05 h=0.60 pos=0.62,0.40,2.72 rot=30,0,0 mirror=x seg=10
+cyl r=0.05 h=1.30 axis=x pos=0,0.40,-3.18 seg=10
+color #d03a10
+material paint
+box size=0.06,0.14,0.10 pos=0.45,0.12,2.74 mirror=x
+color #c0c2c4
+material chrome
+for k = 0, 3
+  box size=1.24,0.03,0.05 pos=0,0.74+k*0.075,2.685
+end

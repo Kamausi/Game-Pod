@@ -35,6 +35,7 @@ material paint                 # sticky: plastic|paint|glass|chrome|rubber|lens|
 box  size=1,0.5,2 bevel=0.04   # rounded edges with smooth normals (also on extrude)
 extrude depth=1.74 bevel=0.05 pts=0.5,-0.1,arc(1.29,-0.30,0.55,159,21,12),1.95,-0.1,...
                                # arc(zc,yc,r,a0,a1,n): n+1 points on a circle (wheel arches)
+text str=MUD_BUDDIES size=0.3 [t=0.07] [depth=0.02]   # block lettering, centred, facing +Z (_ = space)
 for i = 0, 12 [, step]         # repeat the lines up to `end` (inclusive range, nestable);
   set a = i*30                 #   i (and anything `set` from it) works in every expression
   box size=0.38,0.045,0.13 pos=0.72,0.3+0.27*sin(a),0.27*cos(a) rot=90-a,0,0

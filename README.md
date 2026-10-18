@@ -105,5 +105,5 @@ docs/         FORENSICS, PHYSICS, AUDIO, NETCODE, TECH_STACK
   catalogued in [docs/TECH_STACK.md](docs/TECH_STACK.md).
 * Asset shots: from the browser console, `Module.ccall('mb_action', null, ['string'], ['freecam:px,py,pz,tx,ty,tz,fovDeg'])`
   puts the camera at a fixed point looking at a target (heights in metres above the ground there)
-  and hides your truck; `freecam:off` returns to the chase camera. `debugview:1` / `debugview:2`
+  and hides your truck; An optional 8th value of 1 keeps your own vehicle in shot. `freecam:off` returns to the chase camera. `debugview:1` / `debugview:2`
   show the ambient-occlusion and sun-shaft buffers.

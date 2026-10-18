@@ -1,5 +1,8 @@
 #include "cad.h"
+#include <algorithm>
 #include <cctype>
+#include <map>
+#include <vector>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -406,6 +409,70 @@ CadMesh rim(float r, float w, int spokes, Vec3 color) {
     return out;
 }
 
+// Block-letter text from box strokes (same glyphs as tools/cad_letters.py): centred on the local
+// XY plane, facing +Z, cap height 1.4*size. Unknown characters are reported through *bad.
+CadMesh text(const std::string& str, float size, float t, float depth, Vec3 color, char* bad) {
+    static const std::map<char, std::vector<float>> G = {
+        {'M', {0.f,0.f,0.f,1.4f,1.f,0.f,1.f,1.4f,0.f,1.4f,0.5f,0.7f,1.f,1.4f,0.5f,0.7f}},
+        {'U', {0.f,0.1f,0.f,1.4f,1.f,0.1f,1.f,1.4f,0.f,0.f,1.f,0.f}},
+        {'D', {0.f,0.f,0.f,1.4f,0.f,1.4f,0.7f,1.4f,0.f,0.f,0.7f,0.f,1.f,0.25f,1.f,1.15f,0.7f,1.4f,1.f,1.15f,0.7f,0.f,1.f,0.25f}},
+        {'B', {0.f,0.f,0.f,1.4f,0.f,1.4f,0.8f,1.4f,0.f,0.7f,0.8f,0.7f,0.f,0.f,0.85f,0.f,0.95f,0.8f,0.95f,1.3f,1.f,0.1f,1.f,0.6f}},
+        {'I', {0.5f,0.f,0.5f,1.4f,0.15f,1.4f,0.85f,1.4f,0.15f,0.f,0.85f,0.f}},
+        {'E', {0.f,0.f,0.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.7f,0.75f,0.7f,0.f,0.f,1.f,0.f}},
+        {'S', {0.f,1.4f,1.f,1.4f,0.f,0.7f,1.f,0.7f,0.f,0.f,1.f,0.f,0.f,0.7f,0.f,1.4f,1.f,0.f,1.f,0.7f}},
+        {'O', {0.f,0.f,0.f,1.4f,1.f,0.f,1.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.f,1.f,0.f}},
+        {'F', {0.f,0.f,0.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.7f,0.75f,0.7f}},
+        {'R', {0.f,0.f,0.f,1.4f,0.f,1.4f,0.9f,1.4f,0.f,0.7f,0.9f,0.7f,1.f,0.75f,1.f,1.35f,0.4f,0.7f,1.f,0.f}},
+        {'A', {0.f,0.f,0.f,1.3f,1.f,0.f,1.f,1.3f,0.f,1.4f,1.f,1.4f,0.f,0.7f,1.f,0.7f}},
+        {'P', {0.f,0.f,0.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.7f,1.f,0.7f,1.f,0.7f,1.f,1.4f}},
+        {'K', {0.f,0.f,0.f,1.4f,0.05f,0.7f,1.f,1.4f,0.3f,0.9f,1.f,0.f}},
+        {'C', {0.f,0.f,0.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.f,1.f,0.f}},
+        {'G', {0.f,0.f,0.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.f,1.f,0.f,1.f,0.f,1.f,0.6f,0.5f,0.6f,1.f,0.6f}},
+        {'H', {0.f,0.f,0.f,1.4f,1.f,0.f,1.f,1.4f,0.f,0.7f,1.f,0.7f}},
+        {'J', {1.f,0.f,1.f,1.4f,0.f,0.f,1.f,0.f,0.f,0.f,0.f,0.4f}},
+        {'L', {0.f,0.f,0.f,1.4f,0.f,0.f,1.f,0.f}},
+        {'N', {0.f,0.f,0.f,1.4f,1.f,0.f,1.f,1.4f,0.f,1.4f,1.f,0.f}},
+        {'Q', {0.f,0.f,0.f,1.4f,1.f,0.2f,1.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.f,0.8f,0.f,0.6f,0.35f,1.f,-0.1f}},
+        {'T', {0.5f,0.f,0.5f,1.4f,0.f,1.4f,1.f,1.4f}},
+        {'V', {0.f,1.4f,0.5f,0.f,1.f,1.4f,0.5f,0.f}},
+        {'W', {0.f,0.f,0.f,1.4f,1.f,0.f,1.f,1.4f,0.f,0.f,0.5f,0.7f,1.f,0.f,0.5f,0.7f}},
+        {'X', {0.f,0.f,1.f,1.4f,0.f,1.4f,1.f,0.f}},
+        {'Y', {0.f,1.4f,0.5f,0.7f,1.f,1.4f,0.5f,0.7f,0.5f,0.f,0.5f,0.7f}},
+        {'Z', {0.f,1.4f,1.f,1.4f,1.f,1.4f,0.f,0.f,0.f,0.f,1.f,0.f}},
+        {'0', {0.f,0.f,0.f,1.4f,1.f,0.f,1.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.f,1.f,0.f,0.f,0.f,1.f,1.4f}},
+        {'1', {0.5f,0.f,0.5f,1.4f,0.2f,1.15f,0.5f,1.4f,0.15f,0.f,0.85f,0.f}},
+        {'2', {0.f,1.4f,1.f,1.4f,1.f,0.7f,1.f,1.4f,0.f,0.7f,1.f,0.7f,0.f,0.f,0.f,0.7f,0.f,0.f,1.f,0.f}},
+        {'3', {0.f,1.4f,1.f,1.4f,0.3f,0.7f,1.f,0.7f,0.f,0.f,1.f,0.f,1.f,0.f,1.f,1.4f}},
+        {'4', {0.f,0.7f,0.f,1.4f,0.f,0.7f,1.f,0.7f,1.f,0.f,1.f,1.4f}},
+        {'5', {0.f,1.4f,1.f,1.4f,0.f,0.7f,0.f,1.4f,0.f,0.7f,1.f,0.7f,1.f,0.f,1.f,0.7f,0.f,0.f,1.f,0.f}},
+        {'6', {0.f,0.f,0.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.7f,1.f,0.7f,1.f,0.f,1.f,0.7f,0.f,0.f,1.f,0.f}},
+        {'7', {0.f,1.4f,1.f,1.4f,1.f,1.4f,0.4f,0.f}},
+        {'8', {0.f,0.f,0.f,1.4f,1.f,0.f,1.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.7f,1.f,0.7f,0.f,0.f,1.f,0.f}},
+        {'9', {1.f,0.f,1.f,1.4f,0.f,1.4f,1.f,1.4f,0.f,0.7f,1.f,0.7f,0.f,0.7f,0.f,1.4f,0.f,0.f,1.f,0.f}},
+        {'!', {0.5f,0.35f,0.5f,1.4f,0.5f,0.f,0.5f,0.1f}},
+        {'&', {0.f,0.f,0.f,0.7f,0.f,0.f,0.8f,0.f,0.f,0.7f,0.6f,1.4f,0.6f,1.4f,0.9f,1.15f,0.2f,1.1f,1.f,0.f}},
+        {'\'', {0.5f,1.0f,0.5f,1.4f}},
+        {'-', {0.2f,0.7f,0.8f,0.7f}},
+        {' ', {}}
+    };
+    CadMesh out;
+    const float adv = 1.45f;
+    float width = (float(str.size()) * adv - 0.45f) * size, x0 = -width * 0.5f;
+    for (size_t i = 0; i < str.size(); i++) {
+        auto it = G.find(str[i]);
+        if (it == G.end()) { if (bad && !*bad) *bad = str[i]; continue; }
+        const std::vector<float>& sg = it->second;
+        for (size_t k = 0; k + 3 < sg.size(); k += 4) {
+            float X0 = x0 + (float(i) * adv + sg[k]) * size, Y0 = (sg[k + 1] - 0.7f) * size;
+            float X1 = x0 + (float(i) * adv + sg[k + 2]) * size, Y1 = (sg[k + 3] - 0.7f) * size;
+            float len = std::sqrt((X1 - X0) * (X1 - X0) + (Y1 - Y0) * (Y1 - Y0)) + t;
+            Mat4 M = Mat4::trs({(X0 + X1) * 0.5f, (Y0 + Y1) * 0.5f, 0}, Quat::axisAngle({0, 0, 1}, std::atan2(Y1 - Y0, X1 - X0)), {1, 1, 1});
+            out.append(box({len, t, depth}, color), M);
+        }
+    }
+    return out;
+}
+
 }  // namespace cadprim
 
 // ------------------------------------------------------------------------------------------
@@ -731,6 +798,15 @@ struct Interp {
                 float bv = num(a, "bevel", 0.f);
                 if (bv > 0) emit(cadprim::roundedBox(s, bv, int(num(a, "seg", 2)), color), a, "mb_rbox(" + fmt3(s) + "," + fmt(bv) + ")");
                 else emit(cadprim::box(s, color), a, "cube(" + fmt3(s) + ", center=true)");
+            } else if (op == "text") {
+                // text str=MUD_BUDDIES size=0.3 [t=0.07] [depth=0.02]   (underscores are spaces)
+                std::string t = str(a, "str", "");
+                std::replace(t.begin(), t.end(), '_', ' ');
+                float sz = num(a, "size", 0.3f), th = num(a, "t", sz * 0.22f), dp = num(a, "depth", 0.02f);
+                char bad = 0;
+                CadMesh m = cadprim::text(t, sz, th, dp, color, &bad);
+                if (bad) err = std::string("no glyph for '") + bad + "'";
+                else emit(m, a, "mb_text(\"" + t + "\"," + fmt(sz) + ")");
             } else if (op == "cyl") {
                 float r = num(a, "r", 0.5f), r2 = num(a, "r2", r), h = num(a, "h", 1.f);
                 int seg = int(num(a, "seg", 20));

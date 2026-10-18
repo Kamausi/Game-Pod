@@ -257,8 +257,9 @@ void Game::action(const std::string& a) {
     else if (a.rfind("freecam:", 0) == 0) {   // asset shots: fixed camera, heights above the ground, player hidden
         freeCam = a != "freecam:off";
         if (freeCam) {
-            float d = 50;
-            int n = std::sscanf(a.c_str() + 8, "%f,%f,%f,%f,%f,%f,%f", &freePos.x, &freePos.y, &freePos.z, &freeTgt.x, &freeTgt.y, &freeTgt.z, &d);
+            float d = 50, show = 0;
+            int n = std::sscanf(a.c_str() + 8, "%f,%f,%f,%f,%f,%f,%f,%f", &freePos.x, &freePos.y, &freePos.z, &freeTgt.x, &freeTgt.y, &freeTgt.z, &d, &show);
+            freeShowPlayer = show > 0.5f;   // 8th value 1: keep your own vehicle in shot (vehicle portraits)
             if (n < 6) freeCam = false;
             freeFov = (n >= 7 ? d : 50.f) * DEG;
             freePos.y += world.terrain.heightAt(freePos.x, freePos.z);
@@ -684,7 +685,7 @@ void Game::buildFrame(RenderFrame& f) {
     f.particles = &particles.all();
     float comp[4], spin[4];
     for (int i = 0; i < 4; i++) { comp[i] = player.wheels[size_t(i)].compression; spin[i] = player.wheels[size_t(i)].spin; }
-    if ((camMode != 2 && !freeCam) || state != AppState::Playing)
+    if ((camMode != 2 && (!freeCam || freeShowPlayer)) || state != AppState::Playing)
         addVehicleDraws(f, player, playerVis, player.pos, player.rot, comp, spin, player.steerApplied, player.dirt, 1.f);
     for (auto& kv : remotes) {
         Remote& r = kv.second;

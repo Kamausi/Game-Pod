@@ -26,3 +26,4 @@ module mb_rim(r, w, spokes) {
         translate([0,w*0.36,0]) mb_cyl(r*0.28, r*0.24, 0.05, 16);
     }
 }
+module mb_text(s, size) { linear_extrude(height=0.02, center=true) text(s, size=size*1.4, font="Liberation Sans:style=Bold", halign="center", valign="center"); }
