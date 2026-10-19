@@ -171,6 +171,18 @@ int main(int argc, char** argv) {
         CHECK(rankineBulldozing(0.3f, 0.2f, 17000, 2000, 0.1f) > 0, "bulldozing");
     });
 
+    test("cad kernel: mirrored copies keep outward normals", [] {
+        CadResult r = cadBuildSource("box size=0.1,0.1,0.1 pos=1,0,0 mirror=x\n", {}, "mirror");
+        CHECK(r.error.empty(), "%s", r.error.c_str());
+        // every vertex normal on a box points away from its own centre (+-1, 0, 0)
+        int bad = 0;
+        for (const CadVertex& v : r.mesh.verts) {
+            float cx = v.px > 0 ? 1.f : -1.f;
+            if ((v.px - cx) * v.nx + v.py * v.ny + v.pz * v.nz <= 0) bad++;
+        }
+        CHECK(bad == 0, "%d mirrored-box normals point inward", bad);
+    });
+
     test("cad kernel: every part builds", [] {
         const char* parts[] = {"wheels/wheel.mbcad", "vehicles/comanche.mbcad", "vehicles/bogcar76.mbcad", "vehicles/silverado.mbcad",
                                "vehicles/utv.mbcad", "props/barrel.mbcad", "props/tpost.mbcad", "props/schoolbus.mbcad",

@@ -126,6 +126,64 @@ box size=0.04,0.08,0.04 pos=0.58,1.08,-0.02 mirror=x
 color #e6eef2
 material lens
 box size=1.28,0.06,0.02 pos=0,1.13,0.035
+# ---- Trail-rig build-out ----
+# Roof rack basket on the hardtop behind the light bar: frame, slats, gear
+color #151515
+material steel
+for s = -1, 1, 2
+  box size=0.04,0.10,1.60 pos=s*(W/2-0.12),1.15,-1.20
+  for k = 0, 3
+    box size=0.04,0.12,0.04 pos=s*(W/2-0.12),1.10,-0.45-k*0.50
+  end
+end
+box size=W-0.20,0.10,0.04 pos=0,1.15,-0.40
+box size=W-0.20,0.10,0.04 pos=0,1.15,-2.00
+for k = 0, 6
+  box size=W-0.22,0.02,0.05 pos=0,1.11,-0.50-k*0.24
+end
+# Two jerry cans, a hi-lift jack, a shovel and a recovery bag in the basket
+for k = 0, 1
+  color #c41a1a
+  material paint
+  box size=0.17,0.32,0.46 pos=-0.55+k*0.20,1.28,-1.70 bevel=0.03
+  color #1a1a1a
+  box size=0.07,0.04,0.05 pos=-0.55+k*0.20,1.45,-1.55
+end
+color #c41a1a
+material paint
+box size=0.05,0.06,1.25 pos=0.20,1.16,-1.20
+color #1a1a1a
+material steel
+box size=0.10,0.10,0.18 pos=0.20,1.20,-0.95
+color #6e5434
+material matte
+cyl r=0.02 h=0.80 axis=z pos=0.55,1.15,-1.05 seg=6
+color #2a2a2a
+material steel
+box size=0.20,0.02,0.24 pos=0.55,1.15,-1.55
+color #f06010
+material matte
+box size=0.36,0.18,0.30 pos=0.55,1.22,-1.85 bevel=0.05
+# A-pillar ditch lights
+color #151515
+material steel
+box size=0.10,0.10,0.10 pos=W/2+0.03,0.60,0.44 bevel=0.02 mirror=x
+color #fff4d0
+material lens
+box size=0.08,0.08,0.012 pos=W/2+0.03,0.60,0.495 mirror=x
+# Mud flaps behind all four wheels
+color #121212
+material rubber
+box size=0.38,0.30,0.012 pos=W/2-0.14,-0.27,FA-AR-0.16 mirror=x
+box size=0.38,0.30,0.012 pos=W/2-0.14,-0.27,RA-AR-0.18 mirror=x
+# Door lettering
+color #c41a1a
+material paint
+text str=TRAIL_RIG size=0.07 t=0.022 depth=0.006 pos=W/2+0.005,0.28,-0.02 rot=0,90,0
+text str=TRAIL_RIG size=0.07 t=0.022 depth=0.006 pos=-W/2-0.005,0.28,-0.02 rot=0,-90,0
+color #1a1a1a
+text str=MUD_BUDDIES size=0.055 t=0.018 depth=0.006 pos=W/2+0.005,0.15,-0.02 rot=0,90,0
+text str=MUD_BUDDIES size=0.055 t=0.018 depth=0.006 pos=-W/2-0.005,0.15,-0.02 rot=0,-90,0
 # Cab interior and driver (seen through the glass)
 use vehicles/interior.mbcad W=1.80 bl=0.56 wz=0.45 bz=-0.75 ry=0.95 driver=driver
 # Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage

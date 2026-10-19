@@ -24,7 +24,7 @@ box size=0.08,0.77,0.08 pos=W/2-0.07,0.83,0.96 rot=-51.3,0,0 bevel=0.02 mirror=x
 box size=0.08,0.50,0.12 pos=W/2-0.07,0.84,0.05 bevel=0.02 mirror=x
 box size=0.08,0.50,0.10 pos=W/2-0.07,0.84,-1.06 bevel=0.02 mirror=x
 # Bed: sides with the rear arch, rail caps, front wall, tailgate, wheel tubs
-extrude depth=0.07 bevel=0.02 pts=-1.14,-0.13,arc(RA,AY,AR,18.5,161.5,12),-3.12,-0.13,-3.12,0.80,-1.14,0.80 pos=W/2-0.035,0,0 mirror=x
+extrude depth=0.07 bevel=0.02 pts=-1.14,0.80,-3.12,0.80,-3.12,-0.13,arc(RA,AY,AR,161.5,18.5,12),-1.14,-0.13 pos=W/2-0.035,0,0 mirror=x
 box size=0.11,0.035,1.98 pos=W/2-0.055,0.815,-2.13 bevel=0.014 mirror=x
 box size=W-0.14,0.80,0.06 pos=0,0.40,-1.16
 box size=W-0.10,0.78,0.06 pos=0,0.40,-3.10 bevel=0.02
@@ -94,6 +94,71 @@ box size=2.02,0.24,0.18 pos=0,0.0,2.99 bevel=0.02
 box size=1.96,0.22,0.16 pos=0,0.0,-3.16 bevel=0.02
 box size=0.08,0.08,2.30 pos=W/2+0.01,-0.18,0.10 bevel=0.03 mirror=x
 box size=0.12,0.16,5.0 pos=0.55,-0.21,-0.30 mirror=x
+# ---- Diesel mud-truck build-out ----
+# Twin 5" chrome stacks out of the bed front corners with slash-cut tips
+color #cfcfca
+material chrome
+for s = -1, 1, 2
+  cyl r=0.065 h=1.30 pos=s*(W/2-0.22),1.15,-1.30 seg=14
+  cyl r=0.07 h=0.12 pos=s*(W/2-0.22),1.86,-1.30 rot=30,0,0 seg=14
+  color #111111
+  material matte
+  cyl r=0.06 h=0.01 pos=s*(W/2-0.22),1.92,-1.27 rot=30,0,0 seg=14
+  color #cfcfca
+  material chrome
+end
+# Bed rack over the bed: four posts, side rails and crossbars, loaded with a spare, cans and boards
+color #151515
+material steel
+for s = -1, 1, 2
+  box size=0.05,0.62,0.05 pos=s*(W/2-0.08),1.10,-1.50
+  box size=0.05,0.62,0.05 pos=s*(W/2-0.08),1.10,-2.95
+  box size=0.05,0.05,1.50 pos=s*(W/2-0.08),1.42,-2.22
+end
+for k = 0, 3
+  box size=W-0.12,0.04,0.05 pos=0,1.42,-1.55-k*0.45
+end
+color #121212
+material rubber
+tire r=0.42 w=0.28 rim=0.20 lugs=16 depth=0.026 tread=mt pos=0.25,1.58,-2.25 rot=0,0,90
+color #222222
+material steel
+cyl r=0.20 h=0.25 pos=0.25,1.58,-2.25 seg=12
+color #d07a12
+material plastic
+cyl r=0.012 h=0.90 axis=z pos=0.25,1.73,-2.25 seg=5
+for k = 0, 1
+  color #3a6a2a
+  material paint
+  box size=0.17,0.46,0.32 pos=-0.55,1.68,-1.75-k*0.38 bevel=0.03
+  color #1a1a1a
+  box size=0.07,0.05,0.04 pos=-0.55,1.93,-1.67-k*0.38
+end
+color #f06010
+material plastic
+for k = 0, 1
+  box size=0.30,0.025,1.05 pos=-0.30-k*0.04,1.465+k*0.03,-2.65 bevel=0.01
+end
+# Amber cab clearance lights
+color #e8a020
+material lens
+for k = -2, 2
+  box size=0.07,0.035,0.05 pos=k*0.22,1.13,0.62
+end
+# Mud flaps behind all four wheels
+color #121212
+material rubber
+box size=0.40,0.32,0.012 pos=W/2-0.15,-0.29,FA-AR-0.18 mirror=x
+box size=0.40,0.32,0.012 pos=W/2-0.15,-0.29,RA-AR-0.20 mirror=x
+# Rear-door lettering and race number, tailgate lettering
+color #c41a1a
+material paint
+text str=22 size=0.18 t=0.055 depth=0.006 pos=W/2+0.005,0.30,-0.55 rot=0,90,0
+text str=22 size=0.18 t=0.055 depth=0.006 pos=-W/2-0.005,0.30,-0.55 rot=0,-90,0
+color #f2f2ee
+text str=MUD_BUDDIES size=0.07 t=0.022 depth=0.006 pos=W/2+0.005,0.08,0.38 rot=0,90,0
+text str=MUD_BUDDIES size=0.07 t=0.022 depth=0.006 pos=-W/2-0.005,0.08,0.38 rot=0,-90,0
+text str=MUD_TRUCK size=0.09 t=0.028 depth=0.006 pos=0,0.48,-3.165 rot=0,180,0
 # Cab interior and driver (seen through the glass)
 use vehicles/interior.mbcad W=1.84 bl=0.60 wz=1.20 bz=-1.08 ry=1.03 driver=driver
 # Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage

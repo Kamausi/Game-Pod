@@ -26,7 +26,7 @@ box size=0.07,0.62,0.07 pos=W/2-0.06,0.7575,0.325 rot=-46.6,0,0 bevel=0.02 mirro
 box size=0.07,0.43,0.10 pos=W/2-0.06,0.76,-0.59 bevel=0.02 mirror=x
 box size=W-0.10,0.03,0.04 pos=0,0.985,0.10 bevel=0.01
 # Short bed: sides with the rear arch, rail caps, front wall, tailgate and wheel tubs
-extrude depth=0.06 bevel=0.02 pts=-0.68,-0.12,arc(RA,AY,AR,21,159,12),-2.48,-0.12,-2.48,0.56,-0.68,0.56 pos=W/2-0.03,0,0 mirror=x
+extrude depth=0.06 bevel=0.02 pts=-0.68,0.56,-2.48,0.56,-2.48,-0.12,arc(RA,AY,AR,159,21,12),-0.68,-0.12 pos=W/2-0.03,0,0 mirror=x
 box size=0.10,0.03,1.82 pos=W/2-0.05,0.575,-1.58 bevel=0.012 mirror=x
 box size=W-0.12,0.44,0.05 pos=0,0.34,-0.70
 box size=W-0.08,0.46,0.05 pos=0,0.33,-2.465 bevel=0.015
@@ -131,6 +131,55 @@ cyl r=0.055 h=0.06 seg=14 pos=0.62,0.20,-0.80 mirror=x
 color #141414
 material matte
 cyl r=0.045 h=0.01 seg=14 pos=0.62,1.505,-0.80 mirror=x
+# ---- Farm-truck bogger build-out ----
+# Wooden stake sides on the rear half of the bed (weathered boards on steel stakes)
+for s = -1, 1, 2
+  color #3a3a3a
+  material steel
+  for k = 0, 2
+    box size=0.04,0.42,0.05 pos=s*(W/2-0.04),0.76,-1.55-k*0.45
+  end
+  color #8a6a44
+  material matte
+  box size=0.035,0.11,1.05 pos=s*(W/2-0.04),0.66,-2.0
+  box size=0.035,0.11,1.05 pos=s*(W/2-0.04),0.83,-2.0
+  box size=0.035,0.11,1.05 pos=s*(W/2-0.04),1.00,-2.0
+end
+color #8a6a44
+material matte
+box size=W-0.06,0.11,0.035 pos=0,0.66,-2.47
+box size=W-0.06,0.11,0.035 pos=0,0.83,-2.47
+# A square hay bale and a feed bucket in the bed
+color #cfae63
+box size=0.85,0.36,0.44 pos=0.25,0.30,-1.95 rot=0,12,0 bevel=0.02
+color #e0d6b0
+box size=0.012,0.37,0.45 pos=0.05,0.30,-1.99 rot=0,12,0
+color #c41a1a
+material plastic
+cyl r=0.15 r2=0.13 h=0.30 pos=-0.45,0.26,-2.20 seg=12
+# Spotlight on the driver's A-pillar and a CB whip on the passenger mirror
+color #c9c9c4
+material chrome
+sphere r=0.07 pos=W/2+0.08,0.86,0.40 scale=1,1,0.9 seg=10
+color #fff4d0
+material lens
+cyl r=0.055 h=0.01 axis=z pos=W/2+0.08,0.86,0.465 seg=12
+color #111111
+material matte
+cyl r=0.005 h=1.60 pos=-W/2-0.12,1.55,0.55 seg=4
+# Mud flaps behind all four wheels
+color #121212
+material rubber
+box size=0.38,0.30,0.012 pos=W/2-0.14,-0.27,FA-AR-0.16 mirror=x
+box size=0.38,0.30,0.012 pos=W/2-0.14,-0.27,RA-AR-0.18 mirror=x
+# Door lettering and number
+color #f2f2ee
+material paint
+text str=79 size=0.16 t=0.05 depth=0.006 pos=W/2+0.005,0.30,-0.05 rot=0,90,0
+text str=79 size=0.16 t=0.05 depth=0.006 pos=-W/2-0.005,0.30,-0.05 rot=0,-90,0
+color #e8b020
+text str=MUD_BUDDIES size=0.06 t=0.02 depth=0.006 pos=W/2+0.005,0.08,-0.05 rot=0,90,0
+text str=MUD_BUDDIES size=0.06 t=0.02 depth=0.006 pos=-W/2-0.005,0.08,-0.05 rot=0,-90,0
 # Cab interior and driver (seen through the glass)
 use vehicles/interior.mbcad W=1.80 bl=0.545 wz=0.52 bz=-0.60 ry=0.92 driver=driver
 # Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage

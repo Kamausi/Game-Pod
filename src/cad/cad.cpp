@@ -31,6 +31,9 @@ void CadMesh::append(const CadMesh& o, const Mat4& m, bool flip) {
     float cof[9] = {e * i - f * h, -(d * i - f * g), d * h - e * g,
                     -(b * i - c * h), a * i - c * g, -(a * h - b * g),
                     b * f - c * e, -(a * f - c * d), a * e - b * d};
+    // The cofactor carries det(m): under a mirror it would point every normal inward.
+    if (a * cof[0] + b * cof[1] + c * cof[2] < 0)
+        for (float& k : cof) k = -k;
     uint32_t baseIdx = uint32_t(verts.size());
     for (const CadVertex& v : o.verts) {
         Vec3 p = m.transformPoint({v.px, v.py, v.pz});
