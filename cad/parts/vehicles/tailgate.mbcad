@@ -1,0 +1,14 @@
+# Shared pickup tailgate, lofted across the width: barrelled outer skin, rolled top cap with a
+# lip, rounded end edges. Outer face toward +Z, origin at the centre (place on the back of a bed
+# with rot=0,180,0). Takes the caller's colour and material.
+param w = 1.70
+param h = 0.60
+param t = 0.05
+loft full=1 sec=-w/2:-(-t/2)*0.80,-h/2,-(t/2-0.01)*0.80,-h/2,-(t/2)*0.80,-h/2+0.03,-(t/2+0.006)*0.80,0,-(t/2)*0.80,h/2-0.07,-(t/2+0.010)*0.80,h/2-0.045,-(t/2-0.004)*0.80,h/2,-(-t/2-0.01)*0.80,h/2,-(-t/2)*0.80,h/2-0.04|-w/2+0.03:-(-t/2)*1,-h/2,-(t/2-0.01)*1,-h/2,-(t/2)*1,-h/2+0.03,-(t/2+0.006)*1,0,-(t/2)*1,h/2-0.07,-(t/2+0.010)*1,h/2-0.045,-(t/2-0.004)*1,h/2,-(-t/2-0.01)*1,h/2,-(-t/2)*1,h/2-0.04|w/2-0.03:-(-t/2)*1,-h/2,-(t/2-0.01)*1,-h/2,-(t/2)*1,-h/2+0.03,-(t/2+0.006)*1,0,-(t/2)*1,h/2-0.07,-(t/2+0.010)*1,h/2-0.045,-(t/2-0.004)*1,h/2,-(-t/2-0.01)*1,h/2,-(-t/2)*1,h/2-0.04|w/2:-(-t/2)*0.80,-h/2,-(t/2-0.01)*0.80,-h/2,-(t/2)*0.80,-h/2+0.03,-(t/2+0.006)*0.80,0,-(t/2)*0.80,h/2-0.07,-(t/2+0.010)*0.80,h/2-0.045,-(t/2-0.004)*0.80,h/2,-(-t/2-0.01)*0.80,h/2,-(-t/2)*0.80,h/2-0.04 n=2 m=2 rot=0,90,0
+# Recessed handle pocket and latch
+color #111111
+material plastic
+box size=0.22,0.06,0.012 pos=0,h/2-0.11,t/2+0.004 bevel=0.008
+color #c8c8c4
+material chrome
+box size=0.16,0.022,0.01 pos=0,h/2-0.11,t/2+0.010

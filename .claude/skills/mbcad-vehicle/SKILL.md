@@ -18,7 +18,11 @@ origin at frame height). Wheels, axles, links and coilovers are drawn live by th
 - **Budget:** 30k–70k triangles full detail; `lod=1` must drop to roughly the unshaped count.
 
 ## Build order
-1. **Primary forms** — side-profile `extrude`s with `arc(...)` wheel arches for the lower body,
+1. **Primary forms** — preferred: a lofted body shell from `tools/gen_truck_bodies.py` (add the
+   truck's section table: per-station half width, rocker, beltline/hood height, crown; `style='flat'`
+   for slab-sided classics like the MJ), wheel openings with `cut cyl=...` (round, or squared with
+   `p=3.4` and matching `sarc(...)` flares), `liner` wheelhouses, lofted bed sides. Otherwise
+   side-profile `extrude`s with `arc(...)` wheel arches for the lower body,
    greenhouse glass as one `extrude` (material glass) with roof skin and pillars around it, bed
    or tub. Body shells get `bevel=0.075–0.10`.
 2. **Whole-body shaping** — at the top of the part:
@@ -39,6 +43,10 @@ origin at frame height). Wheels, axles, links and coilovers are drawn live by th
    driver), `vehicles/kit.mbcad` (recovery points, winch, snorkel), `vehicles/bumper.mbcad`.
 5. **Details last** — panel gaps, handles, mirrors, badges/plates (`text`), wipers, seals, flare
    bolts, lettering. Decals sit 4–10 mm proud; on clear-coated paint at grazing angles use matte.
+
+## Reference
+Work from photos: match the silhouette (cab height vs. hood, overhangs, arch shape), the face
+(grille pattern, lamp layout), and the signature details (e.g. the MJ's pillar vent, squared flares).
 
 ## Verify (every iteration)
 ```

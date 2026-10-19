@@ -527,6 +527,37 @@ CadMesh loft(const std::vector<float>& zs, const std::vector<std::vector<Vec2>>&
     return out;
 }
 
+
+CadMesh liner(float r, float w, float a0, float a1, int seg, Vec3 color, float rb, float pe) {
+    // Open partial cylinder (or superellipse) along X, faces pointing at the axis (a wheelhouse
+    // seen from outside). rb <= 0 means a circle of radius r.
+    CadMesh m;
+    seg = std::max(2, seg);
+    if (rb <= 0) rb = r;
+    for (int k = 0; k <= seg; k++) {
+        float a = (a0 + (a1 - a0) * float(k) / seg) * DEG;
+        float c = std::cos(a), sn = std::sin(a);
+        float z = (c < 0 ? -1.f : 1.f) * std::pow(std::fabs(c), 2.f / pe) * r;
+        float y = (sn < 0 ? -1.f : 1.f) * std::pow(std::fabs(sn), 2.f / pe) * rb;
+        // inward normal = -gradient of |z/r|^p + |y/rb|^p
+        float gz = (z < 0 ? -1.f : 1.f) * std::pow(std::fabs(z) / r, pe - 1.f) / r;
+        float gy = (y < 0 ? -1.f : 1.f) * std::pow(std::fabs(y) / rb, pe - 1.f) / rb;
+        float gl = std::max(1e-6f, std::sqrt(gz * gz + gy * gy));
+        for (int e = 0; e < 2; e++)
+            m.verts.push_back({e ? w * 0.5f : -w * 0.5f, y, z, 0, -gy / gl, -gz / gl, color.x, color.y, color.z, 0});
+    }
+    for (int k = 0; k < seg; k++) {
+        uint32_t a = uint32_t(2 * k), b = a + 1, c = a + 3, d = a + 2;
+        m.idx.insert(m.idx.end(), {a, c, b, a, d, c});
+    }
+    // Wind so the faces look along their (inward) normals.
+    const CadVertex &A = m.verts[m.idx[0]], &B = m.verts[m.idx[1]], &C = m.verts[m.idx[2]];
+    Vec3 fn = cross(Vec3{B.px - A.px, B.py - A.py, B.pz - A.pz}, Vec3{C.px - A.px, C.py - A.py, C.pz - A.pz});
+    if (fn.x * A.nx + fn.y * A.ny + fn.z * A.nz < 0)
+        for (size_t k = 0; k + 2 < m.idx.size(); k += 3) std::swap(m.idx[k + 1], m.idx[k + 2]);
+    return m;
+}
+
 CadMesh wedge(Vec3 s, Vec3 color) {
     // Full height at -Z, tapering to zero height at +Z (windshield / ramp shape).
     std::vector<Vec2> tri{{-s.z * 0.5f, -s.y * 0.5f}, {s.z * 0.5f, -s.y * 0.5f}, {-s.z * 0.5f, s.y * 0.5f}};
@@ -903,6 +934,113 @@ static void applyDeform(CadMesh& m, const DeformSpec& d) {
     }
 }
 
+
+// Wheel-arch cut: remove everything outboard of |x| > xmin that lies inside the circle of radius r
+// about (zc, yc) in the z-y plane. Edges near the circle are refined first (edge-local rule, so no
+// cracks), then straddling triangles are clipped with intersection points bisected onto the circle.
+static void applyCut(CadMesh& m, float zc, float yc, float ra, float rb, float pe, float xmin) {
+    // Superellipse |dz/a|^p + |dy/b|^p = 1 (p = 2: the circle; ~3-4: squared truck arches),
+    // as an approximate signed distance (positive inside the opening).
+    const float r = std::min(ra, rb);
+    auto f = [&](const CadVertex& v) {
+        float S = std::pow(std::fabs(v.pz - zc) / ra, pe) + std::pow(std::fabs(v.py - yc) / rb, pe);
+        return (1.f - std::pow(S, 1.f / pe)) * r;
+    };
+    const float res = 0.025f;
+    for (int pass = 0; pass < 12; pass++) {
+        std::map<std::pair<uint32_t, uint32_t>, uint32_t> mid;
+        bool any = false;
+        auto split = [&](uint32_t a, uint32_t b) -> int64_t {
+            const CadVertex &A = m.verts[a], &B = m.verts[b];
+            if (std::max(std::fabs(A.px), std::fabs(B.px)) <= xmin) return -1;
+            float dx = A.px - B.px, dy = A.py - B.py, dz = A.pz - B.pz, len = std::sqrt(dx * dx + dy * dy + dz * dz);
+            if (len <= res) return -1;
+            float fa = f(A), fb = f(B);
+            CadVertex M{(A.px + B.px) * 0.5f, (A.py + B.py) * 0.5f, (A.pz + B.pz) * 0.5f, 0, 0, 0, 0, 0, 0, 0};
+            float fm = f(M);
+            bool near = (fa > 0) != (fb > 0) || std::min(std::fabs(fa), std::min(std::fabs(fb), std::fabs(fm))) < len;
+            if (!near) return -1;
+            auto key = std::make_pair(std::min(a, b), std::max(a, b));
+            auto it = mid.find(key);
+            if (it != mid.end()) return it->second;
+            CadVertex v{M.px, M.py, M.pz, A.nx + B.nx, A.ny + B.ny, A.nz + B.nz,
+                        (A.r + B.r) * 0.5f, (A.g + B.g) * 0.5f, (A.b + B.b) * 0.5f, A.mat};
+            float l = std::sqrt(v.nx * v.nx + v.ny * v.ny + v.nz * v.nz);
+            if (l > 1e-6f) { v.nx /= l; v.ny /= l; v.nz /= l; } else { v.nx = A.nx; v.ny = A.ny; v.nz = A.nz; }
+            m.verts.push_back(v);
+            uint32_t id = uint32_t(m.verts.size() - 1);
+            mid[key] = id;
+            any = true;
+            return id;
+        };
+        std::vector<uint32_t> out;
+        out.reserve(m.idx.size());
+        for (size_t k = 0; k + 2 < m.idx.size(); k += 3) {
+            uint32_t a = m.idx[k], b = m.idx[k + 1], c = m.idx[k + 2];
+            int64_t ab = split(a, b), bc = split(b, c), ca = split(c, a);
+            int n = (ab >= 0) + (bc >= 0) + (ca >= 0);
+            auto tri = [&](uint32_t x, uint32_t y, uint32_t z) { out.push_back(x); out.push_back(y); out.push_back(z); };
+            if (n == 0) { tri(a, b, c); continue; }
+            if (n == 3) {
+                uint32_t p = uint32_t(ab), q = uint32_t(bc), rr = uint32_t(ca);
+                tri(a, p, rr); tri(p, b, q); tri(rr, q, c); tri(p, q, rr);
+                continue;
+            }
+            uint32_t v0 = a, v1 = b, v2 = c; int64_t e01 = ab, e12 = bc, e20 = ca;
+            for (int rr = 0; rr < 3 && !(e01 >= 0 && (n == 1 || e12 >= 0)); rr++) {
+                uint32_t t = v0; v0 = v1; v1 = v2; v2 = t;
+                int64_t te = e01; e01 = e12; e12 = e20; e20 = te;
+            }
+            if (n == 1) { tri(v0, uint32_t(e01), v2); tri(uint32_t(e01), v1, v2); }
+            else { uint32_t p = uint32_t(e01), q = uint32_t(e12); tri(p, v1, q); tri(v0, p, q); tri(v0, q, v2); }
+        }
+        m.idx.swap(out);
+        if (!any) break;
+    }
+    // Clip
+    auto lerpV = [&](const CadVertex& A, const CadVertex& B) {
+        // bisect for f = 0 along A (outside, f<=0) -> B (inside, f>0)
+        float lo = 0, hi = 1;
+        for (int it = 0; it < 14; it++) {
+            float t = (lo + hi) * 0.5f;
+            CadVertex M{A.px + (B.px - A.px) * t, A.py + (B.py - A.py) * t, A.pz + (B.pz - A.pz) * t, 0, 0, 0, 0, 0, 0, 0};
+            if (f(M) > 0) hi = t; else lo = t;
+        }
+        float t = lo;
+        CadVertex v{A.px + (B.px - A.px) * t, A.py + (B.py - A.py) * t, A.pz + (B.pz - A.pz) * t,
+                    A.nx + (B.nx - A.nx) * t, A.ny + (B.ny - A.ny) * t, A.nz + (B.nz - A.nz) * t,
+                    A.r, A.g, A.b, A.mat};
+        float l = std::sqrt(v.nx * v.nx + v.ny * v.ny + v.nz * v.nz);
+        if (l > 1e-6f) { v.nx /= l; v.ny /= l; v.nz /= l; }
+        return v;
+    };
+    std::vector<uint32_t> out;
+    out.reserve(m.idx.size());
+    for (size_t k = 0; k + 2 < m.idx.size(); k += 3) {
+        uint32_t id[3] = {m.idx[k], m.idx[k + 1], m.idx[k + 2]};
+        float cx = (m.verts[id[0]].px + m.verts[id[1]].px + m.verts[id[2]].px) / 3.f;
+        if (std::fabs(cx) <= xmin) { out.insert(out.end(), id, id + 3); continue; }
+        bool in[3];
+        int nin = 0;
+        for (int e = 0; e < 3; e++) { in[e] = f(m.verts[id[e]]) > 0; nin += in[e]; }
+        if (nin == 0) { out.insert(out.end(), id, id + 3); continue; }
+        if (nin == 3) continue;
+        std::vector<uint32_t> poly;
+        for (int e = 0; e < 3; e++) {
+            uint32_t a = id[e], b = id[(e + 1) % 3];
+            bool ia = in[e], ib = in[(e + 1) % 3];
+            if (!ia) poly.push_back(a);
+            if (ia != ib) {
+                CadVertex v = ia ? lerpV(m.verts[b], m.verts[a]) : lerpV(m.verts[a], m.verts[b]);
+                m.verts.push_back(v);
+                poly.push_back(uint32_t(m.verts.size() - 1));
+            }
+        }
+        for (size_t t = 1; t + 1 < poly.size(); t++) { out.push_back(poly[0]); out.push_back(poly[t]); out.push_back(poly[t + 1]); }
+    }
+    m.idx.swap(out);
+}
+
 struct Interp {
     CadParams vars;
     Vec3 color{0.7f, 0.7f, 0.7f};
@@ -951,6 +1089,21 @@ struct Interp {
         for (auto& tok : splitTopLevel(it->second, ',')) {
             std::string t = tok;
             t.erase(0, t.find_first_not_of(" \t"));
+            if (t.compare(0, 5, "sarc(") == 0 && t.back() == ')') {
+                // sarc(zc, yc, a, b, p, a0, a1, n): n+1 points on a superellipse (squared arches)
+                auto a = evalList(t.substr(5, t.size() - 6));
+                if (a.size() < 8) { err = "sarc needs zc,yc,a,b,p,a0,a1,n"; return p; }
+                for (size_t i = 0; i + 1 < l.size(); i += 2) p.push_back({l[i], l[i + 1]});
+                l.clear();
+                int cnt = std::max(1, int(a[7] + 0.5f));
+                for (int k = 0; k <= cnt; k++) {
+                    float ang = (a[5] + (a[6] - a[5]) * float(k) / float(cnt)) * DEG;
+                    float c = std::cos(ang), sn = std::sin(ang);
+                    p.push_back({a[0] + a[2] * (c < 0 ? -1.f : 1.f) * std::pow(std::fabs(c), 2.f / a[4]),
+                                 a[1] + a[3] * (sn < 0 ? -1.f : 1.f) * std::pow(std::fabs(sn), 2.f / a[4])});
+                }
+                continue;
+            }
             if (t.compare(0, 4, "arc(") == 0 && t.back() == ')') {
                 // arc(zc, yc, r, a0, a1, n): flush pending coordinates, then n+1 arc points
                 auto a = evalList(t.substr(4, t.size() - 5));
@@ -1160,6 +1313,17 @@ struct Interp {
                 float r = num(a, "r", 0.5f);
                 int seg = segs(a, 16);
                 emit(cadprim::sphere(r, seg, color), a, "sphere(r=" + fmt(r) + ", $fn=" + std::to_string(seg) + ")");
+            } else if (op == "cut") {
+                // cut cyl=zc,yc,r [xmin=]: clip the wheel opening out of everything emitted so far
+                // cut cyl=zc,yc,a[,b] [p=2] [xmin=]: b = height (defaults to a), p = squareness
+                auto c = evalList(str(a, "cyl", "0,0,0.5"));
+                if (c.size() < 3) err = "cut needs cyl=zc,yc,r";
+                else applyCut(mesh, c[0], c[1], c[2], c.size() > 3 ? c[3] : c[2], std::max(1.f, num(a, "p", 2.f)), num(a, "xmin", 0.f));
+            } else if (op == "liner") {
+                // liner r= w= [a0=0] [a1=180] [seg=]: inward-facing partial cylinder along X (wheelhouse)
+                emit(cadprim::liner(num(a, "r", 0.5f), num(a, "w", 0.3f), num(a, "a0", 0.f), num(a, "a1", 180.f), segs(a, 16), color,
+                                    num(a, "b", 0.f), std::max(1.f, num(a, "p", 2.f))), a,
+                     "/* liner */ cube(0.001)");
             } else if (op == "tube") {
                 // tube pts=x,y,z,x,y,z,... r= [seg=]   or   tube helix=coil_r,turns,length r=wire [seg=]
                 float rr = num(a, "r", 0.02f);

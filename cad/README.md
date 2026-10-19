@@ -45,6 +45,11 @@ tube helix=coil_r,turns,length r=wire      # coil spring along +Z
 loft sec=z:x,y,x,y,...|z:x,y,... [n=4] [m=2] [cap=1]
                                # smooth shell through half-profiles (x >= 0, centreline to
                                # centreline, mirrored), Catmull-Rom along z (n) and round (m)
+cut cyl=zc,yc,a[,b] [p=2] xmin=0.6   # clip a wheel opening out of everything emitted so far, outboard
+                               # of |x| > xmin, exactly along a circle (p=2) or squared arch (p~3.4)
+liner r= [b=] [p=] w= a0= a1=  # inward-facing wheelhouse liner along X (same shape as the cut)
+sarc(zc,yc,a,b,p,a0,a1,n)      # superellipse points in pts= lists (squared flares to match cuts)
+loft ... full=1                # full closed sections (no mirroring): bumpers, tailgates
 set _segmul = 1.5              # smoother curves: scales every seg count (children inherit)
 set _bevelmul = 2              # ...and bevel segment counts
 deform [on=] [res=] [tol=] tumble= ty0= ty1= barrel= by0= by1= bow= bz0= bz1=

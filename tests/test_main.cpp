@@ -239,6 +239,45 @@ int main(int argc, char** argv) {
         CHECK(inward == 0, "%d loft normals point inward", inward);
     });
 
+    test("cad kernel: cut clips a clean wheel arch, liner faces inward", [] {
+        CadResult r = cadBuildSource("box size=2,1,4\ncut cyl=0,-0.5,0.6 xmin=0.6\nliner r=0.6 w=0.4 pos=0.8,-0.5,0\n", {}, "cut");
+        CHECK(r.error.empty(), "%s", r.error.c_str());
+        int inside = 0, onCircle = 0, linerOut = 0;
+        std::vector<char> ref(r.mesh.verts.size(), 0);
+        for (uint32_t i : r.mesh.idx) ref[i] = 1;
+        for (size_t vi = 0; vi < r.mesh.verts.size(); vi++) {
+            if (!ref[vi]) continue;   // orphaned by the cut
+            const CadVertex& v = r.mesh.verts[vi];
+            float d = std::sqrt(v.pz * v.pz + (v.py + 0.5f) * (v.py + 0.5f));
+            bool isLiner = std::fabs(d - 0.6f) < 1e-3f && v.px > 0.59f && v.px < 1.01f && (std::fabs(v.ny) + std::fabs(v.nz)) > 0.9f;
+            if (isLiner) { if (v.pz * v.nz + (v.py + 0.5f) * v.ny > 0) linerOut++; continue; }
+            if (std::fabs(v.px) > 0.63f && d < 0.595f) inside++;   // xmin edge stays hidden in the body
+            if (std::fabs(v.px - 1.f) < 1e-4f && std::fabs(d - 0.6f) < 0.004f) onCircle++;
+        }
+        CHECK(inside == 0, "%d skin vertices left inside the arch", inside);
+        CHECK(onCircle > 20, "the clipped edge should follow the circle (%d points)", onCircle);
+        CHECK(linerOut == 0, "%d liner normals point outward", linerOut);
+    });
+
+    test("cad kernel: squared (superellipse) arch cut", [] {
+        CadResult r = cadBuildSource("box size=2,1,4\ncut cyl=0,-0.5,0.6,0.5 p=4 xmin=0.6\n", {}, "sq");
+        CHECK(r.error.empty(), "%s", r.error.c_str());
+        std::vector<char> ref(r.mesh.verts.size(), 0);
+        for (uint32_t i : r.mesh.idx) ref[i] = 1;
+        int inside = 0, corner = 0;
+        for (size_t i = 0; i < r.mesh.verts.size(); i++) {
+            if (!ref[i]) continue;
+            const CadVertex& v = r.mesh.verts[i];
+            if (std::fabs(v.px) < 0.63f) continue;
+            float S = std::pow(std::fabs(v.pz) / 0.6f, 4.f) + std::pow(std::fabs(v.py + 0.5f) / 0.5f, 4.f);
+            if (S < 0.95f) inside++;
+            // a circle of r=0.6 would keep (z=0.45, y=-0.1); the squared arch must remove it
+            if (std::fabs(v.pz - 0.45f) < 0.03f && std::fabs(v.py + 0.1f) < 0.03f) corner++;
+        }
+        CHECK(inside == 0, "%d skin vertices inside the squared arch", inside);
+        CHECK(corner == 0, "squared arch should cut its corners (%d left)", corner);
+    });
+
     test("cad kernel: _segmul raises segment counts", [] {
         CadResult a = cadBuildSource("cyl r=1 h=1 seg=8\n", {}, "s1");
         CadResult b = cadBuildSource("set _segmul = 2\ncyl r=1 h=1 seg=8\n", {}, "s2");

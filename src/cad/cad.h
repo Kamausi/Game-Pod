@@ -73,6 +73,8 @@ CadMesh sphere(float r, int seg, Vec3 color);
 CadMesh lathe(const std::vector<Vec2>& profile, int seg, Vec3 color);  // profile (radius, y)
 CadMesh extrude(const std::vector<Vec2>& poly, float depth, Vec3 color);  // poly in (z,y), along X
 CadMesh wedge(Vec3 size, Vec3 color);
+// Open inward-facing partial cylinder along X (wheelhouse liner), angles in degrees from +Z toward +Y.
+CadMesh liner(float r, float w, float a0, float a1, int seg, Vec3 color, float rb = 0, float pe = 2);  // rb/pe: superellipse
 // Smooth tube swept along a 3D path (parallel-transport frames, capped ends).
 CadMesh tube(const std::vector<Vec3>& path, float r, int seg, Vec3 color);
 // Smooth lofted shell through half-profiles (x >= 0, bottom centre round to top centre, mirrored
