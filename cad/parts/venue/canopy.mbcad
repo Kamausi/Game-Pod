@@ -5,6 +5,7 @@ param color_r = 0.78
 param color_g = 0.10
 param color_b = 0.08
 param walls = 0
+param furnish = 1                  # folding table, camp chairs and a cooler underneath
 set E = 2.0                        # eave height (top of legs)
 set P = 2.9                        # peak height
 # Legs, foot plates and the scissor-truss eave rails
@@ -41,3 +42,35 @@ cyl r=0.06 h=0.06 pos=0,P-0.01,0 seg=8
 material matte
 color color_r*0.85 color_g*0.85 color_b*0.85
 box size=2.9*walls,(E-0.22)*walls,0.012 pos=0,0.02+(E-0.22)/2,-1.47
+
+# ---- Build-out: sandbag weights, folding table, camp chairs, cooler ----
+material matte
+color #2a2d30
+box size=0.32,0.12,0.20 pos=1.46,0.06,1.30 bevel=0.04 mirror=x
+box size=0.32,0.12,0.20 pos=1.46,0.06,-1.30 bevel=0.04 mirror=x
+color #16181a
+box size=0.05,0.10,0.21 pos=1.46,0.06,1.30 mirror=x
+box size=0.05,0.10,0.21 pos=1.46,0.06,-1.30 mirror=x
+use venue/folding_table.mbcad pos=0,0,-0.55 scale=furnish,furnish,furnish
+# Two folding camp chairs facing the front
+for s = -1, 1, 2
+  material steel
+  color #3a3d40
+  cyl r=0.012 h=0.62 pos=s*0.75+0.22,0.30,0.55 rot=14,0,0 seg=5 scale=furnish,furnish,furnish
+  cyl r=0.012 h=0.62 pos=s*0.75-0.22,0.30,0.55 rot=14,0,0 seg=5 scale=furnish,furnish,furnish
+  cyl r=0.012 h=0.62 pos=s*0.75+0.22,0.30,0.95 rot=-14,0,0 seg=5 scale=furnish,furnish,furnish
+  cyl r=0.012 h=0.62 pos=s*0.75-0.22,0.30,0.95 rot=-14,0,0 seg=5 scale=furnish,furnish,furnish
+  material matte
+  color color_r*0.6+0.05 color_g*0.6+0.05 color_b*0.6+0.05
+  box size=0.50,0.04,0.44 pos=s*0.75,0.46,0.74 scale=furnish,furnish,furnish
+  box size=0.50,0.46,0.04 pos=s*0.75,0.72,0.97 rot=-10,0,0 scale=furnish,furnish,furnish
+  color #1c1c1c
+  box size=0.06,0.04,0.40 pos=s*0.75+0.27,0.62,0.76 scale=furnish,furnish,furnish
+  box size=0.06,0.04,0.40 pos=s*0.75-0.27,0.62,0.76 scale=furnish,furnish,furnish
+end
+# Cooler with a white lid beside the table
+material plastic
+color #1f5aa8
+box size=0.62,0.38,0.38 pos=1.15,0.19,-0.55 bevel=0.03 scale=furnish,furnish,furnish
+color #f2f2ee
+box size=0.64,0.07,0.40 pos=1.15,0.41,-0.55 bevel=0.02 scale=furnish,furnish,furnish

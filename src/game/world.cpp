@@ -601,10 +601,10 @@ void World::generate(uint32_t seed) {
             }
         // Shops along the return road: pro shop/parts store, washroom block, first aid.
         building("venue/metal_building.mbcad", -42.f, -66.5f, 0, {5.f, 2.f, 4.f},
-                 with(with(col3(0.55f, 0.12f, 0.1f, "wall"), col3(0.25f, 0.26f, 0.27f, "roof")), {{"w", 10}, {"l", 8}}));
+                 with(with(col3(0.55f, 0.12f, 0.1f, "wall"), col3(0.25f, 0.26f, 0.27f, "roof")), {{"w", 10}, {"l", 8}, {"sign", 1}}));
         addProp("venue/sign.mbcad", -42.f, -61.5f, 0, 1.f, {{"label", 2}, {"arrow", 0}, {"panel_r", 0.1f}, {"panel_g", 0.1f}, {"panel_b", 0.12f}, {"w", 2.4f}});
         building("venue/metal_building.mbcad", -28.f, -66.f, 0, {4.f, 1.8f, 3.f},
-                 with(with(col3(0.82f, 0.8f, 0.72f, "wall"), col3(0.18f, 0.32f, 0.2f, "roof")), {{"w", 8}, {"l", 6}, {"h", 3.f}}));
+                 with(with(col3(0.82f, 0.8f, 0.72f, "wall"), col3(0.18f, 0.32f, 0.2f, "roof")), {{"w", 8}, {"l", 6}, {"h", 3.f}, {"sign", 2}}));
         building("venue/canopy.mbcad", -19.f, -66.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.92f}, {"color_g", 0.92f}, {"color_b", 0.92f}, {"walls", 1}});
         addProp("venue/sign.mbcad", -19.f, -63.5f, 0, 1.f, {{"label", 3}, {"arrow", 0}, {"panel_r", 0.85f}, {"panel_g", 0.1f}, {"panel_b", 0.1f}, {"w", 1.0f}, {"h", 0.6f}});
         person(-18.f, -64.5f, 0, true);
@@ -628,7 +628,7 @@ void World::generate(uint32_t seed) {
         for (int i = 0; i < 9; i++) person(gr.range(16.f, 28.f), gr.range(-81.f, -77.f), PI + gr.range(-0.4f, 0.4f), false);   // lawn crowd
         for (int i = 0; i < 6; i++) person(gr.range(17.f, 27.f), gr.range(-73.f, -67.f), gr.range(0.f, 6.28f), false);
         building("venue/metal_building.mbcad", 27.f, -64.f, 0, {3.5f, 1.6f, 2.5f},
-                 with(with(col3(0.85f, 0.75f, 0.45f, "wall"), col3(0.5f, 0.12f, 0.1f, "roof")), {{"w", 7}, {"l", 5}, {"h", 2.8f}}));
+                 with(with(col3(0.85f, 0.75f, 0.45f, "wall"), col3(0.5f, 0.12f, 0.1f, "roof")), {{"w", 7}, {"l", 5}, {"h", 2.8f}, {"sign", 3}}));
         building("venue/canopy.mbcad", 15.f, -64.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.1f}, {"color_g", 0.12f}, {"color_b", 0.14f}});
         building("venue/canopy.mbcad", 19.f, -64.f, 0, {1.5f, 1.4f, 1.5f}, {{"color_r", 0.95f}, {"color_g", 0.5f}, {"color_b", 0.05f}});
         addProp("venue/folding_table.mbcad", 15.f, -63.f, 0);
@@ -798,7 +798,7 @@ void World::generate(uint32_t seed) {
         // Campground: tents, RVs and campers with tow vehicles, tables, fire rings, a bathhouse.
         {
             building("venue/metal_building.mbcad", 106.f, 30.f, PI, {4.f, 1.8f, 3.f},
-                     with(with(col3(0.62f, 0.5f, 0.36f, "wall"), col3(0.22f, 0.24f, 0.25f, "roof")), {{"w", 8}, {"l", 6}, {"h", 3.f}}));
+                     with(with(col3(0.62f, 0.5f, 0.36f, "wall"), col3(0.22f, 0.24f, 0.25f, "roof")), {{"w", 8}, {"l", 6}, {"h", 3.f}, {"sign", 4}}));
             addProp("venue/sign.mbcad", 98.f, 6.f, PI * 0.5f, 1.f, {{"label", 10}, {"panel_r", 0.4f}, {"panel_g", 0.25f}, {"panel_b", 0.12f}});
             addProp("venue/sign.mbcad", 120.f, 36.f, PI, 1.f, {{"label", 11}, {"arrow", 0}, {"panel_r", 0.1f}, {"panel_g", 0.3f}, {"panel_b", 0.6f}, {"w", 1.0f}});   // RV dump station
             int site = 0;

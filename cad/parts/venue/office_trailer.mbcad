@@ -86,3 +86,90 @@ box size=0.05,1.0,0.05 pos=3.45,fl+0.48,W/2+1.1
 box size=0.05,1.0,0.05 pos=3.45,fl+0.48,W/2+0.12
 box size=0.05,0.05,1.04 pos=3.45,fl+0.98,W/2+0.61
 box size=0.05,0.05,0.9 pos=3.45,0.95,W/2+1.55 rot=35,0,0
+
+# ---- Build-out: skirting, siding grooves, wheelchair ramp, awning, sign, rooftop A/C, meter post ----
+# Vinyl skirting with vertical ribs hides the blocks (hitch left exposed at -X)
+material plastic
+color color_r*0.80 color_g*0.80 color_b*0.78
+box size=L-0.04,fl-0.02,0.03 pos=0,(fl-0.02)/2,W/2-0.06 mirror=z
+box size=0.03,fl-0.02,W-0.12 pos=L/2-0.04,(fl-0.02)/2,0 mirror=x
+color color_r*0.68 color_g*0.68 color_b*0.66
+for i = 0, 21
+  box size=0.025,fl-0.06,0.02 pos=-L/2+0.2+i*0.41,(fl-0.02)/2,W/2-0.04 mirror=z
+end
+# Vertical siding grooves along both long walls
+material paint
+color color_r*0.82 color_g*0.82 color_b*0.80
+for i = 0, 29
+  box size=0.018,bh-0.2,0.012 pos=-L/2+0.15+i*0.30,fl+bh/2,W/2+0.005 mirror=z
+end
+# Wheelchair ramp from the landing toward -X, with posts and twin rails
+material matte
+color #7a6446
+set rl = 4.0
+set ra = atan2(fl-0.05,rl)
+box size=sqrt(rl*rl+(fl-0.05)*(fl-0.05)),0.07,1.0 pos=1.9-rl/2,(fl-0.05)/2+0.02,W/2+0.85 rot=0,0,ra
+color #6a563c
+for k = 0, 4
+  box size=0.09,(fl-0.05)*(1-k/4)+0.05,0.09 pos=1.9-k*rl/4,((fl-0.05)*(1-k/4)+0.05)/2,W/2+0.40
+  box size=0.09,(fl-0.05)*(1-k/4)+0.05,0.09 pos=1.9-k*rl/4,((fl-0.05)*(1-k/4)+0.05)/2,W/2+1.30
+end
+material steel
+color #3a3a3a
+for k = 0, 4
+  box size=0.045,0.92,0.045 pos=1.9-k*rl/4,(fl-0.05)*(1-k/4)+0.52,W/2+1.32
+end
+box size=sqrt(rl*rl+(fl-0.05)*(fl-0.05)),0.045,0.045 pos=1.9-rl/2,(fl-0.05)/2+0.96,W/2+1.32 rot=0,0,ra
+box size=sqrt(rl*rl+(fl-0.05)*(fl-0.05)),0.04,0.04 pos=1.9-rl/2,(fl-0.05)/2+0.58,W/2+1.32 rot=0,0,ra
+# Awning over the door and landing
+material paint
+color stripe_r stripe_g stripe_b
+box size=2.0,0.05,1.3 pos=2.7,fl+2.35,W/2+0.62 rot=12,0,0
+color color_r color_g color_b
+box size=2.02,0.14,0.03 pos=2.7,fl+2.23,W/2+1.28
+material steel
+color #3a3a3a
+box size=0.03,0.03,1.1 pos=1.8,fl+2.12,W/2+0.5 rot=-35,0,0
+box size=0.03,0.03,1.1 pos=3.6,fl+2.12,W/2+0.5 rot=-35,0,0
+# Porch light beside the door
+material lens
+color #ffe9b0
+box size=0.14,0.20,0.10 pos=3.35,fl+2.0,W/2+0.06
+# Sign board above the windows
+material paint
+color stripe_r stripe_g stripe_b
+box size=4.6,0.42,0.04 pos=-1.3,fl+2.28,W/2+0.03
+color #f4f2ec
+text str=RACE_OFFICE size=0.26 t=0.065 depth=0.01 pos=-1.3,fl+2.28,W/2+0.06
+# Rooftop packaged A/C unit and vent stacks
+material plastic
+color #c4c5c0
+box size=1.2,0.55,1.0 pos=-1.0,fl+bh+0.38,0 bevel=0.03
+color #3a3c3e
+cyl r=0.32 h=0.02 pos=-1.0,fl+bh+0.66,0 seg=14
+box size=1.0,0.4,0.02 pos=-1.0,fl+bh+0.36,0.51
+material steel
+color #8f959a
+cyl r=0.05 h=0.35 pos=2.0,fl+bh+0.25,-0.8 seg=8
+cyl r=0.05 h=0.35 pos=-3.4,fl+bh+0.25,0.9 seg=8
+# Electric meter post with conduit at the -X end
+material matte
+color #6e5434
+box size=0.15,1.8,0.15 pos=-L/2-0.6,0.9,-1.2
+material steel
+color #8f959a
+box size=0.30,0.42,0.16 pos=-L/2-0.6,1.35,-1.10
+material lens
+color #d8e2e8
+cyl r=0.08 h=0.03 pos=-L/2-0.6,1.40,-1.01 axis=z seg=10
+material steel
+color #4a4a4a
+cyl r=0.025 h=0.6 axis=x pos=-L/2-0.3,1.20,-1.10 seg=6
+# Steel stairs to the back door on -Z (rear exit)
+color #3a3a3a
+box size=1.0,0.05,0.9 pos=-0.2,fl-0.05,-W/2-0.5
+box size=1.0,0.05,0.28 pos=-0.2,0.36,-W/2-1.05
+box size=1.0,0.05,0.28 pos=-0.2,0.15,-W/2-1.30
+material paint
+color color_r*0.7 color_g*0.7 color_b*0.7
+box size=0.94,2.02,0.05 pos=-0.2,fl+1.05,-W/2-0.02

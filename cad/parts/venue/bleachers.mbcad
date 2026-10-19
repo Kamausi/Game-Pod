@@ -40,3 +40,84 @@ box size=0.05,0.05,3.82 pos=len/2+0.04,1.70,-0.2 rot=23.5,0,0 mirror=x
 box size=0.06,1.0,0.06 pos=len/2+0.04,0.9,1.55 mirror=x
 box size=0.06,1.0,0.06 pos=len/2+0.04,1.65,-0.2 mirror=x
 box size=0.06,1.0,0.06 pos=len/2+0.04,2.42,-1.95 mirror=x
+
+# ---- Grandstand build-out ----
+# Extra frame stations every ~2 m with X-bracing between them so the understructure reads
+set ns = floor(len/2)
+material steel
+color #8a9096
+for i = 0, ns
+  set x = -len/2+0.35+i*(len-0.7)/ns
+  box size=0.06,1.30,0.06 pos=x,0.65,1.55
+  box size=0.06,2.05,0.06 pos=x,1.02,-0.05
+  box size=0.05,0.05,4.0 pos=x,0.93,0.0 rot=26,0,0
+end
+color #7b8187
+for i = 0, ns-1
+  set x = -len/2+0.35+(i+0.5)*(len-0.7)/ns
+  set d = (len-0.7)/ns
+  box size=sqrt(d*d+1.9*1.9),0.035,0.035 pos=x,1.05,-1.99 rot=0,0,atan2(1.9,d)
+  box size=sqrt(d*d+1.9*1.9),0.035,0.035 pos=x,1.05,-1.99 rot=0,0,-atan2(1.9,d)
+end
+# Centre aisle: steel stair treads up the middle with handrails either side
+color #b4b9be
+for r = 0, 4
+  box size=1.0,0.04,0.28 pos=0,0.17+r*0.38,1.88-r*0.8
+  box size=1.0,0.04,0.28 pos=0,0.36+r*0.38,1.60-r*0.8
+end
+color #e0b020
+material paint
+for r = 0, 4
+  box size=1.0,0.012,0.05 pos=0,0.192+r*0.38,1.99-r*0.8
+  box size=1.0,0.012,0.05 pos=0,0.382+r*0.38,1.71-r*0.8
+end
+material steel
+color #9aa0a6
+box size=0.045,0.045,4.3 pos=0.55,1.85,0.0 rot=25.4,0,0 mirror=x
+for r = 0, 2
+  box size=0.045,0.95,0.045 pos=0.55,0.95+r*0.76,1.75-r*1.6 mirror=x
+end
+# Front guard rail along the track side with a sponsor banner
+box size=len+0.1,0.05,0.05 pos=0,1.32,2.06
+box size=len+0.1,0.04,0.04 pos=0,0.86,2.06
+for i = 0, ns
+  box size=0.05,1.30,0.05 pos=-len/2+0.05+i*(len-0.1)/ns,0.66,2.06
+end
+material matte
+color #1d4f9c
+box size=len*0.42,0.40,0.012 pos=-len*0.27,1.06,2.09
+box size=len*0.42,0.40,0.012 pos=len*0.27,1.06,2.09
+color #f2f2ee
+material paint
+text str=MUD_BUDDIES size=0.20 t=0.05 depth=0.01 pos=-len*0.27,1.06,2.10
+text str=MUD_BUDDIES size=0.20 t=0.05 depth=0.01 pos=len*0.27,1.06,2.10
+# Seat row numbers stencilled on the risers at the aisle
+color #20262c
+text str=1 size=0.10 t=0.03 depth=0.006 pos=0.62,0.33,1.40
+text str=2 size=0.10 t=0.03 depth=0.006 pos=0.62,0.71,0.60
+text str=3 size=0.10 t=0.03 depth=0.006 pos=0.62,1.09,-0.20
+text str=4 size=0.10 t=0.03 depth=0.006 pos=0.62,1.47,-1.00
+# Shade roof over the grandstand: tall back columns, raked rafters, standing-seam sheet
+material steel
+color #4c5258
+for i = 0, ns
+  set x = -len/2+0.35+i*(len-0.7)/ns
+  box size=0.12,3.92,0.12 pos=x,1.96,-2.15
+  box size=0.10,0.14,4.6 pos=x,4.14,-0.05 rot=-8,0,0
+  box size=0.05,0.05,2.2 pos=x,3.55,-1.25 rot=-50,0,0
+end
+color #d8dcdf
+box size=len+0.6,0.05,4.8 pos=0,4.26,-0.05 rot=-8,0,0
+color #b8bdc1
+for i = 0, floor(len/0.6)
+  box size=0.03,0.04,4.8 pos=-len/2-0.3+i*0.6,4.30,-0.05 rot=-8,0,0
+end
+# Front fascia with lettering, back wind wall
+color #b0201a
+material paint
+box size=len+0.6,0.42,0.05 pos=0,4.50,2.33
+color #f5f3ee
+text str=GRANDSTAND size=0.26 t=0.07 depth=0.01 pos=0,4.50,2.36
+color #c9ced3
+material steel
+box size=len,1.1,0.03 pos=0,3.55,-2.20

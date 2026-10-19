@@ -14,6 +14,7 @@ param roof_b = 0.10
 param trim_r = 0.93
 param trim_g = 0.93
 param trim_b = 0.90
+param sign = 0          # gable sign: 0 none, 1 parts & pro shop, 2 restrooms, 3 concessions, 4 bathhouse
 set rise = w*0.125
 set dw = min(3.6,w*0.38)
 set dh = min(3.0,h-0.55)
@@ -103,4 +104,115 @@ color #ffe9b0
 box size=0.2,0.12,0.12 pos=wx,2.45,l/2+0.08
 material plastic
 color trim_r*0.8 trim_g*0.8 trim_b*0.8
-box size=0.7,0.45,0.05 pos=0,h+rise*0.45,l/2+0.03
+box size=0.7,0.40,0.05 pos=0,h+rise*0.66,l/2+0.03
+
+# ---- Build-out: wainscot, standing-seam roof, gutters, cupola, awning, services, gable sign ----
+# Darker wainscot band around the base
+material paint
+color wall_r*0.55 wall_g*0.55 wall_b*0.55
+box size=w+0.05,0.95,l+0.05 pos=0,0.575,0
+color trim_r trim_g trim_b
+box size=w+0.08,0.06,l+0.08 pos=0,1.06,0
+# Standing seams down both roof slopes
+set rl = sqrt((w/2+0.3)*(w/2+0.3)+(rise+0.15)*(rise+0.15))
+set ra = atan2(rise+0.15,w/2+0.3)
+set nr = floor((l+0.4)/0.55)
+color roof_r*0.78 roof_g*0.78 roof_b*0.78
+for i = 0, nr
+  set z = -l/2-0.2+(i+0.5)*(l+0.4)/(nr+1)
+  box size=rl,0.035,0.03 pos=(w/2+0.3)/2,h+(rise+0.11)/2+0.035,z rot=0,0,-ra
+  box size=rl,0.035,0.03 pos=-(w/2+0.3)/2,h+(rise+0.11)/2+0.035,z rot=0,0,ra
+end
+# Box gutters along both eaves and corner downspouts
+color trim_r*0.95 trim_g*0.95 trim_b*0.95
+box size=0.13,0.13,l+0.42 pos=w/2+0.40,h-0.12,0 mirror=x
+box size=0.08,h-0.25,0.08 pos=w/2+0.10,(h-0.25)/2+0.05,l/2+0.10 mirror=x
+box size=0.08,h-0.25,0.08 pos=w/2+0.10,(h-0.25)/2+0.05,-l/2-0.10 mirror=x
+box size=0.30,0.08,0.08 pos=w/2+0.25,h-0.20,l/2+0.10 mirror=x
+box size=0.30,0.08,0.08 pos=w/2+0.25,h-0.20,-l/2-0.10 mirror=x
+box size=0.08,0.08,0.30 pos=w/2+0.10,0.08,l/2+0.22 mirror=x
+# Ridge cupola with louvres and a little hip roof
+color trim_r trim_g trim_b
+box size=0.9,0.55,0.9 pos=0,h+rise+0.40,0
+color trim_r*0.6 trim_g*0.6 trim_b*0.6
+for k = 0, 3
+  box size=0.92,0.03,0.7 pos=0,h+rise+0.24+k*0.11,0
+  box size=0.7,0.03,0.92 pos=0,h+rise+0.24+k*0.11,0
+end
+color roof_r roof_g roof_b
+lathe pts=0.78,h+rise+0.66,0,h+rise+1.02 seg=4 rot=0,45,0
+color #2e2e2e
+material steel
+cyl r=0.012 h=0.5 pos=0,h+rise+1.25,0 seg=5
+box size=0.35,0.02,0.02 pos=0,h+rise+1.38,0
+box size=0.02,0.02,0.35 pos=0,h+rise+1.30,0
+# Shed awning on brackets over the walk door and window
+material paint
+color roof_r roof_g roof_b
+box size=gx-wx+1.9,0.05,1.1 pos=(wx+gx)/2,2.62,l/2+0.55 rot=14,0,0
+color trim_r trim_g trim_b
+box size=gx-wx+1.92,0.12,0.04 pos=(wx+gx)/2,2.50,l/2+1.08
+material steel
+color #2e2e2e
+box size=0.04,0.04,1.0 pos=wx-0.75,2.45,l/2+0.5 rot=-30,0,0
+box size=0.04,0.04,1.0 pos=gx+0.75,2.45,l/2+0.5 rot=-30,0,0
+# Gooseneck lights over the roll-up door
+for s = -1, 1, 2
+  cyl r=0.015 h=0.35 axis=z pos=dx+s*(dw/2+0.15),dh+0.55,l/2+0.18 seg=6
+  cyl r=0.12 r2=0.03 h=0.12 pos=dx+s*(dw/2+0.15),dh+0.50,l/2+0.36 seg=10
+end
+material lens
+color #ffe9b0
+cyl r=0.10 h=0.01 pos=dx-(dw/2+0.15),dh+0.44,l/2+0.36 seg=10
+cyl r=0.10 h=0.01 pos=dx+(dw/2+0.15),dh+0.44,l/2+0.36 seg=10
+# Bollards protecting the roll-up door jambs
+material paint
+color #e0b020
+cyl r=0.08 h=1.0 pos=dx-dw/2-0.25,0.5,l/2+0.35 seg=10
+cyl r=0.08 h=1.0 pos=dx+dw/2+0.25,0.5,l/2+0.35 seg=10
+# Condenser unit and meter base on the -X wall
+material plastic
+color #c9cac4
+box size=0.75,0.72,0.75 pos=-w/2-0.55,0.42,-l*0.25 bevel=0.03
+color #3a3c3e
+cyl r=0.28 h=0.02 pos=-w/2-0.55,0.79,-l*0.25 seg=14
+box size=0.70,0.55,0.02 pos=-w/2-0.55,0.42,-l*0.25+0.38
+material steel
+color #8f959a
+box size=0.12,0.40,0.28 pos=-w/2-0.08,1.55,-l*0.05
+cyl r=0.025 h=1.2 pos=-w/2-0.06,0.95,-l*0.05+0.25 seg=6
+material lens
+color #d8e2e8
+cyl r=0.07 h=0.02 axis=x pos=-w/2-0.15,1.60,-l*0.05 seg=10
+# Drink machine on the +X wall
+material paint
+color #b81c18
+box size=0.75,1.85,0.85 pos=w/2+0.45,0.975,l/2-0.75 bevel=0.03
+material lens
+color #e8eef2
+box size=0.02,1.35,0.55 pos=w/2+0.83,1.10,l/2-0.80
+color #202020
+material plastic
+box size=0.03,0.18,0.55 pos=w/2+0.835,0.30,l/2-0.80
+# Timber bench beside the walk door
+material matte
+color #7a6446
+box size=1.5,0.06,0.40 pos=wx+1.25*0+(gx-wx)/2,0.45,l/2+0.45
+box size=1.5,0.30,0.05 pos=wx+(gx-wx)/2,0.70,l/2+0.27
+box size=0.06,0.45,0.36 pos=wx+(gx-wx)/2-0.65,0.22,l/2+0.45
+box size=0.06,0.45,0.36 pos=wx+(gx-wx)/2+0.65,0.22,l/2+0.45
+# Gable sign board with the building's name
+material paint
+color trim_r trim_g trim_b
+box size=w*0.42*min(1,sign),0.42,0.05 pos=0,h+0.22,l/2+0.04
+color roof_r roof_g roof_b
+box size=w*0.42*min(1,sign)-0.08,0.34,0.06 pos=0,h+0.22,l/2+0.045
+color trim_r trim_g trim_b
+set s1 = 1-min(1,abs(sign-1))
+set s2 = 1-min(1,abs(sign-2))
+set s3 = 1-min(1,abs(sign-3))
+set s4 = 1-min(1,abs(sign-4))
+text str=PARTS_&_PRO_SHOP size=0.20 t=0.05 depth=0.01 pos=0,h+0.22,l/2+0.08 scale=s1,s1,s1
+text str=RESTROOMS size=0.22 t=0.055 depth=0.01 pos=0,h+0.22,l/2+0.08 scale=s2,s2,s2
+text str=CONCESSIONS size=0.20 t=0.05 depth=0.01 pos=0,h+0.22,l/2+0.08 scale=s3,s3,s3
+text str=BATHHOUSE size=0.22 t=0.055 depth=0.01 pos=0,h+0.22,l/2+0.08 scale=s4,s4,s4
