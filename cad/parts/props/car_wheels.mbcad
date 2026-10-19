@@ -6,16 +6,30 @@ param WR = 0.33
 param TX = 0.78
 param TW = 0.22
 param spokes = 5
+param lod = 0          # 1 = far version: plain tire, no brakes or lug nuts
+set nl = 1-lod
 set alloy = min(1,spokes)
 set steelw = 1-alloy
 set fx = TX+TW/2
+# Road tires: bulged sidewalls and a fine block tread
+color #121212
+tire r=WR w=TW rim=WR*0.66 lugs=28 depth=0.010 tread=at pos=TX,WR,FA mirror=x scale=nl,nl,nl
+tire r=WR w=TW rim=WR*0.66 lugs=28 depth=0.010 tread=at pos=TX,WR,RA mirror=x scale=nl,nl,nl
 material rubber
-color #111111
-cyl r=WR h=TW axis=x pos=TX,WR,FA mirror=x seg=18
-cyl r=WR h=TW axis=x pos=TX,WR,RA mirror=x seg=18
-color #1d1d1d
-cyl r=WR*0.80 h=0.01 axis=x pos=fx+0.002,WR,FA mirror=x seg=18
-cyl r=WR*0.80 h=0.01 axis=x pos=fx+0.002,WR,RA mirror=x seg=18
+color #0c0c0c
+cyl r=WR*0.68 h=TW*0.80 axis=x pos=TX,WR,FA mirror=x seg=18
+cyl r=WR*lod h=TW axis=x pos=TX,WR,FA mirror=x seg=14
+cyl r=WR*0.68 h=TW*0.80 axis=x pos=TX,WR,RA mirror=x seg=18
+cyl r=WR*lod h=TW axis=x pos=TX,WR,RA mirror=x seg=14
+# Brake discs and calipers behind the wheel face
+material steel
+color #6c6f72
+cyl r=WR*0.50*nl h=0.025 axis=x pos=fx-0.06,WR,FA mirror=x seg=16
+cyl r=WR*0.50*nl h=0.025 axis=x pos=fx-0.06,WR,RA mirror=x seg=16
+material paint
+color #8a1a14
+box size=0.05*nl,0.12,0.07 pos=fx-0.04,WR+WR*0.36,FA-0.06 rot=-30,0,0 mirror=x
+box size=0.05*nl,0.12,0.07 pos=fx-0.04,WR+WR*0.36,RA-0.06 rot=-30,0,0 mirror=x
 # Alloy: rim lip, dark barrel, spokes, centre cap
 material chrome
 color #b8b8b8
@@ -44,3 +58,9 @@ material chrome
 color #c4c4c4
 cyl r=0.045 h=0.04 axis=x pos=fx+0.02,WR,FA mirror=x seg=10
 cyl r=0.045 h=0.04 axis=x pos=fx+0.02,WR,RA mirror=x seg=10
+# Five lug nuts round the centre cap
+color #9a9a9a
+for k = 0, 4
+  cyl r=0.012*nl h=0.03 axis=x pos=fx+0.025,WR+0.075*sin(k*72+36),FA+0.075*cos(k*72+36) mirror=x seg=6
+  cyl r=0.012*nl h=0.03 axis=x pos=fx+0.025,WR+0.075*sin(k*72+36),RA+0.075*cos(k*72+36) mirror=x seg=6
+end

@@ -1,0 +1,88 @@
+# Passenger-car cabin seen through the lot cars' glass: dash with a gauge hood, centre screen
+# and vents, steering wheel (left-hand drive, +X), two front buckets with headrests, centre
+# console, a rear bench with three headrests, parcel shelf and rear-view mirror.
+# Placed by each body with: use props/car_cabin.mbcad W=.. bl=.. wz=.. bz=.. ry=..
+param W = 1.56        # inner width
+param bl = 0.90       # beltline (top of the doors)
+param wz = 1.05       # windshield base (front of the cabin)
+param bz = -1.55      # back of the cabin (rear seat back / parcel shelf)
+param ry = 1.36       # underside of the roof
+param fo = 1.05        # front seat cushion distance behind the windshield base
+param mid = 0         # 1 = second-row captain chairs (minivan)
+param seat_r = 0.16
+param seat_g = 0.16
+param seat_b = 0.17
+set fz = wz-fo        # front seat cushion centre
+set rz = bz+0.42      # rear bench cushion centre
+set sy = bl-0.32      # cushion top
+set dx = W*0.25
+material matte
+# Dash: top pad, face, gauge hood, screen and vents
+color #1a1a1a
+box size=W,0.10,0.42 pos=0,bl+0.02,wz-0.16 bevel=0.03
+box size=W,0.28,0.06 pos=0,bl-0.14,wz-0.38
+box size=0.42,0.07,0.18 pos=dx,bl+0.09,wz-0.32 bevel=0.02
+color #0a0d10
+material glass
+box size=0.26,0.15,0.02 pos=0,bl-0.02,wz-0.42
+material lens
+color #e8f0f4
+box size=0.30,0.06,0.01 pos=dx,bl+0.07,wz-0.415
+material matte
+color #2a2a2a
+box size=0.12,0.05,0.02 pos=-dx,bl-0.03,wz-0.415
+box size=0.12,0.05,0.02 pos=dx+0.32,bl-0.03,wz-0.415
+# Steering column and wheel
+color #151515
+cyl r=0.03 h=0.30 pos=dx,bl-0.05,wz-0.52 rot=-62,0,0 seg=8
+material rubber
+cyl r=0.19 h=0.035 pos=dx,bl+0.02,wz-0.66 rot=-62,0,0 seg=16
+color #262626
+material matte
+cyl r=0.06 h=0.05 pos=dx,bl+0.02,wz-0.64 rot=-62,0,0 seg=10
+# Front buckets: cushion, side bolsters, raked back, headrest
+color seat_r seat_g seat_b
+for s = -1, 1, 2
+  box size=0.50,0.12,0.50 pos=s*dx,sy,fz bevel=0.04
+  box size=0.50,0.62,0.12 pos=s*dx,sy+0.34,fz-0.28 rot=-12,0,0 bevel=0.04
+  box size=0.07,0.42,0.14 pos=s*dx+0.23,sy+0.28,fz-0.26 rot=-12,0,0 bevel=0.02
+  box size=0.07,0.42,0.14 pos=s*dx-0.23,sy+0.28,fz-0.26 rot=-12,0,0 bevel=0.02
+  box size=0.26,0.17,0.10 pos=s*dx,sy+0.74,fz-0.37 rot=-8,0,0 bevel=0.03
+  color #3a3a3a
+  material steel
+  cyl r=0.008 h=0.08 pos=s*dx+0.07,sy+0.64,fz-0.35 seg=4
+  cyl r=0.008 h=0.08 pos=s*dx-0.07,sy+0.64,fz-0.35 seg=4
+  color seat_r seat_g seat_b
+  material matte
+end
+# Second-row captain chairs (minivan)
+color seat_r seat_g seat_b
+for s = -1, 1, 2
+  box size=0.48*mid,0.12,0.48 pos=s*dx,sy,fz-1.0 bevel=0.04
+  box size=0.48*mid,0.60,0.12 pos=s*dx,sy+0.33,fz-1.27 rot=-12,0,0 bevel=0.04
+  box size=0.25*mid,0.16,0.10 pos=s*dx,sy+0.72,fz-1.36 rot=-8,0,0 bevel=0.03
+end
+# Centre console with shifter and cup holders
+color #1c1c1c
+box size=0.22,0.22,0.70 pos=0,sy-0.02,fz+0.08 bevel=0.02
+box size=0.20,0.12,0.30 pos=0,sy+0.12,fz-0.12 bevel=0.03
+color #2e2e2e
+cyl r=0.02 h=0.10 pos=0,sy+0.13,fz+0.25 seg=6
+color #0c0c0c
+cyl r=0.035 h=0.01 pos=0.05,sy+0.095,fz+0.08 seg=8
+cyl r=0.035 h=0.01 pos=-0.05,sy+0.095,fz+0.08 seg=8
+# Rear bench: cushion, back, three headrests
+color seat_r*0.95 seat_g*0.95 seat_b*0.95
+box size=W-0.10,0.12,0.48 pos=0,sy,rz bevel=0.04
+box size=W-0.10,0.58,0.12 pos=0,sy+0.32,rz-0.26 rot=-14,0,0 bevel=0.04
+for k = -1, 1
+  box size=0.24,0.15,0.09 pos=k*W*0.32,sy+0.68,rz-0.36 rot=-10,0,0 bevel=0.03
+end
+# Parcel shelf, headliner and rear-view mirror
+color #202020
+box size=W,0.03,0.30 pos=0,bl+0.04,bz+0.05
+color #4a4844
+box size=W,0.02,wz-bz-0.30 pos=0,ry-0.01,(wz+bz)/2
+color #151515
+box size=0.22,0.06,0.02 pos=0,ry-0.10,wz-0.52 bevel=0.01
+box size=0.02,0.06,0.02 pos=0,ry-0.05,wz-0.52

@@ -513,7 +513,7 @@ void main(){
   if(uGlass == 2){
     // Tinted see-through glass: more opaque at grazing angles and where mud films it.
     float NoV = abs(dot(n, normalize(uCamPos - vWorld)));
-    outA = clamp(0.30 + 0.62*pow(1.0 - NoV, 3.0) + 0.6*m, 0.0, 0.97)*uAlpha;
+    outA = clamp(0.58 + 0.38*pow(1.0 - NoV, 3.0) + 0.6*m, 0.0, 0.97)*uAlpha;
   }
   frag = vec4(finalize(c, vWorld), outA);
 }
@@ -1289,7 +1289,10 @@ void Renderer::loadWorld(World& w) {
         Batch b;
         b.mesh = uploadMesh(r.mesh);
         // Glass drawn see-through (blended, last) for parts with something behind it.
-        b.seeThrough = g.second[0]->part.rfind("vehicles/", 0) == 0 || g.second[0]->part.find("announcer_tower") != std::string::npos;
+        const std::string& part = g.second[0]->part;
+        // Lot cars (props/car_*, *_parked) have cabins behind their glass too.
+        const bool lotCar = part.rfind("props/car_", 0) == 0 || part.find("_parked.mbcad") != std::string::npos;
+        b.seeThrough = part.rfind("vehicles/", 0) == 0 || part.find("announcer_tower") != std::string::npos || lotCar;
         std::vector<float> inst;
         for (auto* p : g.second) {
             Mat4 m = Mat4::trs(p->pos, Quat::axisAngle({0, 1, 0}, p->yaw), {p->scale, p->scale, p->scale});
@@ -1298,7 +1301,8 @@ void Renderer::loadWorld(World& w) {
         }
         setInstances(b.mesh, inst.data(), int(g.second.size()), true);
         // Distance LOD: plentiful parts that declare a 'lod' param get a cheap far version.
-        if (g.second.size() >= 20) {
+        // Lot cars are split into small groups by paint colour, so they qualify at any count.
+        if (g.second.size() >= 20 || lotCar) {
             CadParams lp = g.second[0]->params;
             lp["lod"] = 1;
             CadResult lr = cadBuild(g.second[0]->part, lp);
