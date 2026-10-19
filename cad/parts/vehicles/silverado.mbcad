@@ -74,7 +74,7 @@ material chrome
 box size=0.16,0.06,0.02 pos=0,0.30,2.996
 color #eef2f4
 material lens
-box size=0.30,0.20,0.04 pos=0.80,0.33,2.94 bevel=0.015 mirror=x
+use vehicles/headlamp.mbcad w=0.30 h=0.20 n=2 pos=0.80,0.33,2.96 mirror=x
 color #e08a1a
 box size=0.08,0.10,0.04 pos=0.96,0.33,2.92 bevel=0.01 mirror=x
 color #b01313
@@ -163,3 +163,12 @@ text str=MUD_TRUCK size=0.09 t=0.028 depth=0.006 pos=0,0.48,-3.165 rot=0,180,0
 use vehicles/interior.mbcad W=1.84 bl=0.60 wz=1.20 bz=-1.08 ry=1.03 driver=driver
 # Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage
 use vehicles/kit.mbcad fz=3.08 by=0.00 bw=2.02 rz=-3.24 ry=0.00 sx=1.05 sy0=0.45 sz0=1.60 sy1=1.12 sz1=0.66 winch=winch snorkel=snorkel
+# Windscreen wipers parked along the base of the glass, with arms and pivot caps
+color #111111
+material matte
+box size=0.594,0.012,0.024 pos=0.250,0.658,1.216 rot=38.66,0,0
+box size=0.505,0.010,0.012 pos=0.270,0.669,1.225 rot=38.66,0,0
+cyl r=0.022 h=0.03 pos=0.500,0.623,1.267 rot=38.66,0,0 seg=8
+box size=0.594,0.012,0.024 pos=-0.271,0.658,1.216 rot=38.66,0,0
+box size=0.505,0.010,0.012 pos=-0.251,0.669,1.225 rot=38.66,0,0
+cyl r=0.022 h=0.03 pos=-0.021,0.623,1.267 rot=38.66,0,0 seg=8

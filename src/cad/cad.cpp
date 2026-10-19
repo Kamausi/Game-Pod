@@ -364,10 +364,15 @@ CadMesh tire(float r, float w, float rimR, int lugs, float depth, int tread, Vec
     // Carcass profile in (radius, axial) walked with the outside on the right.
     float rt = r - depth, hw = w * 0.5f;
     float sh = std::min(0.05f, (rt - rimR) * 0.3f);
-    std::vector<Vec2> prof{{rimR, -hw * 0.82f}, {rimR + (rt - rimR) * 0.5f, -hw * 1.02f}, {rt - sh, -hw},
-                           {rt, -hw + sh}, {rt, hw - sh}, {rt - sh, hw}, {rimR + (rt - rimR) * 0.5f, hw * 1.02f},
-                           {rimR, hw * 0.82f}};
-    CadMesh m = lathe(prof, 36, color);
+    // Bead, rim guard, bulging sidewall, rounded shoulder, flat crown (mirrored for both sides).
+    float sw = rt - rimR;
+    std::vector<Vec2> half{{rimR, hw * 0.80f},          {rimR + sw * 0.07f, hw * 0.93f}, {rimR + sw * 0.14f, hw * 0.91f},
+                           {rimR + sw * 0.32f, hw * 1.00f}, {rimR + sw * 0.55f, hw * 1.04f}, {rimR + sw * 0.78f, hw * 1.02f},
+                           {rt - sh, hw * 0.98f},           {rt - sh * 0.35f, hw - sh * 0.35f}, {rt, hw - sh}};
+    std::vector<Vec2> prof;
+    for (auto it = half.begin(); it != half.end(); ++it) prof.push_back({it->x, -it->y});
+    for (auto it = half.rbegin(); it != half.rend(); ++it) prof.push_back(*it);
+    CadMesh m = lathe(prof, 48, color);
     Vec3 lugCol = color * 1.15f;
     float pitch = 2 * PI * rt / std::max(lugs, 1);
     for (int i = 0; i < lugs; i++) {

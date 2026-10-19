@@ -1,0 +1,55 @@
+# Headlamp assembly shared by the drivable vehicles: chrome bezel, dark housing, chrome
+# reflector bowl(s) with a glowing bulb, a DRL/turn strip and a clear outer lens you can see the
+# reflector through. Faces +Z with the lens face at z=0; origin at the lens centre.
+# round=1: one round sealed beam of radius r. round=0: rectangular w x h with n reflectors.
+param round = 0
+param r = 0.09
+param w = 0.30
+param h = 0.18
+param n = 1
+param drl = 1          # LED strip along the bottom edge (rectangular lamps)
+param bezel_r = 0.78
+param bezel_g = 0.78
+param bezel_b = 0.76
+set sq = 1-round
+set rr = r*round
+set cw = w/max(1,n)
+set br = min(cw,h)*0.40*sq
+# ---- Rectangular lamp ----
+material matte
+color #0c0c0c
+box size=w*sq,h,0.05 pos=0,0,-0.03
+material chrome
+color bezel_r bezel_g bezel_b
+box size=w*sq+0.03,0.016,0.025 pos=0,h/2+0.004,-0.004
+box size=w*sq+0.03,0.016,0.025 pos=0,-h/2-0.004,-0.004
+box size=0.016*sq,h+0.02,0.025 pos=w/2+0.004,0,-0.004 mirror=x
+color #d8dadc
+for i = 0, n-1
+  cyl r=br r2=br*0.35 h=0.035 axis=z pos=-w/2+cw*(i+0.5),h*0.06,-0.022 seg=18
+end
+material lens
+color #fff6dc
+for i = 0, n-1
+  sphere r=br*0.30 pos=-w/2+cw*(i+0.5),h*0.06,-0.012 seg=10
+end
+color #f4fbff
+box size=(w-0.03)*sq*drl,0.018,0.012 pos=0,-h/2+0.022,-0.006
+material glass
+color #c8d2d8
+box size=(w-0.008)*sq,h-0.008,0.006 pos=0,0,-0.002
+# ---- Round sealed beam ----
+material matte
+color #0c0c0c
+cyl r=rr h=0.05 axis=z pos=0,0,-0.03 seg=20
+material chrome
+color bezel_r bezel_g bezel_b
+lathe seg=24 axis=z pts=rr*0.92,-0.02,rr*1.14,-0.02,rr*1.14,0.006,rr*0.92,0.006
+color #d8dadc
+cyl r=rr*0.86 r2=rr*0.30 h=0.035 axis=z pos=0,0,-0.022 seg=20
+material lens
+color #fff6dc
+sphere r=rr*0.26 pos=0,0,-0.012 seg=10
+material glass
+color #c8d2d8
+cyl r=rr*0.94 h=0.006 axis=z pos=0,0,-0.002 seg=20

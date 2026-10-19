@@ -1,4 +1,5 @@
-# Wheel assembly: mud tire on a steel/beadlock wheel. Axle along X, rim face toward +X.
+# Wheel assembly: mud tire on an eight-spoke modular wheel (optional beadlock ring). Axle along X,
+# rim face toward +X. The tire has a rim guard and raised sidewall lettering on the outboard side.
 param tire_r = 0.4445        # 35" tire
 param tire_w = 0.3175        # 12.5" section
 param rim_r = 0.1905         # 15" wheel
@@ -6,44 +7,64 @@ param lugs = 18
 param depth = 0.028
 param tread = 1              # 0 = A/T, 1 = M/T, 2 = paddle
 param beadlock = 0
-color #1b1a19
-tire r=tire_r w=tire_w rim=rim_r lugs=lugs depth=depth tread=tread
-color #222222
-material steel
-rim r=rim_r w=tire_w*0.82 spokes=6
-color #8a8a88
-cyl r=rim_r*1.02 h=0.03 axis=x seg=24 pos=tire_w*0.4,0,0 scale=1,beadlock,beadlock
-# Lug nuts on the hub face
-color #b8b8b4
-material chrome
-set LR = rim_r*0.36
-set LX = tire_w*0.82*0.36+0.025
-cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR,0
-cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(60),LR*sin(60)
-cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(120),LR*sin(120)
-cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,-LR,0
-cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(240),LR*sin(240)
-cyl r=0.011 h=0.025 axis=x seg=6 pos=LX,LR*cos(300),LR*sin(300)
-# Shoulder lugs wrapping down both sidewalls (M/T only: mt scales them away for A/T and paddles)
-set mt = max(0,1-abs(tread-1))
 set rt = tire_r-depth
 set hw = tire_w*0.5
+set fx = tire_w*0.30         # wheel face plane
+color #1b1a19
+tire r=tire_r w=tire_w rim=rim_r lugs=lugs depth=depth tread=tread
+# Shoulder lugs wrapping down both sidewalls (M/T only: mt scales them away for A/T and paddles)
+set mt = max(0,1-abs(tread-1))
 color #1f1e1c
 material rubber
 for k = 0, lugs-1
   set a = k*360/lugs
   box size=0.024*mt,0.07*mt,2*pi*rt/lugs*0.42 pos=hw+0.004,(rt-0.045)*sin(a),(rt-0.045)*cos(a) rot=90-a,0,0 mirror=x
 end
-# Beadlock ring bolts (16)
+# Raised lettering on the outboard sidewall
+use wheels/sidewall_text.mbcad rl=rim_r+(rt-rim_r)*0.52 size=(rt-rim_r)*0.085 z=hw*1.045 rot=0,90,0
+# Barrel (dark inside), outer flange and bead seat
+material steel
+color #1c1c1c
+cyl r=rim_r*0.97 h=tire_w*0.80 axis=x seg=28
+color #4a4a4a
+lathe seg=32 axis=x pts=rim_r*0.93,fx+0.024,rim_r*1.05,fx+0.024,rim_r*1.05,fx+0.046,rim_r*0.93,fx+0.046
+# Dished face: dark recess with eight raised spokes, machined spoke tops
+color #0e0e0e
+cyl r=rim_r*0.93 h=0.012 axis=x seg=28 pos=fx-0.01,0,0
+color #3c3c3c
+for k = 0, 7
+  set a = k*45+22.5
+  box size=0.034,rim_r*0.62,rim_r*0.20 pos=fx+0.012,rim_r*0.58*sin(a),rim_r*0.58*cos(a) rot=90-a,0,0
+  color #a4a4a0
+  material chrome
+  box size=0.006,rim_r*0.56,rim_r*0.07 pos=fx+0.030,rim_r*0.58*sin(a),rim_r*0.58*cos(a) rot=90-a,0,0
+  color #3c3c3c
+  material steel
+end
+# Hub with eight lug nuts, centre cap with the MB logo
+cyl r=rim_r*0.38 h=0.045 axis=x seg=20 pos=fx+0.012,0,0
+color #b8b8b4
+material chrome
+for k = 0, 7
+  cyl r=0.011 h=0.03 axis=x seg=6 pos=fx+0.045,rim_r*0.28*sin(k*45),rim_r*0.28*cos(k*45)
+end
+cyl r=rim_r*0.17 h=0.03 axis=x seg=16 pos=fx+0.045,0,0
+color #b01010
+material paint
+text str=MB size=rim_r*0.05 t=rim_r*0.017 depth=0.004 pos=fx+0.061,0,0 rot=0,90,0
+# Beadlock ring with 24 bolts
+color #8a8a88
+material steel
+lathe seg=32 axis=x pts=rim_r*0.99,fx+0.046,rim_r*(0.99+0.11*beadlock),fx+0.046,rim_r*(0.99+0.11*beadlock),fx+0.046+0.03*beadlock,rim_r*0.99,fx+0.046+0.03*beadlock
 color #c8c8c4
 material chrome
-for k = 0, 15
-  cyl r=0.009*beadlock h=0.02 axis=x seg=6 pos=tire_w*0.4+0.02,rim_r*0.97*sin(k*22.5),rim_r*0.97*cos(k*22.5)
+for k = 0, 23
+  cyl r=0.009*beadlock h=0.02 axis=x seg=6 pos=fx+0.075,rim_r*1.045*sin(k*15),rim_r*1.045*cos(k*15)
 end
-# Rim lip and valve stem
-color #2a2a2a
-material steel
-lathe seg=28 axis=x pts=rim_r*0.98,tire_w*0.40,rim_r*1.03,tire_w*0.40,rim_r*1.03,tire_w*0.43,rim_r*0.98,tire_w*0.43
+# Valve stem with cap
 color #111111
 material rubber
-cyl r=0.006 h=0.035 axis=x seg=6 pos=tire_w*0.38,rim_r*0.80,0.02
+cyl r=0.006 h=0.035 axis=x seg=6 pos=fx+0.03,rim_r*0.86,0.02
+color #c8c8c4
+material chrome
+cyl r=0.007 h=0.012 axis=x seg=6 pos=fx+0.052,rim_r*0.86,0.02

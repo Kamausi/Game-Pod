@@ -54,8 +54,8 @@ material matte
 box size=1.36,0.16,0.03 pos=0,0.22,2.825
 color #f0eedc
 material lens
-cyl r=0.075 h=0.04 axis=z seg=18 pos=0.62,0.22,2.83 mirror=x
-cyl r=0.075 h=0.04 axis=z seg=18 pos=0.84,0.22,2.83 mirror=x
+use vehicles/headlamp.mbcad round=1 r=0.072 pos=0.62,0.22,2.85 mirror=x
+use vehicles/headlamp.mbcad round=1 r=0.072 pos=0.84,0.22,2.85 mirror=x
 color #a01212
 box size=0.50,0.13,0.04 pos=0.66,0.24,-2.84 bevel=0.012 mirror=x
 color #111111
@@ -162,3 +162,12 @@ box size=0.36,0.30,0.012 pos=W/2-0.18,-0.32,RA-AR-0.12 mirror=x
 use vehicles/interior.mbcad W=1.74 bl=0.46 wz=0.62 bz=-1.10 ry=0.93 driver=driver
 # Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage
 use vehicles/kit.mbcad fz=3.06 by=0.02 bw=2.04 rz=-2.96 ry=0.02 sx=1.06 sy0=0.32 sz0=1.20 sy1=1.00 sz1=0.08 winch=winch snorkel=snorkel
+# Windscreen wipers parked along the base of the glass, with arms and pivot caps
+color #111111
+material matte
+box size=0.594,0.012,0.024 pos=0.250,0.529,0.618 rot=40.76,0,0
+box size=0.505,0.010,0.012 pos=0.270,0.540,0.628 rot=40.76,0,0
+cyl r=0.022 h=0.03 pos=0.500,0.493,0.668 rot=40.76,0,0 seg=8
+box size=0.594,0.012,0.024 pos=-0.271,0.529,0.618 rot=40.76,0,0
+box size=0.505,0.010,0.012 pos=-0.251,0.540,0.628 rot=40.76,0,0
+cyl r=0.022 h=0.03 pos=-0.021,0.493,0.668 rot=40.76,0,0 seg=8

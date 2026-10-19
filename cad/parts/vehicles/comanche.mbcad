@@ -53,18 +53,28 @@ extrude depth=0.10 bevel=0.02 pts=arc(RA,AY,AR+0.09,165,15,14),arc(RA,AY,AR-0.01
 # Grille: black panel with vertical chrome-edged slots between square headlights
 color #0d0d0d
 box size=0.84,0.22,0.03 pos=0,0.24,1.965
-color #3a3d40
+color #7a7e82
 material steel
 box size=0.025,0.20,0.03 pos=0.05,0.24,1.978 mirror=x
 box size=0.025,0.20,0.03 pos=0.15,0.24,1.978 mirror=x
 box size=0.025,0.20,0.03 pos=0.25,0.24,1.978 mirror=x
 box size=0.025,0.20,0.03 pos=0.35,0.24,1.978 mirror=x
+# Chrome grille surround, centre crossbar and badge
+color #c8c8c4
+material chrome
+box size=0.88,0.022,0.03 pos=0,0.355,1.982
+box size=0.88,0.022,0.03 pos=0,0.125,1.982
+box size=0.022,0.25,0.03 pos=0.43,0.24,1.982 mirror=x
+box size=0.84,0.03,0.035 pos=0,0.24,1.985
+color #b01010
+material paint
+text str=MB size=0.03 t=0.01 depth=0.006 pos=0,0.24,2.004
 color #c8c8c4
 material chrome
 box size=0.24,0.20,0.025 pos=0.58,0.25,1.97 bevel=0.008 mirror=x
 color #f0eee0
 material lens
-box size=0.20,0.16,0.03 pos=0.58,0.25,1.975 bevel=0.01 mirror=x
+use vehicles/headlamp.mbcad w=0.20 h=0.16 n=1 pos=0.58,0.25,1.99 mirror=x
 color #e08a1a
 box size=0.12,0.07,0.04 pos=0.72,0.02,2.08 bevel=0.01 mirror=x
 box size=0.02,0.05,0.10 pos=W/2+0.002,0.30,1.72 mirror=x
@@ -172,3 +182,12 @@ cyl r=0.04 h=0.18 axis=x pos=-W/2+0.02,-0.18,-0.92 seg=10
 use vehicles/interior.mbcad W=1.60 bl=0.48 wz=0.50 bz=-0.76 ry=0.88 driver=driver
 # Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage
 use vehicles/kit.mbcad fz=2.08 by=0.02 bw=1.86 rz=-2.60 ry=0.02 sx=0.93 sy0=0.30 sz0=0.80 sy1=0.95 sz1=0.08 winch=winch snorkel=snorkel
+# Windscreen wipers parked along the base of the glass, with arms and pivot caps
+color #111111
+material matte
+box size=0.522,0.012,0.024 pos=0.220,0.540,0.473 rot=43.67,0,0
+box size=0.444,0.010,0.012 pos=0.240,0.551,0.484 rot=43.67,0,0
+cyl r=0.022 h=0.03 pos=0.439,0.510,0.512 rot=43.67,0,0 seg=8
+box size=0.522,0.012,0.024 pos=-0.238,0.540,0.473 rot=43.67,0,0
+box size=0.444,0.010,0.012 pos=-0.218,0.551,0.484 rot=43.67,0,0
+cyl r=0.022 h=0.03 pos=-0.019,0.510,0.512 rot=43.67,0,0 seg=8

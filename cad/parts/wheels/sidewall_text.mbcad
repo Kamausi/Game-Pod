@@ -1,0 +1,51 @@
+# Raised sidewall lettering, built around the Z axis (letters face +Z) so each letter can be
+# rolled in-plane; wheels/wheel.mbcad places it on the outboard sidewall with rot=0,90,0.
+# Generated letter by letter: "MUD BUDDIES" over the top, "MUD-TERRAIN" under the bottom
+# (tops toward the hub so both read upright), and LT-RADIAL at the sides.
+param rl = 0.30        # lettering radius
+param size = 0.022     # letter size (cap height 1.4*size)
+param z = 0.16         # sidewall offset along the axle
+param scl = 1          # 0 hides it
+set st = 1.30*size/rl*57.29578
+set td = size*0.30
+material rubber
+color #343330
+text str=M size=size t=td depth=0.005 pos=rl*sin((0-5.0)*st),rl*cos((0-5.0)*st),z rot=0,0,-((0-5.0)*st) scale=scl,scl,scl
+text str=U size=size t=td depth=0.005 pos=rl*sin((1-5.0)*st),rl*cos((1-5.0)*st),z rot=0,0,-((1-5.0)*st) scale=scl,scl,scl
+text str=D size=size t=td depth=0.005 pos=rl*sin((2-5.0)*st),rl*cos((2-5.0)*st),z rot=0,0,-((2-5.0)*st) scale=scl,scl,scl
+text str=B size=size t=td depth=0.005 pos=rl*sin((4-5.0)*st),rl*cos((4-5.0)*st),z rot=0,0,-((4-5.0)*st) scale=scl,scl,scl
+text str=U size=size t=td depth=0.005 pos=rl*sin((5-5.0)*st),rl*cos((5-5.0)*st),z rot=0,0,-((5-5.0)*st) scale=scl,scl,scl
+text str=D size=size t=td depth=0.005 pos=rl*sin((6-5.0)*st),rl*cos((6-5.0)*st),z rot=0,0,-((6-5.0)*st) scale=scl,scl,scl
+text str=D size=size t=td depth=0.005 pos=rl*sin((7-5.0)*st),rl*cos((7-5.0)*st),z rot=0,0,-((7-5.0)*st) scale=scl,scl,scl
+text str=I size=size t=td depth=0.005 pos=rl*sin((8-5.0)*st),rl*cos((8-5.0)*st),z rot=0,0,-((8-5.0)*st) scale=scl,scl,scl
+text str=E size=size t=td depth=0.005 pos=rl*sin((9-5.0)*st),rl*cos((9-5.0)*st),z rot=0,0,-((9-5.0)*st) scale=scl,scl,scl
+text str=S size=size t=td depth=0.005 pos=rl*sin((10-5.0)*st),rl*cos((10-5.0)*st),z rot=0,0,-((10-5.0)*st) scale=scl,scl,scl
+text str=M size=size t=td depth=0.005 pos=rl*sin(180-(0-5.0)*st),rl*cos(180-(0-5.0)*st),z rot=0,0,180-(180-(0-5.0)*st) scale=scl,scl,scl
+text str=U size=size t=td depth=0.005 pos=rl*sin(180-(1-5.0)*st),rl*cos(180-(1-5.0)*st),z rot=0,0,180-(180-(1-5.0)*st) scale=scl,scl,scl
+text str=D size=size t=td depth=0.005 pos=rl*sin(180-(2-5.0)*st),rl*cos(180-(2-5.0)*st),z rot=0,0,180-(180-(2-5.0)*st) scale=scl,scl,scl
+text str=- size=size t=td depth=0.005 pos=rl*sin(180-(3-5.0)*st),rl*cos(180-(3-5.0)*st),z rot=0,0,180-(180-(3-5.0)*st) scale=scl,scl,scl
+text str=T size=size t=td depth=0.005 pos=rl*sin(180-(4-5.0)*st),rl*cos(180-(4-5.0)*st),z rot=0,0,180-(180-(4-5.0)*st) scale=scl,scl,scl
+text str=E size=size t=td depth=0.005 pos=rl*sin(180-(5-5.0)*st),rl*cos(180-(5-5.0)*st),z rot=0,0,180-(180-(5-5.0)*st) scale=scl,scl,scl
+text str=R size=size t=td depth=0.005 pos=rl*sin(180-(6-5.0)*st),rl*cos(180-(6-5.0)*st),z rot=0,0,180-(180-(6-5.0)*st) scale=scl,scl,scl
+text str=R size=size t=td depth=0.005 pos=rl*sin(180-(7-5.0)*st),rl*cos(180-(7-5.0)*st),z rot=0,0,180-(180-(7-5.0)*st) scale=scl,scl,scl
+text str=A size=size t=td depth=0.005 pos=rl*sin(180-(8-5.0)*st),rl*cos(180-(8-5.0)*st),z rot=0,0,180-(180-(8-5.0)*st) scale=scl,scl,scl
+text str=I size=size t=td depth=0.005 pos=rl*sin(180-(9-5.0)*st),rl*cos(180-(9-5.0)*st),z rot=0,0,180-(180-(9-5.0)*st) scale=scl,scl,scl
+text str=N size=size t=td depth=0.005 pos=rl*sin(180-(10-5.0)*st),rl*cos(180-(10-5.0)*st),z rot=0,0,180-(180-(10-5.0)*st) scale=scl,scl,scl
+text str=L size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(0-4.0)*st*0.62),rl*cos(90+(0-4.0)*st*0.62),z rot=0,0,-(90+(0-4.0)*st*0.62) scale=scl,scl,scl
+text str=T size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(1-4.0)*st*0.62),rl*cos(90+(1-4.0)*st*0.62),z rot=0,0,-(90+(1-4.0)*st*0.62) scale=scl,scl,scl
+text str=- size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(2-4.0)*st*0.62),rl*cos(90+(2-4.0)*st*0.62),z rot=0,0,-(90+(2-4.0)*st*0.62) scale=scl,scl,scl
+text str=R size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(3-4.0)*st*0.62),rl*cos(90+(3-4.0)*st*0.62),z rot=0,0,-(90+(3-4.0)*st*0.62) scale=scl,scl,scl
+text str=A size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(4-4.0)*st*0.62),rl*cos(90+(4-4.0)*st*0.62),z rot=0,0,-(90+(4-4.0)*st*0.62) scale=scl,scl,scl
+text str=D size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(5-4.0)*st*0.62),rl*cos(90+(5-4.0)*st*0.62),z rot=0,0,-(90+(5-4.0)*st*0.62) scale=scl,scl,scl
+text str=I size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(6-4.0)*st*0.62),rl*cos(90+(6-4.0)*st*0.62),z rot=0,0,-(90+(6-4.0)*st*0.62) scale=scl,scl,scl
+text str=A size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(7-4.0)*st*0.62),rl*cos(90+(7-4.0)*st*0.62),z rot=0,0,-(90+(7-4.0)*st*0.62) scale=scl,scl,scl
+text str=L size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(90+(8-4.0)*st*0.62),rl*cos(90+(8-4.0)*st*0.62),z rot=0,0,-(90+(8-4.0)*st*0.62) scale=scl,scl,scl
+text str=L size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(0-4.0)*st*0.62),rl*cos(270+(0-4.0)*st*0.62),z rot=0,0,-(270+(0-4.0)*st*0.62) scale=scl,scl,scl
+text str=T size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(1-4.0)*st*0.62),rl*cos(270+(1-4.0)*st*0.62),z rot=0,0,-(270+(1-4.0)*st*0.62) scale=scl,scl,scl
+text str=- size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(2-4.0)*st*0.62),rl*cos(270+(2-4.0)*st*0.62),z rot=0,0,-(270+(2-4.0)*st*0.62) scale=scl,scl,scl
+text str=R size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(3-4.0)*st*0.62),rl*cos(270+(3-4.0)*st*0.62),z rot=0,0,-(270+(3-4.0)*st*0.62) scale=scl,scl,scl
+text str=A size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(4-4.0)*st*0.62),rl*cos(270+(4-4.0)*st*0.62),z rot=0,0,-(270+(4-4.0)*st*0.62) scale=scl,scl,scl
+text str=D size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(5-4.0)*st*0.62),rl*cos(270+(5-4.0)*st*0.62),z rot=0,0,-(270+(5-4.0)*st*0.62) scale=scl,scl,scl
+text str=I size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(6-4.0)*st*0.62),rl*cos(270+(6-4.0)*st*0.62),z rot=0,0,-(270+(6-4.0)*st*0.62) scale=scl,scl,scl
+text str=A size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(7-4.0)*st*0.62),rl*cos(270+(7-4.0)*st*0.62),z rot=0,0,-(270+(7-4.0)*st*0.62) scale=scl,scl,scl
+text str=L size=size*0.6 t=td*0.6 depth=0.004 pos=rl*sin(270+(8-4.0)*st*0.62),rl*cos(270+(8-4.0)*st*0.62),z rot=0,0,-(270+(8-4.0)*st*0.62) scale=scl,scl,scl
