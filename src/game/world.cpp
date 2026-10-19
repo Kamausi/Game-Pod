@@ -574,9 +574,15 @@ void World::generate(uint32_t seed) {
             static const float paints[][3] = {{0.75f, 0.75f, 0.76f}, {0.1f, 0.1f, 0.11f}, {0.55f, 0.08f, 0.07f}, {0.9f, 0.9f, 0.9f},
                                               {0.12f, 0.2f, 0.38f}, {0.3f, 0.32f, 0.3f}, {0.45f, 0.36f, 0.25f}, {0.15f, 0.3f, 0.18f}};
             const float* c = paints[gr.next() % 8];
-            bool truck = gr.uniform() < 0.55f;
-            building(truck ? "props/pickup_parked.mbcad" : "props/sedan_parked.mbcad", x, z, yaw,
-                     truck ? Vec3{1.0f, 0.9f, 2.9f} : Vec3{0.92f, 0.75f, 2.4f}, col3(c[0], c[1], c[2], "paint"));
+            // Pickups, crossovers, sedans, minivans and hatchbacks in rough real-lot proportions.
+            static const struct { const char* part; Vec3 half; float weight; } kinds[] = {
+                {"props/pickup_parked.mbcad", {1.0f, 0.9f, 2.9f}, 0.40f}, {"props/sedan_parked.mbcad", {0.92f, 0.75f, 2.4f}, 0.20f},
+                {"props/car_sedan.mbcad", {0.92f, 0.72f, 2.45f}, 0.16f},  {"props/car_minivan.mbcad", {0.98f, 0.9f, 2.6f}, 0.12f},
+                {"props/car_hatch.mbcad", {0.88f, 0.75f, 2.05f}, 0.12f}};
+            float pick = gr.uniform();
+            int k = 0;
+            while (k < 4 && pick >= kinds[k].weight) pick -= kinds[k++].weight;
+            building(kinds[k].part, x, z, yaw, kinds[k].half, col3(c[0], c[1], c[2], "paint"));
             props.back().dirt = gr.range(0.05f, 0.35f);
         };
 

@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
                                "props/tractor_loader.mbcad",
                                "props/dually_hauler.mbcad",
                                "props/pickup_parked.mbcad",
-                               "props/sedan_parked.mbcad",
+                               "props/sedan_parked.mbcad", "props/car_sedan.mbcad", "props/car_minivan.mbcad", "props/car_hatch.mbcad", "props/car_wheels.mbcad",
                                "venue/announcer_tower.mbcad",
                                "venue/banner.mbcad",
                                "venue/bleachers.mbcad",

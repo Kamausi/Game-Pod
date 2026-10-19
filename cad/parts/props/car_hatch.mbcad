@@ -1,0 +1,89 @@
+# Compact five-door hatchback for the visitor lot: stubby nose, upright tailgate with a roof spoiler, black wheel-arch trim, big-mouth grille, five-spoke alloys.
+# Front faces +Z. Origin at ground centre. Shares props/car_wheels.mbcad with the other lot cars.
+param paint_r = 0.85
+param paint_g = 0.12
+param paint_b = 0.1
+set FA = 1.25
+set RA = -1.3
+set WR = 0.3
+set W = 1.75
+set ZF = 2.04
+set ZR = -2.02
+color paint_r paint_g paint_b
+material paint
+# Lower body: side profile with both wheel arches cut in
+extrude depth=W bevel=0.08 pts=-1.98,0.28,arc(RA,WR,WR+0.05,180,0,10),arc(FA,WR,WR+0.05,180,0,10),1.98,0.28,2.04,0.50,1.95,0.70,1.05,0.88,-1.85,0.95,-2.02,0.80
+# Greenhouse and glass
+extrude depth=1.6 bevel=0.06 pts=1.00,0.87,0.25,1.42,-1.55,1.46,-1.98,1.22,-1.98,0.94
+color #10161c
+material glass
+extrude depth=1.6+0.04 pts=0.94,0.90,0.23,1.38,-1.52,1.42,-1.92,1.20,-1.92,0.97
+# Blacked-out pillars across the glass
+color #121212
+material matte
+box size=1.645,0.46,0.08 pos=0,1.16,-0.35
+box size=1.645,0.44,0.16 pos=0,1.18,-1.55 rot=12,0,0
+# Black lower cladding: bumpers, sills and arch liners
+color #1b1b1b
+extrude depth=W+0.02 pts=arc(FA,WR,WR+0.11,182,-2,12),arc(FA,WR,WR+0.05,-2,182,12)
+extrude depth=W+0.02 pts=arc(RA,WR,WR+0.11,182,-2,12),arc(RA,WR,WR+0.05,-2,182,12)
+box size=W+0.02,0.10,FA-RA-2*WR-0.20 pos=0,0.33,(FA+RA)/2
+box size=W+0.04,0.16,0.16 pos=0,0.38,ZF-0.04 bevel=0.03
+box size=W+0.04,0.16,0.16 pos=0,0.38,ZR+0.04 bevel=0.03
+# Door seams, chrome beltline trim and handles
+color paint_r*0.45 paint_g*0.45 paint_b*0.45
+box size=W+0.008,0.56,0.012 pos=0,0.64,0.95
+box size=W+0.008,0.56,0.012 pos=0,0.64,-0.35
+box size=W+0.008,0.50,0.012 pos=0,0.64,-1.40
+box size=W+0.008,0.012,2.10 pos=0,0.40,-0.20
+color #c9c9c4
+material chrome
+box size=1.6+0.05,0.02,2.4 pos=0,0.94,-0.42
+box size=W+0.02,0.03,0.14 pos=0,0.80,0.55
+box size=W+0.02,0.03,0.14 pos=0,0.80,-0.78
+# Mirrors
+color paint_r paint_g paint_b
+material paint
+box size=0.16,0.10,0.14 pos=W/2+0.06,0.98,0.85 mirror=x bevel=0.03
+color #0d0d0d
+material matte
+box size=0.10,0.02,0.10 pos=W/2+0.01,0.98-0.06,0.85+0.03 mirror=x
+# Front: grille, badge, headlamps, indicators, fog lamps, plate
+color #0d0d0d
+material matte
+box size=0.8,0.24,0.04 pos=0,0.58,ZF-0.01 bevel=0.02
+box size=W*0.62,0.10,0.04 pos=0,0.42,ZF+0.04
+color #c8c8c8
+material chrome
+box size=0.8,0.02,0.045 pos=0,0.58+0.24*0.25,ZF
+cyl r=0.045 h=0.02 axis=z pos=0,0.58,ZF+0.012 seg=10
+color #e8eef2
+material lens
+box size=0.38,0.11,0.05 pos=W/2-0.30,0.7,ZF-0.06 rot=0,-14,0 bevel=0.015 mirror=x
+cyl r=0.04 h=0.03 axis=z pos=W/2-0.22,0.42,ZF+0.055 seg=10 mirror=x
+color #e08a1a
+box size=0.10,0.05,0.12 pos=W/2-0.04,0.7-0.04,ZF-0.18 mirror=x
+color #f2f2ee
+material matte
+box size=0.30,0.15,0.01 pos=0,0.50,ZF+0.065
+# Rear: tail lamps, reflectors, plate recess, exhaust, third brake light
+color #b01313
+material lens
+box size=0.30,0.20,0.06 pos=W/2-0.18,1.02,ZR+0.04 bevel=0.02 mirror=x
+box size=0.12,0.03,0.01 pos=W/2-0.20,0.40,ZR-0.045 mirror=x
+color #0d0d0d
+material matte
+box size=0.36,0.19,0.01 pos=0,0.62,ZR-0.005
+color #f2f2ee
+box size=0.30,0.15,0.01 pos=0,0.62,ZR-0.012
+color #9a9a9a
+material steel
+cyl r=0.035 h=0.10 axis=z pos=W/2-0.40,0.30,ZR-0.02 seg=10
+# Roof spoiler over the tailgate glass and a rear wiper
+color #121212
+material plastic
+box size=1.40,0.05,0.24 pos=0,1.47,-1.86 rot=-8,0,0 bevel=0.015
+color #1a1a1a
+material matte
+box size=0.30,0.015,0.02 pos=0.10,1.05,-2.0 rot=0,0,-15
+use props/car_wheels.mbcad FA=FA RA=RA WR=WR TX=W/2-0.13 TW=0.22 spokes=5

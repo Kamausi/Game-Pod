@@ -1,0 +1,46 @@
+# Shared visitor-car wheels: four tires with alloy faces. FA/RA = axle z, WR = tire radius,
+# TX = hub centre x, TW = tire width, spokes = 5 (alloy) or 0 (steel wheel with a hubcap).
+param FA = 1.4
+param RA = -1.4
+param WR = 0.33
+param TX = 0.78
+param TW = 0.22
+param spokes = 5
+set alloy = min(1,spokes)
+set steelw = 1-alloy
+set fx = TX+TW/2
+material rubber
+color #111111
+cyl r=WR h=TW axis=x pos=TX,WR,FA mirror=x seg=18
+cyl r=WR h=TW axis=x pos=TX,WR,RA mirror=x seg=18
+color #1d1d1d
+cyl r=WR*0.80 h=0.01 axis=x pos=fx+0.002,WR,FA mirror=x seg=18
+cyl r=WR*0.80 h=0.01 axis=x pos=fx+0.002,WR,RA mirror=x seg=18
+# Alloy: rim lip, dark barrel, spokes, centre cap
+material chrome
+color #b8b8b8
+cyl r=WR*0.64*alloy h=0.03 axis=x pos=fx+0.005,WR,FA mirror=x seg=16
+cyl r=WR*0.64*alloy h=0.03 axis=x pos=fx+0.005,WR,RA mirror=x seg=16
+material matte
+color #2a2a2a
+cyl r=WR*0.57*alloy h=0.032 axis=x pos=fx+0.007,WR,FA mirror=x seg=16
+cyl r=WR*0.57*alloy h=0.032 axis=x pos=fx+0.007,WR,RA mirror=x seg=16
+material chrome
+color #c4c4c4
+for k = 0, spokes-1
+  box size=0.035*alloy,WR*0.52,0.045 pos=fx+0.015,WR+WR*0.27*sin(k*360/max(1,spokes)),FA+WR*0.27*cos(k*360/max(1,spokes)) rot=90-k*360/max(1,spokes),0,0 mirror=x
+  box size=0.035*alloy,WR*0.52,0.045 pos=fx+0.015,WR+WR*0.27*sin(k*360/max(1,spokes)),RA+WR*0.27*cos(k*360/max(1,spokes)) rot=90-k*360/max(1,spokes),0,0 mirror=x
+end
+# Steel wheel with a domed hubcap
+material steel
+color #3a3c3e
+cyl r=WR*0.62*steelw h=0.03 axis=x pos=fx+0.005,WR,FA mirror=x seg=16
+cyl r=WR*0.62*steelw h=0.03 axis=x pos=fx+0.005,WR,RA mirror=x seg=16
+material chrome
+color #cfd1d3
+sphere r=WR*0.42*steelw pos=fx+0.01,WR,FA scale=0.25,1,1 mirror=x seg=10
+sphere r=WR*0.42*steelw pos=fx+0.01,WR,RA scale=0.25,1,1 mirror=x seg=10
+material chrome
+color #c4c4c4
+cyl r=0.045 h=0.04 axis=x pos=fx+0.02,WR,FA mirror=x seg=10
+cyl r=0.045 h=0.04 axis=x pos=fx+0.02,WR,RA mirror=x seg=10

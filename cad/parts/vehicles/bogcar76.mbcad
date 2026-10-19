@@ -34,6 +34,7 @@ color #e8b020
 text str=76 size=0.17 t=0.055 depth=0.01 pos=W/2+0.008,0.33,0.10 rot=0,90,0
 text str=76 size=0.17 t=0.055 depth=0.01 pos=-W/2-0.008,0.33,0.10 rot=0,-90,0
 # Door seams, trunk and hood shut lines
+color #141414
 box size=0.006,0.52,0.006 pos=W/2+0.002,0.17,0.66 mirror=x
 box size=0.006,0.52,0.006 pos=W/2+0.002,0.17,-0.50 mirror=x
 box size=0.006,0.52,0.006 pos=W/2+0.002,0.17,-1.62 mirror=x
@@ -102,6 +103,61 @@ box size=0.30,0.15,0.01 pos=0,0.30,-2.85
 color #9a9a9a
 material steel
 cyl r=0.04 h=0.14 axis=z pos=0.55,-0.10,-2.90 mirror=x seg=10
+# ---- Show-bogger build-out ----
+# Hand-painted flame job: tongues licking back over the hood (laid on the 2 deg hood slope)
+# and down both front fenders, red-orange outer with yellow cores (matte so the clear-coat
+# sheen doesn't wash them out at low angles)
+material matte
+color 0.92 0.30 0.06
+extrude depth=0.006 pts=2.7,0.86,2.305,0.788,1.75,0.682,2.015,0.588,2.28,0.573,2.13,0.502,1.4,0.396,1.84,0.301,2.28,0.287,2.27,0.215,1.68,0.109,1.98,0.014,2.28,-0.0,2.105,-0.072,1.35,-0.178,1.815,-0.272,2.28,-0.287,2.24,-0.358,1.62,-0.464,1.95,-0.559,2.28,-0.573,2.34,-0.645,1.82,-0.751,2.7,-0.86 pos=0,0.494,0 rot=0,-2.1,90
+color 0.98 0.80 0.12
+extrude depth=0.006 pts=2.7,0.74,2.455,0.678,2.05,0.587,2.25,0.506,2.45,0.493,2.32,0.432,1.78,0.34,2.115,0.259,2.45,0.247,2.43,0.185,2.0,0.094,2.225,0.012,2.45,-0.0,2.29,-0.062,1.72,-0.153,2.085,-0.234,2.45,-0.247,2.405,-0.308,1.95,-0.4,2.2,-0.481,2.45,-0.493,2.48,-0.555,2.1,-0.646,2.7,-0.74 pos=0,0.501,0 rot=0,-2.1,90
+color 0.92 0.30 0.06
+extrude depth=0.006 pos=W/2+0.004,0,0 mirror=x pts=2.78,0.42,1.25,0.435,1.85,0.405,0.60,0.375,1.60,0.345,0.95,0.31,1.95,0.30,2.05,0.20,2.30,0.06,2.78,0.04
+color 0.98 0.80 0.12
+extrude depth=0.006 pos=W/2+0.009,0,0 mirror=x pts=2.78,0.395,1.60,0.405,2.00,0.385,1.00,0.365,1.85,0.345,1.30,0.325,2.05,0.32,2.15,0.22,2.38,0.09,2.78,0.08
+# Hood pins with lanyards
+material chrome
+color #d0d2d4
+for s = -1, 1, 2
+  cyl r=0.022 h=0.03 pos=s*0.70,0.395,2.55 seg=8
+  cyl r=0.022 h=0.03 pos=s*0.70,0.445,1.10 seg=8
+  color #b01010
+  box size=0.006,0.006,0.10 pos=s*0.70+0.03,0.40,2.50
+  color #d0d2d4
+end
+# Big roof number and a windshield sponsor banner
+material paint
+color #111111
+text str=76 size=0.38 t=0.10 depth=0.006 pos=0,1.024,-0.55 rot=-90,0,0
+color #1d4f9c
+box size=W-0.32,0.13,0.008 pos=0,0.888,0.188 rot=-49.2,0,0
+color #f2f2ee
+text str=MUD_BUDDIES size=0.075 t=0.02 depth=0.004 pos=0,0.892,0.193 rot=-49.2,0,0
+# Trunk-deck wing on swan-neck uprights
+material steel
+color #151515
+box size=0.04,0.30,0.12 pos=0.62,0.58,-2.58 rot=-8,0,0 mirror=x
+color paint_r paint_g paint_b
+material paint
+box size=W-0.10,0.03,0.34 pos=0,0.74,-2.62 rot=6,0,0 bevel=0.01
+color #b01010
+box size=0.03,0.18,0.42 pos=W/2-0.06,0.70,-2.62 mirror=x
+# Trunk lettering
+color #111111
+text str=MUD_BUDDIES size=0.07 t=0.02 depth=0.006 pos=0,0.36,-2.86 rot=0,180,0
+# Whip antenna with an orange flag on the rear bumper
+material steel
+color #2a2a2a
+cyl r=0.006 h=1.80 pos=-0.85,1.00,-2.92 seg=4
+material matte
+color #f06010
+extrude depth=0.004 pts=0,0,-0.32,-0.08,0,-0.20 pos=-0.85,1.90,-2.92 rot=0,90,0
+# Rubber mud flaps behind all four wheels
+color #121212
+material rubber
+box size=0.36,0.30,0.012 pos=W/2-0.18,-0.32,FA-AR-0.10 mirror=x
+box size=0.36,0.30,0.012 pos=W/2-0.18,-0.32,RA-AR-0.12 mirror=x
 # Cab interior and driver (seen through the glass)
 use vehicles/interior.mbcad W=1.74 bl=0.46 wz=0.62 bz=-1.10 ry=0.93 driver=driver
 # Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage
