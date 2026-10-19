@@ -57,7 +57,7 @@ material lens
 use vehicles/headlamp.mbcad round=1 r=0.072 pos=0.62,0.22,2.85 mirror=x
 use vehicles/headlamp.mbcad round=1 r=0.072 pos=0.84,0.22,2.85 mirror=x
 color #a01212
-box size=0.50,0.13,0.04 pos=0.66,0.24,-2.84 bevel=0.012 mirror=x
+use vehicles/taillamp.mbcad w=0.50 h=0.13 horiz=1 rev=0.22 bezel_r=0.78 bezel_g=0.78 bezel_b=0.76 pos=0.66,0.24,-2.86 rot=0,180,0 mirror=x
 color #111111
 material steel
 box size=0.12,0.12,4.6 pos=0.52,-0.16,-0.20 mirror=x

@@ -99,21 +99,121 @@ material lens
 use vehicles/headlamp.mbcad w=0.12 h=0.05 n=1 drl=0 pos=0.18,0.40,0.975 mirror=x
 color #b01313
 box size=0.10,0.04,0.02 pos=0.22,0.34,-0.99 mirror=x
-# Rider: helmet, jacket, gloves on the bars, boots on the footwells
+# Rider: riding jacket and pants, jointed arms and legs, gloves on the grips, boots on the
+# footwells, motocross helmet with chin bar, peak and goggles, race number on the back
 color #2a3442
 material matte
-box size=0.13,0.14,0.42 pos=0.13,0.50,-0.12 rot=-10,0,0 mirror=x
-box size=0.12,0.40,0.12 pos=0.17,0.30,0.08 rot=20,0,0 mirror=x
+cyl r=0.075 r2=0.065 h=0.374 pos=0.170,0.550,-0.060 rot=74.48,0,-53.13 seg=10
+cyl r=0.06 r2=0.05 h=0.451 pos=0.225,0.355,0.110 rot=-2.54,0,-176.19 seg=10
+sphere r=0.07 pos=0.210,0.580,0.120 seg=8
+cyl r=0.075 r2=0.065 h=0.374 pos=-0.170,0.550,-0.060 rot=74.48,0,53.13 seg=10
+cyl r=0.06 r2=0.05 h=0.451 pos=-0.225,0.355,0.110 rot=-2.54,0,176.19 seg=10
+sphere r=0.07 pos=-0.210,0.580,0.120 seg=8
 color #141414
-box size=0.11,0.08,0.24 pos=0.20,0.10,0.15 mirror=x
+box size=0.11,0.11,0.27 pos=0.24,0.08,0.15 bevel=0.03 mirror=x
+box size=0.12,0.03,0.29 pos=0.24,0.025,0.15 mirror=x
 color rider_r rider_g rider_b
-cyl r=0.17 r2=0.15 h=0.48 pos=0,0.80,-0.18 rot=12,0,0 seg=10
-cyl r=0.045 h=0.42 pos=0.22,0.80,0.06 rot=-62,0,-12 seg=8 mirror=x
+box size=0.36,0.46,0.22 pos=0,0.765,-0.175 rot=19.2,0,0 bevel=0.06
+box size=0.30,0.16,0.20 pos=0,0.56,-0.26 bevel=0.05
+sphere r=0.075 pos=0.19,0.96,-0.10 seg=10 mirror=x
+cyl r=0.052 r2=0.046 h=0.290 pos=0.250,0.880,0.010 rot=49.38,0,-147.99 seg=8
+cyl r=0.044 r2=0.038 h=0.211 pos=0.310,0.755,0.215 rot=64.12,0,-167.47 seg=8
+sphere r=0.048 pos=0.300,0.800,0.120 seg=8
+cyl r=0.052 r2=0.046 h=0.290 pos=-0.250,0.880,0.010 rot=49.38,0,147.99 seg=8
+cyl r=0.044 r2=0.038 h=0.211 pos=-0.310,0.755,0.215 rot=64.12,0,167.47 seg=8
+sphere r=0.048 pos=-0.300,0.800,0.120 seg=8
 color #111111
-box size=0.07,0.06,0.09 pos=0.32,0.70,0.31 mirror=x
-color #e5e5e5
+box size=0.08,0.07,0.10 pos=0.32,0.70,0.32 bevel=0.02 mirror=x
+color #f2f2ee
 material paint
-sphere r=0.14 pos=0,1.16,-0.10 seg=12
-color #101820
+text str=22 size=0.08 t=0.022 depth=0.006 pos=0,0.80,-0.285 rot=-19.2,180,0
+# Neck roll and helmet
+color #1a1a1a
+material matte
+cyl r=0.075 h=0.06 pos=0,1.00,-0.08 seg=10
+color #e8e8e6
+material paint
+sphere r=0.14 pos=0,1.13,-0.05 scale=1,1,1.12 seg=14
+color rider_r rider_g rider_b
+box size=0.05,0.012,0.30 pos=0,1.272,-0.05
+box size=0.12,0.11,0.12 pos=0,1.04,0.09 rot=-15,0,0 bevel=0.04
+color #e8e8e6
+box size=0.22,0.02,0.13 pos=0,1.215,0.13 rot=-14,0,0 bevel=0.008
+color #111111
+material matte
+box size=0.27,0.03,0.24 pos=0,1.14,-0.03
+color #c8c8c4
+material plastic
+box size=0.20,0.075,0.04 pos=0,1.14,0.10 bevel=0.02
+color #d08a20
 material glass
-box size=0.20,0.07,0.04 pos=0,1.16,0.03 bevel=0.02
+box size=0.17,0.055,0.02 pos=0,1.14,0.122 bevel=0.01
+
+# ---- Detail pass: tube racks with tie-downs and a tool box, bars and controls, nerf bars,
+# skid plate, fuel cap, display pod, fender decals, number plate ----
+color #2a2a2a
+material steel
+cyl r=0.014 h=0.80 axis=x pos=0,0.52,1.06 seg=6
+cyl r=0.014 h=0.80 axis=x pos=0,0.52,0.66 seg=6
+cyl r=0.014 h=0.40 axis=z pos=0.40,0.52,0.86 seg=6 mirror=x
+cyl r=0.014 h=0.86 axis=x pos=0,0.48,-0.57 seg=6
+cyl r=0.014 h=0.86 axis=x pos=0,0.48,-0.99 seg=6
+cyl r=0.014 h=0.42 axis=z pos=0.43,0.48,-0.78 seg=6 mirror=x
+color #b01313
+box size=0.03,0.03,0.03 pos=0.40,0.53,1.06 mirror=x
+box size=0.03,0.03,0.03 pos=0.43,0.49,-0.99 mirror=x
+color #1d1d1d
+material plastic
+box size=0.50,0.20,0.26 pos=0,0.535,-0.80 bevel=0.03
+color #3a3a3a
+box size=0.52,0.02,0.28 pos=0,0.64,-0.80 bevel=0.01
+material chrome
+color #c8c8c4
+box size=0.06,0.04,0.02 pos=0.12,0.58,-0.665 mirror=x
+# Hand guards, brake and clutch levers, mirrors, display pod, kill switch
+material plastic
+color #111111
+box size=0.10,0.07,0.16 pos=0.38,0.72,0.38 rot=0,-20,0 bevel=0.02 mirror=x
+color #9a9a9a
+material steel
+box size=0.14,0.012,0.02 pos=0.27,0.71,0.37 rot=0,-15,0 mirror=x
+cyl r=0.008 h=0.22 pos=0.24,0.80,0.31 rot=-10,0,-15 seg=5 mirror=x
+color #111111
+material plastic
+box size=0.09,0.06,0.02 pos=0.27,0.92,0.30 bevel=0.01 mirror=x
+color #c8d2d8
+material glass
+box size=0.075,0.045,0.006 pos=0.27,0.92,0.29 mirror=x
+color #111111
+material plastic
+box size=0.14,0.06,0.08 pos=0,0.75,0.29 rot=-25,0,0 bevel=0.02
+color #6ad0ff
+material lens
+box size=0.10,0.035,0.006 pos=0,0.762,0.312 rot=-25,0,0
+color #c41e1e
+box size=0.025,0.02,0.025 pos=-0.22,0.72,0.33
+# Nerf bars along the footwells and a skid plate under the frame
+color #2a2a2a
+material steel
+cyl r=0.018 h=0.62 axis=z pos=0.50,0.10,0.05 seg=8 mirror=x
+cyl r=0.018 h=0.18 axis=x pos=0.43,0.10,0.35 seg=8 mirror=x
+cyl r=0.018 h=0.18 axis=x pos=0.43,0.10,-0.25 seg=8 mirror=x
+color #8a8e92
+box size=0.46,0.02,1.30 pos=0,-0.14,0.05
+# Fuel cap on the tank cover
+color #c8c8c4
+material chrome
+cyl r=0.05 h=0.02 pos=0,0.40,0.62 seg=12
+# Fender decals and a rear number plate
+color #f2f2ee
+material paint
+text str=MUD_BUDDIES size=0.035 t=0.01 depth=0.004 pos=0.312,0.30,0.62 rot=0,90,0
+text str=MUD_BUDDIES size=0.035 t=0.01 depth=0.004 pos=-0.312,0.30,0.62 rot=0,-90,0
+material plastic
+color #111111
+box size=0.20,0.12,0.01 pos=0,0.20,-1.035
+material matte
+color #f2f2ee
+box size=0.17,0.09,0.008 pos=0,0.20,-1.04
+color #1a2a4a
+text str=ATV-22 size=0.025 t=0.007 depth=0.003 pos=0,0.20,-1.045 rot=0,180,0

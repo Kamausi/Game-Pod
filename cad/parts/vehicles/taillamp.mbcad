@@ -1,0 +1,44 @@
+# Tail lamp assembly shared by the drivable vehicles: dark housing, bezel, red lens sections with
+# moulded ribs and a clear reverse-light section over a chrome reflector. Faces +Z with the lens
+# face at z=0 (place it on the back of the truck with rot=0,180,0). horiz=1 puts the reverse
+# section in the middle of a wide lamp instead of across a tall one.
+param w = 0.08
+param h = 0.30
+param rev = 0.28       # fraction of the lamp given to the reverse light
+param horiz = 0
+param bezel_r = 0.10
+param bezel_g = 0.10
+param bezel_b = 0.10
+set vt = 1-horiz
+set rh = h*rev*vt+h*horiz          # reverse section height
+set rw = w*vt+w*rev*horiz          # reverse section width
+material matte
+color #0a0a0a
+box size=w,h,0.05 pos=0,0,-0.03
+material plastic
+color bezel_r bezel_g bezel_b
+box size=w+0.02,0.012,0.022 pos=0,h/2+0.004,-0.003
+box size=w+0.02,0.012,0.022 pos=0,-h/2-0.004,-0.003
+box size=0.012,h+0.02,0.022 pos=w/2+0.004,0,-0.003 mirror=x
+# Red sections either side of the reverse light (above/below, or left/right)
+material lens
+color #c41616
+box size=w-0.008,(h-rh)/2-0.006,0.012 pos=0,(h+rh)/4,-0.002 scale=1,vt,1
+box size=w-0.008,(h-rh)/2-0.006,0.012 pos=0,-(h+rh)/4,-0.002 scale=1,vt,1
+box size=(w-rw)/2-0.006,h-0.008,0.012 pos=(w+rw)/4,0,-0.002 scale=horiz,1,1
+box size=(w-rw)/2-0.006,h-0.008,0.012 pos=-(w+rw)/4,0,-0.002 scale=horiz,1,1
+# Moulded ribs across each red section
+color #7a0a0a
+for j = 0, 2
+  box size=w-0.012,0.004*vt,0.006 pos=0,rh/2+(h-rh)/2*(j+0.5)/3,0.005
+  box size=w-0.012,0.004*vt,0.006 pos=0,-rh/2-(h-rh)/2*(j+0.5)/3,0.005
+  box size=0.004*horiz,h-0.012,0.006 pos=rw/2+(w-rw)/2*(j+0.5)/3,0,0.005
+  box size=0.004*horiz,h-0.012,0.006 pos=-rw/2-(w-rw)/2*(j+0.5)/3,0,0.005
+end
+# Reverse light: chrome reflector behind a clear lens
+material chrome
+color #d8dadc
+box size=rw-0.012,rh-0.012,0.01 pos=0,0,-0.012
+material glass
+color #dfe6ea
+box size=rw-0.008,rh-0.008,0.008 pos=0,0,0.0

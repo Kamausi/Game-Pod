@@ -142,7 +142,7 @@ color #4a4a48
 cyl r=0.04 h=0.30 axis=z pos=-0.45,0.20,-1.90 seg=10
 color #b01313
 material lens
-box size=0.18,0.04,0.03 pos=0.50,0.32,-1.885 bevel=0.01 mirror=x
+use vehicles/taillamp.mbcad w=0.20 h=0.06 horiz=1 rev=0.25 pos=0.50,0.32,-1.90 rot=0,180,0 mirror=x
 color #2a2a2a
 material steel
 cyl r=0.007 h=1.60 pos=-0.62,1.20,-0.78 seg=4
@@ -151,3 +151,58 @@ material matte
 extrude depth=0.004 pts=0,0,0.30,-0.07,0,-0.18 rot=0,90,0 pos=-0.62,2.0,-0.78
 # Driver in the left seat
 use vehicles/driver.mbcad dx=0.33 sy=0.31 sz=-0.15 bz=-0.66 wy=0.66 wzz=0.12 ry=1.40 suit_r=0.12 suit_g=0.30 suit_b=0.75 driver=driver
+# ---- Detail pass: roof LED bar and A-pillar pods, cage mirrors, half windscreen, door window
+# nets, mud flaps, fender decals, rear number plate, spare strap ----
+color #111111
+material steel
+box size=1.00,0.07,0.07 pos=0,1.47,0.22 bevel=0.01
+color #f4fbff
+material lens
+box size=0.94,0.04,0.012 pos=0,1.47,0.259
+for s = -1, 1, 2
+  color #111111
+  material steel
+  box size=0.04,0.04,0.06 pos=s*0.64,1.05,0.42
+  use vehicles/headlamp.mbcad round=1 r=0.05 bezel_r=0.15 bezel_g=0.15 bezel_b=0.15 pos=s*0.64,1.10,0.46
+  color #111111
+  material plastic
+  box size=0.16,0.10,0.03 pos=s*0.70,1.08,0.30 rot=0,s*15,0 bevel=0.01
+  color #c8d2d8
+  material glass
+  box size=0.14,0.08,0.006 pos=s*0.70,1.08,0.312 rot=0,s*15,0
+end
+color #b8c4cc
+material glass
+box size=1.20,0.36,0.012 pos=0,0.98,0.42 rot=-18,0,0
+color #111111
+material matte
+box size=1.24,0.03,0.03 pos=0,1.15,0.37 rot=-18,0,0
+# Window nets over the upper door openings
+for k = 0, 5
+  box size=0.012,0.012,0.80 pos=W/2-0.05,0.52+k*0.07,-0.05 mirror=x
+end
+for k = 0, 8
+  box size=0.012,0.38,0.012 pos=W/2-0.05,0.69,-0.42+k*0.095 mirror=x
+end
+# Mud flaps behind the wheels
+color #121212
+material rubber
+box size=0.22,0.24,0.012 pos=W/2-0.10,-0.12,FA-AR-0.06 mirror=x
+box size=0.22,0.24,0.012 pos=W/2-0.10,-0.12,RA-AR-0.08 mirror=x
+# Fender decals and rear number plate
+color #141414
+material paint
+text str=MUD_BUDDIES size=0.045 t=0.012 depth=0.004 pos=W/2-0.035,0.36,-1.40 rot=0,90,0
+text str=MUD_BUDDIES size=0.045 t=0.012 depth=0.004 pos=-W/2+0.035,0.36,-1.40 rot=0,-90,0
+material plastic
+color #111111
+box size=0.26,0.14,0.01 pos=0,0.16,-1.89
+material matte
+color #f2f2ee
+box size=0.23,0.11,0.008 pos=0,0.16,-1.895
+color #1a2a4a
+text str=SXS-22 size=0.03 t=0.008 depth=0.003 pos=0,0.16,-1.90 rot=0,180,0
+# Ratchet strap over the bed spare
+color #e0a020
+material matte
+box size=0.04,0.012,0.62 pos=0,0.628,-1.33

@@ -79,7 +79,7 @@ color #e08a1a
 box size=0.12,0.07,0.04 pos=0.72,0.02,2.08 bevel=0.01 mirror=x
 box size=0.02,0.05,0.10 pos=W/2+0.002,0.30,1.72 mirror=x
 color #a01010
-box size=0.06,0.24,0.04 pos=W/2-0.05,0.46,-2.475 bevel=0.01 mirror=x
+use vehicles/taillamp.mbcad w=0.08 h=0.26 pos=W/2-0.05,0.46,-2.495 rot=0,180,0 mirror=x
 box size=0.02,0.05,0.08 pos=W/2+0.002,0.50,-2.36 mirror=x
 # Black steel plate bumpers, frame rails, rear step
 color #171717
@@ -191,3 +191,10 @@ cyl r=0.022 h=0.03 pos=0.439,0.510,0.512 rot=43.67,0,0 seg=8
 box size=0.522,0.012,0.024 pos=-0.238,0.540,0.473 rot=43.67,0,0
 box size=0.444,0.010,0.012 pos=-0.218,0.551,0.484 rot=43.67,0,0
 cyl r=0.022 h=0.03 pos=-0.019,0.510,0.512 rot=43.67,0,0 seg=8
+# Bolt heads along the fender flares
+color #2a2a2a
+material steel
+for k = 0, 7
+  cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.091,AY+(AR+0.037)*sin(160-k*20),FA+(AR+0.037)*cos(160-k*20) mirror=x
+  cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.091,AY+(AR+0.037)*sin(160-k*20),RA+(AR+0.037)*cos(160-k*20) mirror=x
+end

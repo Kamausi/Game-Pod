@@ -81,7 +81,7 @@ color #e08a1a
 box size=0.30,0.05,0.03 pos=0.40,0.13,2.12 bevel=0.008 mirror=x
 box size=0.02,0.05,0.12 pos=W/2+0.002,0.30,1.92 mirror=x
 color #a01010
-box size=0.07,0.30,0.03 pos=W/2-0.045,0.30,-2.335 bevel=0.01 mirror=x
+use vehicles/taillamp.mbcad w=0.08 h=0.32 pos=W/2-0.045,0.30,-2.35 rot=0,180,0 mirror=x
 box size=0.02,0.05,0.10 pos=W/2+0.002,0.30,-2.20 mirror=x
 # Chrome bumpers, mirrors, door handles, fuel door
 color #c9c9c4
@@ -197,3 +197,24 @@ cyl r=0.022 h=0.03 pos=0.489,0.588,0.475 rot=48.53,0,0 seg=8
 box size=0.582,0.012,0.024 pos=-0.265,0.620,0.441 rot=48.53,0,0
 box size=0.495,0.010,0.012 pos=-0.245,0.629,0.452 rot=48.53,0,0
 cyl r=0.022 h=0.03 pos=-0.021,0.588,0.475 rot=48.53,0,0 seg=8
+# Rear number plate with frame and plate lamp
+material plastic
+color #111111
+box size=0.34,0.19,0.012 pos=-0.45,0.2,-2.335
+material matte
+color #f2f2ee
+box size=0.30,0.15,0.01 pos=-0.45,0.2,-2.3409999999999997
+color #1a2a4a
+text str=TRAIL-1 size=0.045 t=0.012 depth=0.004 pos=-0.45,0.195,-2.347 rot=0,180,0
+color #b01313
+text str=MUD_STATE size=0.014 t=0.004 depth=0.003 pos=-0.45,0.255,-2.347 rot=0,180,0
+material lens
+color #fff6dc
+box size=0.08,0.02,0.02 pos=-0.45,0.305,-2.3449999999999998
+# Bolt heads along the fender flares
+color #2a2a2a
+material steel
+for k = 0, 7
+  cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.086,AY+(AR+0.035)*sin(160-k*20),FA+(AR+0.035)*cos(160-k*20) mirror=x
+  cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.086,AY+(AR+0.035)*sin(160-k*20),RA+(AR+0.035)*cos(160-k*20) mirror=x
+end

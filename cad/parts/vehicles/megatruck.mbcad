@@ -94,7 +94,7 @@ material lens
 use vehicles/headlamp.mbcad w=0.30 h=0.18 n=2 pos=0.72,0.88,2.67 mirror=x
 box size=1.40,0.08,0.06 pos=0,2.47,0.15
 color #b01313
-box size=0.08,0.30,0.04 pos=0.92,0.90,-3.07 mirror=x
+use vehicles/taillamp.mbcad w=0.08 h=0.30 pos=0.92,0.90,-3.09 rot=0,180,0 mirror=x
 color #1a1a1a
 material steel
 box size=1.4,0.20,0.20 pos=0,0.10,2.60 bevel=0.03
@@ -180,3 +180,17 @@ color #f2b01a
 material paint
 text str=MUD_BUDDIES size=0.10 t=0.028 depth=0.008 pos=0.982,0.90,-2.10 rot=0,90,0
 text str=MUD_BUDDIES size=0.10 t=0.028 depth=0.008 pos=-0.982,0.90,-2.10 rot=0,-90,0
+# Rear number plate with frame and plate lamp
+material plastic
+color #111111
+box size=0.34,0.19,0.012 pos=0,0.62,-3.065
+material matte
+color #f2f2ee
+box size=0.30,0.15,0.01 pos=0,0.62,-3.0709999999999997
+color #1a2a4a
+text str=MEGA-54 size=0.045 t=0.012 depth=0.004 pos=0,0.615,-3.077 rot=0,180,0
+color #b01313
+text str=MUD_STATE size=0.014 t=0.004 depth=0.003 pos=0,0.675,-3.077 rot=0,180,0
+material lens
+color #fff6dc
+box size=0.08,0.02,0.02 pos=0,0.725,-3.0749999999999997

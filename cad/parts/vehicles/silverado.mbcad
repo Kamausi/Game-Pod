@@ -78,7 +78,7 @@ use vehicles/headlamp.mbcad w=0.30 h=0.20 n=2 pos=0.80,0.33,2.96 mirror=x
 color #e08a1a
 box size=0.08,0.10,0.04 pos=0.96,0.33,2.92 bevel=0.01 mirror=x
 color #b01313
-box size=0.06,0.34,0.04 pos=W/2-0.05,0.55,-3.13 bevel=0.01 mirror=x
+use vehicles/taillamp.mbcad w=0.08 h=0.36 rev=0.30 pos=W/2-0.05,0.55,-3.15 rot=0,180,0 mirror=x
 # LED light bar on roof mounts
 color #121212
 material steel
@@ -172,3 +172,30 @@ cyl r=0.022 h=0.03 pos=0.500,0.623,1.267 rot=38.66,0,0 seg=8
 box size=0.594,0.012,0.024 pos=-0.271,0.658,1.216 rot=38.66,0,0
 box size=0.505,0.010,0.012 pos=-0.251,0.669,1.225 rot=38.66,0,0
 cyl r=0.022 h=0.03 pos=-0.021,0.623,1.267 rot=38.66,0,0 seg=8
+# Rear number plate with frame and plate lamp
+material plastic
+color #111111
+box size=0.34,0.19,0.012 pos=0,0.2,-3.135
+material matte
+color #f2f2ee
+box size=0.30,0.15,0.01 pos=0,0.2,-3.1409999999999996
+color #1a2a4a
+text str=MUD-22 size=0.045 t=0.012 depth=0.004 pos=0,0.195,-3.147 rot=0,180,0
+color #b01313
+text str=MUD_STATE size=0.014 t=0.004 depth=0.003 pos=0,0.255,-3.147 rot=0,180,0
+material lens
+color #fff6dc
+box size=0.08,0.02,0.02 pos=0,0.305,-3.1449999999999996
+material plastic
+color #121212
+box size=0.22,0.06,0.02 pos=0,0.68,-3.1369999999999996
+material chrome
+color #c8c8c4
+box size=0.16,0.025,0.012 pos=0,0.68,-3.147
+# Bolt heads along the fender flares
+color #2a2a2a
+material steel
+for k = 0, 7
+  cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.101,AY+(AR+0.043)*sin(160-k*20),FA+(AR+0.043)*cos(160-k*20) mirror=x
+  cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.101,AY+(AR+0.043)*sin(160-k*20),RA+(AR+0.043)*cos(160-k*20) mirror=x
+end
