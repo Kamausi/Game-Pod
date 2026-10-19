@@ -92,8 +92,8 @@ box size=0.02,0.05,0.10 pos=W/2+0.002,0.30,-2.20 mirror=x
 # Chrome bumpers, mirrors, door handles, fuel door
 color #c9c9c4
 material chrome
-box size=2.00,0.20,0.16 pos=0,0.0,2.17 bevel=0.03
-box size=1.96,0.18,0.14 pos=0,0.0,-2.39 bevel=0.03
+use vehicles/bumper.mbcad w=2.00 h=0.20 d=0.16 style=2 pos=0,0.0,2.17
+use vehicles/bumper.mbcad w=1.96 h=0.18 d=0.14 style=2 pos=0,0.0,-2.39 rot=0,180,0
 box size=0.05,0.18,0.13 pos=W/2+0.13,0.72,0.36 bevel=0.015 mirror=x
 box size=0.02,0.03,0.12 pos=W/2+0.004,0.43,-0.65 bevel=0.008 mirror=x
 cyl r=0.06 h=0.01 axis=x seg=14 pos=-(W/2+0.002),0.30,-1.95
@@ -224,3 +224,8 @@ for k = 0, 7
   cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.086,AY+(AR+0.035)*sin(160-k*20),FA+(AR+0.035)*cos(160-k*20) mirror=x
   cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.086,AY+(AR+0.035)*sin(160-k*20),RA+(AR+0.035)*cos(160-k*20) mirror=x
 end
+
+# Black rubber seals round the side glass
+color #0c0c0c
+material rubber
+tube pts=0.924,0.560,0.460,0.924,0.990,0.080,0.924,0.990,-2.290,0.924,0.560,-2.290,0.924,0.560,0.460 r=0.009 seg=6 mirror=x

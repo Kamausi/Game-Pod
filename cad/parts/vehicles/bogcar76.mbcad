@@ -49,8 +49,8 @@ box size=W-0.20,0.006,0.006 pos=0,0.465,-1.98
 color #c6c8ca
 material chrome
 box size=0.015,0.025,4.60 pos=W/2+0.04,0.30,0.0 bevel=0.008 mirror=x
-box size=W+0.06,0.18,0.18 pos=0,0.02,2.86 bevel=0.04
-box size=W+0.06,0.18,0.18 pos=0,0.02,-2.87 bevel=0.04
+use vehicles/bumper.mbcad w=W+0.06 h=0.18 d=0.18 style=2 pos=0,0.02,2.86
+use vehicles/bumper.mbcad w=W+0.06 h=0.18 d=0.18 style=2 pos=0,0.02,-2.87 rot=0,180,0
 box size=1.46,0.22,0.04 pos=0,0.22,2.815 bevel=0.01
 extrude depth=0.03 pts=arc(FA,AY,AR+0.03,162,18,14),arc(FA,AY,AR,18,162,14) pos=W/2+0.015,0,0 mirror=x
 extrude depth=0.03 pts=arc(RA,AY,AR+0.03,162,18,14),arc(RA,AY,AR,18,162,14) pos=W/2+0.015,0,0 mirror=x
@@ -177,3 +177,8 @@ cyl r=0.022 h=0.03 pos=0.500,0.493,0.668 rot=40.76,0,0 seg=8
 box size=0.594,0.012,0.024 pos=-0.271,0.529,0.618 rot=40.76,0,0
 box size=0.505,0.010,0.012 pos=-0.251,0.540,0.628 rot=40.76,0,0
 cyl r=0.022 h=0.03 pos=-0.021,0.493,0.668 rot=40.76,0,0 seg=8
+
+# Black rubber seals round the side glass
+color #0c0c0c
+material rubber
+tube pts=0.894,0.460,0.660,0.894,0.960,0.080,0.894,0.980,-1.060,0.894,0.460,-1.660,0.894,0.460,0.660 r=0.009 seg=6 mirror=x

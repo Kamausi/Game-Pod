@@ -424,7 +424,7 @@ CadMesh tube(const std::vector<Vec3>& path, float r, int seg, Vec3 color) {
     return m;
 }
 
-CadMesh loft(const std::vector<float>& zs, const std::vector<std::vector<Vec2>>& half, int n, int m, bool caps, Vec3 color) {
+CadMesh loft(const std::vector<float>& zs, const std::vector<std::vector<Vec2>>& half, int n, int m, bool caps, Vec3 color, bool full) {
     CadMesh out;
     size_t S = zs.size();
     if (S < 2 || half.size() != S) return out;
@@ -436,6 +436,7 @@ CadMesh loft(const std::vector<float>& zs, const std::vector<std::vector<Vec2>>&
     for (size_t s = 0; s < S; s++) {
         auto& L = loops[s];
         for (auto& p : half[s]) L.push_back(p);
+        if (full) continue;   // closed, asymmetric section given in full
         for (size_t i = P; i-- > 0;) {
             Vec2 q{-half[s][i].x, half[s][i].y};
             if (std::fabs(half[s][i].x) < 1e-5f) continue;
@@ -1181,7 +1182,7 @@ struct Interp {
                 }
                 if (err.empty()) emit(cadprim::tube(path, rr, seg, color), a, "/* tube */ cube(0.001)");
             } else if (op == "loft") {
-                // loft sec=z:x,y,x,y,...|z:x,y,... [n=4] [m=2] [cap=1]   (half profiles, x >= 0)
+                // loft sec=z:x,y,x,y,...|z:x,y,... [n=4] [m=2] [cap=1] [full=1]   (half profiles x >= 0, or full closed sections)
                 std::vector<float> zs;
                 std::vector<std::vector<Vec2>> half;
                 std::string secs = str(a, "sec", "");
@@ -1200,7 +1201,8 @@ struct Interp {
                     st = bar + 1;
                 }
                 if (err.empty()) {
-                    CadMesh c = cadprim::loft(zs, half, int(num(a, "n", 4)), int(num(a, "m", 2)), num(a, "cap", 1) > 0.5f, color);
+                    CadMesh c = cadprim::loft(zs, half, int(num(a, "n", 4)), int(num(a, "m", 2)), num(a, "cap", 1) > 0.5f, color,
+                                              num(a, "full", 0) > 0.5f);
                     if (c.verts.empty()) err = "loft sections must have matching point counts";
                     else emit(c, a, "/* loft */ cube(0.001)");
                 }

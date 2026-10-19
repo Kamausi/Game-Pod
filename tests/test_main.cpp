@@ -227,6 +227,18 @@ int main(int argc, char** argv) {
         CHECK(zmax - zmin > 0.58f, "helix should span its length (%.2f)", zmax - zmin);
     });
 
+    test("cad kernel: loft full=1 takes asymmetric closed sections", [] {
+        // A wedge-like bumper section (sloped top) lofted along z: not mirror-symmetric in x.
+        CadResult r = cadBuildSource("loft full=1 sec=-1:0.1,-0.1,0.1,0.1,-0.1,0.15,-0.12,-0.1|1:0.1,-0.1,0.1,0.1,-0.1,0.15,-0.12,-0.1 n=2 m=2\n", {}, "lf");
+        CHECK(r.error.empty(), "%s", r.error.c_str());
+        Vec3 mn = r.mesh.boundsMin(), mx = r.mesh.boundsMax();
+        CHECK(mx.x < 0.13f && mn.x < -0.11f, "full section keeps its own x extents (%.3f..%.3f)", mn.x, mx.x);
+        int inward = 0;
+        for (const CadVertex& v : r.mesh.verts)
+            if (std::fabs(v.nz) < 0.7f && (v.px * v.nx + (v.py - 0.01f) * v.ny) < -0.002f) inward++;
+        CHECK(inward == 0, "%d loft normals point inward", inward);
+    });
+
     test("cad kernel: _segmul raises segment counts", [] {
         CadResult a = cadBuildSource("cyl r=1 h=1 seg=8\n", {}, "s1");
         CadResult b = cadBuildSource("set _segmul = 2\ncyl r=1 h=1 seg=8\n", {}, "s2");

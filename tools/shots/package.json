@@ -1,0 +1,6 @@
+{
+  "name": "mudbuddies-shots",
+  "private": true,
+  "description": "Headless free-camera screenshots of the running game (asset review loop)",
+  "dependencies": { "playwright-core": "^1.56.0" }
+}

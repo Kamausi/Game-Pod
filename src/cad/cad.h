@@ -77,7 +77,8 @@ CadMesh wedge(Vec3 size, Vec3 color);
 CadMesh tube(const std::vector<Vec3>& path, float r, int seg, Vec3 color);
 // Smooth lofted shell through half-profiles (x >= 0, bottom centre round to top centre, mirrored
 // to close) at increasing z stations; Catmull-Rom between stations (n) and round the section (m).
-CadMesh loft(const std::vector<float>& z, const std::vector<std::vector<Vec2>>& half, int n, int m, bool caps, Vec3 color);
+CadMesh loft(const std::vector<float>& z, const std::vector<std::vector<Vec2>>& half, int n, int m, bool caps, Vec3 color,
+             bool full = false);   // full: sections are complete closed loops (no mirroring)
 CadMesh tire(float r, float w, float rim, int lugs, float depth, int tread, Vec3 color);  // axle along X
 CadMesh rim(float r, float w, int spokes, Vec3 color);
 }  // namespace cadprim

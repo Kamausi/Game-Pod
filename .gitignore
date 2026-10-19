@@ -3,3 +3,4 @@
 *.o
 server/data/
 node_modules/
+__pycache__/

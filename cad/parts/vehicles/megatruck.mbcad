@@ -103,8 +103,8 @@ color #b01313
 use vehicles/taillamp.mbcad w=0.08 h=0.30 pos=0.92,0.90,-3.09 rot=0,180,0 mirror=x
 color #1a1a1a
 material steel
-box size=1.4,0.20,0.20 pos=0,0.10,2.60 bevel=0.03
-box size=1.4,0.20,0.20 pos=0,0.10,-3.05 bevel=0.03
+use vehicles/bumper.mbcad w=1.40 h=0.20 d=0.20 style=0 skid=1 pos=0,0.10,2.60
+use vehicles/bumper.mbcad w=1.40 h=0.20 d=0.20 style=1 pos=0,0.10,-3.05 rot=0,180,0
 # ---- Cab glass ----
 color #10161c
 material glass
@@ -200,3 +200,8 @@ text str=MUD_STATE size=0.014 t=0.004 depth=0.003 pos=0,0.675,-3.077 rot=0,180,0
 material lens
 color #fff6dc
 box size=0.08,0.02,0.02 pos=0,0.725,-3.0749999999999997
+
+# Black rubber seals round the side glass
+color #0c0c0c
+material rubber
+tube pts=0.974,1.210,0.640,0.974,1.820,0.340,0.974,1.840,-0.700,0.974,1.270,-0.880,0.974,1.210,0.640 r=0.009 seg=6 mirror=x

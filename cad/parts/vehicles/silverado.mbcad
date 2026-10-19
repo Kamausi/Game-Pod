@@ -72,6 +72,16 @@ box size=1.24,0.36,0.04 pos=0,0.30,2.955 bevel=0.012
 color #0b0b0b
 material matte
 box size=1.14,0.29,0.03 pos=0,0.30,2.965
+# Honeycomb grille insert: staggered hex cells
+color #262626
+material steel
+for i = 0, 20
+  for j = 0, 4
+    cyl r=0.022 h=0.012 axis=z seg=6 pos=-0.52+i*0.052+mod(j,2)*0.026,0.19+j*0.045,2.982
+  end
+end
+color #0b0b0b
+material matte
 color paint_r paint_g paint_b
 material paint
 box size=1.24,0.08,0.05 pos=0,0.30,2.97 bevel=0.012
@@ -96,8 +106,8 @@ box size=1.22,0.06,0.02 pos=0,1.19,0.755
 # Steel bumpers, rock sliders, frame rails
 color #161616
 material steel
-box size=2.02,0.24,0.18 pos=0,0.0,2.99 bevel=0.02
-box size=1.96,0.22,0.16 pos=0,0.0,-3.16 bevel=0.02
+use vehicles/bumper.mbcad w=2.02 h=0.24 d=0.18 style=0 skid=1 pos=0,0.0,2.99
+use vehicles/bumper.mbcad w=1.96 h=0.22 d=0.16 style=1 pos=0,0.0,-3.16 rot=0,180,0
 box size=0.08,0.08,2.30 pos=W/2+0.01,-0.18,0.10 bevel=0.03 mirror=x
 box size=0.12,0.16,5.0 pos=0.55,-0.21,-0.30 mirror=x
 # ---- Diesel mud-truck build-out ----
@@ -205,3 +215,8 @@ for k = 0, 7
   cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.101,AY+(AR+0.043)*sin(160-k*20),FA+(AR+0.043)*cos(160-k*20) mirror=x
   cyl r=0.011 h=0.016 axis=x seg=6 pos=W/2+0.101,AY+(AR+0.043)*sin(160-k*20),RA+(AR+0.043)*cos(160-k*20) mirror=x
 end
+
+# Black rubber seals round the side glass
+color #0c0c0c
+material rubber
+tube pts=0.934,0.590,1.260,0.934,1.070,0.660,0.934,1.090,-1.020,0.934,0.600,-1.100,0.934,0.590,1.260 r=0.009 seg=6 mirror=x
