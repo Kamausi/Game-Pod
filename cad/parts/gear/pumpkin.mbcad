@@ -1,6 +1,8 @@
 # Differential centre section: ribbed housing, bolted cover facing -Z (rear), pinion snout and
 # yoke toward +Z (the game turns it so the pinion points at the driveshaft). s = size scale.
 param s = 1
+set _segmul = 1.8
+set _bevelmul = 1.5
 color #202020
 material steel
 sphere r=0.15*s scale=1.05,1,0.85 seg=12

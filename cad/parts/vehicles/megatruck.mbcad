@@ -1,6 +1,7 @@
 # Mega truck: pickup cab perched on a tube chassis over 54" ag-style tyres, blown big-block
 # through the hood, zoomie headers, 4-link bars and coilovers, roll cage.
 # Body frame: +Z fwd, +X left. Front axle z=1.776, rear z=-1.924, track 2.4, wheel centres y=-0.55.
+param lod = 0             # 1 = far version: unshaped, coarser curves
 param driver = 1          # 0 for parked rigs: empty cab
 param winch = 0           # garage options: winch bumper / snorkel
 param snorkel = 0
@@ -11,6 +12,11 @@ set FA = 1.776
 set RA = -1.924
 set AY = -0.55
 # Tube chassis rails and crossmembers (inside the tyres)
+# High-fidelity surfacing: smoother curves and rounded edges, then the whole vehicle is shaped
+# as one (tumblehome, barrelled sides, tapered nose/tail, plan bow, crowned hood and roof).
+set _segmul = 1.35-0.35*lod
+set _bevelmul = 1.5-0.5*lod
+deform on=1-lod res=0.09 tumble=0.10 ty0=1.25 ty1=1.86 barrel=0.03 by0=0.45 by1=1.24 bow=0.015 bz0=-3.06 bz1=2.66 taperf=0.05 tf0=1.9 tf1=2.66 crown=0.045 cy0=1.0 cy1=1.12 hw=0.98
 color #2b2b2b
 material steel
 box size=0.10,0.12,5.4 pos=0.42,-0.05,-0.08 mirror=x
@@ -22,7 +28,7 @@ box size=0.94,0.10,0.10 pos=0,-0.05,0.4
 # hood, cab and roof, a separate bed with flared sides, fender flares over nothing (tyres outside).
 color paint_r paint_g paint_b
 material paint
-extrude depth=1.96 bevel=0.06 pts=-1.00,0.45,2.62,0.45,2.66,0.62,2.64,1.00,2.55,1.10,0.80,1.18,0.66,1.24,-0.95,1.28,-1.00,1.22
+extrude depth=1.96 bevel=0.09 pts=-1.00,0.45,2.62,0.45,2.66,0.62,2.64,1.00,2.55,1.10,0.80,1.18,0.66,1.24,-0.95,1.28,-1.00,1.22
 # Open greenhouse: roof skin, A/B/C pillars round the see-through cab
 extrude depth=1.96 bevel=0.03 pts=0.36,1.86,-0.72,1.88,-0.72,1.83,0.36,1.81
 box size=0.08,0.729,0.09 pos=0.945,1.550,0.510 rot=-25.82,0,0 mirror=x

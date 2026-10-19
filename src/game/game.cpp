@@ -113,7 +113,8 @@ void Game::addRunningGear(RenderFrame& f, const Vehicle& g, const VehicleVisual&
             span(vis.cvShaft, Vec3{sx * 0.12f, c.y, c.z}, hub);
             item(vis.knuckle[w.left ? 0 : 1], hub, Quat::axisAngle({0, 1, 0}, w.front ? steer : 0.f));
             Vec3 armMid = (lowIn + lowOut) * 0.5f;
-            shock(Vec3{sx * 0.26f, c.y + 0.50f, c.z - 0.04f}, armMid + Vec3{0, 0.03f, 0});
+            // Upper mount tucked under the bodywork (inside the tank/hood shell, clear of the fenders).
+            shock(Vec3{sx * 0.22f, c.y + 0.42f, c.z - 0.04f}, armMid + Vec3{0, 0.03f, 0});
             if (w.front) span(vis.rodThin, Vec3{sx * 0.14f, c.y + 0.02f, c.z - 0.12f},
                               hub + Quat::axisAngle({0, 1, 0}, steer).rotate({0, 0.02f, -0.12f}));
         }

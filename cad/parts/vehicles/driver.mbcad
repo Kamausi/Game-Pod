@@ -12,24 +12,35 @@ param driver = 1
 param suit_r = 0.85
 param suit_g = 0.22
 param suit_b = 0.10
-# ---- Driver: race suit, gloves on the wheel, full-face helmet with a dark visor ----
+# ---- Driver: race suit (lofted torso, smooth tube limbs bent at elbow and knee), gloves on the
+# wheel, boots, full-face helmet with chin bar, peak, dark visor and a neck collar ----
+set _segmul = 1.5
 set hy = min(sy+0.64,ry-0.16)   # helmet centre, kept under the roof
+set sh = hy-0.20                 # shoulder height
 color suit_r suit_g suit_b
 material matte
-box size=0.36*driver,0.12,0.40 pos=dx,sy+0.10,sz+0.06 bevel=0.04
-box size=0.34*driver,hy-sy-0.18,0.20 pos=dx,(sy+hy-0.14)/2+0.02,bz+0.24 rot=-10,0,0 bevel=0.05
-cyl r=0.06*driver h=0.40 pos=dx+0.10,sy+0.06,sz+0.30 rot=80,0,0 seg=8
-cyl r=0.06*driver h=0.40 pos=dx-0.10,sy+0.06,sz+0.30 rot=80,0,0 seg=8
-cyl r=0.045*driver h=0.42 pos=dx+0.16,(hy-0.22+wy)/2,(bz+0.26+wzz)/2 rot=-62,0,8 seg=8
-cyl r=0.045*driver h=0.42 pos=dx-0.16,(hy-0.22+wy)/2,(bz+0.26+wzz)/2 rot=-62,0,-8 seg=8
-color #111111
-sphere r=0.042*driver pos=dx+0.15,wy+0.03,wzz+0.03 seg=6
-sphere r=0.042*driver pos=dx-0.15,wy+0.03,wzz+0.03 seg=6
+loft sec=0.0:0,-0.100,0.120,-0.100,0.150,0.0,0.120,0.090,0,0.100|0.12:0,-0.105,0.128,-0.105,0.160,0.0,0.128,0.095,0,0.105|0.28:0,-0.110,0.136,-0.110,0.170,0.0,0.136,0.099,0,0.110|0.4:0,-0.100,0.152,-0.100,0.190,0.0,0.152,0.090,0,0.100|0.46:0,-0.085,0.136,-0.085,0.170,0.0,0.136,0.077,0,0.085|0.5:0,-0.050,0.056,-0.050,0.070,0.0,0.056,0.045,0,0.050 n=3 m=2 pos=dx,sy+0.02,bz+0.22 rot=-100,0,0 scale=driver,driver,(sh-sy+0.06)/0.50*driver
+box size=0.34*driver,0.12,0.36 pos=dx,sy+0.08,sz+0.02 bevel=0.05
+for s = -1, 1, 2
+  tube pts=dx+s*0.10,sy+0.08,sz-0.06,dx+s*0.11,sy+0.13,sz+0.30,dx+s*0.12,sy-0.20,sz+0.44,dx+s*0.12,sy-0.32,sz+0.46 r=0.062*driver seg=10
+  tube pts=dx+s*0.18,sh,bz+0.24,dx+s*0.22,(sh+wy)/2-0.06,(bz+0.24+wzz)/2+0.02,dx+s*0.15,wy+0.02,wzz+0.02 r=0.046*driver seg=8
+  sphere r=0.06*driver pos=dx+s*0.18,sh,bz+0.24 seg=10
+  color #111111
+  box size=0.10*driver,0.08,0.24 pos=dx+s*0.12,sy-0.34,sz+0.52 bevel=0.03
+  sphere r=0.045*driver pos=dx+s*0.15,wy+0.03,wzz+0.03 seg=8
+  color suit_r suit_g suit_b
+end
+color #f2f2ee
+material plastic
+cyl r=0.075*driver h=0.06 pos=dx,hy-0.15,bz+0.22 seg=12
 color #f2f2ee
 material paint
-sphere r=0.13*driver pos=dx,hy,bz+0.22 scale=0.95,1.05,1.05 seg=10
+sphere r=0.135*driver pos=dx,hy,bz+0.22 scale=0.95,1.04,1.08 seg=16
 color suit_r suit_g suit_b
-box size=0.05*driver,0.02,0.24 pos=dx,hy+0.13,bz+0.22
+box size=0.05*driver,0.015,0.26 pos=dx,hy+0.138,bz+0.22
+color #e6e6e2
+box size=0.16*driver,0.09,0.08 pos=dx,hy-0.09,bz+0.33 rot=-15,0,0 bevel=0.035
+box size=0.20*driver,0.015,0.08 pos=dx,hy+0.10,bz+0.34 rot=-10,0,0 bevel=0.006
 color #0a0e14
 material glass
-box size=0.19*driver,0.07,0.02 pos=dx,hy,bz+0.35 rot=-8,0,0 bevel=0.01
+box size=0.20*driver,0.07,0.03 pos=dx,hy+0.01,bz+0.345 rot=-8,0,0 bevel=0.012

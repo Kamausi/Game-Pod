@@ -7,6 +7,7 @@ param lugs = 18
 param depth = 0.028
 param tread = 1              # 0 = A/T, 1 = M/T, 2 = paddle
 param beadlock = 0
+set _segmul = 1.5
 set rt = tire_r-depth
 set hw = tire_w*0.5
 set fx = tire_w*0.30         # wheel face plane

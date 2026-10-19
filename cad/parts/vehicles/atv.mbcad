@@ -1,6 +1,7 @@
 # Utility ATV mud build with seated rider: twin snorkels behind the bars, radiator relocated
 # up on the front rack, steel racks, front winch. Body frame: +Z fwd, +X left.
 # Front axle z=0.715, rear z=-0.585, track 0.98, wheel centres y=-0.12 (29" tyres, r~0.37).
+param lod = 0             # 1 = far version: unshaped, coarser curves
 param paint_r = 0.15
 param paint_g = 0.35
 param paint_b = 0.16
@@ -10,24 +11,32 @@ param rider_b = 0.10
 set FA = 0.715
 set RA = -0.585
 # Frame, skid plate and footwells (between the wheels)
+# High-fidelity surfacing: smoother curves and rounded edges, then the whole vehicle is shaped
+# as one (tumblehome, barrelled sides, tapered nose/tail, plan bow, crowned hood and roof).
+set _segmul = 1.35-0.35*lod
+set _bevelmul = 1.5-0.5*lod
+deform on=1-lod res=0.09 barrel=0.05 by0=-0.1 by1=0.45 taperf=0.06 tf0=0.8 tf1=1.2 crown=0.03 cy0=0.2 cy1=0.4 hw=0.65
 color #1d1d1d
 material steel
 box size=0.42,0.16,1.55 pos=0,-0.05,0.05 bevel=0.03
 box size=0.22,0.03,0.40 pos=0.30,0.04,0.05 mirror=x
 cyl r=0.04 h=0.86 axis=x pos=0,-0.12,FA
 cyl r=0.04 h=0.86 axis=x pos=0,-0.12,RA
-# Plastic body: front and rear fenders arching over the tyres, centre tank cover
+# Moulded plastic bodywork (lofted shells): arched fenders over all four tyres, a crowned
+# tank/hood running down to the nose, and a tail section under the seat
 color paint_r paint_g paint_b
 material plastic
-extrude depth=0.32 bevel=0.05 pts=0.25,0.10,arc(0.715,-0.12,0.50,150,30,10),1.18,0.08,1.12,0.04,arc(0.715,-0.12,0.42,32,148,10) pos=0.49,0,0 mirror=x
-extrude depth=0.32 bevel=0.05 pts=-0.15,0.10,arc(-0.585,-0.12,0.50,30,150,10),-1.04,0.08,-0.99,0.04,arc(-0.585,-0.12,0.42,148,32,10) pos=0.49,0,0 mirror=x
-box size=0.62,0.18,0.80 pos=0,0.30,0.55 bevel=0.08
-extrude depth=0.58 bevel=0.06 pts=0.95,0.30,1.05,0.36,1.12,0.30,1.10,0.18,0.95,0.20
-box size=0.66,0.10,0.55 pos=0,0.30,-0.62 bevel=0.04
+loft sec=0.255:0.000,-0.079,0.180,-0.094,0.205,-0.069,0.180,-0.034,0.000,-0.024|0.315:0.000,0.072,0.180,0.057,0.205,0.082,0.180,0.117,0.000,0.127|0.415:0.000,0.187,0.180,0.172,0.205,0.197,0.180,0.232,0.000,0.242|0.565:0.000,0.270,0.180,0.255,0.205,0.280,0.180,0.315,0.000,0.325|0.715:0.000,0.295,0.180,0.280,0.205,0.305,0.180,0.340,0.000,0.350|0.865:0.000,0.270,0.180,0.255,0.205,0.280,0.180,0.315,0.000,0.325|1.015:0.000,0.187,0.180,0.172,0.205,0.197,0.180,0.232,0.000,0.242|1.115:0.000,0.072,0.180,0.057,0.205,0.082,0.180,0.117,0.000,0.127|1.175:0.000,-0.079,0.180,-0.094,0.205,-0.069,0.180,-0.034,0.000,-0.024 n=4 m=3 pos=0.47,0,0 mirror=x
+loft sec=-1.045:0.000,-0.079,0.180,-0.094,0.205,-0.069,0.180,-0.034,0.000,-0.024|-0.985:0.000,0.072,0.180,0.057,0.205,0.082,0.180,0.117,0.000,0.127|-0.885:0.000,0.187,0.180,0.172,0.205,0.197,0.180,0.232,0.000,0.242|-0.735:0.000,0.270,0.180,0.255,0.205,0.280,0.180,0.315,0.000,0.325|-0.585:0.000,0.295,0.180,0.280,0.205,0.305,0.180,0.340,0.000,0.350|-0.435:0.000,0.270,0.180,0.255,0.205,0.280,0.180,0.315,0.000,0.325|-0.285:0.000,0.187,0.180,0.172,0.205,0.197,0.180,0.232,0.000,0.242|-0.185:0.000,0.072,0.180,0.057,0.205,0.082,0.180,0.117,0.000,0.127|-0.125:0.000,-0.079,0.180,-0.094,0.205,-0.069,0.180,-0.034,0.000,-0.024 n=4 m=3 pos=0.47,0,0 mirror=x
+loft sec=0.020:0.000,0.060,0.204,0.060,0.240,0.130,0.233,0.310,0.149,0.370,0.000,0.380|0.300:0.000,0.060,0.255,0.060,0.300,0.130,0.291,0.380,0.186,0.440,0.000,0.450|0.620:0.000,0.060,0.255,0.060,0.300,0.130,0.291,0.350,0.186,0.410,0.000,0.420|0.880:0.000,0.060,0.238,0.060,0.280,0.130,0.272,0.280,0.174,0.340,0.000,0.350|1.080:0.000,0.060,0.204,0.060,0.240,0.130,0.233,0.200,0.149,0.260,0.000,0.270|1.200:0.000,0.060,0.145,0.060,0.170,0.130,0.165,0.130,0.105,0.190,0.000,0.200 n=4 m=3
+loft sec=-1.050:0.000,0.060,0.221,0.060,0.260,0.130,0.252,0.210,0.161,0.270,0.000,0.280|-0.850:0.000,0.060,0.264,0.060,0.310,0.130,0.301,0.260,0.192,0.320,0.000,0.330|-0.550:0.000,0.060,0.272,0.060,0.320,0.130,0.310,0.280,0.198,0.340,0.000,0.350|-0.250:0.000,0.060,0.238,0.060,0.280,0.130,0.272,0.290,0.174,0.350,0.000,0.360 n=4 m=3
+# Nose fascia with the grille slot between the headlights
+color paint_r*0.6 paint_g*0.6 paint_b*0.6
+box size=0.30,0.08,0.02 pos=0,0.20,1.205 bevel=0.01
 # Seat
 color #161616
 material matte
-box size=0.34,0.10,0.62 pos=0,0.42,-0.22 bevel=0.04
+loft sec=-0.550:0,0.37,0.135,0.37,0.150,0.41,0.128,0.430,0,0.440|-0.400:0,0.37,0.153,0.37,0.170,0.41,0.145,0.465,0,0.475|-0.150:0,0.37,0.153,0.37,0.170,0.41,0.145,0.470,0,0.480|0.050:0,0.37,0.135,0.37,0.150,0.41,0.128,0.460,0,0.470|0.140:0,0.37,0.099,0.37,0.110,0.41,0.093,0.440,0,0.450 n=4 m=3
 # Steel racks front and rear
 color #222222
 material steel
@@ -40,21 +49,7 @@ color #3a3a3a
 box size=0.42,0.30,0.06 pos=0,0.63,0.80 bevel=0.01
 color #111111
 box size=0.36,0.24,0.02 pos=0,0.63,0.835
-# Suspension: front A-arms and coil-overs, rear swingarm and shocks, CV boots
-color #1c1c1c
-material steel
-box size=0.32,0.035,0.05 pos=0.30,-0.10,0.66 rot=0,0,4 mirror=x
-box size=0.32,0.035,0.05 pos=0.30,-0.02,0.78 rot=0,0,-6 mirror=x
-box size=0.30,0.035,0.05 pos=0.30,-0.10,-0.52 rot=0,0,4 mirror=x
-box size=0.30,0.035,0.05 pos=0.30,-0.02,-0.66 rot=0,0,-6 mirror=x
-color #c41e1e
-material paint
-cyl r=0.035 h=0.34 pos=0.30,0.08,0.70 rot=0,0,-30 seg=8 mirror=x
-cyl r=0.035 h=0.34 pos=0.30,0.08,-0.60 rot=0,0,-30 seg=8 mirror=x
-color #111111
-material rubber
-cyl r=0.03 h=0.22 axis=x pos=0.36,-0.12,0.715 mirror=x
-cyl r=0.03 h=0.22 axis=x pos=0.36,-0.12,-0.585 mirror=x
+# (A-arms, coilovers and CV shafts are drawn live by the game and follow the suspension.)
 # Exhaust, mud flaps, tail light, headlight pod and bar pad
 color #3a3a3a
 material steel
@@ -96,7 +91,7 @@ box size=0.70,0.07,0.08 pos=0,0.08,1.12 bevel=0.02
 cyl r=0.06 h=0.28 axis=x pos=0,0.17,1.08
 color #e8eef2
 material lens
-use vehicles/headlamp.mbcad w=0.12 h=0.05 n=1 drl=0 pos=0.18,0.40,0.975 mirror=x
+use vehicles/headlamp.mbcad w=0.10 h=0.05 n=1 drl=0 pos=0.15,0.20,1.165 rot=-20,0,0 mirror=x
 color #b01313
 box size=0.10,0.04,0.02 pos=0.22,0.34,-0.99 mirror=x
 # Rider: riding jacket and pants, jointed arms and legs, gloves on the grips, boots on the
@@ -207,8 +202,8 @@ cyl r=0.05 h=0.02 pos=0,0.40,0.62 seg=12
 # Fender decals and a rear number plate
 color #f2f2ee
 material paint
-text str=MUD_BUDDIES size=0.035 t=0.01 depth=0.004 pos=0.312,0.30,0.62 rot=0,90,0
-text str=MUD_BUDDIES size=0.035 t=0.01 depth=0.004 pos=-0.312,0.30,0.62 rot=0,-90,0
+text str=MUD_BUDDIES size=0.035 t=0.01 depth=0.004 pos=0.306,0.28,0.62 rot=0,90,0
+text str=MUD_BUDDIES size=0.035 t=0.01 depth=0.004 pos=-0.306,0.28,0.62 rot=0,-90,0
 material plastic
 color #111111
 box size=0.20,0.12,0.01 pos=0,0.20,-1.035

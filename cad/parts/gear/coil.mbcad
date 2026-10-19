@@ -4,7 +4,7 @@ param r = 0.07
 param col = 0
 color 0.75*max(0,1-abs(col-0))+0.85*max(0,1-abs(col-1))+0.1*max(0,1-abs(col-2)) 0.1*max(0,1-abs(col-0))+0.62*max(0,1-abs(col-1))+0.1*max(0,1-abs(col-2)) 0.08+0.04*max(0,1-abs(col-1))
 material paint
-for k = 0, 47
-  set a = k*45+22.5
-  box size=r*0.80,0.016,0.016 pos=r*cos(a),r*sin(a),k/47 rot=0,0,a+90
-end
+# Round-wire helix with closed, ground ends (flat end coils at both perches)
+tube helix=r,6.5,0.94 r=0.012 seg=8 pos=0,0,0.03
+tube helix=r,1,0.03 r=0.012 seg=8
+tube helix=r,1,0.03 r=0.012 seg=8 pos=0,0,0.97

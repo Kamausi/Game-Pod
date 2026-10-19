@@ -19,6 +19,8 @@ set dx = W*0.24       # seat centre offset from the middle
 set wy = bl+0.07      # steering wheel centre height
 set wzz = wz-0.42     # steering wheel z
 # Floor and transmission tunnel
+set _segmul = 1.5
+set _bevelmul = 1.5
 color #1d1d1d
 material matte
 box size=W,0.03,wz-bz pos=0,fy,(wz+bz)/2
@@ -51,22 +53,23 @@ material steel
 cyl r=0.03 h=0.38 pos=dx,bl-0.08,wz-0.24 rot=-62,0,0 seg=8
 color #111111
 material rubber
-lathe seg=18 axis=z pos=dx,wy,wzz rot=-28,0,0 pts=0.165,-0.012,0.185,-0.012,0.185,0.012,0.165,0.012
+tube pts=0.1750,0.0000,0,0.1690,0.0453,0,0.1516,0.0875,0,0.1237,0.1237,0,0.0875,0.1516,0,0.0453,0.1690,0,0.0000,0.1750,0,-0.0453,0.1690,0,-0.0875,0.1516,0,-0.1237,0.1237,0,-0.1516,0.0875,0,-0.1690,0.0453,0,-0.1750,0.0000,0,-0.1690,-0.0453,0,-0.1516,-0.0875,0,-0.1237,-0.1237,0,-0.0875,-0.1516,0,-0.0453,-0.1690,0,-0.0000,-0.1750,0,0.0453,-0.1690,0,0.0875,-0.1516,0,0.1237,-0.1237,0,0.1516,-0.0875,0,0.1690,-0.0453,0,0.1750,-0.0000,0 r=0.014 seg=8 pos=dx,wy,wzz rot=-28,0,0
 color #222222
 material plastic
 cyl r=0.05 h=0.03 axis=z pos=dx,wy,wzz rot=-28,0,0 seg=10
 box size=0.30,0.025,0.02 pos=dx,wy,wzz rot=-28,0,0
-# Bucket seats: cushion with bolsters, reclined back, headrest
+# Racing bucket seats (lofted): cushion with raised side bolsters, high back with wrap-around
+# bolsters and an integrated headrest, harness belts
 color #262626
 material matte
 for s = -1, 1, 2
-  box size=0.46,0.10,0.48 pos=s*dx,sy,sz bevel=0.03
-  box size=0.07,0.14,0.46 pos=s*dx+0.21,sy+0.05,sz bevel=0.02
-  box size=0.07,0.14,0.46 pos=s*dx-0.21,sy+0.05,sz bevel=0.02
-  box size=0.46,0.62,0.10 pos=s*dx,sy+0.33,bz+0.16 rot=-12,0,0 bevel=0.03
-  box size=0.26,0.14,0.08 pos=s*dx,min(sy+0.62,ry-0.22),bz+0.12 rot=-12,0,0 bevel=0.03
-  box size=0.04,0.40,0.012 pos=s*dx+0.10,sy+0.35,bz+0.215 rot=-12,0,0
-  box size=0.04,0.40,0.012 pos=s*dx-0.10,sy+0.35,bz+0.215 rot=-12,0,0
+  loft sec=-0.24:0,-0.05,0.21,-0.05,0.24,0.060,0.20,0.050,0.15,0.0,0,-0.012|-0.1:0,-0.05,0.21,-0.05,0.24,0.075,0.20,0.065,0.15,0.0,0,-0.012|0.08:0,-0.05,0.21,-0.05,0.24,0.070,0.20,0.060,0.15,0.0,0,-0.012|0.22:0,-0.05,0.21,-0.05,0.24,0.040,0.20,0.030,0.15,0.0,0,-0.012 n=3 m=2 pos=s*dx,sy,sz
+  loft sec=0.0:0,0.10,0.220,0.10,0.250,0.0,0.240,-0.080,0.180,-0.03,0,0.0|0.25:0,0.10,0.229,0.10,0.260,0.0,0.250,-0.100,0.187,-0.03,0,0.0|0.45:0,0.10,0.211,0.10,0.240,0.0,0.230,-0.080,0.173,-0.03,0,0.0|0.56:0,0.10,0.150,0.10,0.170,0.0,0.163,-0.030,0.122,-0.03,0,0.0|0.62:0,0.10,0.132,0.10,0.150,0.0,0.144,-0.030,0.108,-0.03,0,0.0|0.8:0,0.10,0.132,0.10,0.150,0.0,0.144,-0.020,0.108,-0.03,0,0.0|0.86:0,0.10,0.114,0.10,0.130,0.0,0.125,-0.010,0.094,-0.03,0,0.0 n=3 m=2 pos=s*dx,sy-0.02,bz+0.10 rot=-102,0,0 scale=1,1,min(1,(ry-0.06-sy)/0.86)
+  color #c41a1a
+  box size=0.045,0.50,0.012 pos=s*dx+0.09,sy+0.30,bz+0.06 rot=-12,0,0
+  box size=0.045,0.50,0.012 pos=s*dx-0.09,sy+0.30,bz+0.06 rot=-12,0,0
+  box size=0.30,0.045,0.012 pos=s*dx,sy+0.10,bz+0.30 rot=-80,0,0
+  color #262626
 end
 # Centre console, shifter, transfer-case lever
 color #1c1c1c

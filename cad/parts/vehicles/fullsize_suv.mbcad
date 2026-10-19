@@ -2,6 +2,7 @@
 # square-body sheet metal, round headlights in square chrome bezels, contrasting white
 # hardtop with big quarter glass, swing-out spare tyre carrier, roof light bar, rock sliders.
 # Body frame: origin at frame height, +Z forward, +X left. Front axle z=1.2105, rear z=-1.4795.
+param lod = 0             # 1 = far version: unshaped, coarser curves
 param driver = 1          # 0 for parked rigs: empty cab
 param winch = 0           # garage options: winch bumper / snorkel
 param snorkel = 0
@@ -16,12 +17,17 @@ set FA = 1.2105
 set RA = -1.4795
 set AY = -0.30
 set AR = 0.56
+# High-fidelity surfacing: smoother curves and rounded edges, then the whole vehicle is shaped
+# as one (tumblehome, barrelled sides, tapered nose/tail, plan bow, crowned hood and roof).
+set _segmul = 1.35-0.35*lod
+set _bevelmul = 1.5-0.5*lod
+deform on=1-lod res=0.09 tumble=0.09 ty0=0.56 ty1=1.05 barrel=0.03 by0=-0.12 by1=0.56 bow=0.016 bz0=-2.35 bz1=2.10 taperf=0.06 tf0=1.2 tf1=2.10 taperr=0.03 tr0=-1.8 tr1=-2.35 crown=0.045 cy0=0.44 cy1=0.55 hw=0.97
 color paint_r paint_g paint_b
 material paint
 # Front clip: fenders, hood and grille surround with the arch cut in
-extrude depth=W bevel=0.04 pts=0.48,-0.10,arc(FA,AY,AR,159,21,12),2.08,-0.10,2.10,0.04,2.10,0.52,2.07,0.555,0.48,0.56
+extrude depth=W bevel=0.075 pts=0.48,-0.10,arc(FA,AY,AR,159,21,12),2.08,-0.10,2.10,0.04,2.10,0.52,2.07,0.555,0.48,0.56
 # Tub: doors, rear quarters and tailgate in one side profile with the rear arch
-extrude depth=W bevel=0.04 pts=0.48,-0.12,arc(RA,AY,AR,21,159,12),-2.32,-0.12,-2.32,0.56,0.48,0.56
+extrude depth=W bevel=0.075 pts=0.48,-0.12,arc(RA,AY,AR,21,159,12),-2.32,-0.12,-2.32,0.56,0.48,0.56
 # Windshield frame (body colour)
 box size=0.07,0.60,0.07 pos=W/2-0.06,0.78,0.28 rot=-42.3,0,0 bevel=0.02 mirror=x
 box size=W-0.08,0.05,0.06 pos=0,0.985,0.09 bevel=0.015

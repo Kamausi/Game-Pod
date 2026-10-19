@@ -354,6 +354,178 @@ CadMesh extrudeBevel(const std::vector<Vec2>& polyIn, float depth, float bevel, 
     return B.m;
 }
 
+
+static Vec2 crom2(Vec2 a, Vec2 b, Vec2 c, Vec2 d, float t) {
+    float t2 = t * t, t3 = t2 * t;
+    return {0.5f * (2 * b.x + (-a.x + c.x) * t + (2 * a.x - 5 * b.x + 4 * c.x - d.x) * t2 + (-a.x + 3 * b.x - 3 * c.x + d.x) * t3),
+            0.5f * (2 * b.y + (-a.y + c.y) * t + (2 * a.y - 5 * b.y + 4 * c.y - d.y) * t2 + (-a.y + 3 * b.y - 3 * c.y + d.y) * t3)};
+}
+static float crom1(float a, float b, float c, float d, float t) {
+    float t2 = t * t, t3 = t2 * t;
+    return 0.5f * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+}
+
+CadMesh tube(const std::vector<Vec3>& path, float r, int seg, Vec3 color) {
+    CadMesh m;
+    if (path.size() < 2 || r <= 0) return m;
+    seg = std::max(3, seg);
+    size_t n = path.size();
+    std::vector<Vec3> T(n);
+    for (size_t i = 0; i < n; i++) {
+        Vec3 d = path[std::min(i + 1, n - 1)] - path[i > 0 ? i - 1 : 0];
+        T[i] = normalize(d);
+    }
+    // Initial normal: any vector not parallel to the first tangent; then parallel transport.
+    Vec3 up = std::fabs(T[0].y) < 0.9f ? Vec3{0, 1, 0} : Vec3{1, 0, 0};
+    Vec3 N = normalize(cross(cross(T[0], up), T[0]));
+    std::vector<Vec3> Ns(n), Bs(n);
+    for (size_t i = 0; i < n; i++) {
+        if (i > 0) {
+            Vec3 ax = cross(T[i - 1], T[i]);
+            float s = length(ax);
+            if (s > 1e-6f) {
+                float ang = std::atan2(s, dot(T[i - 1], T[i]));
+                N = Quat::axisAngle(ax * (1.f / s), ang).rotate(N);
+            }
+            N = normalize(N - T[i] * dot(N, T[i]));
+        }
+        Ns[i] = N;
+        Bs[i] = cross(T[i], N);
+    }
+    for (size_t i = 0; i < n; i++)
+        for (int k = 0; k <= seg; k++) {
+            float a = 2 * PI * k / seg;
+            Vec3 nn = Ns[i] * std::cos(a) + Bs[i] * std::sin(a);
+            Vec3 p = path[i] + nn * r;
+            m.verts.push_back({p.x, p.y, p.z, nn.x, nn.y, nn.z, color.x, color.y, color.z, 0});
+        }
+    auto id = [&](size_t i, int k) { return uint32_t(i * (seg + 1) + k); };
+    for (size_t i = 0; i + 1 < n; i++)
+        for (int k = 0; k < seg; k++) {
+            uint32_t a = id(i, k), b = id(i, k + 1), c = id(i + 1, k + 1), d = id(i + 1, k);
+            m.idx.insert(m.idx.end(), {a, c, b, a, d, c});
+        }
+    // Caps
+    for (int e = 0; e < 2; e++) {
+        size_t i = e ? n - 1 : 0;
+        Vec3 nn = e ? T[i] : T[i] * -1.f;
+        uint32_t c0 = uint32_t(m.verts.size());
+        m.verts.push_back({path[i].x, path[i].y, path[i].z, nn.x, nn.y, nn.z, color.x, color.y, color.z, 0});
+        for (int k = 0; k <= seg; k++) {
+            float a = 2 * PI * k / seg;
+            Vec3 p = path[i] + (Ns[i] * std::cos(a) + Bs[i] * std::sin(a)) * r;
+            m.verts.push_back({p.x, p.y, p.z, nn.x, nn.y, nn.z, color.x, color.y, color.z, 0});
+        }
+        for (int k = 0; k < seg; k++) {
+            if (e) m.idx.insert(m.idx.end(), {c0, c0 + 1 + uint32_t(k), c0 + 2 + uint32_t(k)});
+            else m.idx.insert(m.idx.end(), {c0, c0 + 2 + uint32_t(k), c0 + 1 + uint32_t(k)});
+        }
+    }
+    return m;
+}
+
+CadMesh loft(const std::vector<float>& zs, const std::vector<std::vector<Vec2>>& half, int n, int m, bool caps, Vec3 color) {
+    CadMesh out;
+    size_t S = zs.size();
+    if (S < 2 || half.size() != S) return out;
+    size_t P = half[0].size();
+    for (auto& h : half) if (h.size() != P || P < 2) return out;
+    n = std::max(1, n); m = std::max(1, m);
+    // Closed loops: half profile, then the mirror back down (skipping points on the centreline).
+    std::vector<std::vector<Vec2>> loops(S);
+    for (size_t s = 0; s < S; s++) {
+        auto& L = loops[s];
+        for (auto& p : half[s]) L.push_back(p);
+        for (size_t i = P; i-- > 0;) {
+            Vec2 q{-half[s][i].x, half[s][i].y};
+            if (std::fabs(half[s][i].x) < 1e-5f) continue;
+            L.push_back(q);
+        }
+        // drop duplicate centreline points at the seam (first == last after mirroring)
+    }
+    size_t Lc = loops[0].size();
+    for (auto& L : loops) if (L.size() != Lc) return out;   // centreline points must match across stations
+    // Smooth round the loop
+    std::vector<std::vector<Vec2>> rings(S);
+    for (size_t s = 0; s < S; s++) {
+        auto& L = loops[s];
+        for (size_t i = 0; i < Lc; i++)
+            for (int k = 0; k < m; k++)
+                rings[s].push_back(crom2(L[(i + Lc - 1) % Lc], L[i], L[(i + 1) % Lc], L[(i + 2) % Lc], float(k) / m));
+    }
+    size_t R = rings[0].size();
+    // Smooth along z (clamped ends)
+    std::vector<std::vector<Vec3>> grid;
+    for (size_t s = 0; s + 1 < S; s++)
+        for (int k = 0; k < n || (s + 2 == S && k == n); k++) {
+            float t = float(k) / n;
+            size_t a = s > 0 ? s - 1 : 0, b = s, c = s + 1, d = std::min(s + 2, S - 1);
+            float z = crom1(zs[a], zs[b], zs[c], zs[d], t);
+            std::vector<Vec3> row(R);
+            for (size_t j = 0; j < R; j++) {
+                Vec2 q = crom2(rings[a][j], rings[b][j], rings[c][j], rings[d][j], t);
+                row[j] = {q.x, q.y, z};
+            }
+            grid.push_back(row);
+        }
+    size_t G = grid.size();
+    // Smooth normals from the grid
+    for (size_t i = 0; i < G; i++)
+        for (size_t j = 0; j <= R; j++) {
+            size_t jj = j % R;
+            Vec3 du = grid[i][(jj + 1) % R] - grid[i][(jj + R - 1) % R];
+            Vec3 dv = grid[std::min(i + 1, G - 1)][jj] - grid[i > 0 ? i - 1 : 0][jj];
+            Vec3 nn = normalize(cross(dv, du));
+            Vec3 p = grid[i][jj];
+            out.verts.push_back({p.x, p.y, p.z, nn.x, nn.y, nn.z, color.x, color.y, color.z, 0});
+        }
+    auto id = [&](size_t i, size_t j) { return uint32_t(i * (R + 1) + j); };
+    for (size_t i = 0; i + 1 < G; i++)
+        for (size_t j = 0; j < R; j++) {
+            uint32_t a = id(i, j), b = id(i, j + 1), c = id(i + 1, j + 1), d = id(i + 1, j);
+            out.idx.insert(out.idx.end(), {a, b, c, a, c, d});
+        }
+    // Outward check: flip winding (and normals) if the normals point at the section centre.
+    {
+        Vec3 c{0, 0, 0};
+        for (auto& p : grid[G / 2]) c = c + p;
+        c = c * (1.f / R);
+        const CadVertex& v = out.verts[id(G / 2, 0)];
+        Vec3 o{v.px - c.x, v.py - c.y, v.pz - c.z};
+        if (o.x * v.nx + o.y * v.ny + o.z * v.nz < 0) {
+            for (auto& vv : out.verts) { vv.nx = -vv.nx; vv.ny = -vv.ny; vv.nz = -vv.nz; }
+            for (size_t k = 0; k + 2 < out.idx.size(); k += 3) std::swap(out.idx[k + 1], out.idx[k + 2]);
+        }
+        // Make the triangle winding agree with the (now outward) normals.
+        const CadVertex &A = out.verts[out.idx[0]], &B = out.verts[out.idx[1]], &C = out.verts[out.idx[2]];
+        Vec3 fn = cross(Vec3{B.px - A.px, B.py - A.py, B.pz - A.pz}, Vec3{C.px - A.px, C.py - A.py, C.pz - A.pz});
+        if (fn.x * A.nx + fn.y * A.ny + fn.z * A.nz < 0)
+            for (size_t k = 0; k + 2 < out.idx.size(); k += 3) std::swap(out.idx[k + 1], out.idx[k + 2]);
+    }
+    if (caps) {
+        for (int e = 0; e < 2; e++) {
+            size_t i = e ? G - 1 : 0;
+            Vec3 c{0, 0, 0};
+            for (auto& p : grid[i]) c = c + p;
+            c = c * (1.f / R);
+            Vec3 nn{0, 0, e ? 1.f : -1.f};
+            uint32_t c0 = uint32_t(out.verts.size());
+            out.verts.push_back({c.x, c.y, c.z, nn.x, nn.y, nn.z, color.x, color.y, color.z, 0});
+            for (size_t j = 0; j <= R; j++) {
+                Vec3 p = grid[i][j % R];
+                out.verts.push_back({p.x, p.y, p.z, nn.x, nn.y, nn.z, color.x, color.y, color.z, 0});
+            }
+            for (size_t j = 0; j < R; j++) {
+                uint32_t a = c0 + 1 + uint32_t(j), b = c0 + 2 + uint32_t(j);
+                Vec3 fn = cross(Vec3{out.verts[a].px - c.x, out.verts[a].py - c.y, 0}, Vec3{out.verts[b].px - c.x, out.verts[b].py - c.y, 0});
+                if ((fn.z > 0) == (e == 1)) out.idx.insert(out.idx.end(), {c0, a, b});
+                else out.idx.insert(out.idx.end(), {c0, b, a});
+            }
+        }
+    }
+    return out;
+}
+
 CadMesh wedge(Vec3 s, Vec3 color) {
     // Full height at -Z, tapering to zero height at +Z (windshield / ramp shape).
     std::vector<Vec2> tri{{-s.z * 0.5f, -s.y * 0.5f}, {s.z * 0.5f, -s.y * 0.5f}, {-s.z * 0.5f, s.y * 0.5f}};
@@ -610,11 +782,132 @@ float cadEval(const std::string& expr, const CadParams& vars, std::string* err) 
 // ------------------------------------------------------------------------------------------
 // Part interpreter
 namespace {
+// ------------------------------------------------------------------------------------------
+// Body shaping: a smooth deformation field applied to a finished part (deform op). Large
+// triangles are first split edge by edge (an edge splits only on its own length, so neighbours
+// always agree and no cracks open), then every vertex moves through the field and normals are
+// carried through the field's Jacobian. Gives flat-sided bodies tumblehome, barrelled sides,
+// tapered noses and tails, a plan-view bow and crowned hoods and roofs, with every detail on
+// the panels following the surface.
+struct DeformSpec {
+    bool on = false;
+    float res = 0.10f;                                   // edges shorter than this never split
+    float tol = 0.003f;                                  // ...and longer ones only if they'd bend more
+    float tumble = 0, ty0 = 0, ty1 = 1;                  // narrow toward the roof between ty0..ty1
+    float barrel = 0, by0 = 0, by1 = 1;                  // bulge the sides, peaking mid by0..by1
+    float bow = 0, bz0 = -2, bz1 = 2;                    // plan-view bow, peaking mid bz0..bz1
+    float taperf = 0, tf0 = 1, tf1 = 2;                  // narrow the nose from tf0 to tf1 (z)
+    float taperr = 0, tr0 = -1, tr1 = -2;                // narrow the tail from tr0 to tr1 (z)
+    float crown = 0, cy0 = 0, cy1 = 1, hw = 1;           // raise the centreline above cy0..cy1
+};
+static float smooth01(float a, float b, float v) {
+    if (std::fabs(b - a) < 1e-6f) return v >= b ? 1.f : 0.f;
+    float t = std::min(1.f, std::max(0.f, (v - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+}
+static float bell01(float a, float b, float v) {
+    if (std::fabs(b - a) < 1e-6f) return 0.f;
+    float u = std::min(1.f, std::max(0.f, (v - a) / (b - a)));
+    return 4.f * u * (1.f - u);
+}
+static Vec3 deformPoint(const DeformSpec& d, Vec3 p) {
+    float s = (1.f - d.tumble * smooth01(d.ty0, d.ty1, p.y)) * (1.f + d.barrel * bell01(d.by0, d.by1, p.y)) *
+              (1.f + d.bow * bell01(d.bz0, d.bz1, p.z)) * (1.f - d.taperf * smooth01(d.tf0, d.tf1, p.z)) *
+              (1.f - d.taperr * smooth01(d.tr0, d.tr1, p.z));
+    float u = std::min(1.f, std::fabs(p.x) / std::max(0.05f, d.hw));
+    float y = p.y + d.crown * (1.f - u * u) * smooth01(d.cy0, d.cy1, p.y);
+    return {p.x * s, y, p.z};
+}
+static void subdivide(CadMesh& m, const DeformSpec& d) {
+    const float res = std::max(0.02f, d.res);
+    for (int pass = 0; pass < 10; pass++) {
+        std::map<std::pair<uint32_t, uint32_t>, uint32_t> mid;
+        auto edgeLen = [&](uint32_t a, uint32_t b) {
+            const CadVertex &A = m.verts[a], &B = m.verts[b];
+            float dx = A.px - B.px, dy = A.py - B.py, dz = A.pz - B.pz;
+            return std::sqrt(dx * dx + dy * dy + dz * dz);
+        };
+        auto split = [&](uint32_t a, uint32_t b) -> int64_t {
+            if (edgeLen(a, b) <= res) return -1;
+            {
+                // Only where the field would bend the edge: deformed midpoint vs. the chord.
+                const CadVertex &A = m.verts[a], &B = m.verts[b];
+                Vec3 pa{A.px, A.py, A.pz}, pb{B.px, B.py, B.pz};
+                Vec3 fm = deformPoint(d, (pa + pb) * 0.5f), fc = (deformPoint(d, pa) + deformPoint(d, pb)) * 0.5f;
+                if (length(fm - fc) <= d.tol) return -1;
+            }
+            auto key = std::make_pair(std::min(a, b), std::max(a, b));
+            auto it = mid.find(key);
+            if (it != mid.end()) return it->second;
+            const CadVertex &A = m.verts[a], &B = m.verts[b];
+            CadVertex v{(A.px + B.px) * 0.5f, (A.py + B.py) * 0.5f, (A.pz + B.pz) * 0.5f,
+                        A.nx + B.nx, A.ny + B.ny, A.nz + B.nz,
+                        (A.r + B.r) * 0.5f, (A.g + B.g) * 0.5f, (A.b + B.b) * 0.5f, A.mat};
+            float l = std::sqrt(v.nx * v.nx + v.ny * v.ny + v.nz * v.nz);
+            if (l > 1e-6f) { v.nx /= l; v.ny /= l; v.nz /= l; } else { v.nx = A.nx; v.ny = A.ny; v.nz = A.nz; }
+            m.verts.push_back(v);
+            uint32_t id = uint32_t(m.verts.size() - 1);
+            mid[key] = id;
+            return id;
+        };
+        std::vector<uint32_t> out;
+        out.reserve(m.idx.size() * 2);
+        bool any = false;
+        for (size_t k = 0; k + 2 < m.idx.size(); k += 3) {
+            uint32_t a = m.idx[k], b = m.idx[k + 1], c = m.idx[k + 2];
+            int64_t ab = split(a, b), bc = split(b, c), ca = split(c, a);
+            int n = (ab >= 0) + (bc >= 0) + (ca >= 0);
+            auto tri = [&](uint32_t x, uint32_t y, uint32_t z) { out.push_back(x); out.push_back(y); out.push_back(z); };
+            if (n == 0) { tri(a, b, c); continue; }
+            any = true;
+            if (n == 3) {
+                uint32_t p = uint32_t(ab), q = uint32_t(bc), r = uint32_t(ca);
+                tri(a, p, r); tri(p, b, q); tri(r, q, c); tri(p, q, r);
+                continue;
+            }
+            // Rotate so the split edges start at 'a'
+            uint32_t v0 = a, v1 = b, v2 = c; int64_t e01 = ab, e12 = bc, e20 = ca;
+            for (int rr = 0; rr < 3 && !(e01 >= 0 && (n == 1 || e12 >= 0)); rr++) {
+                uint32_t t = v0; v0 = v1; v1 = v2; v2 = t;
+                int64_t te = e01; e01 = e12; e12 = e20; e20 = te;
+            }
+            if (n == 1) {
+                tri(v0, uint32_t(e01), v2); tri(uint32_t(e01), v1, v2);
+            } else {
+                uint32_t p = uint32_t(e01), q = uint32_t(e12);
+                tri(p, v1, q); tri(v0, p, q); tri(v0, q, v2);
+            }
+        }
+        m.idx.swap(out);
+        if (!any) break;
+    }
+}
+static void applyDeform(CadMesh& m, const DeformSpec& d) {
+    if (!d.on || m.verts.empty()) return;
+    subdivide(m, d);
+    const float h = 0.002f;
+    for (CadVertex& v : m.verts) {
+        Vec3 p{v.px, v.py, v.pz};
+        Vec3 c0 = deformPoint(d, p);
+        Vec3 dx = (deformPoint(d, {p.x + h, p.y, p.z}) - deformPoint(d, {p.x - h, p.y, p.z})) * (0.5f / h);
+        Vec3 dy = (deformPoint(d, {p.x, p.y + h, p.z}) - deformPoint(d, {p.x, p.y - h, p.z})) * (0.5f / h);
+        Vec3 dz = (deformPoint(d, {p.x, p.y, p.z + h}) - deformPoint(d, {p.x, p.y, p.z - h})) * (0.5f / h);
+        // n' = cof(J) n, J columns = dx, dy, dz
+        Vec3 n{v.nx, v.ny, v.nz};
+        Vec3 c1 = cross(dy, dz), c2 = cross(dz, dx), c3 = cross(dx, dy);
+        Vec3 nn{c1.x * n.x + c2.x * n.y + c3.x * n.z, c1.y * n.x + c2.y * n.y + c3.y * n.z, c1.z * n.x + c2.z * n.y + c3.z * n.z};
+        nn = normalize(nn);
+        v.px = c0.x; v.py = c0.y; v.pz = c0.z;
+        v.nx = nn.x; v.ny = nn.y; v.nz = nn.z;
+    }
+}
+
 struct Interp {
     CadParams vars;
     Vec3 color{0.7f, 0.7f, 0.7f};
     int material = MatPlastic;
     CadMesh mesh;
+    DeformSpec deform;
     std::string scad;
     std::string err;
     int depth = 0;
@@ -637,6 +930,13 @@ struct Interp {
         auto it = a.find(k);
         if (it == a.end()) return def;
         return cadEval(it->second, vars, &err);
+    }
+    // Segment counts scale with the part's _segmul / _bevelmul smoothness settings.
+    int segs(const std::map<std::string, std::string>& a, int def, bool bevel = false) {
+        int sg = int(num(a, "seg", float(def)));
+        auto it = vars.find(bevel ? "_bevelmul" : "_segmul");
+        if (it != vars.end() && it->second > 1.f) sg = int(std::ceil(sg * it->second));
+        return sg;
     }
     std::string str(const std::map<std::string, std::string>& a, const char* k, const std::string& def) {
         auto it = a.find(k);
@@ -817,10 +1117,27 @@ struct Interp {
                     else a[tok.substr(0, eq)] = tok.substr(eq + 1);
                 }
             }
+            if (op == "deform") {
+                // deform [on=] [res=] [tol=] [tumble= ty0= ty1=] [barrel= by0= by1=] [bow= bz0= bz1=]
+                //        [taperf= tf0= tf1=] [taperr= tr0= tr1=] [crown= cy0= cy1= hw=]
+                DeformSpec& d = deform;
+                d.on = num(a, "on", 1.f) > 0.5f;
+                d.res = num(a, "res", d.res);
+                d.tol = num(a, "tol", d.tol);
+                d.tumble = num(a, "tumble", d.tumble); d.ty0 = num(a, "ty0", d.ty0); d.ty1 = num(a, "ty1", d.ty1);
+                d.barrel = num(a, "barrel", d.barrel); d.by0 = num(a, "by0", d.by0); d.by1 = num(a, "by1", d.by1);
+                d.bow = num(a, "bow", d.bow); d.bz0 = num(a, "bz0", d.bz0); d.bz1 = num(a, "bz1", d.bz1);
+                d.taperf = num(a, "taperf", d.taperf); d.tf0 = num(a, "tf0", d.tf0); d.tf1 = num(a, "tf1", d.tf1);
+                d.taperr = num(a, "taperr", d.taperr); d.tr0 = num(a, "tr0", d.tr0); d.tr1 = num(a, "tr1", d.tr1);
+                d.crown = num(a, "crown", d.crown); d.cy0 = num(a, "cy0", d.cy0); d.cy1 = num(a, "cy1", d.cy1);
+                d.hw = num(a, "hw", d.hw);
+                if (!err.empty()) err = name + ":" + std::to_string(lineNo) + ": " + err;
+                continue;
+            }
             if (op == "box") {
                 Vec3 s = vec3(a, "size", {1, 1, 1});
                 float bv = num(a, "bevel", 0.f);
-                if (bv > 0) emit(cadprim::roundedBox(s, bv, int(num(a, "seg", 2)), color), a, "mb_rbox(" + fmt3(s) + "," + fmt(bv) + ")");
+                if (bv > 0) emit(cadprim::roundedBox(s, bv, segs(a, 2, true), color), a, "mb_rbox(" + fmt3(s) + "," + fmt(bv) + ")");
                 else emit(cadprim::box(s, color), a, "cube(" + fmt3(s) + ", center=true)");
             } else if (op == "text") {
                 // text str=MUD_BUDDIES size=0.3 [t=0.07] [depth=0.02]   (underscores are spaces)
@@ -833,15 +1150,60 @@ struct Interp {
                 else emit(m, a, "mb_text(\"" + t + "\"," + fmt(sz) + ")");
             } else if (op == "cyl") {
                 float r = num(a, "r", 0.5f), r2 = num(a, "r2", r), h = num(a, "h", 1.f);
-                int seg = int(num(a, "seg", 20));
+                int seg = segs(a, 20);
                 std::string ax = str(a, "axis", "y");
                 CadMesh c;
                 c.append(cadprim::cylinder(r, r2, h, seg, color), Mat4::trs({}, axisQuat(ax)));
                 emit(c, a, axisScad(ax) + " mb_cyl(" + fmt(r) + "," + fmt(r2) + "," + fmt(h) + "," + std::to_string(seg) + ")");
             } else if (op == "sphere") {
                 float r = num(a, "r", 0.5f);
-                int seg = int(num(a, "seg", 16));
+                int seg = segs(a, 16);
                 emit(cadprim::sphere(r, seg, color), a, "sphere(r=" + fmt(r) + ", $fn=" + std::to_string(seg) + ")");
+            } else if (op == "tube") {
+                // tube pts=x,y,z,x,y,z,... r= [seg=]   or   tube helix=coil_r,turns,length r=wire [seg=]
+                float rr = num(a, "r", 0.02f);
+                int seg = segs(a, 8);
+                std::vector<Vec3> path;
+                if (a.count("helix")) {
+                    auto h = evalList(a["helix"]);
+                    if (h.size() < 3) err = "helix needs coil_r,turns,length";
+                    else {
+                        int steps = std::max(8, int(h[1] * 16));
+                        for (int k = 0; k <= steps; k++) {
+                            float t = float(k) / steps, ang = t * h[1] * 2 * PI;
+                            path.push_back({h[0] * std::cos(ang), h[0] * std::sin(ang), t * h[2]});
+                        }
+                    }
+                } else {
+                    auto l = evalList(str(a, "pts", ""));
+                    for (size_t i = 0; i + 2 < l.size(); i += 3) path.push_back({l[i], l[i + 1], l[i + 2]});
+                    if (path.size() < 2) err = "tube needs at least two points";
+                }
+                if (err.empty()) emit(cadprim::tube(path, rr, seg, color), a, "/* tube */ cube(0.001)");
+            } else if (op == "loft") {
+                // loft sec=z:x,y,x,y,...|z:x,y,... [n=4] [m=2] [cap=1]   (half profiles, x >= 0)
+                std::vector<float> zs;
+                std::vector<std::vector<Vec2>> half;
+                std::string secs = str(a, "sec", "");
+                size_t st = 0;
+                while (st <= secs.size() && err.empty()) {
+                    size_t bar = secs.find('|', st);
+                    std::string one = secs.substr(st, bar == std::string::npos ? std::string::npos : bar - st);
+                    size_t colon = one.find(':');
+                    if (colon == std::string::npos) { err = "loft section needs z:points"; break; }
+                    zs.push_back(cadEval(one.substr(0, colon), vars, &err));
+                    auto l = evalList(one.substr(colon + 1));
+                    std::vector<Vec2> h;
+                    for (size_t i = 0; i + 1 < l.size(); i += 2) h.push_back({l[i], l[i + 1]});
+                    half.push_back(h);
+                    if (bar == std::string::npos) break;
+                    st = bar + 1;
+                }
+                if (err.empty()) {
+                    CadMesh c = cadprim::loft(zs, half, int(num(a, "n", 4)), int(num(a, "m", 2)), num(a, "cap", 1) > 0.5f, color);
+                    if (c.verts.empty()) err = "loft sections must have matching point counts";
+                    else emit(c, a, "/* loft */ cube(0.001)");
+                }
             } else if (op == "wedge") {
                 Vec3 s = vec3(a, "size", {1, 1, 1});
                 emit(cadprim::wedge(s, color), a, "mb_wedge(" + fmt3(s) + ")");
@@ -853,13 +1215,13 @@ struct Interp {
                 std::string ax = str(a, "axis", op == "lathe" ? "y" : "x");
                 CadMesh c;
                 if (op == "lathe") {
-                    int seg = int(num(a, "seg", 24));
+                    int seg = segs(a, 24);
                     Quat q = ax == "x" ? axisQuat("x") : (ax == "z" ? axisQuat("z") : Quat{});
                     c.append(cadprim::lathe(p, seg, color), Mat4::trs({}, q));
                     emit(c, a, axisScad(ax) + " mb_lathe(" + list + "," + std::to_string(seg) + ")");
                 } else {
                     float d = num(a, "depth", 1.f), bv = num(a, "bevel", 0.f);
-                    c = cadprim::extrudeBevel(p, d, bv, int(num(a, "seg", 2)), color);
+                    c = cadprim::extrudeBevel(p, d, bv, segs(a, 2, true), color);
                     emit(c, a, "mb_extrude(" + list + "," + fmt(d) + ")");
                 }
             } else if (op == "tire") {
@@ -887,12 +1249,15 @@ struct Interp {
                 std::string path = cadRoot() + "/" + positional[0];
                 if (!readFile(path, src2)) { err = "cannot read " + path; break; }
                 Interp child;
+                for (const char* k : {"_segmul", "_bevelmul"})
+                    if (vars.count(k) && !ov.count(k)) ov[k] = vars[k];
                 child.vars = ov;
                 child.color = color;
                 child.material = material;
                 child.depth = depth + 1;
                 child.indent = indent + "  ";
                 child.run(src2, positional[0]);
+                if (child.err.empty()) applyDeform(child.mesh, child.deform);
                 if (!child.err.empty()) { err = child.err; break; }
                 emit(child.mesh, a, "{\n" + child.scad + indent + "}", -1);
             } else {
@@ -913,6 +1278,7 @@ CadResult cadBuildSource(const std::string& source, const CadParams& overrides, 
     Interp in;
     in.vars = overrides;
     in.run(source, name);
+    if (in.err.empty()) applyDeform(in.mesh, in.deform);
     CadResult r;
     r.mesh = std::move(in.mesh);
     r.error = in.err;

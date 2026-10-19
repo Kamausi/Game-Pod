@@ -8,6 +8,8 @@
 #include <vector>
 #include "audio/audio.h"
 #include "cad/cad.h"
+#include <array>
+#include <map>
 #include "game/modes.h"
 #include "game/world.h"
 #include "net/net.h"
@@ -169,6 +171,67 @@ int main(int argc, char** argv) {
         CHECK(std::fabs(magicFormula(0.f, 10, 1.65f, 1, 0.97f)) < 1e-6f, "MF(0) != 0");
         CHECK(std::fabs(minnaertFrequency(0.001f) - 3290.f) < 120.f, "Minnaert 1mm bubble ~3.3 kHz, got %.0f", minnaertFrequency(0.001f));
         CHECK(rankineBulldozing(0.3f, 0.2f, 17000, 2000, 0.1f) > 0, "bulldozing");
+    });
+
+    test("cad kernel: deform keeps closed parts watertight and shapes them", [] {
+        CadResult r = cadBuildSource("deform res=0.1 crown=0.1 cy0=0.2 cy1=0.5 hw=0.5 tumble=0.2 ty0=0 ty1=0.5\n"
+                                     "box size=1,1,1 pos=0,0,0\n", {}, "deform");
+        CHECK(r.error.empty(), "%s", r.error.c_str());
+        // Every edge (by position) is shared by exactly two triangles: no T-junction cracks.
+        std::map<std::array<long, 6>, int> edges;
+        auto key = [](const CadVertex& a, const CadVertex& b) {
+            std::array<long, 3> p{lround(a.px * 1e4), lround(a.py * 1e4), lround(a.pz * 1e4)};
+            std::array<long, 3> q{lround(b.px * 1e4), lround(b.py * 1e4), lround(b.pz * 1e4)};
+            if (q < p) std::swap(p, q);
+            return std::array<long, 6>{p[0], p[1], p[2], q[0], q[1], q[2]};
+        };
+        float maxEdge = 0, topCentre = -1, topCorner = 10, topHalfW = 0, botHalfW = 0;
+        for (size_t k = 0; k + 2 < r.mesh.idx.size(); k += 3)
+            for (int e = 0; e < 3; e++) {
+                const CadVertex& a = r.mesh.verts[r.mesh.idx[k + e]];
+                const CadVertex& b = r.mesh.verts[r.mesh.idx[k + (e + 1) % 3]];
+                edges[key(a, b)]++;
+            }
+        int bad = 0;
+        for (auto& kv : edges) if (kv.second != 2) bad++;
+        CHECK(bad == 0, "%d edges not shared by exactly two triangles", bad);
+        for (const CadVertex& v : r.mesh.verts) {
+            if (v.ny > 0.5f) {
+                if (std::fabs(v.px) < 0.01f) topCentre = std::max(topCentre, v.py);
+                topCorner = std::min(topCorner, v.py);
+                if (v.px > 0.2f) CHECK(v.nx > 0.01f, "crowned top normal should tilt outward");
+            }
+            if (v.py > 0.45f) topHalfW = std::max(topHalfW, std::fabs(v.px));
+            if (v.py < -0.45f) botHalfW = std::max(botHalfW, std::fabs(v.px));
+        }
+        maxEdge = float(r.mesh.idx.size() / 3);   // triangle count: the field must have refined the box
+        CHECK(topCentre > 0.58f, "crown should lift the top centre (got %.3f)", topCentre);
+        CHECK(topCorner < topCentre - 0.05f, "crown should leave the edges lower");
+        CHECK(topHalfW < botHalfW - 0.05f, "tumblehome should narrow the top (%.3f vs %.3f)", topHalfW, botHalfW);
+        CHECK(maxEdge > 100.f, "the box should be refined where the field bends it (%.0f tris)", maxEdge);
+    });
+
+    test("cad kernel: loft and tube build closed shells with outward normals", [] {
+        CadResult r = cadBuildSource("loft sec=-1:0,-0.3,0.4,-0.2,0.5,0.1,0,0.4|0:0,-0.35,0.5,-0.2,0.6,0.1,0,0.5|1:0,-0.3,0.4,-0.2,0.5,0.1,0,0.4 n=4 m=3\n"
+                                     "tube helix=0.1,5,0.6 r=0.012 seg=6 pos=2,0,0\n", {}, "lt");
+        CHECK(r.error.empty(), "%s", r.error.c_str());
+        int inward = 0, n = 0;
+        float zmin = 9, zmax = -9;
+        for (const CadVertex& v : r.mesh.verts) {
+            if (v.px < 1.5f) {
+                // loft: side normals point away from the z axis (caps point along z)
+                if (std::fabs(v.nz) < 0.7f) { n++; if (v.px * v.nx + (v.py - 0.05f) * v.ny < 0) inward++; }
+            } else { zmin = std::min(zmin, v.pz); zmax = std::max(zmax, v.pz); }
+        }
+        CHECK(n > 50 && inward == 0, "%d of %d loft normals point inward", inward, n);
+        CHECK(zmax - zmin > 0.58f, "helix should span its length (%.2f)", zmax - zmin);
+    });
+
+    test("cad kernel: _segmul raises segment counts", [] {
+        CadResult a = cadBuildSource("cyl r=1 h=1 seg=8\n", {}, "s1");
+        CadResult b = cadBuildSource("set _segmul = 2\ncyl r=1 h=1 seg=8\n", {}, "s2");
+        CHECK(a.error.empty() && b.error.empty(), "build");
+        CHECK(b.mesh.verts.size() > a.mesh.verts.size() * 3 / 2, "segmul 2 should roughly double the cylinder");
     });
 
     test("cad kernel: mirrored copies keep outward normals", [] {

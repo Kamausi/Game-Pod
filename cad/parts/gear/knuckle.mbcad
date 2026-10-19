@@ -1,6 +1,8 @@
 # Axle-end knuckle with brake caliper (doesn't spin): hub boss along X, steering knuckle body,
 # red caliper over the rotor at the rear-top. side = +1 left wheel, -1 right (hub faces outboard).
 param side = 1
+set _segmul = 1.8
+set _bevelmul = 1.5
 color #222222
 material steel
 cyl r=0.075 h=0.10 axis=x pos=side*0.0,0,0 seg=12

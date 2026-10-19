@@ -1,5 +1,6 @@
 # 1976 full-size sedan "bog car" (photo 3: white, '1976' lettered on the glass).
 # Long hood, formal roofline with opera windows, chrome bumpers. Front axle z=1.36, rear z=-1.73.
+param lod = 0             # 1 = far version: unshaped, coarser curves
 param driver = 1          # 0 for parked rigs: empty cab
 param winch = 0           # garage options: winch bumper / snorkel
 param snorkel = 0
@@ -11,10 +12,15 @@ set FA = 1.36
 set RA = -1.73
 set AY = -0.26
 set AR = 0.52
+# High-fidelity surfacing: smoother curves and rounded edges, then the whole vehicle is shaped
+# as one (tumblehome, barrelled sides, tapered nose/tail, plan bow, crowned hood and roof).
+set _segmul = 1.35-0.35*lod
+set _bevelmul = 1.5-0.5*lod
+deform on=1-lod res=0.09 tumble=0.12 ty0=0.46 ty1=1.0 barrel=0.035 by0=-0.10 by1=0.46 bow=0.02 bz0=-2.85 bz1=2.85 taperf=0.05 tf0=1.9 tf1=2.85 taperr=0.04 tr0=-2.0 tr1=-2.85 crown=0.04 cy0=0.36 cy1=0.44 hw=0.99
 color paint_r paint_g paint_b
 material paint
 # Whole lower body in one side profile: both arches, long hood, cowl, rear deck
-extrude depth=W bevel=0.07 pts=-2.80,-0.10,arc(RA,AY,AR,162,18,12),arc(FA,AY,AR,162,18,12),2.78,-0.10,2.82,0.06,2.82,0.30,2.76,0.38,1.00,0.445,0.70,0.46,-1.66,0.46,-1.95,0.45,-2.70,0.42,-2.82,0.36,-2.84,0.10
+extrude depth=W bevel=0.10 pts=-2.80,-0.10,arc(RA,AY,AR,162,18,12),arc(FA,AY,AR,162,18,12),2.78,-0.10,2.82,0.06,2.82,0.30,2.76,0.38,1.00,0.445,0.70,0.46,-1.66,0.46,-1.95,0.45,-2.70,0.42,-2.82,0.36,-2.84,0.10
 # Roof skin, A-pillars and the formal C-pillars with opera windows
 extrude depth=W-0.12 bevel=0.04 pts=0.12,0.94,0.06,1.005,-1.06,1.015,-1.16,0.97,-1.16,0.94
 box size=0.07,0.77,0.07 pos=W/2-0.09,0.71,0.37 rot=-49.2,0,0 bevel=0.02 mirror=x

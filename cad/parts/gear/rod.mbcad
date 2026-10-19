@@ -2,6 +2,8 @@
 # game stretches it to length. r = radius, tone = 0 black steel, 1 bright (chrome / alloy).
 param r = 0.025
 param tone = 0
+set _segmul = 1.8
+set _bevelmul = 1.5
 color 0.12+0.6*tone 0.12+0.6*tone 0.12+0.58*tone
 material steel
 cyl r=r h=1 axis=z pos=0,0,0.5 seg=8

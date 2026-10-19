@@ -40,9 +40,24 @@ for i = 0, 12 [, step]         # repeat the lines up to `end` (inclusive range, 
   set a = i*30                 #   i (and anything `set` from it) works in every expression
   box size=0.38,0.045,0.13 pos=0.72,0.3+0.27*sin(a),0.27*cos(a) rot=90-a,0,0
 end
+tube pts=x,y,z,x,y,z,... r=0.02 [seg=8]     # smooth swept tube (parallel-transport frames)
+tube helix=coil_r,turns,length r=wire      # coil spring along +Z
+loft sec=z:x,y,x,y,...|z:x,y,... [n=4] [m=2] [cap=1]
+                               # smooth shell through half-profiles (x >= 0, centreline to
+                               # centreline, mirrored), Catmull-Rom along z (n) and round (m)
+set _segmul = 1.5              # smoother curves: scales every seg count (children inherit)
+set _bevelmul = 2              # ...and bevel segment counts
+deform [on=] [res=] [tol=] tumble= ty0= ty1= barrel= by0= by1= bow= bz0= bz1=
+       taperf= tf0= tf1= taperr= tr0= tr1= crown= cy0= cy1= hw=
+                               # shape the finished part as one: tumblehome above ty0..ty1,
+                               # barrelled sides peaking mid by0..by1, plan-view bow, nose/tail
+                               # taper, crown on the centreline above cy0..cy1. Big triangles
+                               # are split only where the field bends them (crack-free), normals
+                               # follow the field, and details on the panels stay on the surface.
 ```
 Distance LOD: a part that declares `param lod = 0` and builds a cheaper mesh with `lod=1` gets that
-version drawn beyond ~60 m (45 m Medium, 30 m Low) when it has 20+ instances (trees, weeds).
+version drawn beyond ~60 m (45 m Medium, 30 m Low) when it has 20+ instances (trees, weeds); lot cars and vehicle bodies get it at any count
+(the drivable vehicles' `lod=1` turns their `deform` and smoothing off).
 
 Materials drive the game's physically based shading (clearcoat paint, reflective glass,
 chrome, satin rubber, glowing lenses); tires are always rubber. Mud is applied in-shader on

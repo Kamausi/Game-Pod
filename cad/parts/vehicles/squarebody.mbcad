@@ -3,6 +3,7 @@
 # rectangular headlights, chrome bumpers, trimmed black flares, bed roll bar with lights
 # and twin stacks behind the cab.
 # Body frame: origin at frame height, +Z forward, +X left. Front axle z=1.311, rear z=-1.669.
+param lod = 0             # 1 = far version: unshaped, coarser curves
 param driver = 1          # 0 for parked rigs: empty cab
 param winch = 0           # garage options: winch bumper / snorkel
 param snorkel = 0
@@ -14,12 +15,17 @@ set FA = 1.311
 set RA = -1.669
 set AY = -0.30
 set AR = 0.56
+# High-fidelity surfacing: smoother curves and rounded edges, then the whole vehicle is shaped
+# as one (tumblehome, barrelled sides, tapered nose/tail, plan bow, crowned hood and roof).
+set _segmul = 1.35-0.35*lod
+set _bevelmul = 1.5-0.5*lod
+deform on=1-lod res=0.09 tumble=0.10 ty0=0.55 ty1=1.0 barrel=0.03 by0=-0.12 by1=0.545 bow=0.015 bz0=-2.5 bz1=2.22 taperf=0.06 tf0=1.3 tf1=2.22 taperr=0.025 tr0=-1.9 tr1=-2.5 crown=0.04 cy0=0.42 cy1=0.53 hw=0.97
 color paint_r paint_g paint_b
 material paint
 # Front clip: fenders, flat hood and grille surround in one side profile with the arch cut in
-extrude depth=W bevel=0.04 pts=0.55,-0.10,arc(FA,AY,AR,159,21,12),2.20,-0.10,2.22,0.04,2.22,0.50,2.19,0.535,0.55,0.545
+extrude depth=W bevel=0.075 pts=0.55,-0.10,arc(FA,AY,AR,159,21,12),2.20,-0.10,2.22,0.04,2.22,0.50,2.19,0.535,0.55,0.545
 # Regular cab: doors / lower cab
-extrude depth=W bevel=0.04 pts=0.55,-0.12,0.55,0.545,-0.64,0.545,-0.64,-0.12
+extrude depth=W bevel=0.075 pts=0.55,-0.12,0.55,0.545,-0.64,0.545,-0.64,-0.12
 # Flat roof skin with drip rails, A- and B-pillars around the glass
 extrude depth=W-0.08 bevel=0.03 pts=0.12,0.955,0.08,1.0,-0.58,1.0,-0.64,0.97,-0.64,0.955
 box size=0.07,0.62,0.07 pos=W/2-0.06,0.7575,0.325 rot=-46.6,0,0 bevel=0.02 mirror=x

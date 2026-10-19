@@ -1302,7 +1302,8 @@ void Renderer::loadWorld(World& w) {
         setInstances(b.mesh, inst.data(), int(g.second.size()), true);
         // Distance LOD: plentiful parts that declare a 'lod' param get a cheap far version.
         // Lot cars are split into small groups by paint colour, so they qualify at any count.
-        if (g.second.size() >= 20 || lotCar) {
+        // Shaped vehicle bodies (parked rigs) are heavy up close, so they qualify at any count too.
+        if (g.second.size() >= 20 || lotCar || part.rfind("vehicles/", 0) == 0) {
             CadParams lp = g.second[0]->params;
             lp["lod"] = 1;
             CadResult lr = cadBuild(g.second[0]->part, lp);
