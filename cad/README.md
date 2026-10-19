@@ -47,7 +47,7 @@ version drawn beyond ~60 m (45 m Medium, 30 m Low) when it has 20+ instances (tr
 Materials drive the game's physically based shading (clearcoat paint, reflective glass,
 chrome, satin rubber, glowing lenses); tires are always rubber. Mud is applied in-shader on
 top, so parts are authored clean.
-Expressions: `+ - * / ^ ( )`, `sin cos sqrt min max abs floor ceil round mod` (degrees), `pi`.
+Expressions: `+ - * / ^ ( )`, `sin cos tan atan2 sqrt min max abs floor ceil round mod` (degrees), `pi`.
 
 ## Tooling
 ```

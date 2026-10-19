@@ -4,6 +4,8 @@
 # and twin stacks behind the cab.
 # Body frame: origin at frame height, +Z forward, +X left. Front axle z=1.311, rear z=-1.669.
 param driver = 1          # 0 for parked rigs: empty cab
+param winch = 0           # garage options: winch bumper / snorkel
+param snorkel = 0
 param paint_r = 0.62
 param paint_g = 0.18
 param paint_b = 0.12
@@ -131,3 +133,5 @@ material matte
 cyl r=0.045 h=0.01 seg=14 pos=0.62,1.505,-0.80 mirror=x
 # Cab interior and driver (seen through the glass)
 use vehicles/interior.mbcad W=1.80 bl=0.545 wz=0.52 bz=-0.60 ry=0.92 driver=driver
+# Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage
+use vehicles/kit.mbcad fz=2.37 by=0.00 bw=2.00 rz=-2.63 ry=0.00 sx=1.03 sy0=0.35 sz0=0.90 sy1=1.00 sz1=0.10 winch=winch snorkel=snorkel

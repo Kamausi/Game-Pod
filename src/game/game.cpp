@@ -18,7 +18,8 @@ VehicleSound g_playerSound;
 
 void VehicleVisual::build(Renderer& r, const VehicleConfig& c) {
     const BodySpec& b = findBody(c.body);
-    body = r.mesh(b.cadPart, {{"paint_r", c.paint[0]}, {"paint_g", c.paint[1]}, {"paint_b", c.paint[2]}});
+    body = r.mesh(b.cadPart, {{"paint_r", c.paint[0]}, {"paint_g", c.paint[1]}, {"paint_b", c.paint[2]},
+                              {"winch", c.winch ? 1.f : 0.f}, {"snorkel", c.snorkel ? 1.f : 0.f}});
     float tr = c.tireIn * 0.0254f * 0.5f;
     wheel = r.mesh("wheels/wheel.mbcad", {{"tire_r", tr},
                                           {"tire_w", c.widthIn * 0.0254f},

@@ -1,6 +1,8 @@
 # 1976 full-size sedan "bog car" (photo 3: white, '1976' lettered on the glass).
 # Long hood, formal roofline with opera windows, chrome bumpers. Front axle z=1.36, rear z=-1.73.
 param driver = 1          # 0 for parked rigs: empty cab
+param winch = 0           # garage options: winch bumper / snorkel
+param snorkel = 0
 param paint_r = 0.88
 param paint_g = 0.88
 param paint_b = 0.86
@@ -102,3 +104,5 @@ material steel
 cyl r=0.04 h=0.14 axis=z pos=0.55,-0.10,-2.90 mirror=x seg=10
 # Cab interior and driver (seen through the glass)
 use vehicles/interior.mbcad W=1.74 bl=0.46 wz=0.62 bz=-1.10 ry=0.93 driver=driver
+# Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage
+use vehicles/kit.mbcad fz=3.06 by=0.02 bw=2.04 rz=-2.96 ry=0.02 sx=1.06 sy0=0.32 sz0=1.20 sy1=1.00 sz1=0.08 winch=winch snorkel=snorkel

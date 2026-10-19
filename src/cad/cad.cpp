@@ -520,6 +520,8 @@ struct Expr {
                 if (id == "cos") return std::cos(A(0) * DEG);
                 if (id == "sqrt") return std::sqrt(std::max(0.f, A(0)));
                 if (id == "abs") return std::fabs(A(0));
+                if (id == "atan2") return std::atan2(A(0), A(1)) / DEG;   // degrees, like sin/cos
+                if (id == "tan") return std::tan(A(0) * DEG);
                 if (id == "floor") return std::floor(A(0));
                 if (id == "ceil") return std::ceil(A(0));
                 if (id == "round") return std::round(A(0));

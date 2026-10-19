@@ -1,0 +1,76 @@
+# Bolt-on off-road kit shared by the trucks, placed by each body with its own dimensions and
+# switched on by the garage options: a winch (drum, motor, control box, roller fairlead, synthetic
+# line to a hook on a D-ring) on a steel winch plate across the front bumper, and a raised-air
+# snorkel climbing the passenger A-pillar to a ram head above the roof. Recovery D-rings and a
+# hitch receiver with a shackle block are always fitted.
+# Body frame: +Z forward, +X left (driver), passenger side is -X.
+param winch = 0
+param snorkel = 0
+param fz = 2.0          # front bumper face (z)
+param by = 0.02         # front bumper centre height
+param bw = 1.80         # bumper width
+param rz = -2.55        # rear bumper face (z)
+param ry = 0.02         # rear bumper centre height
+param sx = 0.82         # snorkel x (outside the passenger fender/A-pillar)
+param sy0 = 0.20        # snorkel intake on the fender (y)
+param sz0 = 0.85        # ... (z)
+param sy1 = 0.95        # top of the pillar run (roof height)
+param sz1 = 0.10        # ... (z)
+# ---- Recovery points: red D-ring shackles on the front bumper, receiver + shackle block at the rear ----
+color #c41a1a
+material paint
+for s = -1, 1, 2
+  box size=0.04,0.10,0.10 pos=s*bw*0.33,by,fz+0.04
+  lathe seg=12 axis=x pos=s*bw*0.33,by-0.02,fz+0.10 rot=0,0,90 pts=0.035,-0.012,0.05,-0.012,0.05,0.012,0.035,0.012
+end
+color #1a1a1a
+material steel
+box size=0.12,0.12,0.30 pos=0,ry-0.06,rz-0.08
+color #c41a1a
+material paint
+box size=0.10,0.10,0.12 pos=0,ry-0.06,rz-0.26 bevel=0.01
+lathe seg=12 axis=x pos=0,ry-0.06,rz-0.36 rot=0,0,90 pts=0.035,-0.012,0.05,-0.012,0.05,0.012,0.035,0.012
+# ---- Winch on a plate in front of the bumper ----
+color #1c1c1c
+material steel
+box size=0.70*winch,0.05,0.26 pos=0,by-0.10,fz+0.13
+color #2a2a2a
+cyl r=0.075*winch h=0.38 axis=x pos=0,by+0.0,fz+0.14 seg=14
+color #c4c4c0
+material chrome
+cyl r=0.065*winch h=0.30 axis=x pos=0,by+0.0,fz+0.14 seg=14
+color #111111
+material steel
+cyl r=0.08*winch h=0.20 axis=x pos=0.29,by+0.0,fz+0.14 seg=14
+box size=0.18*winch,0.12,0.12 pos=-0.27,by+0.02,fz+0.14 bevel=0.01
+color #1f1f1f
+box size=0.10*winch,0.07,0.06 pos=-0.27,by+0.11,fz+0.12
+# roller fairlead
+color #3a3a3a
+box size=0.30*winch,0.12,0.04 pos=0,by-0.02,fz+0.27
+color #c8c8c4
+material chrome
+cyl r=0.022*winch h=0.20 axis=x pos=0,by+0.02,fz+0.28 seg=8
+cyl r=0.022*winch h=0.20 axis=x pos=0,by-0.06,fz+0.28 seg=8
+# line and hook (orange synthetic rope)
+color #f06010
+material matte
+cyl r=0.012*winch h=0.10 axis=z pos=0,by-0.02,fz+0.33 seg=6
+color #c41a1a
+material paint
+box size=0.03*winch,0.10,0.02 pos=0,by-0.07,fz+0.39 rot=-10,0,0
+# ---- Snorkel: body up the A-pillar, ram head above the roof ----
+color #161616
+material plastic
+cyl r=0.055*snorkel h=sy1-sy0 pos=-sx,(sy0+sy1)/2,(sz0+sz1)/2 rot=-(atan2(sz0-sz1,sy1-sy0)),0,0 seg=10
+box size=0.10*snorkel,0.10,0.18 pos=-sx,sy0,sz0+0.04 bevel=0.02
+box size=0.12*snorkel,0.12,0.10 pos=-sx,sy1+0.05,sz1 bevel=0.03
+box size=0.13*snorkel,0.10,0.14 pos=-sx,sy1+0.10,sz1+0.07 rot=-20,0,0 bevel=0.03
+color #2a2a2a
+material matte
+for k = 0, 3
+  box size=0.11*snorkel,0.008,0.012 pos=-sx,sy1+0.07+k*0.022,sz1+0.14 rot=-20,0,0
+end
+color #8a8a86
+material steel
+box size=0.04*snorkel,0.02,0.06 pos=-sx+0.04,(sy0+sy1)*0.5,(sz0+sz1)*0.5

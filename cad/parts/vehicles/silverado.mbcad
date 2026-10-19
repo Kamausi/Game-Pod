@@ -1,6 +1,8 @@
 # GMT800 crew-cab mud truck (photo 3, far right): caked in tan mud, roof light bar,
 # hood propped open (radiator packed with mud -> overheating). Front axle z=1.56, rear z=-2.34.
 param driver = 1          # 0 for parked rigs: empty cab
+param winch = 0           # garage options: winch bumper / snorkel
+param snorkel = 0
 param paint_r = 0.62
 param paint_g = 0.55
 param paint_b = 0.42
@@ -94,3 +96,5 @@ box size=0.08,0.08,2.30 pos=W/2+0.01,-0.18,0.10 bevel=0.03 mirror=x
 box size=0.12,0.16,5.0 pos=0.55,-0.21,-0.30 mirror=x
 # Cab interior and driver (seen through the glass)
 use vehicles/interior.mbcad W=1.84 bl=0.60 wz=1.20 bz=-1.08 ry=1.03 driver=driver
+# Bolt-on kit: recovery points always, winch and snorkel when fitted in the garage
+use vehicles/kit.mbcad fz=3.08 by=0.00 bw=2.02 rz=-3.24 ry=0.00 sx=1.05 sy0=0.45 sz0=1.60 sy1=1.12 sz1=0.66 winch=winch snorkel=snorkel
