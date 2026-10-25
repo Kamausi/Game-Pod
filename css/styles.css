@@ -22,6 +22,7 @@
   --accent-ink: #0d1411;
   --border: #2d3631;
   --shadow: none;
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,6 +36,7 @@
     --accent-ink: #0d1411;
     --border: #2d3631;
     --shadow: none;
+    color-scheme: dark;
   }
 }
 
@@ -45,15 +47,23 @@ body {
   font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
-  padding-bottom: 76px;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Paint the phone's status-bar band so content never shows through above the header. */
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; z-index: 10;
+  height: env(safe-area-inset-top, 0px); background: var(--surface);
 }
 
 a { color: inherit; }
 
 .topbar {
-  position: sticky; top: 0; z-index: 5;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -64,7 +74,12 @@ a { color: inherit; }
   padding: 4px 10px; font-size: 14px; font-weight: 600;
 }
 
-main { max-width: 720px; margin: 0 auto; padding: 16px; outline: none; }
+main {
+  max-width: 720px; margin: 0 auto; outline: none;
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
 
 h1 { font-size: 26px; line-height: 1.2; margin: 8px 0 4px; }
 h2 { font-size: 19px; margin: 24px 0 10px; }
@@ -142,6 +157,9 @@ a.card:hover { border-color: var(--accent); }
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 5;
   display: flex; background: var(--surface); border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 .tabbar a {
   flex: 1; text-align: center; text-decoration: none; padding: 8px 0 10px;
@@ -151,14 +169,16 @@ a.card:hover { border-color: var(--accent); }
 .tabbar a.active { color: var(--accent); font-weight: 700; }
 
 .toast {
-  position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(20px);
+  position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(20px);
   background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px;
   opacity: 0; pointer-events: none; transition: all 0.25s; max-width: 90vw; z-index: 10;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 .floating-save {
-  position: fixed; right: 16px; bottom: 90px; z-index: 9;
+  position: fixed; z-index: 9;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(90px + env(safe-area-inset-bottom, 0px));
   background: var(--accent); color: var(--accent-ink); border: 0;
   padding: 10px 14px; border-radius: 999px; font: inherit; font-weight: 700;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); cursor: pointer;
@@ -233,3 +253,9 @@ a.card:hover { border-color: var(--accent); }
 .book-text hr.break { border: 0; text-align: center; margin: 1.5em 0; }
 .book-text hr.break::after { content: "⁂"; color: var(--muted); }
 .chapter-end { text-align: center; margin-top: 24px; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

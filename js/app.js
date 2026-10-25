@@ -869,9 +869,20 @@
       return render();
     }
 
-    if (action === "reset" && confirm("Reset all progress? This can't be undone.")) {
+    // Two taps to reset, so progress is never erased by accident.
+    if (action === "reset") {
+      if (el.dataset.armed !== "yes") {
+        el.dataset.armed = "yes";
+        el.textContent = "Tap again to erase all progress";
+        setTimeout(() => {
+          el.dataset.armed = "";
+          el.textContent = "Reset all progress";
+        }, 4000);
+        return;
+      }
       state = L.defaultState();
       save();
+      toast("Progress reset");
       return render();
     }
   });
