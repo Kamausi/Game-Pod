@@ -103,3 +103,35 @@ test("content is well formed", () => {
   for (const c of CHALLENGES) for (const id of c.lessons) assert.ok(ids.has(id), `${c.id} references missing ${id}`);
   for (const s of SHORTS) assert.ok(s.answer < s.options.length);
 });
+
+test("finishing chapters awards XP once, counts toward the daily goal and finishes the book", () => {
+  let s = L.defaultState();
+  let r = L.finishChapter(s, "book", 0, 2, "2026-10-01");
+  assert.equal(r.gained, L.XP.chapter);
+  assert.equal(r.finishedBook, false);
+  assert.equal(L.activityOnDay(r.state, "2026-10-01"), 1);
+  assert.equal(r.state.streak, 1);
+  const again = L.finishChapter(r.state, "book", 0, 2, "2026-10-01");
+  assert.equal(again.gained, 0);
+  r = L.finishChapter(r.state, "book", 1, 2, "2026-10-02");
+  assert.equal(r.gained, L.XP.chapter + L.XP.bookDone);
+  assert.equal(r.finishedBook, true);
+  assert.deepEqual(L.readingStats(r.state), { chaptersRead: 2, booksFinished: 1 });
+  const badges = L.awardBadges(r.state, { perfectQuizzes: 0, finishedChallenges: 0, ...L.readingStats(r.state) });
+  assert.ok(badges.earned.some((b) => b.id === "bibliophile"));
+});
+
+test("reading position is remembered without touching progress", () => {
+  const s = L.setBookPosition(L.defaultState(), "book", 3, 0.5);
+  assert.deepEqual(L.bookEntry(s, "book"), { chapter: 3, pos: 0.5, done: [], finished: false });
+  assert.equal(s.xp, 0);
+});
+
+test("state saved before books existed still works", () => {
+  const old = { ...L.defaultState() };
+  delete old.books;
+  delete old.chapterLog;
+  assert.equal(L.activityOnDay(old, "2026-10-01"), 0);
+  assert.equal(L.readingStats(old).chaptersRead, 0);
+  assert.equal(L.finishChapter(old, "b", 0, 3, "2026-10-01").gained, L.XP.chapter);
+});

@@ -40,6 +40,9 @@
       badges: [],
       reviews: 0,
       dailyGoal: 1,
+      books: {}, // bookId -> { chapter, pos, done: [chapterIndex], finished }
+      chapterLog: {}, // day -> chapters finished that day
+      fontSize: 18,
     };
   }
 
@@ -70,7 +73,7 @@
     return { level, into: xp - floor, needed: ceil - floor };
   }
 
-  const XP = { lesson: 50, quizPerfect: 30, quizPerQuestion: 10, highlight: 5, review: 5, challengeDay: 20, challengeDone: 100 };
+  const XP = { lesson: 50, quizPerfect: 30, quizPerQuestion: 10, highlight: 5, review: 5, challengeDay: 20, challengeDone: 100, chapter: 15, bookDone: 250 };
 
   function completeLesson(state, lessonId, quizScore, quizTotal, today) {
     let s = touchStreak(state, today);
@@ -93,6 +96,49 @@
 
   function lessonsOnDay(state, day) {
     return Object.values(state.completed).filter((c) => c.day === day).length;
+  }
+
+  // Lessons plus book chapters finished on `day`; this is what the daily goal counts.
+  function activityOnDay(state, day) {
+    return lessonsOnDay(state, day) + ((state.chapterLog || {})[day] || 0);
+  }
+
+  // --- Books ---
+  function bookEntry(state, bookId) {
+    return (state.books || {})[bookId] || { chapter: 0, pos: 0, done: [], finished: false };
+  }
+
+  // Remember where the reader is, without awarding anything.
+  function setBookPosition(state, bookId, chapter, pos) {
+    const entry = { ...bookEntry(state, bookId), chapter, pos };
+    return { ...state, books: { ...(state.books || {}), [bookId]: entry } };
+  }
+
+  // Mark a chapter finished. XP is only awarded the first time; finishing every
+  // chapter awards the book bonus once.
+  function finishChapter(state, bookId, index, totalChapters, today) {
+    const entry = bookEntry(state, bookId);
+    if (entry.done.includes(index)) return { state, gained: 0, finishedBook: false };
+    let s = touchStreak(state, today);
+    const done = [...entry.done, index];
+    const finishedBook = !entry.finished && done.length >= totalChapters;
+    const gained = XP.chapter + (finishedBook ? XP.bookDone : 0);
+    const log = s.chapterLog || {};
+    s = {
+      ...s,
+      xp: s.xp + gained,
+      chapterLog: { ...log, [today]: (log[today] || 0) + 1 },
+      books: { ...(s.books || {}), [bookId]: { ...entry, done, finished: entry.finished || finishedBook } },
+    };
+    return { state: s, gained, finishedBook };
+  }
+
+  function readingStats(state) {
+    const entries = Object.values(state.books || {});
+    return {
+      chaptersRead: entries.reduce((n, e) => n + e.done.length, 0),
+      booksFinished: entries.filter((e) => e.finished).length,
+    };
   }
 
   // --- Spaced repetition (simplified SM-2) ---
@@ -146,6 +192,10 @@
     { id: "perfect", name: "Sharp Mind", icon: "🎯", desc: "Ace 3 quizzes", test: (s, ctx) => ctx.perfectQuizzes >= 3 },
     { id: "challenger", name: "Challenger", icon: "🏅", desc: "Finish a challenge", test: (s, ctx) => ctx.finishedChallenges >= 1 },
     { id: "level-5", name: "Rising Star", icon: "⭐", desc: "Reach level 5", test: (s) => levelFor(s.xp).level >= 5 },
+    { id: "first-chapter", name: "Opening Lines", icon: "📖", desc: "Finish a chapter of a classic", test: (s, ctx) => ctx.chaptersRead >= 1 },
+    { id: "page-turner", name: "Page Turner", icon: "📜", desc: "Finish 25 chapters", test: (s, ctx) => ctx.chaptersRead >= 25 },
+    { id: "bibliophile", name: "Bibliophile", icon: "🏛️", desc: "Finish a whole book", test: (s, ctx) => ctx.booksFinished >= 1 },
+    { id: "classicist", name: "Classicist", icon: "👑", desc: "Finish 5 whole books", test: (s, ctx) => ctx.booksFinished >= 5 },
   ];
 
   // Returns { state, earned: [badge] } with any newly earned badges added.
@@ -164,7 +214,7 @@
 
   return {
     dayKey, daysBetween, addDays, defaultState, touchStreak, currentStreak, levelFor, XP,
-    completeLesson, lessonsOnDay, newCard, reviewCard, dueCards, challengeProgress,
+    completeLesson, lessonsOnDay, activityOnDay, bookEntry, setBookPosition, finishChapter, readingStats, newCard, reviewCard, dueCards, challengeProgress,
     BADGES, awardBadges, dailyPick,
   };
 });

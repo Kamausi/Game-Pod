@@ -1,0 +1,491 @@
+{
+ "categories": {
+  "philosophy": {
+   "label": "Philosophy & Wisdom",
+   "color": "#8a5cd6"
+  },
+  "success": {
+   "label": "Success & Strategy",
+   "color": "#2f7de1"
+  },
+  "society": {
+   "label": "Society & Politics",
+   "color": "#d6455d"
+  },
+  "science": {
+   "label": "Science & Nature",
+   "color": "#1f9d6b"
+  },
+  "memoir": {
+   "label": "Memoir & Biography",
+   "color": "#d18a1a"
+  },
+  "fiction": {
+   "label": "Classic Fiction",
+   "color": "#3a8fa3"
+  },
+  "poetry": {
+   "label": "Poetry & Drama",
+   "color": "#b5567e"
+  }
+ },
+ "books": [
+  {
+   "slug": "marcus-aurelius_meditations_george-long",
+   "category": "philosophy",
+   "year": 180
+  },
+  {
+   "slug": "epictetus_short-works_george-long",
+   "category": "philosophy",
+   "year": 125,
+   "title": "The Enchiridion & Fragments"
+  },
+  {
+   "slug": "epictetus_discourses_george-long",
+   "category": "philosophy",
+   "year": 108
+  },
+  {
+   "slug": "seneca_moral-letters-to-lucilius_richard-m-gummere",
+   "category": "philosophy",
+   "year": 65
+  },
+  {
+   "slug": "seneca_dialogues_aubrey-stewart",
+   "category": "philosophy",
+   "year": 49
+  },
+  {
+   "slug": "laozi_tao-te-ching_james-legge",
+   "category": "philosophy",
+   "year": -400,
+   "keep_sections": true
+  },
+  {
+   "slug": "confucius_analects_james-legge",
+   "category": "philosophy",
+   "year": -475
+  },
+  {
+   "slug": "plato_dialogues_benjamin-jowett",
+   "category": "philosophy",
+   "year": -380
+  },
+  {
+   "slug": "henry-david-thoreau_walden",
+   "category": "philosophy",
+   "year": 1854
+  },
+  {
+   "slug": "ralph-waldo-emerson_essays",
+   "category": "philosophy",
+   "year": 1841
+  },
+  {
+   "slug": "kahlil-gibran_the-prophet",
+   "category": "philosophy",
+   "year": 1923
+  },
+  {
+   "slug": "hermann-hesse_siddhartha_gunther-olesch_anke-dreher_amy-coulter_stefan-langer_semyon-chaichenets",
+   "category": "philosophy",
+   "year": 1922
+  },
+  {
+   "slug": "friedrich-nietzsche_thus-spake-zarathustra_thomas-common",
+   "category": "philosophy",
+   "year": 1883
+  },
+  {
+   "slug": "friedrich-nietzsche_beyond-good-and-evil_helen-zimmern",
+   "category": "philosophy",
+   "year": 1886
+  },
+  {
+   "slug": "bertrand-russell_the-problems-of-philosophy",
+   "category": "philosophy",
+   "year": 1912
+  },
+  {
+   "slug": "david-hume_an-enquiry-concerning-human-understanding",
+   "category": "philosophy",
+   "year": 1748
+  },
+  {
+   "slug": "william-james_the-varieties-of-religious-experience",
+   "category": "philosophy",
+   "year": 1902
+  },
+  {
+   "slug": "sun-tzu_the-art-of-war_lionel-giles",
+   "category": "success",
+   "year": -500
+  },
+  {
+   "slug": "niccolo-machiavelli_the-prince_w-k-marriott",
+   "category": "success",
+   "year": 1532
+  },
+  {
+   "slug": "benjamin-franklin_the-autobiography-of-benjamin-franklin",
+   "category": "success",
+   "year": 1791
+  },
+  {
+   "slug": "p-t-barnum_the-art-of-money-getting",
+   "category": "success",
+   "year": 1880
+  },
+  {
+   "slug": "adam-smith_the-wealth-of-nations",
+   "category": "society",
+   "year": 1776
+  },
+  {
+   "slug": "john-stuart-mill_on-liberty",
+   "category": "society",
+   "year": 1859
+  },
+  {
+   "slug": "karl-marx_friedrich-engels_the-communist-manifesto_samuel-moore",
+   "category": "society",
+   "year": 1848
+  },
+  {
+   "slug": "thomas-hobbes_leviathan",
+   "category": "society",
+   "year": 1651
+  },
+  {
+   "slug": "john-locke_two-treatises-of-government",
+   "category": "society",
+   "year": 1689
+  },
+  {
+   "slug": "jean-jacques-rousseau_the-social-contract_g-d-h-cole",
+   "category": "society",
+   "year": 1762
+  },
+  {
+   "slug": "mary-wollstonecraft_a-vindication-of-the-rights-of-woman",
+   "category": "society",
+   "year": 1792
+  },
+  {
+   "slug": "thomas-paine_the-age-of-reason",
+   "category": "society",
+   "year": 1794
+  },
+  {
+   "slug": "w-e-b-du-bois_the-souls-of-black-folk",
+   "category": "society",
+   "year": 1903
+  },
+  {
+   "slug": "niccolo-machiavelli_discourses-on-livy_ninian-hill-thomson",
+   "category": "society",
+   "year": 1531
+  },
+  {
+   "slug": "charles-darwin_the-origin-of-species",
+   "category": "science",
+   "year": 1859
+  },
+  {
+   "slug": "charles-darwin_the-voyage-of-the-beagle",
+   "category": "science",
+   "year": 1839
+  },
+  {
+   "slug": "frederick-douglass_narrative-of-the-life-of-frederick-douglass",
+   "category": "memoir",
+   "year": 1845
+  },
+  {
+   "slug": "booker-t-washington_up-from-slavery",
+   "category": "memoir",
+   "year": 1901
+  },
+  {
+   "slug": "helen-keller_the-story-of-my-life",
+   "category": "memoir",
+   "year": 1903
+  },
+  {
+   "slug": "jane-austen_pride-and-prejudice",
+   "category": "fiction",
+   "year": 1813
+  },
+  {
+   "slug": "jane-austen_emma",
+   "category": "fiction",
+   "year": 1815
+  },
+  {
+   "slug": "jane-austen_sense-and-sensibility",
+   "category": "fiction",
+   "year": 1811
+  },
+  {
+   "slug": "mary-shelley_frankenstein",
+   "category": "fiction",
+   "year": 1818
+  },
+  {
+   "slug": "herman-melville_moby-dick",
+   "category": "fiction",
+   "year": 1851
+  },
+  {
+   "slug": "f-scott-fitzgerald_the-great-gatsby",
+   "category": "fiction",
+   "year": 1925
+  },
+  {
+   "slug": "f-scott-fitzgerald_this-side-of-paradise",
+   "category": "fiction",
+   "year": 1920
+  },
+  {
+   "slug": "lewis-carroll_alices-adventures-in-wonderland",
+   "category": "fiction",
+   "year": 1865
+  },
+  {
+   "slug": "arthur-conan-doyle_the-adventures-of-sherlock-holmes",
+   "category": "fiction",
+   "year": 1892
+  },
+  {
+   "slug": "bram-stoker_dracula",
+   "category": "fiction",
+   "year": 1897
+  },
+  {
+   "slug": "charlotte-bronte_jane-eyre",
+   "category": "fiction",
+   "year": 1847
+  },
+  {
+   "slug": "emily-bronte_wuthering-heights",
+   "category": "fiction",
+   "year": 1847
+  },
+  {
+   "slug": "leo-tolstoy_war-and-peace_louise-maude_aylmer-maude",
+   "category": "fiction",
+   "year": 1869
+  },
+  {
+   "slug": "leo-tolstoy_anna-karenina_constance-garnett",
+   "category": "fiction",
+   "year": 1878
+  },
+  {
+   "slug": "fyodor-dostoevsky_crime-and-punishment_constance-garnett",
+   "category": "fiction",
+   "year": 1866
+  },
+  {
+   "slug": "fyodor-dostoevsky_the-brothers-karamazov_constance-garnett",
+   "category": "fiction",
+   "year": 1880
+  },
+  {
+   "slug": "oscar-wilde_the-picture-of-dorian-gray",
+   "category": "fiction",
+   "year": 1890
+  },
+  {
+   "slug": "charles-dickens_great-expectations",
+   "category": "fiction",
+   "year": 1861
+  },
+  {
+   "slug": "charles-dickens_a-tale-of-two-cities",
+   "category": "fiction",
+   "year": 1859
+  },
+  {
+   "slug": "charles-dickens_a-christmas-carol",
+   "category": "fiction",
+   "year": 1843
+  },
+  {
+   "slug": "mark-twain_the-adventures-of-huckleberry-finn",
+   "category": "fiction",
+   "year": 1884
+  },
+  {
+   "slug": "miguel-de-cervantes-saavedra_don-quixote_john-ormsby",
+   "category": "fiction",
+   "year": 1605
+  },
+  {
+   "slug": "joseph-conrad_heart-of-darkness",
+   "category": "fiction",
+   "year": 1899
+  },
+  {
+   "slug": "victor-hugo_les-miserables_isabel-f-hapgood",
+   "category": "fiction",
+   "year": 1862
+  },
+  {
+   "slug": "alexandre-dumas_the-count-of-monte-cristo_chapman-and-hall",
+   "category": "fiction",
+   "year": 1844
+  },
+  {
+   "slug": "h-g-wells_the-time-machine",
+   "category": "fiction",
+   "year": 1895
+  },
+  {
+   "slug": "jules-verne_around-the-world-in-eighty-days_george-makepeace-towle",
+   "category": "fiction",
+   "year": 1872
+  },
+  {
+   "slug": "nathaniel-hawthorne_the-scarlet-letter",
+   "category": "fiction",
+   "year": 1850
+  },
+  {
+   "slug": "jack-london_the-call-of-the-wild",
+   "category": "fiction",
+   "year": 1903
+  },
+  {
+   "slug": "james-joyce_ulysses",
+   "category": "fiction",
+   "year": 1922
+  },
+  {
+   "slug": "virginia-woolf_mrs-dalloway",
+   "category": "fiction",
+   "year": 1925
+  },
+  {
+   "slug": "virginia-woolf_to-the-lighthouse",
+   "category": "fiction",
+   "year": 1927
+  },
+  {
+   "slug": "virginia-woolf_orlando",
+   "category": "fiction",
+   "year": 1928
+  },
+  {
+   "slug": "ernest-hemingway_the-sun-also-rises",
+   "category": "fiction",
+   "year": 1926
+  },
+  {
+   "slug": "ernest-hemingway_a-farewell-to-arms",
+   "category": "fiction",
+   "year": 1929
+  },
+  {
+   "slug": "william-faulkner_the-sound-and-the-fury",
+   "category": "fiction",
+   "year": 1929
+  },
+  {
+   "slug": "william-faulkner_as-i-lay-dying",
+   "category": "fiction",
+   "year": 1930
+  },
+  {
+   "slug": "george-eliot_middlemarch",
+   "category": "fiction",
+   "year": 1871
+  },
+  {
+   "slug": "gustave-flaubert_madame-bovary_eleanor-marx-aveling",
+   "category": "fiction",
+   "year": 1857
+  },
+  {
+   "slug": "louisa-may-alcott_little-women",
+   "category": "fiction",
+   "year": 1868
+  },
+  {
+   "slug": "robert-louis-stevenson_treasure-island",
+   "category": "fiction",
+   "year": 1883
+  },
+  {
+   "slug": "robert-louis-stevenson_the-strange-case-of-dr-jekyll-and-mr-hyde",
+   "category": "fiction",
+   "year": 1886
+  },
+  {
+   "slug": "edgar-allan-poe_short-fiction",
+   "category": "fiction",
+   "year": 1845
+  },
+  {
+   "slug": "edith-wharton_the-age-of-innocence",
+   "category": "fiction",
+   "year": 1920
+  },
+  {
+   "slug": "dashiell-hammett_the-maltese-falcon",
+   "category": "fiction",
+   "year": 1930
+  },
+  {
+   "slug": "agatha-christie_the-mysterious-affair-at-styles",
+   "category": "fiction",
+   "year": 1920
+  },
+  {
+   "slug": "agatha-christie_the-murder-of-roger-ackroyd",
+   "category": "fiction",
+   "year": 1926
+  },
+  {
+   "slug": "homer_the-odyssey_william-cullen-bryant",
+   "category": "poetry",
+   "year": -725
+  },
+  {
+   "slug": "homer_the-iliad_william-cullen-bryant",
+   "category": "poetry",
+   "year": -750
+  },
+  {
+   "slug": "dante-alighieri_the-divine-comedy_henry-wadsworth-longfellow",
+   "category": "poetry",
+   "year": 1320
+  },
+  {
+   "slug": "john-milton_paradise-lost",
+   "category": "poetry",
+   "year": 1667
+  },
+  {
+   "slug": "william-shakespeare_hamlet",
+   "category": "poetry",
+   "year": 1603
+  },
+  {
+   "slug": "william-shakespeare_macbeth",
+   "category": "poetry",
+   "year": 1623
+  },
+  {
+   "slug": "william-shakespeare_king-lear",
+   "category": "poetry",
+   "year": 1608
+  },
+  {
+   "slug": "william-shakespeare_romeo-and-juliet",
+   "category": "poetry",
+   "year": 1597
+  }
+ ]
+}

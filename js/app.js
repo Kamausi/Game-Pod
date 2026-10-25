@@ -2,6 +2,7 @@
 (function () {
   const { LESSONS, CATEGORIES, CHALLENGES, SHORTS } = window.Content;
   const L = window.Logic;
+  const Books = window.BookCatalog || { categories: {}, books: [] };
   const STORAGE_KEY = "gamepod:v1";
   const view = document.getElementById("view");
 
@@ -35,23 +36,46 @@
       return l && c.quizScore === l.quiz.length;
     }).length;
     const finishedChallenges = CHALLENGES.filter((c) => L.challengeProgress(c, state.challenges[c.id], today()).finished).length;
-    return { perfectQuizzes, finishedChallenges };
+    return { perfectQuizzes, finishedChallenges, ...L.readingStats(state) };
+  }
+
+  const bookById = (id) => Books.books.find((b) => b.id === id);
+
+  // Title of whatever a highlight came from: a lesson or a book ("book:<id>").
+  function sourceTitle(sourceId) {
+    if (sourceId.startsWith("book:")) {
+      const b = bookById(sourceId.slice(5));
+      return b ? b.title : "";
+    }
+    const l = lessonById(sourceId);
+    return l ? l.title : "";
   }
 
   // Award any newly earned badges and announce them.
   function checkBadges() {
     const res = L.awardBadges(state, badgeContext());
     state = res.state;
-    res.earned.forEach((b, i) => setTimeout(() => toast(`${b.icon} Badge unlocked: ${b.name}`), 1200 * (i + 1)));
+    res.earned.forEach((b) => toast(`${b.icon} Badge unlocked: ${b.name}`));
   }
 
-  let toastTimer;
+  // Toasts are queued so several in a row (XP, level up, badge) are all seen.
+  const toasts = [];
   function toast(msg) {
+    toasts.push(msg);
+    if (toasts.length === 1) showNextToast();
+  }
+
+  function showNextToast() {
     const t = document.getElementById("toast");
-    t.textContent = msg;
+    t.textContent = toasts[0];
     t.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+    setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(() => {
+        toasts.shift();
+        if (toasts.length) showNextToast();
+      }, 250);
+    }, 2000);
   }
 
   function renderHeader() {
@@ -82,7 +106,7 @@
   function homeView() {
     const t = today();
     const streak = L.currentStreak(state, t);
-    const doneToday = L.lessonsOnDay(state, t);
+    const doneToday = L.activityOnDay(state, t);
     const pick = L.dailyPick(LESSONS, t);
     const due = L.dueCards(state, t).length;
     const week = [];
@@ -93,6 +117,7 @@
     }
     const active = CHALLENGES.filter((c) => state.challenges[c.id] && !L.challengeProgress(c, state.challenges[c.id], t).finished);
     const nextUp = LESSONS.filter((l) => !state.completed[l.id]).slice(0, 4);
+    const reading = recentBooks();
 
     return `
       <div class="card hero">
@@ -109,6 +134,8 @@
         <div class="week">${week.join("")}</div>
       </div>
 
+      ${reading.length ? `<h2>📖 Continue reading</h2>${reading.slice(0, 2).map(continueCard).join("")}` : ""}
+
       <h2>✨ Pick of the day</h2>
       ${lessonCard(pick)}
 
@@ -118,7 +145,10 @@
       <h2>🏁 Challenges</h2>
       ${active.length ? active.map(challengeCard).join("") : `<a class="card" href="#/challenges"><h3>Start a challenge</h3><div class="muted small">Guided paths that unlock one lesson a day.</div></a>`}
 
-      ${nextUp.length ? `<h2>📖 Up next</h2><div class="grid">${nextUp.map(lessonCard).join("")}</div>` : ""}
+      ${!reading.length ? `<h2>🏛️ Read a classic</h2><a class="card" href="#/books"><h3>${Books.books.length} full-length books</h3>
+        <div class="muted small">Public-domain classics, from Meditations to The Great Gatsby. Every chapter earns XP.</div></a>` : ""}
+
+      ${nextUp.length ? `<h2>🎓 Up next</h2><div class="grid">${nextUp.map(lessonCard).join("")}</div>` : ""}
     `;
   }
 
@@ -128,7 +158,7 @@
     const btn = (key, label) => `<a class="btn small ${filter === key ? "active" : ""}" href="#/library?c=${key}">${esc(label)}</a>`;
     const done = Object.keys(state.completed).length;
     return `
-      <h1>Library</h1>
+      <h1>Lessons</h1>
       <p class="muted">${done} of ${LESSONS.length} lessons finished · <a href="#/challenges">Challenges</a></p>
       <div class="filters">${btn("all", "All")}${Object.entries(CATEGORIES).map(([k, c]) => btn(k, c.label)).join("")}</div>
       <div class="grid" style="margin-top:12px">${list.map(lessonCard).join("")}</div>
@@ -140,7 +170,7 @@
     if (!l) return notFound();
     const saved = new Set(state.highlights.filter((h) => h.lessonId === id).map((h) => h.text));
     return `
-      <a href="#/library" class="muted small">← Library</a>
+      <a href="#/library" class="muted small">← Lessons</a>
       <div class="row spread" style="margin-top:8px">${tag(l.category)}<span class="muted small">${l.minutes} min read</span></div>
       <h1>${esc(l.title)}</h1>
       <div class="row" style="margin:12px 0">
@@ -288,12 +318,11 @@
         <p class="muted small">${state.highlights.length} card${state.highlights.length === 1 ? "" : "s"} in your deck · ${state.reviews} review${state.reviews === 1 ? "" : "s"} done</p></div>`;
     }
     const h = due[0];
-    const l = lessonById(h.lessonId);
     return `
       <h1>Review</h1>
       <p class="muted">${due.length} card${due.length === 1 ? "" : "s"} due</p>
       <div class="card flashcard">
-        <div class="muted small">${l ? esc(l.title) : ""}</div>
+        <div class="muted small">${esc(sourceTitle(h.lessonId))}</div>
         <h2 style="margin:6px 0">${esc(h.prompt || "What was the key idea you saved?")}</h2>
         ${reviewRevealed ? `<div class="answer">${esc(h.text)}</div>` : ""}
       </div>
@@ -358,6 +387,8 @@
         <div class="card"><div class="muted small">Best streak</div><h3>🏆 ${state.bestStreak}</h3></div>
         <div class="card"><div class="muted small">Lessons</div><h3>📚 ${Object.keys(state.completed).length}/${LESSONS.length}</h3></div>
         <div class="card"><div class="muted small">Perfect quizzes</div><h3>🎯 ${ctx.perfectQuizzes}</h3></div>
+        <div class="card"><div class="muted small">Chapters read</div><h3>📖 ${ctx.chaptersRead}</h3></div>
+        <div class="card"><div class="muted small">Books finished</div><h3>🏛️ ${ctx.booksFinished}</h3></div>
       </div>
 
       <h2>Badges (${state.badges.length}/${L.BADGES.length})</h2>
@@ -368,8 +399,7 @@
 
       <h2>Highlights (${state.highlights.length})</h2>
       ${state.highlights.length ? state.highlights.map((h) => {
-        const l = lessonById(h.lessonId);
-        return `<div class="card"><div class="row spread"><span class="muted small">${l ? esc(l.title) : ""}</span>
+        return `<div class="card"><div class="row spread"><span class="muted small">${esc(sourceTitle(h.lessonId))}</span>
           <button class="btn small danger" data-action="delete-highlight" data-id="${h.id}">Delete</button></div>
           <p style="margin:6px 0 0">${esc(h.text)}</p></div>`;
       }).join("") : `<p class="muted">Nothing saved yet.</p>`}
@@ -383,6 +413,271 @@
         <div style="margin-top:16px"><button class="btn small danger" data-action="reset">Reset all progress</button></div>
       </div>
     `;
+  }
+
+  // ---------- books ----------
+  // Each book is a gzipped JSON file in books/, fetched only when opened.
+  const bookCache = new Map();
+  let bookQuery = "";
+  let bookFilter = "all";
+  let readerSession = null; // { id, index, total, chapter } while a chapter is open
+
+  function loadBook(id) {
+    if (!bookCache.has(id)) {
+      const p = fetch(`books/${id}.json.gz`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.arrayBuffer();
+        })
+        .then(async (buf) => {
+          const bytes = new Uint8Array(buf);
+          // Some servers decompress .gz for us; only inflate if it's still gzip.
+          if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+            const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"));
+            return JSON.parse(await new Response(stream).text());
+          }
+          return JSON.parse(new TextDecoder().decode(bytes));
+        });
+      p.catch(() => bookCache.delete(id));
+      bookCache.set(id, p);
+    }
+    return bookCache.get(id);
+  }
+
+  // Fill #slot once the book loads, unless the user has navigated away.
+  function fillWhenLoaded(id, fn) {
+    const hash = location.hash;
+    loadBook(id)
+      .then((book) => { if (location.hash === hash) fn(book); })
+      .catch(() => {
+        const slot = view.querySelector("#slot");
+        if (location.hash !== hash || !slot) return;
+        slot.innerHTML = `<div class="card"><h3>Couldn't load this book</h3><p class="muted small">Books are loaded from the
+          <code>books/</code> folder, so the app has to be served over HTTP (for example with <code>npm start</code>)
+          rather than opened as a file.</p></div>`;
+      });
+  }
+
+  function remember(id, chapter, pos) {
+    state = L.setBookPosition(state, id, chapter, pos);
+    state.books[id].updated = Date.now();
+    save();
+  }
+
+  function formatYear(y) {
+    if (y == null) return "";
+    if (y < 0) return `c. ${-y} BC`;
+    return y < 1000 ? `c. ${y} AD` : String(y);
+  }
+
+  function formatLength(minutes) {
+    return minutes < 90 ? `${Math.max(1, minutes)} min` : `${Math.round(minutes / 60)} h`;
+  }
+
+  const chapterMinutes = (ch) => Math.max(1, Math.round(ch.w / 238));
+  // Many novels title chapters with a bare numeral ("XIV"); show "Chapter XIV".
+  const chapterLabel = (t) => (/^[IVXLC]+$/.test(t) ? `Chapter ${t}` : t);
+
+  function bookTag(b) {
+    const c = Books.categories[b.category];
+    return c ? `<span class="tag" style="background:${c.color}">${esc(c.label)}</span>` : "";
+  }
+
+  function cover(b, size) {
+    const c = Books.categories[b.category] || { color: "#55606a" };
+    // Vary the shade per book so a shelf of one category isn't a single colour.
+    let h = 0;
+    for (const ch of b.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const shift = (h % 50) - 25;
+    return `<div class="cover ${size || ""}" style="--cover:${c.color};--shift:${shift}deg" aria-hidden="true">
+      <div class="cover-title">${esc(b.title)}</div><div class="cover-author">${esc(b.author)}</div></div>`;
+  }
+
+  function bookProgress(b) {
+    return b.chapters ? L.bookEntry(state, b.id).done.length / b.chapters : 0;
+  }
+
+  // Books that are started but not finished, most recently read first.
+  function recentBooks() {
+    return Object.entries(state.books || {})
+      .filter(([id, e]) => bookById(id) && !e.finished && (e.done.length || e.chapter || e.pos))
+      .sort((a, b) => (b[1].updated || 0) - (a[1].updated || 0))
+      .map(([id]) => bookById(id));
+  }
+
+  function continueCard(b) {
+    const e = L.bookEntry(state, b.id);
+    return `<a class="card" href="#/read/${b.id}/${e.chapter}" style="display:flex;gap:12px;align-items:center">${cover(b, "mini")}
+      <div style="flex:1;min-width:0"><h3>${esc(b.title)}</h3>
+        <div class="muted small">${esc(b.author)} · chapter ${e.chapter + 1} of ${b.chapters}</div>
+        <div style="margin-top:8px">${progressBar(bookProgress(b))}</div></div></a>`;
+  }
+
+  function bookCard(b) {
+    const p = bookProgress(b);
+    return `<a class="book-card" href="#/book/${b.id}">${cover(b)}
+      <div class="book-title">${esc(b.title)}</div>
+      <div class="muted small">${esc(b.author)}</div>
+      ${p > 0 ? `<div style="margin-top:4px">${progressBar(p)}</div>` : `<div class="muted small">${formatLength(b.minutes)}</div>`}</a>`;
+  }
+
+  function bookGrid() {
+    const q = bookQuery.trim().toLowerCase();
+    const list = Books.books.filter((b) =>
+      (bookFilter === "all" || b.category === bookFilter) &&
+      (!q || `${b.title} ${b.author}`.toLowerCase().includes(q)));
+    return list.length ? list.map(bookCard).join("") : `<p class="muted">No books match.</p>`;
+  }
+
+  function booksView(params) {
+    bookFilter = params.get("c") || "all";
+    const btn = (key, label) => `<a class="btn small ${bookFilter === key ? "active" : ""}" href="#/books?c=${key}">${esc(label)}</a>`;
+    const reading = recentBooks();
+    const finished = L.readingStats(state).booksFinished;
+    return `
+      <h1>Books</h1>
+      <p class="muted">${Books.books.length} full-length public-domain classics${finished ? ` · ${finished} finished` : ""}.</p>
+      ${reading.length ? `<h2>Continue reading</h2>${reading.slice(0, 3).map(continueCard).join("")}<h2>All books</h2>` : ""}
+      <input class="search" type="search" placeholder="Search by title or author" aria-label="Search books"
+        data-action="book-search" value="${esc(bookQuery)}">
+      <div class="filters">${btn("all", "All")}${Object.entries(Books.categories).map(([k, c]) => btn(k, c.label)).join("")}</div>
+      <div class="book-grid" id="book-grid">${bookGrid()}</div>
+    `;
+  }
+
+  function bookView(id) {
+    const b = bookById(id);
+    if (!b) return notFound();
+    const e = L.bookEntry(state, id);
+    const started = e.done.length || e.chapter || e.pos;
+    fillWhenLoaded(id, (book) => {
+      view.querySelector("#slot").innerHTML = `<h2>Contents</h2><div class="card toc">${book.chapters.map((c, i) => `
+        <a href="#/read/${id}/${i}" class="toc-row ${started && i === e.chapter ? "current" : ""}">
+          <span>${esc(chapterLabel(c.t))}</span>
+          <span class="muted small">${e.done.includes(i) ? '<span class="done-mark">✓</span>' : `${chapterMinutes(c)} min`}</span>
+        </a>`).join("")}</div>`;
+    });
+    return `
+      <a href="#/books" class="muted small">← Books</a>
+      <div class="book-hero">
+        ${cover(b, "large")}
+        <div>
+          ${bookTag(b)}
+          <h1>${esc(b.title)}</h1>
+          <div>${esc(b.author)}${b.translator ? `<span class="muted"> · translated by ${esc(b.translator)}</span>` : ""}</div>
+          <div class="muted small">${formatYear(b.year)} · ${b.chapters} chapters · about ${formatLength(b.minutes)}</div>
+          <div style="margin:12px 0">${progressBar(bookProgress(b))}
+            <div class="muted small" style="margin-top:4px">${e.done.length}/${b.chapters} chapters read${e.finished ? " · 🎉 Finished" : ""}</div></div>
+          <a class="btn primary" href="#/read/${id}/${e.chapter}">${started ? "Continue reading" : "Start reading"}</a>
+        </div>
+      </div>
+      ${b.blurb ? `<p>${esc(b.blurb)}</p>` : ""}
+      <div id="slot"><p class="muted">Loading contents…</p></div>
+      <p class="muted small">Text from the <a href="${esc(b.source)}" target="_blank" rel="noopener">Standard Ebooks edition</a>,
+        in the public domain in the United States.</p>
+    `;
+  }
+
+  function renderBlock(b) {
+    switch (b[0]) {
+      case "h": return `<h3>${esc(b[1])}</h3>`;
+      case "v": return `<p class="verse">${esc(b[1])}</p>`;
+      case "q": return `<blockquote>${esc(b[1])}</blockquote>`;
+      case "d": return `<p class="line"><span class="speaker">${esc(b[1])}</span> ${esc(b[2])}</p>`;
+      case "b": return `<hr class="break">`;
+      default: return `<p>${esc(b[1])}</p>`;
+    }
+  }
+
+  function readerView(id, index) {
+    const b = bookById(id);
+    if (!b) return notFound();
+    fillWhenLoaded(id, (book) => {
+      const slot = view.querySelector("#slot");
+      const ch = book.chapters[index];
+      if (!ch) { slot.innerHTML = notFound(); return; }
+      const entry = L.bookEntry(state, id);
+      const resume = entry.chapter === index ? entry.pos : 0;
+      remember(id, index, resume);
+      readerSession = { id, index, total: book.chapters.length, chapter: ch };
+      const last = index + 1 >= book.chapters.length;
+      slot.innerHTML = `
+        <div class="muted small" style="margin-top:12px">Chapter ${index + 1} of ${book.chapters.length} · ${chapterMinutes(ch)} min</div>
+        <h1>${esc(chapterLabel(ch.t))}</h1>
+        <div class="row" style="margin:12px 0">
+          <button class="btn small" data-action="listen-book">🔊 Listen</button>
+          <button class="btn small" data-action="font" data-step="-1" aria-label="Smaller text">A−</button>
+          <button class="btn small" data-action="font" data-step="1" aria-label="Larger text">A+</button>
+        </div>
+        <article class="reader book-text" data-lesson="book:${id}">${ch.b.map(renderBlock).join("")}</article>
+        <div class="card chapter-end">
+          ${entry.done.includes(index)
+            ? `<p class="done-mark">✓ Chapter read</p>`
+            : `<button class="btn primary" data-action="finish-chapter">✓ Finish chapter · +${L.XP.chapter} XP${last ? ` (+${L.XP.bookDone} for the book)` : ""}</button>`}
+          <div class="row spread" style="margin-top:12px">
+            ${index > 0 ? `<a class="btn small" href="#/read/${id}/${index - 1}">← Previous</a>` : "<span></span>"}
+            ${last ? "" : `<a class="btn small" href="#/read/${id}/${index + 1}">Next →</a>`}
+          </div>
+        </div>`;
+      if (resume > 0) {
+        requestAnimationFrame(() => window.scrollTo(0, resume * (document.documentElement.scrollHeight - innerHeight)));
+      }
+    });
+    return `
+      <div class="row spread"><a href="#/book/${id}" class="muted small">← ${esc(b.title)}</a><span class="muted small">${esc(b.author)}</span></div>
+      <div id="slot"><p class="muted">Loading…</p></div>
+    `;
+  }
+
+  function finishCurrentChapter() {
+    const r = readerSession;
+    if (!r) return;
+    const before = L.levelFor(state.xp).level;
+    const res = L.finishChapter(state, r.id, r.index, r.total, today());
+    state = res.state;
+    if (res.gained) toast(res.finishedBook ? `🎉 You finished the book! +${res.gained} XP` : `📖 Chapter done! +${res.gained} XP`);
+    const after = L.levelFor(state.xp).level;
+    if (after > before) toast(`⭐ Level up! You're now level ${after}`);
+    checkBadges();
+    save();
+    if (r.index + 1 < r.total) {
+      remember(r.id, r.index + 1, 0);
+      location.hash = `#/read/${r.id}/${r.index + 1}`;
+    } else {
+      location.hash = `#/book/${r.id}`;
+    }
+  }
+
+  // Remember the reading position as the user scrolls.
+  let scrollTimer;
+  window.addEventListener("scroll", () => {
+    if (!readerSession) return;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      if (!readerSession) return;
+      const max = document.documentElement.scrollHeight - innerHeight;
+      remember(readerSession.id, readerSession.index, max > 0 ? Math.min(1, scrollY / max) : 0);
+    }, 400);
+  }, { passive: true });
+
+  // Chapters can be long, so speak one block at a time.
+  function toggleBookAudio(btn) {
+    if (!("speechSynthesis" in window)) return toast("Audio isn't supported in this browser");
+    if (speechSynthesis.speaking || speechSynthesis.pending) {
+      stopAudio();
+      btn.textContent = "🔊 Listen";
+      return;
+    }
+    const r = readerSession;
+    if (!r) return;
+    const texts = [r.chapter.t, ...r.chapter.b.filter((b) => b.length > 1).map((b) => (b[0] === "d" ? `${b[1]}. ${b[2]}` : b[1]))];
+    texts.forEach((t, i) => {
+      const u = new SpeechSynthesisUtterance(t.replace(/\n/g, " "));
+      u.rate = 1.05;
+      if (i === texts.length - 1) u.onend = () => { btn.textContent = "🔊 Listen"; };
+      speechSynthesis.speak(u);
+    });
+    btn.textContent = "⏹ Stop";
   }
 
   function notFound() {
@@ -400,6 +695,9 @@
     [/^\/challenges$/, () => challengesView(), "home"],
     [/^\/challenge\/([\w-]+)$/, (m) => challengeView(m[1]), "home"],
     [/^\/profile$/, () => profileView(), "profile"],
+    [/^\/books$/, (m, p) => booksView(p), "books"],
+    [/^\/book\/([\w-]+)$/, (m) => bookView(m[1]), "books"],
+    [/^\/read\/([\w-]+)\/(\d+)$/, (m) => readerView(m[1], Number(m[2])), "books"],
   ];
 
   let lastPath = null;
@@ -410,6 +708,7 @@
     const params = new URLSearchParams(query || "");
     if (path !== lastPath) {
       stopAudio();
+      readerSession = null;
       if (!path.startsWith("/quiz/")) quiz = null;
       reviewRevealed = false;
       window.scrollTo(0, 0);
@@ -491,6 +790,14 @@
     const t = today();
 
     if (action === "listen") return toggleAudio(el);
+    if (action === "listen-book") return toggleBookAudio(el);
+    if (action === "finish-chapter") return finishCurrentChapter();
+    if (action === "font") {
+      state.fontSize = Math.min(26, Math.max(14, (state.fontSize || 18) + Number(el.dataset.step)));
+      save();
+      document.documentElement.style.setProperty("--reader-size", state.fontSize + "px");
+      return;
+    }
 
     if (action === "save-section") {
       const l = lessonById(view.querySelector(".reader").dataset.lesson);
@@ -569,6 +876,14 @@
     }
   });
 
+  view.addEventListener("input", (e) => {
+    if (e.target.dataset.action === "book-search") {
+      bookQuery = e.target.value;
+      const grid = view.querySelector("#book-grid");
+      if (grid) grid.innerHTML = bookGrid();
+    }
+  });
+
   view.addEventListener("change", (e) => {
     const action = e.target.dataset.action;
     if (action === "goal") {
@@ -587,6 +902,7 @@
 
   try { applyTheme(localStorage.getItem("gamepod:theme") || "auto"); } catch (e) { /* ignore */ }
 
+  document.documentElement.style.setProperty("--reader-size", (state.fontSize || 18) + "px");
   window.addEventListener("hashchange", render);
   render();
 })();
