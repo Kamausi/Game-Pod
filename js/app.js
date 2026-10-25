@@ -424,7 +424,9 @@
 
   function loadBook(id) {
     if (!bookCache.has(id)) {
-      const p = fetch(`books/${id}.json.gz`)
+      // A host that can't serve .gz can set window.BookFiles = "books/{id}.json".
+      const url = (window.BookFiles || "books/{id}.json.gz").replace("{id}", id);
+      const p = fetch(url)
         .then((r) => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return r.arrayBuffer();
