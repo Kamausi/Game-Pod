@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f9d6b">
+  <title>Game-Pod</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="#/" class="brand">🎧 Game-Pod</a>
+    <div class="stats">
+      <span class="pill" id="streak-pill" title="Daily streak">🔥 0</span>
+      <span class="pill" id="xp-pill" title="Level and XP">⭐ Lv 1</span>
+    </div>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <nav class="tabbar">
+    <a href="#/" data-tab="home"><span>🏠</span>Today</a>
+    <a href="#/library" data-tab="library"><span>📚</span>Library</a>
+    <a href="#/shorts" data-tab="shorts"><span>⚡</span>Shorts</a>
+    <a href="#/review" data-tab="review"><span>🧠</span>Review</a>
+    <a href="#/profile" data-tab="profile"><span>🏅</span>Me</a>
+  </nav>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <button id="save-selection" class="floating-save" hidden>🖍️ Save highlight</button>
+
+  <script src="js/logic.js"></script>
+  <script src="js/content.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

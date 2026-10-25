@@ -1,0 +1,10 @@
+{
+  "name": "game-pod",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A gamified microlearning web app: short lessons, streaks, badges, flashcards and challenges.",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node --test tests/*.test.js"
+  }
+}
